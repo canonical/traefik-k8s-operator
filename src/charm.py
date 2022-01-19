@@ -25,8 +25,7 @@ _TRAEFIK_LAYER_NAME = "traefik"
 _TRAEFIK_SERVICE_NAME = "traefik"
 # We watch the parent folder of where we store the configuration files,
 # as that is usually safer for Traefik
-_TRAEFIK_INGRESS_CONFIGURATIONS_WATCH_DIRECTORY = "/opt/traefik/"
-_TRAEFIK_INGRESS_CONFIGURATIONS_DIRECTORY = f"{_TRAEFIK_INGRESS_CONFIGURATIONS_WATCH_DIRECTORY}/juju/"
+_TRAEFIK_INGRESS_CONFIGURATIONS_DIRECTORY = f"/opt/traefik/juju/"
 
 
 class TraefikIngressCharm(CharmBase):
@@ -89,7 +88,7 @@ class TraefikIngressCharm(CharmBase):
                 },
                 "providers": {
                     "file": {
-                        "directory": _TRAEFIK_INGRESS_CONFIGURATIONS_WATCH_DIRECTORY,
+                        "directory": _TRAEFIK_INGRESS_CONFIGURATIONS_DIRECTORY,
                         "watch": True,
                     }
                 }
