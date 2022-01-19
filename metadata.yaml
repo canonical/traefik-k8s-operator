@@ -3,7 +3,7 @@
 
 # For a complete list of supported options, see:
 # https://discourse.charmhub.io/t/charm-metadata-v2/3674/15
-name: traefik-k8s-operator
+name: traefik-k8s
 display-name: |
   Traefik Ingress Operator for Kubernetes
 summary: |
