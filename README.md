@@ -1,26 +1,29 @@
-# operator-template
+# Traefik Ingress Charmed Operator
 
 ## Description
 
-TODO: Describe your charm in a few paragraphs of Markdown
+This [Juju](https://juju.is) charmed operator written with the [Operator Lifecycle Manager Framework](https://juju.is/docs/olm), powering ingress-like capabilities on Kubernetes.
+
+## OCI Images
+
+```sh
+docker build . -t localhost:32000/traefik:v1
+```
 
 ## Usage
 
-TODO: Provide high-level usage, such as required config or relations
+```sh
+juju deploy ./traefik-k8s-operator_ubuntu-20.04-amd64.charm traefik-ingress --trust --resource traefik-image=localhost:32000/traefik:v1
+```
+
+This charm can be related via the `ingress` relation with the `prometheus-k8s` charm built from the [`istio-gateway-ingress`](https://github.com/canonical/prometheus-k8s-operator/tree/istio-gateway-ingress) branch.
 
 ## Relations
 
 TODO: Provide any relations which are provided or required by your charm
 
-## OCI Images
-
-TODO: Include a link to the default image your charm uses
-
 ## Contributing
 
 <!-- TEMPLATE-TODO: Change this URL to be the full Github path to CONTRIBUTING.md-->
 
-Please see the [Juju SDK docs](https://juju.is/docs/sdk) for guidelines on enhancements to this
-charm following best practice guidelines, and
-[CONTRIBUTING.md](https://github.com/<name>/<operator>/blob/main/CONTRIBUTING.md) for developer
-guidance.
+Please see the [Juju SDK docs](https://juju.is/docs/sdk) for guidelines on enhancements to this charm following best practice guidelines, and [CONTRIBUTING.md](./CONTRIBUTING.md) for developer guidance.

@@ -8,7 +8,9 @@
 # Learn more about config at: https://juju.is/docs/sdk/config
 
 options:
-  thing:
-    default: 🎁
-    description: A thing used by the charm.
+  external_hostname:
+    description: |
+      The DNS name to be used by Traefik ingress.
+      If unspecified, the gateway address will be used, e.g,
+      as provided by MetalLB.
     type: string

@@ -1,0 +1,5 @@
+* Get dynamic ingress configuration loading to work
+* Sketch itests
+* Validate load test
+* Plan out TLS support
+* Integrate COS (metrics, logs, alerts, grafana dashboards)
