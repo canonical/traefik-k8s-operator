@@ -106,8 +106,7 @@ class TraefikIngressCharm(CharmBase):
                     }
                 },
                 # We always start the Prometheus endpoint for simplicity
-                # TODO: Generate th
-                # is file in the dynamic configuration folder when the
+                # TODO: Generate this file in the dynamic configuration folder when the
                 # metrics-endpoint relation is established?
                 "metrics": {
                     "prometheus": {
