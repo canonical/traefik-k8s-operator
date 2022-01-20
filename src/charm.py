@@ -25,7 +25,7 @@ _TRAEFIK_LAYER_NAME = "traefik"
 _TRAEFIK_SERVICE_NAME = "traefik"
 # We watch the parent folder of where we store the configuration files,
 # as that is usually safer for Traefik
-_TRAEFIK_INGRESS_CONFIGURATIONS_DIRECTORY = f"/opt/traefik/juju/"
+_TRAEFIK_INGRESS_CONFIGURATIONS_DIRECTORY = f"/opt/traefik/juju"
 
 
 class TraefikIngressCharm(CharmBase):
@@ -47,6 +47,7 @@ class TraefikIngressCharm(CharmBase):
 
         # TODO Need to ensure K8s service has LoadBalancer IP before processing proxy requests?
 
+        self.framework.observe(self.on["ingress"].relation_created, self._handle_ingress_change)
         self.framework.observe(self.on["ingress"].relation_joined, self._handle_ingress_change)
         self.framework.observe(self.on["ingress"].relation_changed, self._handle_ingress_change)
         self.framework.observe(self.on["ingress"].relation_departed, self._handle_ingress_change)
@@ -68,6 +69,17 @@ class TraefikIngressCharm(CharmBase):
         # TODO Use the Traefik user and group?
         container.make_dir(path="/etc/traefik", make_parents=True)
         container.make_dir(path=_TRAEFIK_INGRESS_CONFIGURATIONS_DIRECTORY, make_parents=True)
+
+        # Since pebble ready will also occur after a pod churn, but we store the
+        # configuration files on a storage volume that survives the pod churn, before
+        # we start traefik we clean up all Juju-generated config files to avoid spurious
+        # routes.
+        for ingress_relation_configuration_file in container.list_files(
+            path=_TRAEFIK_INGRESS_CONFIGURATIONS_DIRECTORY,
+            pattern="juju_*.yaml"
+        ):
+            container.remove_path(ingress_relation_configuration_file.path)
+            logger.debug(f"Deleted orphaned ingress configuration file: {ingress_relation_configuration_file.path}")
 
         # TODO Disable static config BS with telemetry and check new version
         basic_configurations = yaml.dump(
@@ -127,38 +139,62 @@ class TraefikIngressCharm(CharmBase):
 
         # Version negotiation
 
-        supported_versions_raw = relation.data[relation.app]["_supported_versions"]
+        if self.unit.is_leader():
+            supported_versions_raw = relation.data[relation.app]["_supported_versions"]
 
-        supported_versions = yaml.safe_load(supported_versions_raw)
+            supported_versions = yaml.safe_load(supported_versions_raw)
 
-        if "v3" not in supported_versions:
-            logger.error(f"The {other_app_name} application does not support the ingress relation v3 (found: '{supported_versions}'); aborting data negotiation")
-            # TODO Put the charm in Blocked status?
-            return
+            if "v3" not in supported_versions:
+                logger.error(
+                    f"The {other_app_name} application does not support the ingress relation v3 "
+                    f"(found: '{supported_versions}'); aborting data negotiation"
+                )
+                # TODO Put the charm in Blocked status?
+                return
 
-        logger.debug(f"Remote app of the '{relation.name}:{relation.id}' relation supports v3")
+            logger.debug(f"Remote app of the '{relation.name}:{relation.id}' relation supports v3")
 
-        if not "_supported_versions" in relation.data[self.app]:
-            relation.data[self.app]["_supported_versions"] = "[v3]"
-            logger.debug(f"Version v3 negotiated over the '{relation.name}:{relation.id}' relation")
-            self.unit.status = ActiveStatus()
-            return
-
-        self.unit.status = MaintenanceStatus(
-            "updating the ingress configurations for the "
-            f"'{relation.name}:{relation.id}' relation"
-        )
+            if not "_supported_versions" in relation.data[self.app]:
+                relation.data[self.app]["_supported_versions"] = "[v3]"
+                logger.debug(f"Version v3 negotiated over the '{relation.name}:{relation.id}' relation")
+                self.unit.status = ActiveStatus()
+                return
 
         if not "data" in relation.data[relation.app]:
-            logger.debug(f"Databag 'data' not found in the '{relation.name}:{relation.id}' relation; aborting data negotiation")
-            # TODO Put the charm in Blocked status?
+            if self.unit.is_leader():
+                logger.debug(
+                    f"Databag 'data' not found in the '{relation.name}:{relation.id}' "
+                    "relation; aborting data negotiation"
+                )
+                # TODO Put the charm in Blocked status?
+            else:
+                logger.debug(
+                    "Leader unit has not yet completed version negotiation for the "
+                    f"'{relation.name}:{relation.id}' relation; skipping further event processing"
+                )
             self.unit.status = ActiveStatus()
             return
+
+        self.unit.status = MaintenanceStatus("updating ingress configurations")
+        logger.debug(
+            "Updating the ingress configurations for the "
+            f"'{relation.name}:{relation.id}' relation"
+        )
 
         other_app_data = yaml.safe_load(relation.data[relation.app]["data"])
 
         if not "namespace" in other_app_data:
-            logger.debug(f"Namespace data not found in the '{relation.name}:{relation.id}' relation; aborting data negotiation")
+            logger.debug(
+                f"Namespace data not found in the '{relation.name}:{relation.id}' relation; aborting data negotiation"
+            )
+            # TODO Put the charm in Blocked status?
+            self.unit.status = ActiveStatus()
+            return
+
+        if not "port" in other_app_data:
+            logger.debug(
+                f"Port data not found in the '{relation.name}:{relation.id}' relation; aborting data negotiation"
+            )
             # TODO Put the charm in Blocked status?
             self.unit.status = ActiveStatus()
             return
@@ -202,8 +238,6 @@ class TraefikIngressCharm(CharmBase):
             # API and getting the pod ip.
             unit_ingress_address = f"{other_app_name}-{unit_id}.{other_app_name}-endpoints.{namespace}.svc.cluster.local"
             
-            relation.data[unit]["ingress-address"]
-
             traefik_router_name = f"juju-{namespace}-{other_app_name}-{unit_id}-router"
             traefik_service_name = f"juju-{namespace}-{other_app_name}-{unit_id}-service"
 
@@ -220,12 +254,14 @@ class TraefikIngressCharm(CharmBase):
 
             unit_urls[unit.name] = f"http://{gateway_address}:{self._port}/{route_prefix}"
 
-        container.push(
-            f"{_TRAEFIK_INGRESS_CONFIGURATIONS_DIRECTORY}/{self._ingress_config_file_name(relation)}",
-            yaml.dump(ingress_relation_configuration),
-        )
+        ingress_relation_configuration_path = f"{_TRAEFIK_INGRESS_CONFIGURATIONS_DIRECTORY}/{self._ingress_config_file_name(relation)}"
+        container.push(ingress_relation_configuration_path, yaml.dump(ingress_relation_configuration))
 
-        relation.data[self.app]["data"] = yaml.dump({"url": f"http://{gateway_address}:{self._port}/ahahano", "unit_urls": unit_urls})
+        logger.debug(f"Updated ingress configuration file: {ingress_relation_configuration_path}")
+
+        if self.unit.is_leader():
+            # TODO remove this when the SDI library is updated
+            relation.data[self.app]["data"] = yaml.dump({"url": f"http://{gateway_address}:{self._port}/nope", "unit_urls": unit_urls})
 
         self.unit.status = ActiveStatus()
 
@@ -243,18 +279,21 @@ class TraefikIngressCharm(CharmBase):
             self.unit.status = WaitingStatus(
                 f"container '{_TRAEFIK_CONTAINER_NAME}' not yet ready"
             )
+            event.defer()
             return
 
-        self.unit.status = MaintenanceStatus(
-            "deleting the ingress configurations for the "
+        self.unit.status = MaintenanceStatus("updating ingress configurations")
+
+        logger.debug(
+            "Deleting the ingress configurations for the "
             f"'{relation.name}:{relation.id}' relation"
         )
 
-        # TODO What happens when the file does not exist?
         try:
-            container.remove_path(
-                f"{_TRAEFIK_INGRESS_CONFIGURATIONS_DIRECTORY}/{self._ingress_config_file_name(relation)}"
-            )
+            ingress_relation_configuration_path = f"{_TRAEFIK_INGRESS_CONFIGURATIONS_DIRECTORY}/{self._ingress_config_file_name(relation)}"
+
+            container.remove_path(ingress_relation_configuration_path)
+            logger.debug(f"Deleted orphaned {ingress_relation_configuration_path} ingress configuration file")
         except PathError:
             logger.debug(
                 "Trying to delete non-existent ingress configurations for the "

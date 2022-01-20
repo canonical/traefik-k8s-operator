@@ -3,3 +3,4 @@
 * Validate load test
 * Plan out TLS support
 * Integrate COS (metrics, logs, alerts, grafana dashboards)
+* Disable version check and analytics
