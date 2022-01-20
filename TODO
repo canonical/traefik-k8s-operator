@@ -1,5 +1,10 @@
+* O11y:
+    * more metrics alert rules:
+        * upstream services with spikes of failures / status of upstream going not OK
+    * logs integration & alert rules
+    * grafana dashboards
 * Sketch itests
 * Validate load test
 * Plan out TLS support
-* Integrate COS (metrics, logs, alerts, grafana dashboards)
 * Disable version check and analytics
+* Find a civilized way to enable the built-in dashboard

@@ -35,3 +35,8 @@ storage:
 provides:
   ingress:
     interface: ingress
+  metrics-endpoint:
+    interface: prometheus_scrape
+    description: |
+      Exposes the Prometheus metrics endpoint providing telemetry about the
+      Traefik instance

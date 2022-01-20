@@ -34,7 +34,11 @@ docker push localhost:32000/traefik:v1
 juju deploy ./traefik-k8s_ubuntu-20.04-amd64.charm traefik-ingress --trust --resource traefik-image=localhost:32000/traefik:v1
 ```
 
-This charm can be related via the `ingress` relation with the `prometheus-k8s` charm built from the [`istio-gateway-ingress`](https://github.com/canonical/prometheus-k8s-operator/tree/istio-gateway-ingress) branch.
+This charm can be related via the `ingress` relation with the `prometheus-k8s` charm built from the [`istio-gateway-ingress`](https://github.com/canonical/prometheus-k8s-operator/tree/istio-gateway-ingress) branch:
+
+```sh
+juju add-relation traefik-ingress:metrics-endpoint prometheus
+```
 
 ## Relations
 

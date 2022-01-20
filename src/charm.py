@@ -10,6 +10,7 @@ import logging
 
 import yaml
 from charms.observability_libs.v0.kubernetes_service_patch import KubernetesServicePatch
+from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 from lightkube import Client
 from lightkube.resources.core_v1 import Service
 from ops.charm import CharmBase, RelationEvent
@@ -35,12 +36,21 @@ class TraefikIngressCharm(CharmBase):
         super().__init__(*args)
 
         self._port = 80
-        self._ping_port = 8082
+        self._diagnostics_port = 8082
 
         self.service_patch = KubernetesServicePatch(
             charm=self,
             service_type="LoadBalancer",
             ports=[(f"{self.app.name}", self._port)],
+        )
+
+        self.metrics_endpoint = MetricsEndpointProvider(
+            self,
+            jobs=[
+                {
+                    "static_configs": [{"targets": [f"*:{self._diagnostics_port}"]}],
+                },
+            ],
         )
 
         self.framework.observe(self.on.traefik_pebble_ready, self._on_traefik_pebble_ready)
@@ -88,15 +98,25 @@ class TraefikIngressCharm(CharmBase):
                     "level": "DEBUG",
                 },
                 "entryPoints": {
-                    "ping": {
-                        "address": f":{self._ping_port}"
+                    "diagnostics": {
+                        "address": f":{self._diagnostics_port}"
                     },
                     "web": {
                         "address": f":{self._port}"
                     }
                 },
+                # We always start the Prometheus endpoint for simplicity
+                # TODO: Generate this file in the dynamic configuration folder when the metrics-endpoint
+                # relation is established?
+                "metrics": {
+                    "prometheus": {
+                        "addRoutersLabels": True,
+                        "addServicesLabels": True,
+                        "entryPoint": "diagnostics",
+                    }
+                },
                 "ping": {
-                    "entryPoint": "ping"
+                    "entryPoint": "diagnostics"
                 },
                 "providers": {
                     "file": {
