@@ -1,5 +1,21 @@
 # Contributing
 
+## Notable design decisions
+
+Traefik is a clusterless proxy: each unit is performing its own routing decisions and keeping track of the health of upstreams (i.e., the addresses it routes requests for).
+Each Traefik operator listens to changes in the `ingress` relations and generates their own configurations.
+Only the leader unit of the Traefik operator, however, communicates "back" with the application on the other side of the relation by providing the URL at which the units are reachable.
+
+**Limitation:** Since follower (i.e., "non-leader") units of a Juju application _cannot_ access their application databag in the relation (TODO: Add Juju bug link), it can be the case
+that follower units starts routing to units that have not yet been notified by the leader unit of the Traefik operator, what their externally-reachable URL is.
+
+In order to configure Traefik, we use its [File provider](https://doc.traefik.io/traefik/providers/file/), which uses `inotify` mechanisms to know when new files are created or modified in the filesystem.
+Unfortunately, `inotify` does not work in most container filesystems, which is why we resorted to storing the unit configuration in a _mounted volume_.
+
+**TODO:** Test that the configuration reloading mechanism works across various CSIs on the various Kuberneteses out there.
+
+
+
 ## Overview
 
 This documents explains the processes and practices recommended for contributing enhancements to

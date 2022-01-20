@@ -1,4 +1,3 @@
-* Get dynamic ingress configuration loading to work
 * Sketch itests
 * Validate load test
 * Plan out TLS support
