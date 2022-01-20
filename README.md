@@ -4,10 +4,28 @@
 
 This [Juju](https://juju.is) charmed operator written with the [Operator Lifecycle Manager Framework](https://juju.is/docs/olm), powering ingress-like capabilities on Kubernetes.
 
+## Setup
+
+These instructions assume you will run the charm on [`microk8s`](https://microk8s.io), and rely on a few plugins, specifically:
+
+```sh
+sudo snap install microk8s
+microk8s enable storage dns registry
+microk8s enable metallb 192.168.0.10-192.168.0.100 # You likely wanna change these IP ranges
+```
+
+The setup for Juju consists as follows:
+
+```sh
+sudo snap install juju
+juju bootstrap microk8s development
+```
+
 ## OCI Images
 
 ```sh
 docker build . -t localhost:32000/traefik:v1
+docker push localhost:32000/traefik:v1
 ```
 
 ## Usage
