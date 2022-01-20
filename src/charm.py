@@ -26,7 +26,7 @@ _TRAEFIK_LAYER_NAME = "traefik"
 _TRAEFIK_SERVICE_NAME = "traefik"
 # We watch the parent folder of where we store the configuration files,
 # as that is usually safer for Traefik
-_TRAEFIK_INGRESS_CONFIGURATIONS_DIRECTORY = f"/opt/traefik/juju"
+_TRAEFIK_INGRESS_CONFIGURATIONS_DIRECTORY = "/opt/traefik/juju"
 
 
 class TraefikIngressCharm(CharmBase):
@@ -106,8 +106,9 @@ class TraefikIngressCharm(CharmBase):
                     }
                 },
                 # We always start the Prometheus endpoint for simplicity
-                # TODO: Generate this file in the dynamic configuration folder when the metrics-endpoint
-                # relation is established?
+                # TODO: Generate th
+                # is file in the dynamic configuration folder when the
+                # metrics-endpoint relation is established?
                 "metrics": {
                     "prometheus": {
                         "addRoutersLabels": True,
@@ -174,13 +175,13 @@ class TraefikIngressCharm(CharmBase):
 
             logger.debug(f"Remote app of the '{relation.name}:{relation.id}' relation supports v3")
 
-            if not "_supported_versions" in relation.data[self.app]:
+            if "_supported_versions" not in relation.data[self.app]:
                 relation.data[self.app]["_supported_versions"] = "[v3]"
                 logger.debug(f"Version v3 negotiated over the '{relation.name}:{relation.id}' relation")
                 self.unit.status = ActiveStatus()
                 return
 
-        if not "data" in relation.data[relation.app]:
+        if "data" not in relation.data[relation.app]:
             if self.unit.is_leader():
                 logger.debug(
                     f"Databag 'data' not found in the '{relation.name}:{relation.id}' "
@@ -203,7 +204,7 @@ class TraefikIngressCharm(CharmBase):
 
         other_app_data = yaml.safe_load(relation.data[relation.app]["data"])
 
-        if not "namespace" in other_app_data:
+        if "namespace" not in other_app_data:
             logger.debug(
                 f"Namespace data not found in the '{relation.name}:{relation.id}' relation; aborting data negotiation"
             )
@@ -211,7 +212,7 @@ class TraefikIngressCharm(CharmBase):
             self.unit.status = ActiveStatus()
             return
 
-        if not "port" in other_app_data:
+        if "port" not in other_app_data:
             logger.debug(
                 f"Port data not found in the '{relation.name}:{relation.id}' relation; aborting data negotiation"
             )
@@ -257,7 +258,7 @@ class TraefikIngressCharm(CharmBase):
             # We probably could just look up the IP on `relation_joined` using the Kube
             # API and getting the pod ip.
             unit_ingress_address = f"{other_app_name}-{unit_id}.{other_app_name}-endpoints.{namespace}.svc.cluster.local"
-            
+
             traefik_router_name = f"juju-{namespace}-{other_app_name}-{unit_id}-router"
             traefik_service_name = f"juju-{namespace}-{other_app_name}-{unit_id}-service"
 
@@ -377,7 +378,7 @@ class TraefikIngressCharm(CharmBase):
                 _TRAEFIK_SERVICE_NAME: {
                     "override": "replace",
                     "summary": "Traefik",
-                    "command": f"/usr/local/bin/traefik",
+                    "command": "/usr/local/bin/traefik",
                 },
             },
         }
@@ -396,7 +397,7 @@ class TraefikIngressCharm(CharmBase):
                     )
 
                     container.stop(_TRAEFIK_SERVICE_NAME)
-            except:
+            except Exception:
                 # We have not yet set up the pebble service, nevermind
                 logger.exception(
                     "The following error occurred while stopping the '%s' service, "
