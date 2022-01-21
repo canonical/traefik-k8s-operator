@@ -38,6 +38,8 @@ class TraefikIngressCharm(CharmBase):
         self._port = 80
         self._diagnostics_port = 8082
 
+        self.traefik_container = self.unit.get_container(_TRAEFIK_CONTAINER_NAME)
+
         self.service_patch = KubernetesServicePatch(
             charm=self,
             service_type="LoadBalancer",
@@ -65,30 +67,29 @@ class TraefikIngressCharm(CharmBase):
 
     def _on_traefik_pebble_ready(self, event):
         # Ensure the required basic configurations and folders exist
-        container = self.unit.get_container(_TRAEFIK_CONTAINER_NAME)
 
         # TODO Handle case the relation events are deferred and this hook has not
         # run yet when the pebble event queueing triggers the previously deferred
         # events.
-        if not container.can_connect():
+        if not self.traefik_container.can_connect():
             self.unit.status = WaitingStatus(
                 f"container '{_TRAEFIK_CONTAINER_NAME}' not yet ready"
             )
             return
 
         # TODO Use the Traefik user and group?
-        container.make_dir(path="/etc/traefik", make_parents=True)
-        container.make_dir(path=_TRAEFIK_INGRESS_CONFIGURATIONS_DIRECTORY, make_parents=True)
+        self.traefik_container.make_dir(path="/etc/traefik", make_parents=True)
+        self.traefik_container.make_dir(path=_TRAEFIK_INGRESS_CONFIGURATIONS_DIRECTORY, make_parents=True)
 
         # Since pebble ready will also occur after a pod churn, but we store the
         # configuration files on a storage volume that survives the pod churn, before
         # we start traefik we clean up all Juju-generated config files to avoid spurious
         # routes.
-        for ingress_relation_configuration_file in container.list_files(
+        for ingress_relation_configuration_file in self.traefik_container.list_files(
             path=_TRAEFIK_INGRESS_CONFIGURATIONS_DIRECTORY,
             pattern="juju_*.yaml"
         ):
-            container.remove_path(ingress_relation_configuration_file.path)
+            self.traefik_container.remove_path(ingress_relation_configuration_file.path)
             logger.debug(f"Deleted orphaned ingress configuration file: {ingress_relation_configuration_file.path}")
 
         # TODO Disable static config BS with telemetry and check new version
@@ -127,7 +128,7 @@ class TraefikIngressCharm(CharmBase):
             }
         )
 
-        container.push("/etc/traefik/traefik.yaml", basic_configurations)
+        self.traefik_container.push("/etc/traefik/traefik.yaml", basic_configurations)
 
         # After the container (re)starts, we need to loop over the relations to ensure all
         # the ingress configurations are there
@@ -147,9 +148,7 @@ class TraefikIngressCharm(CharmBase):
         self._process_ingress_relation(event.relation)
 
     def _process_ingress_relation(self, relation: Relation):
-        container = self.unit.get_container(_TRAEFIK_CONTAINER_NAME)
-
-        if not container.can_connect():
+        if not self.traefik_container.can_connect():
             self.unit.status = WaitingStatus(
                 f"container '{_TRAEFIK_CONTAINER_NAME}' not yet ready"
             )
@@ -275,7 +274,7 @@ class TraefikIngressCharm(CharmBase):
             unit_urls[unit.name] = f"http://{gateway_address}:{self._port}/{route_prefix}"
 
         ingress_relation_configuration_path = f"{_TRAEFIK_INGRESS_CONFIGURATIONS_DIRECTORY}/{self._ingress_config_file_name(relation)}"
-        container.push(ingress_relation_configuration_path, yaml.dump(ingress_relation_configuration))
+        self.traefik_container.push(ingress_relation_configuration_path, yaml.dump(ingress_relation_configuration))
 
         logger.debug(f"Updated ingress configuration file: {ingress_relation_configuration_path}")
 
@@ -293,9 +292,7 @@ class TraefikIngressCharm(CharmBase):
 
         relation = event.relation
 
-        container = self.unit.get_container(_TRAEFIK_CONTAINER_NAME)
-
-        if not container.can_connect():
+        if not self.traefik_container.can_connect():
             self.unit.status = WaitingStatus(
                 f"container '{_TRAEFIK_CONTAINER_NAME}' not yet ready"
             )
@@ -312,7 +309,7 @@ class TraefikIngressCharm(CharmBase):
         try:
             ingress_relation_configuration_path = f"{_TRAEFIK_INGRESS_CONFIGURATIONS_DIRECTORY}/{self._ingress_config_file_name(relation)}"
 
-            container.remove_path(ingress_relation_configuration_path)
+            self.traefik_container.remove_path(ingress_relation_configuration_path)
             logger.debug(f"Deleted orphaned {ingress_relation_configuration_path} ingress configuration file")
         except PathError:
             logger.debug(
@@ -362,9 +359,7 @@ class TraefikIngressCharm(CharmBase):
         return None
 
     def _restart_traefik(self):
-        container = self.unit.get_container(_TRAEFIK_CONTAINER_NAME)
-
-        if not container.can_connect():
+        if not self.traefik_container.can_connect():
             self.unit.status = WaitingStatus(
                 f"container '{_TRAEFIK_CONTAINER_NAME}' not yet ready"
             )
@@ -382,20 +377,20 @@ class TraefikIngressCharm(CharmBase):
             },
         }
 
-        current_pebble_layer = container.get_plan().to_dict()
+        current_pebble_layer = self.traefik_container.get_plan().to_dict()
 
         if current_pebble_layer != updated_pebble_layer:
             self.unit.status = MaintenanceStatus(f"updating the '{_TRAEFIK_SERVICE_NAME}' service")
 
-            container.add_layer(_TRAEFIK_LAYER_NAME, updated_pebble_layer, combine=True)
+            self.traefik_container.add_layer(_TRAEFIK_LAYER_NAME, updated_pebble_layer, combine=True)
 
             try:
-                if is_restart := container.get_service(_TRAEFIK_SERVICE_NAME).is_running():
+                if is_restart := self.traefik_container.get_service(_TRAEFIK_SERVICE_NAME).is_running():
                     self.unit.status = MaintenanceStatus(
                         f"stopping the '{_TRAEFIK_SERVICE_NAME}' service to update the configurations"
                     )
 
-                    container.stop(_TRAEFIK_SERVICE_NAME)
+                    self.traefik_container.stop(_TRAEFIK_SERVICE_NAME)
             except Exception:
                 # We have not yet set up the pebble service, nevermind
                 logger.exception(
@@ -407,7 +402,7 @@ class TraefikIngressCharm(CharmBase):
 
             self.unit.status = MaintenanceStatus(f"starting the '{_TRAEFIK_SERVICE_NAME}' service")
 
-            container.start(_TRAEFIK_SERVICE_NAME)
+            self.traefik_container.start(_TRAEFIK_SERVICE_NAME)
 
             if is_restart:
                 logger.info(f"'{_TRAEFIK_SERVICE_NAME}' service restarted")
