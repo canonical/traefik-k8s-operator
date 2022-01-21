@@ -24,7 +24,7 @@ resources:
     type: oci-image
     description: OCI image for traefik (https://hub.docker.com/_/traefik/)
     # Included for simplicity in integration tests
-    upstream-source: docker.io/library/traefik:latest
+    # upstream-source: ### Update this when we settle which image we want to use
 
 storage:
   # We need to store the configurations in a volume, as Traefik's directory
