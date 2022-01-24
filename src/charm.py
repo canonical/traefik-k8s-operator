@@ -379,40 +379,35 @@ class TraefikIngressCharm(CharmBase):
 
         current_pebble_layer = self.traefik_container.get_plan().to_dict()
 
-        if current_pebble_layer != updated_pebble_layer:
-            self.unit.status = MaintenanceStatus(f"updating the '{_TRAEFIK_SERVICE_NAME}' service")
-
+        if not current_pebble_layer or _TRAEFIK_SERVICE_NAME not in current_pebble_layer["services"]:
+            self.unit.status = MaintenanceStatus(f"creating the '{_TRAEFIK_SERVICE_NAME}' service")
             self.traefik_container.add_layer(_TRAEFIK_LAYER_NAME, updated_pebble_layer, combine=True)
 
-            try:
-                if is_restart := self.traefik_container.get_service(_TRAEFIK_SERVICE_NAME).is_running():
-                    self.unit.status = MaintenanceStatus(
-                        f"stopping the '{_TRAEFIK_SERVICE_NAME}' service to update the configurations"
-                    )
-
-                    self.traefik_container.stop(_TRAEFIK_SERVICE_NAME)
-            except Exception:
-                # We have not yet set up the pebble service, nevermind
-                logger.exception(
-                    "The following error occurred while stopping the '%s' service, "
-                    "maybe it has not been created yet?",
-                    _TRAEFIK_SERVICE_NAME,
-                    exc_info=True,
+        try:
+            if is_restart := self.traefik_container.get_service(_TRAEFIK_SERVICE_NAME).is_running():
+                self.unit.status = MaintenanceStatus(
+                    f"stopping the '{_TRAEFIK_SERVICE_NAME}' service to update the configurations"
                 )
 
-            self.unit.status = MaintenanceStatus(f"starting the '{_TRAEFIK_SERVICE_NAME}' service")
-
-            self.traefik_container.start(_TRAEFIK_SERVICE_NAME)
-
-            if is_restart:
-                logger.info(f"'{_TRAEFIK_SERVICE_NAME}' service restarted")
-            else:
-                logger.info(f"'{_TRAEFIK_SERVICE_NAME}' service started")
-        else:
-            logger.debug(
-                "No differences found in the Pebble plan for the "
-                f"'{_TRAEFIK_SERVICE_NAME}' service, no restart needed"
+                self.traefik_container.stop(_TRAEFIK_SERVICE_NAME)
+        except Exception:
+            # We have not yet set up the pebble service, nevermind
+            logger.exception(
+                "The following error occurred while stopping the '%s' service, "
+                "maybe it has not been created yet?",
+                _TRAEFIK_SERVICE_NAME,
+                exc_info=True,
             )
+
+        maintenance_status_message = f"restarting the '{_TRAEFIK_SERVICE_NAME}' service" if is_restart else f"starting the '{_TRAEFIK_SERVICE_NAME}' service"
+        self.unit.status = MaintenanceStatus(maintenance_status_message)
+
+        self.traefik_container.start(_TRAEFIK_SERVICE_NAME)
+
+        if is_restart:
+            logger.info(f"'{_TRAEFIK_SERVICE_NAME}' service restarted")
+        else:
+            logger.info(f"'{_TRAEFIK_SERVICE_NAME}' service started")
 
         self.unit.status = ActiveStatus()
 
