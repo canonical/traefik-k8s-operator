@@ -146,7 +146,7 @@ class KubernetesServicePatch(Object):
         service_name: str = None,
         service_type: ServiceType = "ClusterIP",
     ) -> Service:
-        """Creates a valid Service representation for Alertmanager.
+        """Creates a valid Service representation for the service.
 
         Args:
             ports: a list of tuples of the form (name, port) or (name, port, targetPort)
@@ -237,5 +237,9 @@ class KubernetesServicePatch(Object):
         Returns:
             str: A string containing the name of the current Kubernetes namespace.
         """
-        with open("/var/run/secrets/kubernetes.io/serviceaccount/namespace", "r") as f:
-            return f.read().strip()
+        try:
+            with open("/var/run/secrets/kubernetes.io/serviceaccount/namespace", "r") as f:
+                return f.read().strip()
+        except FileNotFoundError:
+            # In testing scenarios we usually do not have the namespace set up
+            return self.charm.model.name

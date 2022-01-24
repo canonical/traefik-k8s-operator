@@ -15,3 +15,6 @@ class TestTraefikIngressCharm(unittest.TestCase):
         self.harness = Harness(TraefikIngressCharm)
         self.addCleanup(self.harness.cleanup)
         self.harness.begin()
+
+    def test_nothing(self):
+        pass

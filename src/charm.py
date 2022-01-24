@@ -65,7 +65,7 @@ class TraefikIngressCharm(CharmBase):
         self.framework.observe(self.on["ingress"].relation_departed, self._handle_ingress_change)
         self.framework.observe(self.on["ingress"].relation_broken, self._handle_ingress_broken)
 
-    def _on_traefik_pebble_ready(self, event):
+    def _on_traefik_pebble_ready(self, _):
         # Ensure the required basic configurations and folders exist
 
         # TODO Handle case the relation events are deferred and this hook has not
@@ -79,18 +79,21 @@ class TraefikIngressCharm(CharmBase):
 
         # TODO Use the Traefik user and group?
         self.traefik_container.make_dir(path="/etc/traefik", make_parents=True)
-        self.traefik_container.make_dir(path=_TRAEFIK_INGRESS_CONFIGURATIONS_DIRECTORY, make_parents=True)
+        self.traefik_container.make_dir(
+            path=_TRAEFIK_INGRESS_CONFIGURATIONS_DIRECTORY, make_parents=True
+        )
 
         # Since pebble ready will also occur after a pod churn, but we store the
         # configuration files on a storage volume that survives the pod churn, before
         # we start traefik we clean up all Juju-generated config files to avoid spurious
         # routes.
         for ingress_relation_configuration_file in self.traefik_container.list_files(
-            path=_TRAEFIK_INGRESS_CONFIGURATIONS_DIRECTORY,
-            pattern="juju_*.yaml"
+            path=_TRAEFIK_INGRESS_CONFIGURATIONS_DIRECTORY, pattern="juju_*.yaml"
         ):
             self.traefik_container.remove_path(ingress_relation_configuration_file.path)
-            logger.debug(f"Deleted orphaned ingress configuration file: {ingress_relation_configuration_file.path}")
+            logger.debug(
+                f"Deleted orphaned ingress configuration file: {ingress_relation_configuration_file.path}"
+            )
 
         # TODO Disable static config BS with telemetry and check new version
         basic_configurations = yaml.dump(
@@ -99,12 +102,8 @@ class TraefikIngressCharm(CharmBase):
                     "level": "DEBUG",
                 },
                 "entryPoints": {
-                    "diagnostics": {
-                        "address": f":{self._diagnostics_port}"
-                    },
-                    "web": {
-                        "address": f":{self._port}"
-                    }
+                    "diagnostics": {"address": f":{self._diagnostics_port}"},
+                    "web": {"address": f":{self._port}"},
                 },
                 # We always start the Prometheus endpoint for simplicity
                 # TODO: Generate this file in the dynamic configuration folder when the
@@ -116,15 +115,13 @@ class TraefikIngressCharm(CharmBase):
                         "entryPoint": "diagnostics",
                     }
                 },
-                "ping": {
-                    "entryPoint": "diagnostics"
-                },
+                "ping": {"entryPoint": "diagnostics"},
                 "providers": {
                     "file": {
                         "directory": _TRAEFIK_INGRESS_CONFIGURATIONS_DIRECTORY,
                         "watch": True,
                     }
-                }
+                },
             }
         )
 
@@ -147,6 +144,31 @@ class TraefikIngressCharm(CharmBase):
 
         self._process_ingress_relation(event.relation)
 
+    def _negotiate_version(self, relation: Relation):
+        if self.unit.is_leader():
+            if "_supported_versions" not in relation.data[self.app]:
+                relation.data[self.app]["_supported_versions"] = "[v3]"
+                return None
+
+        if "_supported_versions" not in relation.data[relation.app]:
+            logger.debug(
+                f"Remote app of the '{relation.name}:{relation.id}' has not yet posted their supported versions"
+            )
+            # It's fine to drop the event here: when we get a "relation changed", we are
+            # anyhow going to re-process the entire relation
+            return None
+
+        supported_versions = yaml.safe_load(relation.data[relation.app]["_supported_versions"])
+
+        if "v3" not in supported_versions:
+            logger.error(
+                f"The {relation.app.name} application does not support the ingress relation v3 "
+                f"(found: '{supported_versions}'); aborting data negotiation"
+            )
+            return None
+
+        return "v3"
+
     def _process_ingress_relation(self, relation: Relation):
         if not self.traefik_container.can_connect():
             self.unit.status = WaitingStatus(
@@ -154,49 +176,21 @@ class TraefikIngressCharm(CharmBase):
             )
             return
 
+        # Version negotiation
+        if not self._negotiate_version(relation):
+            # If the version is not negotiated yet, we cannot do much
+            self.unit.status = ActiveStatus()
+            return
+
         other_app_name = relation.app.name
 
-        # Version negotiation
-
-        if self.unit.is_leader():
-            if "_supported_versions" not in relation.data[relation.app]:
-               logger.debug(f"Remote app of the '{relation.name}:{relation.id}' has not yet posted their supported versions")
-               # It's fine to drop the event here: when we get a "relation changed", we are
-               # anyhow going to re-process the entire relation
-               return
-
-            supported_versions_raw = relation.data[relation.app]["_supported_versions"]
-
-            supported_versions = yaml.safe_load(supported_versions_raw)
-
-            if "v3" not in supported_versions:
-                logger.error(
-                    f"The {other_app_name} application does not support the ingress relation v3 "
-                    f"(found: '{supported_versions}'); aborting data negotiation"
-                )
-                # TODO Put the charm in Blocked status?
-                return
-
-            logger.debug(f"Remote app of the '{relation.name}:{relation.id}' relation supports v3")
-
-            if "_supported_versions" not in relation.data[self.app]:
-                relation.data[self.app]["_supported_versions"] = "[v3]"
-                logger.debug(f"Version v3 negotiated over the '{relation.name}:{relation.id}' relation")
-                self.unit.status = ActiveStatus()
-                return
-
         if "data" not in relation.data[relation.app]:
-            if self.unit.is_leader():
-                logger.debug(
-                    f"Databag 'data' not found in the '{relation.name}:{relation.id}' "
-                    "relation; aborting data negotiation"
-                )
-                # TODO Put the charm in Blocked status?
-            else:
-                logger.debug(
-                    "Leader unit has not yet completed version negotiation for the "
-                    f"'{relation.name}:{relation.id}' relation; skipping further event processing"
-                )
+            logger.debug(
+                f"Databag 'data' not found in the '{relation.name}:{relation.id}' "
+                "relation; aborting data negotiation"
+            )
+            # TODO Put the charm in Blocked status?
+
             self.unit.status = ActiveStatus()
             return
 
@@ -251,7 +245,8 @@ class TraefikIngressCharm(CharmBase):
                     logger.debug(f"Skipping unit {unit}")
                     continue
 
-                unit_id = unit.name[len(other_app_name) + 1:]
+                # Black and flake8 disagree on this line so we tell flake8 not to bother
+                unit_id = unit.name[len(other_app_name) + 1 :]  # noqa: E203
 
                 # This does not work in CMRs if the application IS NOT ON THE SAME CLUSTER.
                 # We probably could just look up the IP on `relation_joined` using the Kube
@@ -289,16 +284,23 @@ class TraefikIngressCharm(CharmBase):
             }
 
             ingress_relation_configuration["http"]["services"][traefik_service_name] = {
-                "loadBalancer": {"servers": [{"url": f"http://{other_app_name}.{namespace}.svc.cluster.local:{port}"}]}
+                "loadBalancer": {
+                    "servers": [
+                        {"url": f"http://{other_app_name}.{namespace}.svc.cluster.local:{port}"}
+                    ]
+                }
             }
 
         ingress_relation_configuration_path = f"{_TRAEFIK_INGRESS_CONFIGURATIONS_DIRECTORY}/{self._ingress_config_file_name(relation)}"
-        self.traefik_container.push(ingress_relation_configuration_path, yaml.dump(ingress_relation_configuration))
+        self.traefik_container.push(
+            ingress_relation_configuration_path, yaml.dump(ingress_relation_configuration)
+        )
 
         logger.debug(f"Updated ingress configuration file: {ingress_relation_configuration_path}")
 
         if self.unit.is_leader():
-            # TODO Set either url or unit_urls when the SDI library is updated to avoid requiring url when per_unit routing is used
+            # TODO Set either url or unit_urls when the SDI library is updated to avoid
+            # requiring url when per_unit routing is used
             relation.data[self.app]["data"] = yaml.dump({"url": url, "unit_urls": unit_urls})
 
         self.unit.status = ActiveStatus()
@@ -329,7 +331,9 @@ class TraefikIngressCharm(CharmBase):
             ingress_relation_configuration_path = f"{_TRAEFIK_INGRESS_CONFIGURATIONS_DIRECTORY}/{self._ingress_config_file_name(relation)}"
 
             self.traefik_container.remove_path(ingress_relation_configuration_path)
-            logger.debug(f"Deleted orphaned {ingress_relation_configuration_path} ingress configuration file")
+            logger.debug(
+                f"Deleted orphaned {ingress_relation_configuration_path} ingress configuration file"
+            )
         except PathError:
             logger.debug(
                 "Trying to delete non-existent ingress configurations for the "
@@ -362,7 +366,8 @@ class TraefikIngressCharm(CharmBase):
             return self.model.config["external_hostname"]
 
         namespace = self.model.name
-        # This could also be used
+        # This could also be used, but then needs to be mocked in the tests:
+        #
         # with open("/var/run/secrets/kubernetes.io/serviceaccount/namespace", "r") as f:
         #     namespace = f.read().strip()
 
@@ -398,12 +403,19 @@ class TraefikIngressCharm(CharmBase):
 
         current_pebble_layer = self.traefik_container.get_plan().to_dict()
 
-        if not current_pebble_layer or _TRAEFIK_SERVICE_NAME not in current_pebble_layer["services"]:
+        if (
+            not current_pebble_layer
+            or _TRAEFIK_SERVICE_NAME not in current_pebble_layer["services"]
+        ):
             self.unit.status = MaintenanceStatus(f"creating the '{_TRAEFIK_SERVICE_NAME}' service")
-            self.traefik_container.add_layer(_TRAEFIK_LAYER_NAME, updated_pebble_layer, combine=True)
+            self.traefik_container.add_layer(
+                _TRAEFIK_LAYER_NAME, updated_pebble_layer, combine=True
+            )
 
         try:
-            if is_restart := self.traefik_container.get_service(_TRAEFIK_SERVICE_NAME).is_running():
+            if is_restart := self.traefik_container.get_service(
+                _TRAEFIK_SERVICE_NAME
+            ).is_running():
                 self.unit.status = MaintenanceStatus(
                     f"stopping the '{_TRAEFIK_SERVICE_NAME}' service to update the configurations"
                 )
@@ -418,15 +430,12 @@ class TraefikIngressCharm(CharmBase):
                 exc_info=True,
             )
 
-        maintenance_status_message = f"restarting the '{_TRAEFIK_SERVICE_NAME}' service" if is_restart else f"starting the '{_TRAEFIK_SERVICE_NAME}' service"
-        self.unit.status = MaintenanceStatus(maintenance_status_message)
-
-        self.traefik_container.start(_TRAEFIK_SERVICE_NAME)
-
+        maintenance_status_message = f"starting the '{_TRAEFIK_SERVICE_NAME}' service"
         if is_restart:
-            logger.info(f"'{_TRAEFIK_SERVICE_NAME}' service restarted")
-        else:
-            logger.info(f"'{_TRAEFIK_SERVICE_NAME}' service started")
+            maintenance_status_message = f"re{maintenance_status_message}"
+
+        self.unit.status = MaintenanceStatus(maintenance_status_message)
+        self.traefik_container.start(_TRAEFIK_SERVICE_NAME)
 
         self.unit.status = ActiveStatus()
 
