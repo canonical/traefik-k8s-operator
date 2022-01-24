@@ -159,6 +159,12 @@ class TraefikIngressCharm(CharmBase):
         # Version negotiation
 
         if self.unit.is_leader():
+            if "_supported_versions" not in relation.data[relation.app]:
+               logger.debug(f"Remote app of the '{relation.name}:{relation.id}' has not yet posted their supported versions")
+               # It's fine to drop the event here: when we get a "relation changed", we are
+               # anyhow going to re-process the entire relation
+               return
+
             supported_versions_raw = relation.data[relation.app]["_supported_versions"]
 
             supported_versions = yaml.safe_load(supported_versions_raw)
