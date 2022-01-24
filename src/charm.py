@@ -232,13 +232,8 @@ class TraefikIngressCharm(CharmBase):
         # rewrite = relation.data["rewrite"]
         port = other_app_data["port"]
 
-        if other_app_data["per_unit_routes"] is not True:
-            # TODO Implement "normal" ingress routing over the K8s service
-            logger.warning(
-                f"The application '{relation.app.name}' is not requesting per_unit routing "
-                f"over the '{relation.name}:{relation.id}' relation; aborting data negotiation"
-            )
-            return
+        # TODO We should cache this, it is very expensive
+        gateway_address = self._get_gateway_address()
 
         ingress_relation_configuration = {
             "http": {
@@ -248,25 +243,45 @@ class TraefikIngressCharm(CharmBase):
         }
 
         unit_urls = {}
-        # We should cache this, it is very expensive
-        gateway_address = self._get_gateway_address()
+        url = f"http://{gateway_address}:{self._port}/juju-{namespace}-{other_app_name}"
 
-        for unit in relation.units:
-            if unit.app is self.app:
-                logger.debug(f"Skipping unit {unit}")
-                continue
+        if other_app_data["per_unit_routes"] is True:
+            for unit in relation.units:
+                if unit.app is self.app:
+                    logger.debug(f"Skipping unit {unit}")
+                    continue
 
-            unit_id = unit.name[len(other_app_name) + 1:]
+                unit_id = unit.name[len(other_app_name) + 1:]
 
-            # This does not work in CMRs if the application IS NOT ON THE SAME CLUSTER.
-            # We probably could just look up the IP on `relation_joined` using the Kube
-            # API and getting the pod ip.
-            unit_ingress_address = f"{other_app_name}-{unit_id}.{other_app_name}-endpoints.{namespace}.svc.cluster.local"
+                # This does not work in CMRs if the application IS NOT ON THE SAME CLUSTER.
+                # We probably could just look up the IP on `relation_joined` using the Kube
+                # API and getting the pod ip.
+                unit_ingress_address = f"{other_app_name}-{unit_id}.{other_app_name}-endpoints.{namespace}.svc.cluster.local"
 
-            traefik_router_name = f"juju-{namespace}-{other_app_name}-{unit_id}-router"
-            traefik_service_name = f"juju-{namespace}-{other_app_name}-{unit_id}-service"
+                traefik_router_name = f"juju-{namespace}-{other_app_name}-{unit_id}-router"
+                traefik_service_name = f"juju-{namespace}-{other_app_name}-{unit_id}-service"
 
-            route_prefix = f"{namespace}-{other_app_name}-{unit_id}"
+                route_prefix = f"{namespace}-{other_app_name}-{unit_id}"
+                ingress_relation_configuration["http"]["routers"][traefik_router_name] = {
+                    "rule": f"PathPrefix(`/{route_prefix}`)",
+                    "service": traefik_service_name,
+                    "entryPoints": ["web"],
+                }
+
+                ingress_relation_configuration["http"]["services"][traefik_service_name] = {
+                    "loadBalancer": {"servers": [{"url": f"http://{unit_ingress_address}:{port}"}]}
+                }
+
+                unit_urls[unit.name] = f"http://{gateway_address}:{self._port}/{route_prefix}"
+
+            # Change the default URL to something meaningless
+            # TODO Get rid of this when setting the URL is no longer requested by SDI
+            url = f"http://{gateway_address}:{self._port}/nope"
+        else:
+            traefik_router_name = f"juju-{namespace}-{other_app_name}-router"
+            traefik_service_name = f"juju-{namespace}-{other_app_name}-service"
+
+            route_prefix = f"{namespace}-{other_app_name}"
             ingress_relation_configuration["http"]["routers"][traefik_router_name] = {
                 "rule": f"PathPrefix(`/{route_prefix}`)",
                 "service": traefik_service_name,
@@ -274,10 +289,8 @@ class TraefikIngressCharm(CharmBase):
             }
 
             ingress_relation_configuration["http"]["services"][traefik_service_name] = {
-                "loadBalancer": {"servers": [{"url": f"http://{unit_ingress_address}:{port}"}]}
+                "loadBalancer": {"servers": [{"url": f"http://{other_app_name}.{namespace}.svc.cluster.local:{port}"}]}
             }
-
-            unit_urls[unit.name] = f"http://{gateway_address}:{self._port}/{route_prefix}"
 
         ingress_relation_configuration_path = f"{_TRAEFIK_INGRESS_CONFIGURATIONS_DIRECTORY}/{self._ingress_config_file_name(relation)}"
         self.traefik_container.push(ingress_relation_configuration_path, yaml.dump(ingress_relation_configuration))
@@ -285,8 +298,8 @@ class TraefikIngressCharm(CharmBase):
         logger.debug(f"Updated ingress configuration file: {ingress_relation_configuration_path}")
 
         if self.unit.is_leader():
-            # TODO remove this when the SDI library is updated
-            relation.data[self.app]["data"] = yaml.dump({"url": f"http://{gateway_address}:{self._port}/nope", "unit_urls": unit_urls})
+            # TODO Set either url or unit_urls when the SDI library is updated to avoid requiring url when per_unit routing is used
+            relation.data[self.app]["data"] = yaml.dump({"url": url, "unit_urls": unit_urls})
 
         self.unit.status = ActiveStatus()
 
