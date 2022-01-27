@@ -7,9 +7,24 @@ from functools import cache
 from pathlib import Path
 
 import sborl
+from ops.charm import CharmBase, RelationEvent
+from ops.framework import EventSource
 from ops.model import Relation, Unit
 
 log = logging.getLogger(__name__)
+
+
+class IngressUnitRequestEvent(RelationEvent):
+    """Event representing an incoming request.
+
+    This is equivalent to the "ready" event, but is more semantically meaningful.
+    """
+
+
+class IngressUnitProviderEvents(sborl.events.EndpointWrapperEvents):
+    """Container for IUP events."""
+
+    request = EventSource(IngressUnitRequestEvent)
 
 
 class IngressUnitProvider(sborl.EndpointWrapper):
@@ -18,6 +33,22 @@ class IngressUnitProvider(sborl.EndpointWrapper):
     ROLE = "provides"
     INTERFACE = "ingress-unit"
     SCHEMA = Path(__file__).parent / "schema.yaml"
+
+    on = IngressUnitProviderEvents()
+
+    def __init__(self, charm: CharmBase, endpoint: str = None):
+        """Constructor for IngressUnitProvider.
+
+        Args:
+            charm: The charm that is instantiating the instance.
+            endpoint: The name of the relation endpoint to bind to
+                (defaults to "ingress-unit").
+        """
+        super().__init__(charm, endpoint)
+        self.framework.observe(self.on.ready, self._emit_request_event)
+
+    def _emit_request_event(self, event):
+        self.on.request.emit(event.relation)
 
     def get_request(self, relation: Relation):
         """Get the IngressRequest for the given Relation."""
