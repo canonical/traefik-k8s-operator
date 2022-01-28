@@ -41,21 +41,22 @@ class IngressUnitRequirer(sborl.EndpointWrapper):
                 (defaults to "ingress-per-unit"; relation must be of interface type
                 "ingress-per-unit" and have "limit: 1")
         Request Args:
-            port: the port of the service (required)
+            port: the port of the service (required if rewrite is given)
             rewrite: the path on the target service to map the request to; defaults
                 to "/"
         """
         super().__init__(charm, endpoint)
-        self.auto_data = self._get_data(port, rewrite)
+        if port:
+            self.auto_data = self._complete_request(port, rewrite)
 
-    def _get_data(self, port: int, rewrite: str):
+    def _complete_request(self, port: int, rewrite: str):
         unit_name_dashed = self.charm.unit.name.replace("/", "-")
         binding = self.charm.model.get_binding(self.endpoint)
         return {
             self.charm.unit: {
                 "model": self.model.name,
                 "name": self.charm.unit.name,
-                "ip": binding.network.bind_address,
+                "ip": str(binding.network.bind_address),
                 "prefix": f"{self.model.name}-{unit_name_dashed}",
                 "port": port,
                 "rewrite": rewrite or "/",
@@ -70,7 +71,7 @@ class IngressUnitRequirer(sborl.EndpointWrapper):
             rewrite: the path on the target unit to map the request to; defaults
                 to "/"
         """
-        self.wrap(self.relation, self._get_data(port, rewrite))
+        self.wrap(self.relation, self._complete_request(port, rewrite))
 
     @property
     def relation(self):

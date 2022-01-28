@@ -1,6 +1,7 @@
 # Copyright 2021 Canonical Ltd.
 # See LICENSE file for licensing details.
 
+from ipaddress import IPv4Address
 from textwrap import dedent
 from unittest.mock import Mock
 
@@ -28,7 +29,7 @@ class MockRequirerCharm(CharmBase):
 
 
 def test_ingress_requirer(monkeypatch):
-    monkeypatch.setattr(Binding, "network", Mock(bind_address="10.10.10.10"))
+    monkeypatch.setattr(Binding, "network", Mock(bind_address=IPv4Address("10.10.10.10")))
     harness = Harness(MockRequirerCharm, meta=MockRequirerCharm.META)
     harness._backend.model_name = "test-model"
     harness.set_leader(False)
