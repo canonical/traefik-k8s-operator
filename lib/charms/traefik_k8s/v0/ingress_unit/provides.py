@@ -3,13 +3,20 @@
 """Provides side of ingress-unit relation."""
 
 import logging
-from functools import cache
 from pathlib import Path
 
 import sborl
 from ops.charm import CharmBase, RelationEvent
 from ops.framework import EventSource
 from ops.model import Relation, Unit
+
+try:
+    # introduced in 3.9
+    from functools import cache
+except ImportError:
+    from functools import lru_cache
+
+    cache = lru_cache(maxsize=None)
 
 log = logging.getLogger(__name__)
 
