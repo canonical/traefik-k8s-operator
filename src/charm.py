@@ -11,12 +11,21 @@ import logging
 import yaml
 from charms.observability_libs.v0.kubernetes_service_patch import KubernetesServicePatch
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
+from charms.traefik_k8s.v0.ingress_unit import IngressUnitProvider
 from lightkube import Client
 from lightkube.resources.core_v1 import Service
 from ops.charm import CharmBase, RelationEvent
 from ops.main import main
 from ops.model import ActiveStatus, MaintenanceStatus, Relation, WaitingStatus
 from ops.pebble import PathError
+
+try:
+    # introduced in 3.9
+    from functools import cache
+except ImportError:
+    from functools import lru_cache
+
+    cache = lru_cache(maxsize=None)
 
 logger = logging.getLogger(__name__)
 
@@ -55,15 +64,12 @@ class TraefikIngressCharm(CharmBase):
             ],
         )
 
+        self.ingress_unit = IngressUnitProvider(self)
+
         self.framework.observe(self.on.traefik_pebble_ready, self._on_traefik_pebble_ready)
-
-        # TODO Need to ensure K8s service has LoadBalancer IP before processing proxy requests?
-
-        self.framework.observe(self.on["ingress"].relation_created, self._handle_ingress_change)
-        self.framework.observe(self.on["ingress"].relation_joined, self._handle_ingress_change)
-        self.framework.observe(self.on["ingress"].relation_changed, self._handle_ingress_change)
-        self.framework.observe(self.on["ingress"].relation_departed, self._handle_ingress_change)
-        self.framework.observe(self.on["ingress"].relation_broken, self._handle_ingress_broken)
+        self.framework.observe(self.ingress_unit.on.request, self._handle_ingress_unit_request)
+        self.framework.observe(self.ingress_unit.on.failed, self._handle_ingress_unit_failure)
+        self.framework.observe(self.ingress_unit.on.broken, self._handle_ingress_unit_broken)
 
     def _on_traefik_pebble_ready(self, _):
         # Ensure the required basic configurations and folders exist
@@ -129,102 +135,41 @@ class TraefikIngressCharm(CharmBase):
 
         # After the container (re)starts, we need to loop over the relations to ensure all
         # the ingress configurations are there
-        for ingress_relation in self.model.relations["ingress"]:
-            self._process_ingress_relation(ingress_relation)
+        for ingress_relation in self.ingress_unit.relations:
+            self._process_ingress_unit_relation(ingress_relation)
 
         self._restart_traefik()
 
         self.unit.status = ActiveStatus()
 
-    def _handle_ingress_change(self, event: RelationEvent):
+    def _handle_ingress_unit_request(self, event: RelationEvent):
         if not isinstance(self.unit.status, ActiveStatus):
             logger.debug("Charm not active yet, deferring event")
             event.defer()
             return
 
-        self._process_ingress_relation(event.relation)
+        self._process_ingress_unit_relation(event.relation)
 
-    def _negotiate_version(self, relation: Relation):
-        if self.unit.is_leader():
-            if "_supported_versions" not in relation.data[self.app]:
-                relation.data[self.app]["_supported_versions"] = "[v3]"
-                return None
+    def _handle_ingress_unit_failure(self, event: RelationEvent):
+        self.unit.status = self.ingress_unit.get_status(event.relation)
 
-        if "_supported_versions" not in relation.data[relation.app]:
-            logger.debug(
-                f"Remote app of the '{relation.name}:{relation.id}' has not yet posted their supported versions"
-            )
-            # It's fine to drop the event here: when we get a "relation changed", we are
-            # anyhow going to re-process the entire relation
-            return None
-
-        supported_versions = yaml.safe_load(relation.data[relation.app]["_supported_versions"])
-
-        if "v3" not in supported_versions:
-            logger.error(
-                f"The {relation.app.name} application does not support the ingress relation v3 "
-                f"(found: '{supported_versions}'); aborting data negotiation"
-            )
-            return None
-
-        return "v3"
-
-    def _process_ingress_relation(self, relation: Relation):
+    def _process_ingress_unit_relation(self, relation: Relation):
         if not self.traefik_container.can_connect():
             self.unit.status = WaitingStatus(
                 f"container '{_TRAEFIK_CONTAINER_NAME}' not yet ready"
             )
             return
-
-        # Version negotiation
-        if not self._negotiate_version(relation):
-            # If the version is not negotiated yet, we cannot do much
-            self.unit.status = ActiveStatus()
+        # There's a very small chance that we're processing a relation event
+        # which was deferred until after the relation was broken.
+        if not self.ingress_unit.is_ready(relation):
             return
 
-        other_app_name = relation.app.name
-
-        if "data" not in relation.data[relation.app]:
-            logger.debug(
-                f"Databag 'data' not found in the '{relation.name}:{relation.id}' "
-                "relation; aborting data negotiation"
-            )
-            # TODO Put the charm in Blocked status?
-
-            self.unit.status = ActiveStatus()
-            return
-
+        request = self.ingress_unit.get_request(relation)
         self.unit.status = MaintenanceStatus("updating ingress configurations")
         logger.debug(
             "Updating the ingress configurations for the "
             f"'{relation.name}:{relation.id}' relation"
         )
-
-        other_app_data = yaml.safe_load(relation.data[relation.app]["data"])
-
-        if "namespace" not in other_app_data:
-            logger.debug(
-                f"Namespace data not found in the '{relation.name}:{relation.id}' relation; aborting data negotiation"
-            )
-            # TODO Put the charm in Blocked status?
-            self.unit.status = ActiveStatus()
-            return
-
-        if "port" not in other_app_data:
-            logger.debug(
-                f"Port data not found in the '{relation.name}:{relation.id}' relation; aborting data negotiation"
-            )
-            # TODO Put the charm in Blocked status?
-            self.unit.status = ActiveStatus()
-            return
-
-        # We are relying on the fact that the model has the same name as the namespace
-        namespace = other_app_data["namespace"]
-        # namespace = relation.data["namespace"]
-        # service = relation.data["service"]
-        # prefix = relation.data["prefix"]
-        # rewrite = relation.data["rewrite"]
-        port = other_app_data["port"]
 
         # TODO We should cache this, it is very expensive
         gateway_address = self._get_gateway_address()
@@ -236,60 +181,27 @@ class TraefikIngressCharm(CharmBase):
             }
         }
 
-        unit_urls = {}
-        url = f"http://{gateway_address}:{self._port}/juju-{namespace}-{other_app_name}"
+        for unit in request.units:
+            unit_prefix = request.get_prefix(unit)
+            unit_ingress_address = request.get_ip(unit)
+            unit_port = request.port
+            traefik_router_name = f"juju-{unit_prefix}-router"
+            traefik_service_name = f"juju-{unit_prefix}-service"
 
-        if other_app_data["per_unit_routes"] is True:
-            for unit in relation.units:
-                if unit.app is self.app:
-                    logger.debug(f"Skipping unit {unit}")
-                    continue
-
-                # Black and flake8 disagree on this line so we tell flake8 not to bother
-                unit_id = unit.name[len(other_app_name) + 1 :]  # noqa: E203
-
-                # This does not work in CMRs if the application IS NOT ON THE SAME CLUSTER.
-                # We probably could just look up the IP on `relation_joined` using the Kube
-                # API and getting the pod ip.
-                unit_ingress_address = f"{other_app_name}-{unit_id}.{other_app_name}-endpoints.{namespace}.svc.cluster.local"
-
-                traefik_router_name = f"juju-{namespace}-{other_app_name}-{unit_id}-router"
-                traefik_service_name = f"juju-{namespace}-{other_app_name}-{unit_id}-service"
-
-                route_prefix = f"{namespace}-{other_app_name}-{unit_id}"
-                ingress_relation_configuration["http"]["routers"][traefik_router_name] = {
-                    "rule": f"PathPrefix(`/{route_prefix}`)",
-                    "service": traefik_service_name,
-                    "entryPoints": ["web"],
-                }
-
-                ingress_relation_configuration["http"]["services"][traefik_service_name] = {
-                    "loadBalancer": {"servers": [{"url": f"http://{unit_ingress_address}:{port}"}]}
-                }
-
-                unit_urls[unit.name] = f"http://{gateway_address}:{self._port}/{route_prefix}"
-
-            # Change the default URL to something meaningless
-            # TODO Get rid of this when setting the URL is no longer requested by SDI
-            url = f"http://{gateway_address}:{self._port}/nope"
-        else:
-            traefik_router_name = f"juju-{namespace}-{other_app_name}-router"
-            traefik_service_name = f"juju-{namespace}-{other_app_name}-service"
-
-            route_prefix = f"{namespace}-{other_app_name}"
             ingress_relation_configuration["http"]["routers"][traefik_router_name] = {
-                "rule": f"PathPrefix(`/{route_prefix}`)",
+                "rule": f"PathPrefix(`/{unit_prefix}`)",
                 "service": traefik_service_name,
                 "entryPoints": ["web"],
             }
 
             ingress_relation_configuration["http"]["services"][traefik_service_name] = {
                 "loadBalancer": {
-                    "servers": [
-                        {"url": f"http://{other_app_name}.{namespace}.svc.cluster.local:{port}"}
-                    ]
+                    "servers": [{"url": f"http://{unit_ingress_address}:{unit_port}"}]
                 }
             }
+
+            if self.unit.is_leader():
+                request.respond(unit, f"http://{gateway_address}:{self._port}/{unit_prefix}")
 
         ingress_relation_configuration_path = f"{_TRAEFIK_INGRESS_CONFIGURATIONS_DIRECTORY}/{self._ingress_config_file_name(relation)}"
         self.traefik_container.push(
@@ -298,14 +210,9 @@ class TraefikIngressCharm(CharmBase):
 
         logger.debug(f"Updated ingress configuration file: {ingress_relation_configuration_path}")
 
-        if self.unit.is_leader():
-            # TODO Set either url or unit_urls when the SDI library is updated to avoid
-            # requiring url when per_unit routing is used
-            relation.data[self.app]["data"] = yaml.dump({"url": url, "unit_urls": unit_urls})
-
         self.unit.status = ActiveStatus()
 
-    def _handle_ingress_broken(self, event: RelationEvent):
+    def _handle_ingress_unit_broken(self, event: RelationEvent):
         if not isinstance(self.unit.status, ActiveStatus):
             logger.debug("Charm not active yet, deferring event")
             event.defer()
@@ -353,6 +260,7 @@ class TraefikIngressCharm(CharmBase):
 
         return f"juju_ingress_{relation.name}_{relation.id}_{other_app.name}.yaml"
 
+    @cache
     def _get_gateway_address(self):
         """Determine the external address for the ingress gateway.
 

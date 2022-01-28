@@ -33,8 +33,8 @@ storage:
     type: filesystem
 
 provides:
-  ingress:
-    interface: ingress
+  ingress-unit:
+    interface: ingress-unit
   metrics-endpoint:
     interface: prometheus_scrape
     description: |
