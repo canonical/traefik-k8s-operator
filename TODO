@@ -1,0 +1,12 @@
+* O11y:
+    * more metrics alert rules:
+        * upstream services with spikes of failures / status of upstream going not OK
+    * logs integration & alert rules
+    * grafana dashboards
+* Test that the configuration reloading mechanism works across various CSIs on the various Kuberneteses out there.
+* Support routing non "per_unit": I would implement this by simply routing to the K8s service created by Juju, but that has the issue that it requires the proxied charm to fix its service port using e.g. the [KubernetesServicePatch](./lib/charms/observability_libs/v0/kubernetes_service_patch.py) utility. Another option would be to define a Traefik service listing each unit separately as server url, but that likely brutally violates the element of least surprise for Juju admins that want to change the way load balancing works for their application and reach out to `kubectl edit service`.
+* Sketch itests
+* Validate load test
+* Plan out TLS support
+* Disable version check and analytics
+* Find a civilized way to enable the built-in dashboard
