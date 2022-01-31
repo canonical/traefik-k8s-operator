@@ -18,7 +18,7 @@ APP_NAME = METADATA["name"]
 
 
 @pytest.mark.xfail
-@pytest.mark.abort_on_fail
+@pytest.mark.abort_on_fail  # doesn't work w/ xfail: pytest-operator #46
 async def test_build_and_deploy(ops_test: OpsTest):
     """Build the charm-under-test and deploy it together with related charms.
 
@@ -39,6 +39,7 @@ async def test_build_and_deploy(ops_test: OpsTest):
     await ops_test.model.set_config({"update-status-hook-interval": "60m"})
 
 
+@pytest.mark.xfail
 @pytest.mark.abort_on_fail
 async def test_application_is_up(ops_test: OpsTest):
     status = await ops_test.model.get_status()  # noqa: F821
