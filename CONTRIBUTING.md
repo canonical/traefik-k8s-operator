@@ -18,7 +18,7 @@ This documents explains the processes and practices recommended for contributing
 ## Notable design decisions
 
 Traefik is a cluster-less proxy: each unit is performing its own routing decisions and keeping track of the health of upstreams (i.e., the addresses it routes requests for).
-Each Traefik operator listens to changes in the `ingress` relations and generates their own configurations.
+Each Traefik operator listens to changes in the `ingress-unit` relations and generates their own configurations.
 Only the leader unit of the Traefik operator, however, communicates "back" with the application on the other side of the relation by providing the URL at which the units are reachable.
 
 **Limitation:** Since follower (i.e., "non-leader") units of a Juju application _cannot_ access their application databag in the relation (see [this Juju bug report](https://bugs.launchpad.net/juju/+bug/1911010)), it can be the case that follower units starts routing to units that have not yet been notified by the leader unit of the Traefik operator, what their externally-reachable URL is.
