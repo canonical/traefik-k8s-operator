@@ -11,7 +11,7 @@ import logging
 import yaml
 from charms.observability_libs.v0.kubernetes_service_patch import KubernetesServicePatch
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
-from charms.traefik_k8s.v0.ingress_unit import IngressUnitProvider
+from charms.traefik_k8s.v0.ingress_per_unit import IngressPerUnitProvider
 from lightkube import Client
 from lightkube.resources.core_v1 import Service
 from ops.charm import CharmBase, RelationEvent
@@ -64,12 +64,18 @@ class TraefikIngressCharm(CharmBase):
             ],
         )
 
-        self.ingress_unit = IngressUnitProvider(self)
+        self.ingress_per_unit = IngressPerUnitProvider(self)
 
         self.framework.observe(self.on.traefik_pebble_ready, self._on_traefik_pebble_ready)
-        self.framework.observe(self.ingress_unit.on.request, self._handle_ingress_unit_request)
-        self.framework.observe(self.ingress_unit.on.failed, self._handle_ingress_unit_failure)
-        self.framework.observe(self.ingress_unit.on.broken, self._handle_ingress_unit_broken)
+        self.framework.observe(
+            self.ingress_per_unit.on.request, self._handle_ingress_per_unit_request
+        )
+        self.framework.observe(
+            self.ingress_per_unit.on.failed, self._handle_ingress_per_unit_failure
+        )
+        self.framework.observe(
+            self.ingress_per_unit.on.broken, self._handle_ingress_per_unit_broken
+        )
 
     def _on_traefik_pebble_ready(self, _):
         # Ensure the required basic configurations and folders exist
@@ -135,25 +141,25 @@ class TraefikIngressCharm(CharmBase):
 
         # After the container (re)starts, we need to loop over the relations to ensure all
         # the ingress configurations are there
-        for ingress_relation in self.ingress_unit.relations:
-            self._process_ingress_unit_relation(ingress_relation)
+        for ingress_relation in self.ingress_per_unit.relations:
+            self._process_ingress_per_unit_relation(ingress_relation)
 
         self._restart_traefik()
 
         self.unit.status = ActiveStatus()
 
-    def _handle_ingress_unit_request(self, event: RelationEvent):
+    def _handle_ingress_per_unit_request(self, event: RelationEvent):
         if not isinstance(self.unit.status, ActiveStatus):
             logger.debug("Charm not active yet, deferring event")
             event.defer()
             return
 
-        self._process_ingress_unit_relation(event.relation)
+        self._process_ingress_per_unit_relation(event.relation)
 
-    def _handle_ingress_unit_failure(self, event: RelationEvent):
-        self.unit.status = self.ingress_unit.get_status(event.relation)
+    def _handle_ingress_per_unit_failure(self, event: RelationEvent):
+        self.unit.status = self.ingress_per_unit.get_status(event.relation)
 
-    def _process_ingress_unit_relation(self, relation: Relation):
+    def _process_ingress_per_unit_relation(self, relation: Relation):
         if not self.traefik_container.can_connect():
             self.unit.status = WaitingStatus(
                 f"container '{_TRAEFIK_CONTAINER_NAME}' not yet ready"
@@ -161,17 +167,16 @@ class TraefikIngressCharm(CharmBase):
             return
         # There's a very small chance that we're processing a relation event
         # which was deferred until after the relation was broken.
-        if not self.ingress_unit.is_ready(relation):
+        if not self.ingress_per_unit.is_ready(relation):
             return
 
-        request = self.ingress_unit.get_request(relation)
+        request = self.ingress_per_unit.get_request(relation)
         self.unit.status = MaintenanceStatus("updating ingress configurations")
         logger.debug(
             "Updating the ingress configurations for the "
             f"'{relation.name}:{relation.id}' relation"
         )
 
-        # TODO We should cache this, it is very expensive
         gateway_address = self._get_gateway_address()
 
         ingress_relation_configuration = {
@@ -212,7 +217,7 @@ class TraefikIngressCharm(CharmBase):
 
         self.unit.status = ActiveStatus()
 
-    def _handle_ingress_unit_broken(self, event: RelationEvent):
+    def _handle_ingress_per_unit_broken(self, event: RelationEvent):
         if not isinstance(self.unit.status, ActiveStatus):
             logger.debug("Charm not active yet, deferring event")
             event.defer()
