@@ -14,7 +14,7 @@ class MockIPUProvider(MockRemoteRelationMixin, IngressPerUnitProvider):
 
     Exactly the same as the normal IngressPerUnitProvider but, acts as if it's on
     the remote side of any relation, and it automatically triggers events when
-    repsonses are sent.
+    responses are sent.
     """
 
     def get_request(self, relation: Relation):
@@ -28,7 +28,7 @@ class MockIngressRequest(IngressRequest):
 
     Exactly the same as the normal IngressRequest but acts as if it's on the
     remote side of any relation, and it automatically triggers events when
-    repsonses are sent.
+    responses are sent.
     """
 
     @property

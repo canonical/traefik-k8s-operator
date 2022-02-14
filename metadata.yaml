@@ -16,7 +16,7 @@ containers:
   traefik:
     resource: traefik-image
     mounts:
-      - storage: dynamic-configurations
+      - storage: configurations
         location: /opt/traefik/
 
 resources:
@@ -29,7 +29,7 @@ resources:
 storage:
   # We need to store the configurations in a volume, as Traefik's directory
   # discovery provider does not work in the file system of the Docker image
-  dynamic-configurations:
+  configurations:
     type: filesystem
 
 provides:

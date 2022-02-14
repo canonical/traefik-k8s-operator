@@ -25,6 +25,7 @@ class IngressPerUnitRequirer(sborl.EndpointWrapper):
         charm: CharmBase,
         endpoint: str = None,
         *,
+        hostname: str = None,
         port: int = None,
         rewrite: str = None,
     ):
@@ -40,6 +41,8 @@ class IngressPerUnitRequirer(sborl.EndpointWrapper):
             endpoint: the name of the relation endpoint to bind to
                 (defaults to "ingress-per-unit"; relation must be of interface type
                 "ingress_per_unit" and have "limit: 1")
+            hostname: Hostname to be used by the ingress provider to address the requirer
+                unit; if unspecified, the pod ip of the unit will be used instead
         Request Args:
             port: the port of the service (required if rewrite is given)
             rewrite: the path on the target service to map the request to; defaults
@@ -47,31 +50,37 @@ class IngressPerUnitRequirer(sborl.EndpointWrapper):
         """
         super().__init__(charm, endpoint)
         if port:
-            self.auto_data = self._complete_request(port, rewrite)
+            self.auto_data = self._complete_request(hostname or "", port, rewrite)
 
-    def _complete_request(self, port: int, rewrite: str):
+    def _complete_request(self, hostname: str, port: int, rewrite: str):
         unit_name_dashed = self.charm.unit.name.replace("/", "-")
-        binding = self.charm.model.get_binding(self.endpoint)
+
+        if not hostname:
+            binding = self.charm.model.get_binding(self.endpoint)
+            hostname = str(binding.network.bind_address)
+
         return {
             self.charm.unit: {
                 "model": self.model.name,
                 "name": self.charm.unit.name,
-                "ip": str(binding.network.bind_address),
+                "ip": hostname,
                 "prefix": f"{self.model.name}-{unit_name_dashed}",
                 "port": port,
                 "rewrite": rewrite or "/",
             },
         }
 
-    def request(self, *, port: int, rewrite: str = None):
+    def request(self, *, hostname: str = None, port: int, rewrite: str = None):
         """Request ingress to this unit.
 
         Args:
+            hostname: Hostname to be used by the ingress provider to address the requirer
+                unit; if unspecified, the pod ip of the unit will be used instead
             port: the port of the service (required)
             rewrite: the path on the target unit to map the request to; defaults
                 to "/"
         """
-        self.wrap(self.relation, self._complete_request(port, rewrite))
+        self.wrap(self.relation, self._complete_request(hostname, port, rewrite))
 
     @property
     def relation(self):
