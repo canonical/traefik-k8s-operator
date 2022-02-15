@@ -81,7 +81,7 @@ class TraefikIngressCharm(CharmBase):
             ],
         )
 
-        self.ingress_per_unit = IngressPerUnitProvider(charm=self, endpoint="ingress-per-unit")
+        self.ingress_per_unit = IngressPerUnitProvider(charm=self)
 
         self.framework.observe(self.on.traefik_pebble_ready, self._on_traefik_pebble_ready)
         self.framework.observe(self.on.start, self._on_start)
@@ -386,7 +386,6 @@ class TraefikIngressCharm(CharmBase):
         if "external_hostname" in self.model.config:
             if external_hostname := self.model.config["external_hostname"]:
                 return external_hostname
-            
 
         return _get_loadbalancer_status(namespace=self.model.name, service_name=self.app.name)
 

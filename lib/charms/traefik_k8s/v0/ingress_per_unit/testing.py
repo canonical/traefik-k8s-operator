@@ -5,8 +5,11 @@
 from ops.model import Relation
 from sborl.testing import MockRemoteRelationMixin
 
-from .provides import IngressPerUnitProvider, IngressRequest
-from .requires import IngressPerUnitRequirer
+from .ingress_per_unit import (
+    IngressPerUnitProvider,
+    IngressPerUnitRequirer,
+    IngressRequest,
+)
 
 
 class MockIPUProvider(MockRemoteRelationMixin, IngressPerUnitProvider):

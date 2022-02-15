@@ -49,5 +49,4 @@ LIBPATCH = 1
 from . import testing
 
 # flake8: noqa: E401,E402
-from .provides import IngressPerUnitProvider
-from .requires import IngressPerUnitRequirer
+from .ingress_per_unit import IngressPerUnitProvider, IngressPerUnitRequirer
