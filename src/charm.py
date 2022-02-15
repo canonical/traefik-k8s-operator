@@ -384,7 +384,9 @@ class TraefikIngressCharm(CharmBase):
         returns None.
         """
         if "external_hostname" in self.model.config:
-            return self.model.config["external_hostname"]
+            if external_hostname := self.model.config["external_hostname"]:
+                return external_hostname
+            
 
         return _get_loadbalancer_status(namespace=self.model.name, service_name=self.app.name)
 
