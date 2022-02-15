@@ -1,10 +1,14 @@
 FROM ubuntu:20.04 AS download
 
+ARG traefik_version="2.5.6"
+
 RUN apt-get update; apt-get install -y curl ca-certificates
 
-RUN curl -L https://github.com/traefik/traefik/releases/download/v2.5.6/traefik_v2.5.6_linux_amd64.tar.gz -O
+ENV TRAEFIK_VERSION=${traefik_version}
 
-RUN tar xzvf traefik_v2.5.6_linux_amd64.tar.gz
+RUN curl -L -s "https://github.com/traefik/traefik/releases/download/v${TRAEFIK_VERSION}/traefik_v${TRAEFIK_VERSION}_linux_amd64.tar.gz" -o traefik.tgz
+
+RUN tar xzf traefik.tgz
 
 FROM ubuntu:20.04
 
