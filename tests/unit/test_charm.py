@@ -25,6 +25,8 @@ class TestTraefikIngressCharm(unittest.TestCase):
         self.harness.set_leader(True)
         self.harness.begin_with_initial_hooks()
 
+        self.harness.container_pebble_ready("traefik")
+
         self.assertEqual(self.harness.charm.unit.status, ActiveStatus())
 
         requirer = MockIPURequirer(self.harness)
@@ -71,6 +73,8 @@ class TestTraefikIngressCharm(unittest.TestCase):
         self.assertEqual(
             self.harness.charm.unit.status, WaitingStatus("gateway address not available")
         )
+
+        self.harness.container_pebble_ready("traefik")
 
         requirer = MockIPURequirer(self.harness)
         relation = requirer.relate()
@@ -148,14 +152,14 @@ class TestTraefikIngressCharm(unittest.TestCase):
         self.harness.set_leader(True)
         self.harness.begin_with_initial_hooks()
 
+        self.harness.container_pebble_ready("traefik")
+
         requirer = MockIPURequirer(self.harness)
         relation = requirer.relate()
         requirer.request(hostname="10.1.10.1", port=9000)
 
         assert requirer.is_available(relation)
         assert requirer.is_ready(relation)
-
-        self.harness.container_pebble_ready("traefik")
 
         self.assertEqual(
             requirer.urls,

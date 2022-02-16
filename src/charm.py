@@ -28,6 +28,7 @@ from ops.model import (
     ActiveStatus,
     BlockedStatus,
     MaintenanceStatus,
+    ModelError,
     Relation,
     WaitingStatus,
 )
@@ -173,10 +174,20 @@ class TraefikIngressCharm(CharmBase):
             self._process_status_and_configurations()
 
     def _process_status_and_configurations(self):
-        if not self.traefik_container.can_connect():
-            self.unit.status = WaitingStatus(
-                f"container '{_TRAEFIK_CONTAINER_NAME}' not yet ready"
+        if not self._gateway_address:
+            self.unit.status = MaintenanceStatus(
+                "resetting ingress-per-unit relations: gateway address not available"
             )
+
+            for relation in self.model.relations["ingress-per-unit"]:
+                self._wipe_ingress_for_relation(relation)
+
+            self.unit.status = WaitingStatus("gateway address not available")
+
+            return
+
+        if not self._is_traefik_service_running():
+            self.unit.status = WaitingStatus(f"service '{_TRAEFIK_CONTAINER_NAME}' not ready yet")
             return
 
         self.unit.status = MaintenanceStatus("updating the ingress configurations")
@@ -184,23 +195,20 @@ class TraefikIngressCharm(CharmBase):
         for ingress_relation in self.ingress_per_unit.relations:
             self._process_ingress_per_unit_relation(ingress_relation)
 
-        if not self._gateway_address:
-            self.unit.status = WaitingStatus("gateway address not available")
-        elif isinstance(self.unit.status, MaintenanceStatus):
+        if isinstance(self.unit.status, MaintenanceStatus):
             self.unit.status = ActiveStatus()
         else:
             self.unit.status = BlockedStatus("setup of some ingress relation failed")
             logger.error("The setup of some ingress relation failed, see previous logs")
 
     def _handle_ingress_per_unit_request(self, event: RelationEvent):
-        if not self.traefik_container.can_connect():
-            self.unit.status = WaitingStatus(
-                f"container '{_TRAEFIK_CONTAINER_NAME}' not yet ready"
-            )
+        if not self._gateway_address:
+            self.unit.status = WaitingStatus("gateway address not available")
+            event.defer()
             return
 
-        if not isinstance(self.unit.status, ActiveStatus):
-            logger.debug("Charm not in active status, deferring event")
+        if not self._is_traefik_service_running():
+            self.unit.status = WaitingStatus(f"service '{_TRAEFIK_CONTAINER_NAME}' not ready yet")
             event.defer()
             return
 
@@ -244,11 +252,11 @@ class TraefikIngressCharm(CharmBase):
             }
         }
 
-        # TODO Ideally, follower units could maybe instead watch for the data
-        # in the ingress app data bag, but Juju does not allow units to read
-        # the application data bag on their side of the relation, so we may
-        # start routing for a remote unit before the leader unit of ingress
-        # has communicated the url.
+        # FIXME Ideally, follower units could instead watch for the data in the
+        # ingress app data bag, but Juju does not allow non-leader units to read
+        # the application data bag on their side of the relation, so we may start
+        # routing for a remote unit before the leader unit of ingress has
+        # communicated the url.
         for unit in request.units:
             unit_prefix = request.get_prefix(unit)
             unit_ingress_address = request.get_ip(unit)
@@ -284,41 +292,45 @@ class TraefikIngressCharm(CharmBase):
         self.unit.status = self.ingress_per_unit.get_status(event.relation)
 
     def _handle_ingress_per_unit_broken(self, event: RelationEvent):
-        if not isinstance(self.unit.status, ActiveStatus):
-            logger.debug("Charm not active yet, deferring event")
-            event.defer()
-            return
-
-        if not self.traefik_container.can_connect():
-            self.unit.status = WaitingStatus(
-                f"container '{_TRAEFIK_CONTAINER_NAME}' not yet ready"
-            )
+        if not self._is_traefik_service_running():
+            self.unit.status = WaitingStatus(f"service '{_TRAEFIK_CONTAINER_NAME}' not ready yet")
             event.defer()
             return
 
         self.unit.status = MaintenanceStatus("updating ingress configurations")
 
-        relation = event.relation
-
-        logger.debug(
-            "Deleting the ingress configurations for the "
-            f"'{relation.name}:{relation.id}' relation"
-        )
-
-        try:
-            ingress_relation_configuration_path = f"{_TRAEFIK_INGRESS_CONFIGURATIONS_DIRECTORY}/{self._ingress_config_file_name(relation)}"
-
-            self.traefik_container.remove_path(ingress_relation_configuration_path)
-            logger.debug(
-                f"Deleted orphaned {ingress_relation_configuration_path} ingress configuration file"
-            )
-        except PathError:
-            logger.debug(
-                "Trying to delete non-existent ingress configurations for the "
-                f"'{relation.name}:{relation.id}' relation"
-            )
+        self._wipe_ingress_for_relation(event.relation)
 
         self.unit.status = ActiveStatus()
+
+    def _wipe_ingress_for_relation(self, relation: Relation):
+        logger.debug(f"Wiping the ingress setup for the '{relation.name}:{relation.id}' relation")
+
+        # Delete configuration files for the relation. In case of Traefik pod
+        # churns, and depending on the event ordering, we might be executing this
+        # logic before pebble in the traefik container is up and running. If that
+        # is the case, nevermind, we will wipe the dangling config files anyhow
+        # during _on_traefik_pebble_ready .
+        if self.traefik_container.can_connect():
+            try:
+                ingress_relation_configuration_path = f"{_TRAEFIK_INGRESS_CONFIGURATIONS_DIRECTORY}/{self._ingress_config_file_name(relation)}"
+
+                self.traefik_container.remove_path(ingress_relation_configuration_path)
+                logger.debug(
+                    f"Deleted orphaned {ingress_relation_configuration_path} ingress configuration file"
+                )
+            except PathError:
+                logger.debug(
+                    f"Ingress configurations for the '{relation.name}:{relation.id}' relation not found"
+                )
+
+        # Wipe URLs sent to the requesting units, as they are based on a gateway
+        # address that is no longer valid.
+        if self.ingress_per_unit.is_ready():
+            for unit in relation.units:
+                if unit.app != self.app:
+                    if request := self.ingress_per_unit.get_request(relation):
+                        request.respond(unit, "")
 
     def _ingress_config_file_name(self, relation: Relation):
         # Using both the relation it and the app name in the file to facilitate
@@ -329,13 +341,19 @@ class TraefikIngressCharm(CharmBase):
 
         return f"juju_ingress_{relation.name}_{relation.id}_{relation.app.name}.yaml"
 
-    def _restart_traefik(self):
+    def _is_traefik_service_running(self):
         if not self.traefik_container.can_connect():
-            self.unit.status = WaitingStatus(
-                f"container '{_TRAEFIK_CONTAINER_NAME}' not yet ready"
-            )
-            return
+            return False
 
+        try:
+            # FIXME We cannot check by looking got the _TRAEFIK_SERVICE_NAME in
+            # `self.traefik_container.get_services()` because it would wrongly fail
+            # in the test Harness, see https://github.com/canonical/operator/issues/694
+            return self.traefik_container.get_service(_TRAEFIK_SERVICE_NAME).is_running()
+        except ModelError:
+            return False
+
+    def _restart_traefik(self):
         updated_pebble_layer = {
             "summary": "Traefik layer",
             "description": "Pebble config layer for Traefik",
@@ -343,7 +361,7 @@ class TraefikIngressCharm(CharmBase):
                 _TRAEFIK_SERVICE_NAME: {
                     "override": "replace",
                     "summary": "Traefik",
-                    "command": "/usr/local/bin/traefik",
+                    "command": "/usr/bin/traefik",
                 },
             },
         }
