@@ -38,6 +38,7 @@ class SomeCharm(CharmBase):
 """
 
 import logging
+from typing import Optional
 
 from ops.charm import CharmBase, RelationEvent, RelationRole
 from ops.framework import EventSource
@@ -48,7 +49,7 @@ from serialized_data_interface.events import EndpointWrapperEvents
 
 try:
     # introduced in 3.9
-    from functools import cache
+    from functools import cache  # type: ignore
 except ImportError:
     from functools import lru_cache
 
@@ -273,7 +274,7 @@ class IngressPerUnitRequirer(EndpointWrapper):
         if port:
             self.auto_data = self._complete_request(hostname or "", port, rewrite)
 
-    def _complete_request(self, hostname: str, port: int, rewrite: str):
+    def _complete_request(self, hostname: Optional[str], port: int, rewrite: Optional[str]):
         unit_name_dashed = self.charm.unit.name.replace("/", "-")
 
         if not hostname:
