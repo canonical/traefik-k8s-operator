@@ -24,7 +24,7 @@ juju deploy ./traefik-k8s_ubuntu-20.04-amd64.charm traefik-ingress --trust --res
 
 ### Providing ingress proxying
 
-This charm can be related via the `ingress-per-unit` relation with the `prometheus-k8s` charm built from the [`johnsca:traefik-ingress-unit`](https://github.com/johnsca/prometheus-operator/tree/traefik-ingress-unit) branch:
+This charm can be related via the `ingress-per-unit` relation with the `prometheus-k8s` charm built from the [`ingress` branch](https://github.com/canonical/prometheus-operator/tree/ingress):
 
 ```sh
 juju add-relation traefik-ingress:ingress-per-unit prometheus-k8s
