@@ -5,10 +5,10 @@ from textwrap import dedent
 from unittest.mock import Mock
 
 from charms.traefik_k8s.v0.ingress_per_unit import IngressPerUnitProvider
-from charms.traefik_k8s.v0.ingress_per_unit.testing import MockIPURequirer
 from ops.charm import CharmBase
 from ops.model import Binding
 from ops.testing import Harness
+from test_lib_helpers import MockIPURequirer
 
 
 class MockProviderCharm(CharmBase):

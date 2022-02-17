@@ -1,14 +1,50 @@
-# Copyright 2021 Canonical Ltd.
+# Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
-"""Provides side of ingress_per_unit interface protocol."""
+
+"""# Interface Library for ingress_per_unit.
+
+This library wraps relation endpoints using the `ingress_per_unit` interface
+and provides a Python API for both requesting and providing per-unit
+ingress.
+
+## Getting Started
+
+To get started using the library, you just need to fetch the library using `charmcraft`. **Note
+that you also need to add the `serialized_data_interface` dependency to your charm's `requirements.txt`.**
+
+```shell
+cd some-charm
+charmcraft fetch-lib charms.traefik-k8s.v0.ingress_per_unit
+echo "serialized_data_interface" >> requirements.txt
+```
+
+Then, to initialise the library:
+
+```python
+# ...
+from charms.traefik-k8s.v0.ingress_per_unit import IngressUnitRequirer
+
+class SomeCharm(CharmBase):
+  def __init__(self, *args):
+    # ...
+    self.ingress_per_unit = IngressPerUnitRequirer(self, port=80)
+    self.framework.observe(self.ingress_per_unit.on.ready, self._handle_ingress_per_unit)
+    # ...
+
+    def _handle_ingress_per_unit(self, event):
+        log.info("This unit's ingress URL: %s", self.ingress_per_unit.url)
+```
+"""
 
 import logging
 from pathlib import Path
 
-import sborl
 from ops.charm import CharmBase, RelationEvent, RelationRole
 from ops.framework import EventSource
 from ops.model import Relation, Unit
+from serialized_data_interface import EndpointWrapper
+from serialized_data_interface.errors import RelationDataError
+from serialized_data_interface.events import EndpointWrapperEvents
 
 try:
     # introduced in 3.9
@@ -18,7 +54,81 @@ except ImportError:
 
     cache = lru_cache(maxsize=None)
 
+# The unique Charmhub library identifier, never change it
+LIBID = ""  # can't register a library until the charm is in the store 9_9
+
+# Increment this major API version when introducing breaking changes
+LIBAPI = 0
+
+# Increment this PATCH version before using `charmcraft publish-lib` or reset
+# to 0 if you are raising the major API version
+LIBPATCH = 1
+
 log = logging.getLogger(__name__)
+
+INGRESS_SCHEMA = {
+  "v1": {
+    "requires": {
+      "unit": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "ip": {
+            "type": "string"
+          },
+          "port": {
+            "type": "integer"
+          },
+          "prefix": {
+            "type": "string"
+          },
+          "rewrite": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "model",
+          "name",
+          "ip",
+          "port",
+          "prefix",
+          "rewrite"
+        ]
+      }
+    },
+    "provides": {
+      "app": {
+        "type": "object",
+        "properties": {
+          "ingress": {
+            "type": "object",
+            "patternProperties": {
+              "": {
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "url"
+                ]
+              }
+            }
+          }
+        },
+        "required": [
+          "ingress"
+        ]
+      }
+    }
+  }
+}
 
 
 class IngressPerUnitRequestEvent(RelationEvent):
@@ -28,18 +138,18 @@ class IngressPerUnitRequestEvent(RelationEvent):
     """
 
 
-class IngressPerUnitProviderEvents(sborl.events.EndpointWrapperEvents):
+class IngressPerUnitProviderEvents(EndpointWrapperEvents):
     """Container for IUP events."""
 
     request = EventSource(IngressPerUnitRequestEvent)
 
 
-class IngressPerUnitProvider(sborl.EndpointWrapper):
+class IngressPerUnitProvider(EndpointWrapper):
     """Implementation of the provider of ingress_per_unit."""
 
     ROLE = RelationRole.provides.name
     INTERFACE = "ingress_per_unit"
-    SCHEMA = Path(__file__).parent / "schema.yaml"
+    SCHEMA = INGRESS_SCHEMA
 
     on = IngressPerUnitProviderEvents()
 
@@ -146,16 +256,16 @@ class IngressRequest:
         self._provider.wrap(self._relation, self._data)
 
 
-class RelationDataMismatchError(sborl.errors.RelationDataError):
+class RelationDataMismatchError(RelationDataError):
     """Data from different units do not match where they should."""
 
 
-class IngressPerUnitRequirer(sborl.EndpointWrapper):
+class IngressPerUnitRequirer(EndpointWrapper):
     """Implementation of the requirer of ingress_per_unit."""
 
     ROLE = RelationRole.requires.name
     INTERFACE = "ingress_per_unit"
-    SCHEMA = Path(__file__).parent / "schema.yaml"
+    SCHEMA = INGRESS_SCHEMA
     LIMIT = 1
 
     def __init__(

@@ -6,9 +6,9 @@
 import unittest
 from unittest.mock import patch
 
-from charms.traefik_k8s.v0.ingress_per_unit.testing import MockIPURequirer
 from ops.model import ActiveStatus, WaitingStatus
 from ops.testing import Harness
+from test_lib_helpers import MockIPURequirer
 
 from charm import TraefikIngressCharm
 
