@@ -1,16 +1,10 @@
 # Copyright 2021 Canonical Ltd.
 # See LICENSE file for licensing details.
-#
-# TEMPLATE-TODO: change this example to suit your needs.
-# If you don't need a config, you can remove the file entirely.
-# It ties in to the example _on_config_changed handler in src/charm.py
-#
-# Learn more about config at: https://juju.is/docs/sdk/config
 
 options:
   external_hostname:
     description: |
       The DNS name to be used by Traefik ingress.
-      If unspecified, the gateway address will be used, e.g,
+      If unspecified, the gateway ingress ip address will be used, e.g,
       as provided by MetalLB.
     type: string

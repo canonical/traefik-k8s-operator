@@ -16,7 +16,7 @@ containers:
   traefik:
     resource: traefik-image
     mounts:
-      - storage: dynamic-configurations
+      - storage: configurations
         location: /opt/traefik/
 
 resources:
@@ -24,17 +24,17 @@ resources:
     type: oci-image
     description: OCI image for traefik (https://hub.docker.com/_/traefik/)
     # Included for simplicity in integration tests
-    # upstream-source: ### Update this when we settle which image we want to use
+    upstream-source: docker.io/jnsgruk/traefik:2.6.1 ### Update this when we settle which image we want to use
 
 storage:
   # We need to store the configurations in a volume, as Traefik's directory
   # discovery provider does not work in the file system of the Docker image
-  dynamic-configurations:
+  configurations:
     type: filesystem
 
 provides:
-  ingress:
-    interface: ingress
+  ingress-per-unit:
+    interface: ingress_per_unit
   metrics-endpoint:
     interface: prometheus_scrape
     description: |

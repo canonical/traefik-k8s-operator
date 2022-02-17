@@ -18,16 +18,16 @@ This documents explains the processes and practices recommended for contributing
 ## Notable design decisions
 
 Traefik is a cluster-less proxy: each unit is performing its own routing decisions and keeping track of the health of upstreams (i.e., the addresses it routes requests for).
-Each Traefik operator listens to changes in the `ingress` relations and generates their own configurations.
+Each Traefik operator listens to changes in the `ingress-per-unit` relations and generates their own configurations.
 Only the leader unit of the Traefik operator, however, communicates "back" with the application on the other side of the relation by providing the URL at which the units are reachable.
 
 **Limitation:** Since follower (i.e., "non-leader") units of a Juju application _cannot_ access their application databag in the relation (see [this Juju bug report](https://bugs.launchpad.net/juju/+bug/1911010)), it can be the case that follower units starts routing to units that have not yet been notified by the leader unit of the Traefik operator, what their externally-reachable URL is.
 
 In order to configure Traefik, we use its [File provider](https://doc.traefik.io/traefik/providers/file/), which uses `inotify` mechanisms to know when new files are created or modified in the filesystem.
-Unfortunately, `inotify` does not work in most container filesystems, including the one of the [upstream Traefik image](https://hub.docker.com/_/traefik), which is why we resorted to:
+Unfortunately, `inotify` does not work in the [upstream Traefik image](https://hub.docker.com/_/traefik), which is why we resorted to:
 
 * storing the unit configuration in a _mounted volume_
-* run the Traefik process on a custom container image built on the [`ubuntu` base image](https://hub.docker.com/_/ubuntu).
+* run the Traefik process on a custom container image built on the [`ubuntu` base image](https://hub.docker.com/_/ubuntu), see the [Container image](#container-image) section.
 
 ## Developing
 
@@ -54,11 +54,11 @@ These instructions assume you will run the charm on [`microk8s`](https://microk8
 
 ```sh
 sudo snap install microk8s --classic
-microk8s enable storage dns registry
+microk8s enable storage dns
 microk8s enable metallb 192.168.0.10-192.168.0.100  # You will likely want to change these IP ranges
 ```
 
-The `storage`, `dns` and `registry` plugins are required machinery for most Juju charms running on K8s.
+The `storage` and `dns` plugins are required machinery for most Juju charms running on K8s.
 This charm is no different.
 The `metallb` plugin is needed so that the Traefik ingress will receive on its service, which is of type `LoadBalancer`, an external IP it can propagate to the proxied applications.
 
@@ -77,12 +77,9 @@ Build the charm in this git repository using:
 charmcraft pack
 ```
 
-The charm uses a custom container image built on Ubuntu:
+### Container image
 
-```sh
-docker build . -t localhost:32000/traefik:v1
-docker push localhost:32000/traefik:v1  # This will push the locally-built image to the registry provided by microk8s
-```
+We are using an Ubuntu-based image built from [this repository](https://github.com/jnsgruk/traefik-oci-image).
 
 The reason **not** to use the [upstream Traefik image](https://hub.docker.com/_/traefik), is that the [File provider](https://doc.traefik.io/traefik/providers/file/) the charm uses (see [Notable design decisions](#notable design-decisions) section) does not seem to work in the upstream, busybox-based Traefik image.
 
@@ -93,5 +90,5 @@ The reason **not** to use the [upstream Traefik image](https://hub.docker.com/_/
 juju add-model dev
 # Enable DEBUG logging
 juju model-config logging-config="<root>=INFO;unit=DEBUG"
-juju deploy ./traefik-k8s_ubuntu-20.04-amd64.charm traefik-ingress --trust --resource traefik-image=localhost:32000/traefik:v1
+juju deploy ./traefik-k8s_ubuntu-20.04-amd64.charm traefik-ingress --trust --resource traefik-image=docker.io/jnsgruk/traefik:2.6.1
 ```
