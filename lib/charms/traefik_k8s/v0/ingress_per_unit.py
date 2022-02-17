@@ -10,7 +10,8 @@ ingress.
 ## Getting Started
 
 To get started using the library, you just need to fetch the library using `charmcraft`. **Note
-that you also need to add the `serialized_data_interface` dependency to your charm's `requirements.txt`.**
+that you also need to add the `serialized_data_interface` dependency to your charm's
+`requirements.txt`.**
 
 ```shell
 cd some-charm
@@ -37,7 +38,6 @@ class SomeCharm(CharmBase):
 """
 
 import logging
-from pathlib import Path
 
 from ops.charm import CharmBase, RelationEvent, RelationRole
 from ops.framework import EventSource
@@ -67,67 +67,40 @@ LIBPATCH = 1
 log = logging.getLogger(__name__)
 
 INGRESS_SCHEMA = {
-  "v1": {
-    "requires": {
-      "unit": {
-        "type": "object",
-        "properties": {
-          "model": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "ip": {
-            "type": "string"
-          },
-          "port": {
-            "type": "integer"
-          },
-          "prefix": {
-            "type": "string"
-          },
-          "rewrite": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "model",
-          "name",
-          "ip",
-          "port",
-          "prefix",
-          "rewrite"
-        ]
-      }
-    },
-    "provides": {
-      "app": {
-        "type": "object",
-        "properties": {
-          "ingress": {
-            "type": "object",
-            "patternProperties": {
-              "": {
+    "v1": {
+        "requires": {
+            "unit": {
                 "type": "object",
                 "properties": {
-                  "url": {
-                    "type": "string"
-                  }
+                    "model": {"type": "string"},
+                    "name": {"type": "string"},
+                    "ip": {"type": "string"},
+                    "port": {"type": "integer"},
+                    "prefix": {"type": "string"},
+                    "rewrite": {"type": "string"},
                 },
-                "required": [
-                  "url"
-                ]
-              }
+                "required": ["model", "name", "ip", "port", "prefix", "rewrite"],
             }
-          }
         },
-        "required": [
-          "ingress"
-        ]
-      }
+        "provides": {
+            "app": {
+                "type": "object",
+                "properties": {
+                    "ingress": {
+                        "type": "object",
+                        "patternProperties": {
+                            "": {
+                                "type": "object",
+                                "properties": {"url": {"type": "string"}},
+                                "required": ["url"],
+                            }
+                        },
+                    }
+                },
+                "required": ["ingress"],
+            }
+        },
     }
-  }
 }
 
 

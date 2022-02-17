@@ -12,6 +12,7 @@ import yaml
 from charms.observability_libs.v0.kubernetes_service_patch import KubernetesServicePatch
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 from charms.traefik_k8s.v0.ingress_per_unit import IngressPerUnitProvider
+from lightkube import Client
 from lightkube.resources.core_v1 import Service
 from ops.charm import (
     CharmBase,
@@ -44,9 +45,7 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
-_TRAEFIK_CONTAINER_NAME = "traefik"
-_TRAEFIK_LAYER_NAME = "traefik"
-_TRAEFIK_SERVICE_NAME = "traefik"
+_TRAEFIK_CONTAINER_NAME = _TRAEFIK_LAYER_NAME = _TRAEFIK_SERVICE_NAME = "traefik"
 # We watch the parent folder of where we store the configuration files,
 # as that is usually safer for Traefik
 _TRAEFIK_INGRESS_CONFIGURATIONS_DIRECTORY = "/opt/traefik/juju"
