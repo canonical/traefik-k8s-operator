@@ -17,7 +17,7 @@ microk8s enable metallb 192.168.0.10-192.168.0.100 # You likely wanna change the
 ## Usage
 
 ```sh
-juju deploy ./traefik-k8s_ubuntu-20.04-amd64.charm traefik-ingress --trust --resource traefik-image=localhost:32000/traefik:v1
+juju deploy ./traefik-k8s_ubuntu-20.04-amd64.charm traefik-ingress --trust --resource traefik-image=docker.io/jnsgruk/traefik:2.6.1
 ```
 
 ## Relations
