@@ -56,7 +56,7 @@ except ImportError:
     cache = lru_cache(maxsize=None)
 
 # The unique Charmhub library identifier, never change it
-LIBID = ""  # can't register a library until the charm is in the store 9_9
+LIBID = "7ef06111da2945ed84f4f5d4eb5b353a"  # can't register a library until the charm is in the store 9_9
 
 # Increment this major API version when introducing breaking changes
 LIBAPI = 0
