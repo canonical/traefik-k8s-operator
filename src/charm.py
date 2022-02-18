@@ -6,6 +6,7 @@
 
 """Charm Traefik."""
 
+import enum
 import logging
 
 import yaml
@@ -51,6 +52,11 @@ _TRAEFIK_CONTAINER_NAME = _TRAEFIK_LAYER_NAME = _TRAEFIK_SERVICE_NAME = "traefik
 _TRAEFIK_INGRESS_CONFIGURATIONS_DIRECTORY = "/opt/traefik/juju"
 
 
+class _RoutingMode(enum.Enum):
+    path = "path"
+    subdomain = "subdomain"
+
+
 class TraefikIngressCharm(CharmBase):
     """Charm the service."""
 
@@ -61,7 +67,7 @@ class TraefikIngressCharm(CharmBase):
     def __init__(self, *args):
         super().__init__(*args)
 
-        self._stored.set_default(current_gateway_address=None)
+        self._stored.set_default(current_external_host=None, current_routing_mode=None)
 
         self.traefik_container = self.unit.get_container(_TRAEFIK_CONTAINER_NAME)
 
@@ -165,20 +171,37 @@ class TraefikIngressCharm(CharmBase):
     def _on_config_changed(self, _: ConfigChangedEvent):
         # If the external hostname is changed since we last processed it, we need to
         # to reconsider all data sent over the relations and all configs
-        new_gateway_address = self._gateway_address
+        new_external_host = self._external_host
+        new_routing_mode = self.config["routing_mode"]
 
-        if self._stored.current_gateway_address != new_gateway_address:
-            self._stored.current_gateway_address = new_gateway_address
+        if (
+            self._stored.current_external_host != new_external_host
+            or self._stored.current_routing_mode != new_routing_mode
+        ):
+            self._stored.current_external_host = new_external_host
+            self._stored.current_routing_mode = new_routing_mode
             self._process_status_and_configurations()
 
     def _process_status_and_configurations(self):
-        if not self._gateway_address:
+        routing_mode = self.config["routing_mode"]
+        try:
+            _RoutingMode(routing_mode)
+        except ValueError:
+            self.unit.status = MaintenanceStatus(
+                "resetting ingress-per-unit relations: invalid routing_mode"
+            )
+
+            self._wipe_ingress_for_all_relations()
+
+            self.unit.status = BlockedStatus(f"'{routing_mode}' is not a valid routing_mode value")
+            return
+
+        if not self._external_host:
             self.unit.status = MaintenanceStatus(
                 "resetting ingress-per-unit relations: gateway address not available"
             )
 
-            for relation in self.model.relations["ingress-per-unit"]:
-                self._wipe_ingress_for_relation(relation)
+            self._wipe_ingress_for_all_relations()
 
             self.unit.status = WaitingStatus("gateway address not available")
 
@@ -200,7 +223,7 @@ class TraefikIngressCharm(CharmBase):
             logger.error("The setup of some ingress relation failed, see previous logs")
 
     def _handle_ingress_per_unit_request(self, event: RelationEvent):
-        if not self._gateway_address:
+        if not self._external_host:
             self.unit.status = WaitingStatus("gateway address not available")
             event.defer()
             return
@@ -231,8 +254,10 @@ class TraefikIngressCharm(CharmBase):
             f"'{relation.name}:{relation.id}' relation"
         )
 
+        routing_mode = _RoutingMode(self.config["routing_mode"])
+
         if self.unit.is_leader():
-            if not (gateway_address := self._gateway_address):
+            if not (gateway_address := self._external_host):
                 service = f"{self.app.name}.{self.model.name}.svc.cluster.local"
 
                 for unit in request.units:
@@ -250,6 +275,8 @@ class TraefikIngressCharm(CharmBase):
             }
         }
 
+        external_host = self._external_host
+
         # FIXME Ideally, follower units could instead watch for the data in the
         # ingress app data bag, but Juju does not allow non-leader units to read
         # the application data bag on their side of the relation, so we may start
@@ -263,8 +290,15 @@ class TraefikIngressCharm(CharmBase):
             traefik_router_name = f"juju-{unit_prefix}-router"
             traefik_service_name = f"juju-{unit_prefix}-service"
 
+            if routing_mode == _RoutingMode.path:
+                route_rule = f"PathPrefix(`/{unit_prefix}`)"
+                unit_url = f"http://{gateway_address}:{self._port}/{unit_prefix}"
+            elif routing_mode == _RoutingMode.subdomain:
+                route_rule = f"Host(`{unit_prefix}.{external_host}`)"
+                unit_url = f"http://{unit_prefix}.{gateway_address}:{self._port}/"
+
             ingress_relation_configuration["http"]["routers"][traefik_router_name] = {
-                "rule": f"PathPrefix(`/{unit_prefix}`)",
+                "rule": route_rule,
                 "service": traefik_service_name,
                 "entryPoints": ["web"],
             }
@@ -276,7 +310,7 @@ class TraefikIngressCharm(CharmBase):
             }
 
             if self.unit.is_leader():
-                request.respond(unit, f"http://{gateway_address}:{self._port}/{unit_prefix}")
+                request.respond(unit, unit_url)
 
         ingress_relation_configuration_path = f"{_TRAEFIK_INGRESS_CONFIGURATIONS_DIRECTORY}/{self._ingress_config_file_name(relation)}"
         self.traefik_container.push(
@@ -301,6 +335,10 @@ class TraefikIngressCharm(CharmBase):
         self._wipe_ingress_for_relation(event.relation)
 
         self.unit.status = ActiveStatus()
+
+    def _wipe_ingress_for_all_relations(self):
+        for relation in self.model.relations["ingress-per-unit"]:
+            self._wipe_ingress_for_relation(relation)
 
     def _wipe_ingress_for_relation(self, relation: Relation):
         logger.debug(f"Wiping the ingress setup for the '{relation.name}:{relation.id}' relation")
@@ -391,7 +429,7 @@ class TraefikIngressCharm(CharmBase):
         self.traefik_container.start(_TRAEFIK_SERVICE_NAME)
 
     @property
-    def _gateway_address(self):
+    def _external_host(self):
         """Determine the external address for the ingress gateway.
 
         It will prefer the `external-hostname` config if that is set, otherwise
