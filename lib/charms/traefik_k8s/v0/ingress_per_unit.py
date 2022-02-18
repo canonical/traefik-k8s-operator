@@ -75,12 +75,10 @@ INGRESS_SCHEMA = {
                 "properties": {
                     "model": {"type": "string"},
                     "name": {"type": "string"},
-                    "ip": {"type": "string"},
+                    "host": {"type": "string"},
                     "port": {"type": "integer"},
-                    "prefix": {"type": "string"},
-                    "rewrite": {"type": "string"},
                 },
-                "required": ["model", "name", "ip", "port", "prefix", "rewrite"],
+                "required": ["model", "name", "host", "port"],
             }
         },
         "provides": {
@@ -159,7 +157,7 @@ class IngressPerUnitProvider(EndpointWrapper):
         for unit in relation.units:
             if not data[unit]:
                 continue
-            new_fields = {field: data[unit][field] for field in ("model", "port", "rewrite")}
+            new_fields = {field: data[unit][field] for field in ("model", "port")}
             if prev_fields is None:
                 prev_fields = new_fields
             if new_fields != prev_fields:
@@ -189,34 +187,57 @@ class IngressRequest:
     @property
     def model(self):
         """The name of the model the request was made from."""
-        return self._data[self.units[0]]["model"]
+        return self._get_data_from_first_unit("model")
 
     @property
     def app_name(self):
         """The name of the remote app.
 
         Note: This is not the same as `self.app.name` when using CMR relations,
-        since `self.app.name` is replaced by a UUID to avoid ambiguity.
+        since `self.app.name` is replaced by a `remote-{UUID}` pattern.
         """
-        return self._data[self.units[0]]["name"].split("/")[0]
+        first_unit_name = self._get_data_from_first_unit("name")
+
+        if first_unit_name:
+            return first_unit_name.split("/")[0]
+
+        return None
 
     @property
     def port(self):
         """The backend port."""
-        return self._data[self.units[0]]["port"]
+        return self._get_data_from_first_unit("port")
 
-    @property
-    def rewrite(self):
-        """The backend path."""
-        return self._data[self.units[0]]["rewrite"]
+    def get_host(self, unit: Unit):
+        """The hostname (DNS address, ip) of the given unit."""
+        return self._get_unit_data(unit, "host")
 
-    def get_prefix(self, unit: Unit):
-        """Return the prefix for the given unit."""
-        return self._data[unit]["prefix"]
+    def get_unit_name(self, unit: Unit):
+        """The name of the remote unit.
 
-    def get_ip(self, unit: Unit):
-        """Return the IP of the given unit."""
-        return self._data[unit]["ip"]
+        Note: This is not the same as `self.unit.name` when using CMR relations,
+        since `self.unit.name` is replaced by a `remote-{UUID}` pattern.
+        """
+        return self._get_unit_data(unit, "name")
+
+    def _get_data_from_first_unit(self, key: str):
+        if self.units:
+            first_unit_data = self._data[self.units[0]]
+
+            if key in first_unit_data:
+                return first_unit_data[key]
+
+        return None
+
+    def _get_unit_data(self, unit: Unit, key: str):
+        if self.units:
+            if unit in self.units:
+                unit_data = self._data[unit]
+
+                if key in unit_data:
+                    return unit_data[key]
+
+        return None
 
     def respond(self, unit: Unit, url: str):
         """Send URL back for the given unit.
@@ -224,7 +245,7 @@ class IngressRequest:
         Note: only the leader can send URLs.
         """
         # Can't use `unit.name` because with CMR it's a UUID.
-        remote_unit_name = self._data[unit]["name"]
+        remote_unit_name = self.get_unit_name(unit)
         ingress = self._data[self._provider.charm.app].setdefault("ingress", {})
         ingress.setdefault(remote_unit_name, {})["url"] = url
         self._provider.wrap(self._relation, self._data)
@@ -247,9 +268,8 @@ class IngressPerUnitRequirer(EndpointWrapper):
         charm: CharmBase,
         endpoint: str = None,
         *,
-        hostname: str = None,
+        host: str = None,
         port: int = None,
-        rewrite: str = None,
     ):
         """Constructor for IngressRequirer.
 
@@ -263,46 +283,38 @@ class IngressPerUnitRequirer(EndpointWrapper):
             endpoint: the name of the relation endpoint to bind to
                 (defaults to "ingress-per-unit"; relation must be of interface type
                 "ingress_per_unit" and have "limit: 1")
-            hostname: Hostname to be used by the ingress provider to address the requirer
+            host: Hostname to be used by the ingress provider to address the requirer
                 unit; if unspecified, the pod ip of the unit will be used instead
         Request Args:
-            port: the port of the service (required if rewrite is given)
-            rewrite: the path on the target service to map the request to; defaults
-                to "/"
+            port: the port of the service
         """
         super().__init__(charm, endpoint)
         if port:
-            self.auto_data = self._complete_request(hostname or "", port, rewrite)
+            self.auto_data = self._complete_request(host or "", port)
 
-    def _complete_request(self, hostname: Optional[str], port: int, rewrite: Optional[str]):
-        unit_name_dashed = self.charm.unit.name.replace("/", "-")
-
-        if not hostname:
+    def _complete_request(self, host: Optional[str], port: int):
+        if not host:
             binding = self.charm.model.get_binding(self.endpoint)
-            hostname = str(binding.network.bind_address)
+            host = str(binding.network.bind_address)
 
         return {
             self.charm.unit: {
                 "model": self.model.name,
                 "name": self.charm.unit.name,
-                "ip": hostname,
-                "prefix": f"{self.model.name}-{unit_name_dashed}",
+                "host": host,
                 "port": port,
-                "rewrite": rewrite or "/",
             },
         }
 
-    def request(self, *, hostname: str = None, port: int, rewrite: str = None):
+    def request(self, *, host: str = None, port: int):
         """Request ingress to this unit.
 
         Args:
-            hostname: Hostname to be used by the ingress provider to address the requirer
+            host: Hostname to be used by the ingress provider to address the requirer
                 unit; if unspecified, the pod ip of the unit will be used instead
             port: the port of the service (required)
-            rewrite: the path on the target unit to map the request to; defaults
-                to "/"
         """
-        self.wrap(self.relation, self._complete_request(hostname, port, rewrite))
+        self.wrap(self.relation, self._complete_request(host, port))
 
     @property
     def relation(self):

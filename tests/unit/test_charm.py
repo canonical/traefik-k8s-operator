@@ -16,6 +16,7 @@ from charm import TraefikIngressCharm
 class TestTraefikIngressCharm(unittest.TestCase):
     def setUp(self):
         self.harness = Harness(TraefikIngressCharm)
+        self.harness.set_model_name("test-model")
         self.addCleanup(self.harness.cleanup)
 
     @patch("charm.KubernetesServicePatch", lambda **unused: None)
@@ -31,7 +32,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
         requirer = MockIPURequirer(self.harness)
         relation = requirer.relate()
-        requirer.request(hostname="10.1.10.1", port=9000)
+        requirer.request(host="10.1.10.1", port=9000)
 
         assert requirer.is_available(relation)
 
@@ -78,7 +79,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
         requirer = MockIPURequirer(self.harness)
         relation = requirer.relate()
-        requirer.request(hostname="10.1.10.1", port=9000)
+        requirer.request(host="10.1.10.1", port=9000)
 
         assert requirer.is_available(relation)
         assert not requirer.is_ready(relation)
@@ -95,7 +96,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
         requirer = MockIPURequirer(self.harness)
         relation = requirer.relate()
-        requirer.request(hostname="10.1.10.1", port=9000)
+        requirer.request(host="10.1.10.1", port=9000)
 
         self.harness.container_pebble_ready("traefik")
 
@@ -119,7 +120,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
         requirer = MockIPURequirer(self.harness)
         relation = requirer.relate()
-        requirer.request(hostname="10.1.10.1", port=9000)
+        requirer.request(host="10.1.10.1", port=9000)
 
         self.harness.container_pebble_ready("traefik")
 
@@ -156,7 +157,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
         requirer = MockIPURequirer(self.harness)
         relation = requirer.relate()
-        requirer.request(hostname="10.1.10.1", port=9000)
+        requirer.request(host="10.1.10.1", port=9000)
 
         assert requirer.is_available(relation)
         assert requirer.is_ready(relation)

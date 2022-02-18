@@ -256,8 +256,9 @@ class TraefikIngressCharm(CharmBase):
         # routing for a remote unit before the leader unit of ingress has
         # communicated the url.
         for unit in request.units:
-            unit_prefix = request.get_prefix(unit)
-            unit_ingress_address = request.get_ip(unit)
+            unit_name = request.get_unit_name(unit).replace("/", "-")
+            unit_prefix = f"{request.model}-{unit_name}"
+            unit_ingress_address = request.get_host(unit)
             unit_port = request.port
             traefik_router_name = f"juju-{unit_prefix}-router"
             traefik_service_name = f"juju-{unit_prefix}-service"
