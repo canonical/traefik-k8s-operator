@@ -8,3 +8,32 @@ options:
       If unspecified, the gateway ingress ip address will be used, e.g,
       as provided by MetalLB.
     type: string
+  routing_mode:
+    description: |
+      The routing mode allows you to specify how Traefik going to generate
+      routes on behalf of the requesters.
+
+      Valid values are "path" and "subdomain".
+
+      With the "path" routing mode, Traefik will use its externally-visible url,
+      and create a route for the requester that will be structure like:
+
+      `<external_url>/<requester_model_name>-<requester_application_name>-<requester-unit-index>`
+
+      For example, an ingress-per-unit provider with `http://foo` external URL,
+      will provide to the unit `my-unit/2` in the `my-model` model the
+      following URL:
+
+      `http://foo/my-model-my-unit-2`
+
+      With the "subdomain" routing mode, Traefik will use its externally-visible url,
+      and create a route for the requester that will be structure like:
+
+      `<protocol>://<requester_model_name>-<requester_application_name>-<requester-unit-index>.<external_hostname>:<port>/`
+
+      For example, an ingress-per-unit provider with `http://foo:8080` external URL,
+      will provide to the unit `my-unit/2` in the `my-model` model the following URL:
+
+      `http://my-model-my-unit-2.foo:8080`
+    type: string
+    default: path
