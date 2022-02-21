@@ -193,7 +193,14 @@ class TraefikIngressCharm(CharmBase):
 
             self._wipe_ingress_for_all_relations()
 
-            self.unit.status = BlockedStatus(f"'{routing_mode}' is not a valid routing_mode value")
+            self.unit.status = BlockedStatus(
+                f"'{routing_mode}' is not a valid routing_mode value; see debug logs for more information"
+            )
+            logger.error(
+                "'%s' is not a valid routing_mode value; valid values are: %s",
+                routing_mode,
+                [e.value for e in _RoutingMode],
+            )
             return
 
         if not self._external_host:
@@ -204,7 +211,6 @@ class TraefikIngressCharm(CharmBase):
             self._wipe_ingress_for_all_relations()
 
             self.unit.status = WaitingStatus("gateway address not available")
-
             return
 
         if not self._is_traefik_service_running():

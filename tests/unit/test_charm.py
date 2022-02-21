@@ -134,7 +134,9 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
         self.assertEqual(
             self.harness.charm.unit.status,
-            BlockedStatus("'FOOBAR' is not a valid routing_mode value"),
+            BlockedStatus(
+                "'FOOBAR' is not a valid routing_mode value; see debug logs for more information"
+            ),
         )
 
         self.harness.update_config(
