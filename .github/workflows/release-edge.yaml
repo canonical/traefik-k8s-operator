@@ -1,0 +1,93 @@
+name: Release to Edge
+
+on: 
+  push:
+    branches:
+      - main  
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      
+      - name: Install dependencies
+        run: python3 -m pip install tox
+      
+      - name: Run linters
+        run: tox -e lint
+  
+  unit-test:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: Install dependencies
+        run: python -m pip install tox
+  
+      - name: Run tests
+        run: tox -e unit
+  
+  integration-test:
+    name: Integration tests (microk8s)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: Setup operator environment
+        uses: charmed-kubernetes/actions-operator@main
+        with:
+          provider: microk8s
+      
+      - name: Run integration tests
+        run: tox -e integration -- --model testing
+
+      - name: Dump logs
+        uses: canonical/charm-logdump-action@main
+        if: failure()
+        with:
+          app: traefik-k8s
+
+ release-to-charmhub:
+    name: Release to CharmHub
+    needs: 
+      - lint
+      - unit-test
+      - integration-test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      
+      - name: Upload to edge channel
+        uses: canonical/charmhub-upload-action@0.2.0
+        with:
+          credentials: "${{ secrets.CHARMHUB_TOKEN }}"
+
+      - name: Get Revision ID
+        id: revision
+        env:
+          CHARMCRAFT_AUTH: "${{ secrets.CHARMHUB_TOKEN }}"
+        run: |
+          echo "::set-output name=rev::$(charmcraft status prometheus-scrape-config-k8s | grep edge | awk '{printf "%s", $NF}')"
+      
+      - name: Create tag
+        uses: actions/create-release@v1
+        with:
+          draft: false
+          prerelease: false
+          release_name: Revision ${{ steps.revision.outputs.rev }}
+          tag_name: rev${{ steps.revision.outputs.rev }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
