@@ -80,8 +80,7 @@ jobs:
         env:
           CHARMCRAFT_AUTH: "${{ secrets.CHARMHUB_TOKEN }}"
         run: |
-          echo "::set-output name=rev::$(charmcraft status prometheus-scrape-config-k8s | grep edge | awk '{printf "%s", $NF}')"
-      
+          echo "::set-output name=rev::$(charmcraft status traefik-k8s | grep edge | awk '{print $2}')"      
       - name: Create tag
         uses: actions/create-release@v1
         with:
