@@ -57,7 +57,7 @@ jobs:
         with:
           app: traefik-k8s
 
- release-to-charmhub:
+  release-to-charmhub:
     name: Release to CharmHub
     needs: 
       - lint
