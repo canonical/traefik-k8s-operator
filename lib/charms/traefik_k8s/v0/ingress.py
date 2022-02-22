@@ -211,7 +211,7 @@ class RelationDataMismatchError(RelationDataError):
 
 
 class IngressPerAppRequirer(EndpointWrapper):
-    """Implementation of the requirer of ingress_per_unit."""
+    """Implementation of the requirer of the ingress relation."""
 
     ROLE = RelationRole.requires.name
     INTERFACE = "ingress"
@@ -235,12 +235,11 @@ class IngressPerAppRequirer(EndpointWrapper):
 
         Args:
             charm: the charm that is instantiating the library.
-            endpoint: the name of the relation endpoint to bind to
-                (defaults to "ingress-per-unit"; relation must be of interface type
-                "ingress_per_unit" and have "limit: 1")
-            host: Hostname to be used by the ingress provider to address the requirer
-                application; if unspecified, the default Kubernetes service name will
-                be used.
+            endpoint: the name of the relation endpoint to bind to (defaults to `ingress`);
+                relation must be of interface type `ingress` and have "limit: 1")
+            host: Hostname to be used by the ingress provider to address the requiring
+                application; if unspecified, the default Kubernetes service name will be used.
+
         Request Args:
             port: the port of the service
         """
@@ -266,11 +265,11 @@ class IngressPerAppRequirer(EndpointWrapper):
         }
 
     def request(self, *, host: str = None, port: int):
-        """Request ingress to this unit.
+        """Request ingress to this application.
 
         Args:
-            host: Hostname to be used by the ingress provider to address the requirer
-                unit; if unspecified, the pod ip of the unit will be used instead
+            host: Hostname to be used by the ingress provider to address the requirer; if
+                unspecified, the Kubernetes service address is used.
             port: the port of the service (required)
         """
         self.wrap(self.relation, self._complete_request(host, port))
