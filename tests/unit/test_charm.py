@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
 from ops.testing import Harness
-from test_lib_helpers import MockIPURequirer
+from test_lib_helpers import MockIPARequirer, MockIPURequirer
 
 from charm import TraefikIngressCharm
 
@@ -61,6 +61,49 @@ class TestTraefikIngressCharm(unittest.TestCase):
             {
                 "ingress-per-unit-remote/0": "http://testhostname:80/test-model-ingress-per-unit-remote-0"
             },
+        )
+        self.assertEqual(self.harness.charm.unit.status, ActiveStatus())
+
+    @patch("charm.KubernetesServicePatch", lambda **unused: None)
+    def test_pebble_ready_with_gateway_address_from_config_and_path_routing_mode_2(self):
+        """Test round-trip bootstrap and relation with a consumer."""
+        self.harness.update_config({"external_hostname": "testhostname"})
+        self.harness.set_leader(True)
+        self.harness.begin_with_initial_hooks()
+
+        self.harness.container_pebble_ready("traefik")
+
+        self.assertEqual(self.harness.charm.unit.status, ActiveStatus())
+
+        requirer = MockIPARequirer(self.harness)
+        relation = requirer.relate()
+        requirer.request(host="foo.bar", port=3000)
+
+        assert requirer.is_available(relation)
+
+        traefik_container = self.harness.charm.unit.get_container("traefik")
+        self.assertEqual(
+            traefik_container.pull(
+                f"/opt/traefik/juju/juju_ingress_{relation.name}_{relation.id}_{relation.app.name}.yaml"
+            ).read(),
+            """http:
+  routers:
+    juju-test-model-ingress-per-unit-remote-0-router:
+      entryPoints:
+      - web
+      rule: PathPrefix(`/test-model-ingress-per-unit-remote-0`)
+      service: juju-test-model-ingress-per-unit-remote-0-service
+  services:
+    juju-test-model-ingress-per-unit-remote-0-service:
+      loadBalancer:
+        servers:
+        - url: http://foo.bar:3000
+""",
+        )
+
+        self.assertEqual(
+            requirer.url,
+            "http://testhostname:80/test-model-ingress-per-unit-remote",
         )
         self.assertEqual(self.harness.charm.unit.status, ActiveStatus())
 
