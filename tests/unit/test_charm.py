@@ -65,7 +65,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
         self.assertEqual(self.harness.charm.unit.status, ActiveStatus())
 
     @patch("charm.KubernetesServicePatch", lambda **unused: None)
-    def test_pebble_ready_with_gateway_address_from_config_and_path_routing_mode_2(self):
+    def test_pebble_ready_with_gateway_address_from_config_and_path_routing_mode_per_app(self):
         """Test round-trip bootstrap and relation with a consumer."""
         self.harness.update_config({"external_hostname": "testhostname"})
         self.harness.set_leader(True)
@@ -88,13 +88,13 @@ class TestTraefikIngressCharm(unittest.TestCase):
             ).read(),
             """http:
   routers:
-    juju-test-model-ingress-per-unit-remote-0-router:
+    juju-test-model-ingress-per-unit-remote-router:
       entryPoints:
       - web
-      rule: PathPrefix(`/test-model-ingress-per-unit-remote-0`)
-      service: juju-test-model-ingress-per-unit-remote-0-service
+      rule: PathPrefix(`/test-model-ingress-per-unit-remote`)
+      service: juju-test-model-ingress-per-unit-remote-service
   services:
-    juju-test-model-ingress-per-unit-remote-0-service:
+    juju-test-model-ingress-per-unit-remote-service:
       loadBalancer:
         servers:
         - url: http://foo.bar:3000
