@@ -2,15 +2,15 @@
 # See LICENSE file for licensing details.
 """Helpers for unit testing charms which use this library."""
 
+from charms.traefik_k8s.v0.ingress import (
+    IngressPerAppProvider,
+    IngressPerAppRequest,
+    IngressPerAppRequirer,
+)
 from charms.traefik_k8s.v0.ingress_per_unit import (
     IngressPerUnitProvider,
     IngressPerUnitRequirer,
     IngressRequest,
-)
-from charms.traefik_k8s.v0.ingress import (
-    IngressPerAppProvider,
-    IngressPerAppRequirer,
-    IngressPerAppRequest,
 )
 from ops.model import Relation
 from serialized_data_interface.testing import MockRemoteRelationMixin

@@ -100,25 +100,13 @@ class TraefikIngressCharm(CharmBase):
         self.framework.observe(self.on.update_status, self._on_update_status)
         self.framework.observe(self.on.config_changed, self._on_config_changed)
 
-        self.framework.observe(
-            self.ingress_per_app.on.request, self._handle_ingress_request
-        )
-        self.framework.observe(
-            self.ingress_per_app.on.failed, self._handle_ingress_failure
-        )
-        self.framework.observe(
-            self.ingress_per_app.on.broken, self._handle_ingress_broken
-        )
+        self.framework.observe(self.ingress_per_app.on.request, self._handle_ingress_request)
+        self.framework.observe(self.ingress_per_app.on.failed, self._handle_ingress_failure)
+        self.framework.observe(self.ingress_per_app.on.broken, self._handle_ingress_broken)
 
-        self.framework.observe(
-            self.ingress_per_unit.on.request, self._handle_ingress_request
-        )
-        self.framework.observe(
-            self.ingress_per_unit.on.failed, self._handle_ingress_failure
-        )
-        self.framework.observe(
-            self.ingress_per_unit.on.broken, self._handle_ingress_broken
-        )
+        self.framework.observe(self.ingress_per_unit.on.request, self._handle_ingress_request)
+        self.framework.observe(self.ingress_per_unit.on.failed, self._handle_ingress_failure)
+        self.framework.observe(self.ingress_per_unit.on.broken, self._handle_ingress_broken)
 
     def _on_traefik_pebble_ready(self, _: PebbleReadyEvent):
         # The the Traefik container comes up, e.g., after a pod churn, we
@@ -236,7 +224,7 @@ class TraefikIngressCharm(CharmBase):
 
         self.unit.status = MaintenanceStatus("updating the ingress configurations")
 
-        for ingress_relation in (self.ingress_per_app.relations + self.ingress_per_unit.relations):
+        for ingress_relation in self.ingress_per_app.relations + self.ingress_per_unit.relations:
             self._process_ingress_relation(ingress_relation)
 
         if isinstance(self.unit.status, MaintenanceStatus):
@@ -266,9 +254,13 @@ class TraefikIngressCharm(CharmBase):
         # which was deferred until after the relation was broken.
         relation_type = _get_relation_type(relation)
 
-        if relation_type == _IngressRelationType.per_app and not self.ingress_per_app.is_ready(relation):
+        if relation_type == _IngressRelationType.per_app and not self.ingress_per_app.is_ready(
+            relation
+        ):
             return
-        elif relation_type == _IngressRelationType.per_unit and not self.ingress_per_unit.is_ready(relation):
+        elif relation_type == _IngressRelationType.per_unit and not self.ingress_per_unit.is_ready(
+            relation
+        ):
             return
 
         self.unit.status = MaintenanceStatus(
@@ -280,7 +272,11 @@ class TraefikIngressCharm(CharmBase):
             f"'{relation.name}:{relation.id}' relation"
         )
 
-        request = self.ingress_per_app.get_request(relation) if relation_type == _IngressRelationType.per_app else self.ingress_per_unit.get_request(relation)
+        request = (
+            self.ingress_per_app.get_request(relation)
+            if relation_type == _IngressRelationType.per_app
+            else self.ingress_per_unit.get_request(relation)
+        )
 
         if self.unit.is_leader():
             if not (gateway_address := self._external_host):
@@ -329,9 +325,7 @@ class TraefikIngressCharm(CharmBase):
             }
 
             ingress_relation_configuration["http"]["services"][traefik_service_name] = {
-                "loadBalancer": {
-                    "servers": [{"url": f"http://{app_ingress_address}:{app_port}"}]
-                }
+                "loadBalancer": {"servers": [{"url": f"http://{app_ingress_address}:{app_port}"}]}
             }
 
             if self.unit.is_leader():
@@ -382,7 +376,11 @@ class TraefikIngressCharm(CharmBase):
         logger.debug(f"Updated ingress configuration file: {ingress_relation_configuration_path}")
 
     def _handle_ingress_failure(self, event: RelationEvent):
-        self.unit.status = self.ingress_per_app.get_status(event.relation) if _get_relation_type(event.relation) == _IngressRelationType.per_app else self.ingress_per_unit.get_status(event.relation)
+        self.unit.status = (
+            self.ingress_per_app.get_status(event.relation)
+            if _get_relation_type(event.relation) == _IngressRelationType.per_app
+            else self.ingress_per_unit.get_status(event.relation)
+        )
 
     def _handle_ingress_broken(self, event: RelationEvent):
         if not self._is_traefik_service_running():
@@ -397,7 +395,7 @@ class TraefikIngressCharm(CharmBase):
         self.unit.status = ActiveStatus()
 
     def _wipe_ingress_for_all_relations(self):
-        for relation in (self.model.relations["ingress"] + self.model.relations["ingress-per-unit"]):
+        for relation in self.model.relations["ingress"] + self.model.relations["ingress-per-unit"]:
             self._wipe_ingress_for_relation(relation)
 
     def _wipe_ingress_for_relation(self, relation: Relation):
@@ -523,7 +521,11 @@ def _get_loadbalancer_status(namespace: str, service_name: str):
 
 
 def _get_relation_type(relation: Relation) -> _IngressRelationType:
-    return _IngressRelationType.per_app if relation.name == "ingress" else _IngressRelationType.per_unit
+    return (
+        _IngressRelationType.per_app
+        if relation.name == "ingress"
+        else _IngressRelationType.per_unit
+    )
 
 
 if __name__ == "__main__":

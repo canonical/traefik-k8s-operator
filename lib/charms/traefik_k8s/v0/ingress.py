@@ -83,10 +83,7 @@ INGRESS_SCHEMA = {
             # Without this empty "unit" declaration, the requirer (but not
             # the provider!) fails with a serialized_data_interface.errors.MissingSchemaError
             # when looking up the schema for single units (although no schema is needed)
-            "unit": {
-                "type": "object",
-                "properties": {}
-            }
+            "unit": {"type": "object", "properties": {}},
         },
         "provides": {
             "app": {
@@ -101,10 +98,7 @@ INGRESS_SCHEMA = {
                 },
                 "required": ["ingress"],
             },
-            "unit": {
-                "type": "object",
-                "properties": {}
-            }
+            "unit": {"type": "object", "properties": {}},
         },
     }
 }
@@ -165,7 +159,11 @@ class IngressPerAppProvider(EndpointWrapper):
 
         other_app = relation.app
 
-        new_fields = {field: data[other_app][field] for field in ("model", "port") if field in data[other_app]}
+        new_fields = {
+            field: data[other_app][field]
+            for field in ("model", "port")
+            if field in data[other_app]
+        }
         if prev_fields is None:
             prev_fields = new_fields
         if new_fields != prev_fields:
