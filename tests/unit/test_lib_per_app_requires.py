@@ -58,7 +58,7 @@ def test_ingress_app_requirer():
 
     request = provider.get_request(relation)
     print(f"Relation data: {relation.data}")
-    assert request.app_name == "test-requirer"
+    assert request.app_name == "ingress-remote"
     request.respond("http://url/")
     assert requirer.is_available(relation)
     assert requirer.is_ready(relation)
