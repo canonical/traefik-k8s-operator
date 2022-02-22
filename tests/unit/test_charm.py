@@ -1,11 +1,10 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
-#
-# Learn more about testing at: https://juju.is/docs/sdk/testing
 
 import unittest
 from unittest.mock import patch
 
+import yaml
 from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
 from ops.testing import Harness
 from test_lib_helpers import MockIPARequirer, MockIPURequirer
@@ -25,7 +24,6 @@ class TestTraefikIngressCharm(unittest.TestCase):
         self.harness.update_config({"external_hostname": "testhostname"})
         self.harness.set_leader(True)
         self.harness.begin_with_initial_hooks()
-
         self.harness.container_pebble_ready("traefik")
 
         self.assertEqual(self.harness.charm.unit.status, ActiveStatus())
@@ -33,28 +31,30 @@ class TestTraefikIngressCharm(unittest.TestCase):
         requirer = MockIPURequirer(self.harness)
         relation = requirer.relate()
         requirer.request(host="10.1.10.1", port=9000)
-
         assert requirer.is_available(relation)
 
         traefik_container = self.harness.charm.unit.get_container("traefik")
-        self.assertEqual(
-            traefik_container.pull(
-                f"/opt/traefik/juju/juju_ingress_{relation.name}_{relation.id}_{relation.app.name}.yaml"
-            ).read(),
-            """http:
-  routers:
-    juju-test-model-ingress-per-unit-remote-0-router:
-      entryPoints:
-      - web
-      rule: PathPrefix(`/test-model-ingress-per-unit-remote-0`)
-      service: juju-test-model-ingress-per-unit-remote-0-service
-  services:
-    juju-test-model-ingress-per-unit-remote-0-service:
-      loadBalancer:
-        servers:
-        - url: http://10.1.10.1:9000
-""",
-        )
+        file = f"/opt/traefik/juju/juju_ingress_{relation.name}_{relation.id}_{relation.app.name}.yaml"
+        conf = yaml.safe_load(traefik_container.pull(file).read())
+
+        expected = {
+            "http": {
+                "routers": {
+                    "juju-test-model-ingress-per-unit-remote-0-router": {
+                        "entryPoints": ["web"],
+                        "rule": "PathPrefix(`/test-model-ingress-per-unit-remote-0`)",
+                        "service": "juju-test-model-ingress-per-unit-remote-0-service",
+                    }
+                },
+                "services": {
+                    "juju-test-model-ingress-per-unit-remote-0-service": {
+                        "loadBalancer": {"servers": [{"url": "http://10.1.10.1:9000"}]}
+                    }
+                },
+            }
+        }
+
+        self.assertEqual(conf, expected)
 
         self.assertEqual(
             requirer.urls,
@@ -70,7 +70,6 @@ class TestTraefikIngressCharm(unittest.TestCase):
         self.harness.update_config({"external_hostname": "testhostname"})
         self.harness.set_leader(True)
         self.harness.begin_with_initial_hooks()
-
         self.harness.container_pebble_ready("traefik")
 
         self.assertEqual(self.harness.charm.unit.status, ActiveStatus())
@@ -78,29 +77,29 @@ class TestTraefikIngressCharm(unittest.TestCase):
         requirer = MockIPARequirer(self.harness)
         relation = requirer.relate()
         requirer.request(host="foo.bar", port=3000)
-
         assert requirer.is_available(relation)
 
         traefik_container = self.harness.charm.unit.get_container("traefik")
-        self.maxDiff = None
-        self.assertEqual(
-            traefik_container.pull(
-                f"/opt/traefik/juju/juju_ingress_{relation.name}_{relation.id}_{relation.app.name}.yaml"
-            ).read(),
-            """http:
-  routers:
-    juju-test-model-ingress-remote-router:
-      entryPoints:
-      - web
-      rule: PathPrefix(`/test-model-ingress-remote`)
-      service: juju-test-model-ingress-remote-service
-  services:
-    juju-test-model-ingress-remote-service:
-      loadBalancer:
-        servers:
-        - url: http://foo.bar:3000
-""",
-        )
+        file = f"/opt/traefik/juju/juju_ingress_{relation.name}_{relation.id}_{relation.app.name}.yaml"
+        conf = yaml.safe_load(traefik_container.pull(file).read())
+
+        expected = {
+            "http": {
+                "routers": {
+                    "juju-test-model-ingress-remote-router": {
+                        "entryPoints": ["web"],
+                        "rule": "PathPrefix(`/test-model-ingress-remote`)",
+                        "service": "juju-test-model-ingress-remote-service",
+                    }
+                },
+                "services": {
+                    "juju-test-model-ingress-remote-service": {
+                        "loadBalancer": {"servers": [{"url": "http://foo.bar:3000"}]}
+                    }
+                },
+            }
+        }
+        self.assertEqual(conf, expected)
 
         self.assertEqual(
             requirer.url,
@@ -129,28 +128,30 @@ class TestTraefikIngressCharm(unittest.TestCase):
         requirer = MockIPURequirer(self.harness)
         relation = requirer.relate()
         requirer.request(host="10.1.10.1", port=9000)
-
         assert requirer.is_available(relation)
 
         traefik_container = self.harness.charm.unit.get_container("traefik")
-        self.assertEqual(
-            traefik_container.pull(
-                f"/opt/traefik/juju/juju_ingress_{relation.name}_{relation.id}_{relation.app.name}.yaml"
-            ).read(),
-            """http:
-  routers:
-    juju-test-model-ingress-per-unit-remote-0-router:
-      entryPoints:
-      - web
-      rule: Host(`test-model-ingress-per-unit-remote-0.testhostname`)
-      service: juju-test-model-ingress-per-unit-remote-0-service
-  services:
-    juju-test-model-ingress-per-unit-remote-0-service:
-      loadBalancer:
-        servers:
-        - url: http://10.1.10.1:9000
-""",
-        )
+        file = f"/opt/traefik/juju/juju_ingress_{relation.name}_{relation.id}_{relation.app.name}.yaml"
+        conf = yaml.safe_load(traefik_container.pull(file).read())
+
+        expected = {
+            "http": {
+                "routers": {
+                    "juju-test-model-ingress-per-unit-remote-0-router": {
+                        "entryPoints": ["web"],
+                        "rule": "Host(`test-model-ingress-per-unit-remote-0.testhostname`)",
+                        "service": "juju-test-model-ingress-per-unit-remote-0-service",
+                    }
+                },
+                "services": {
+                    "juju-test-model-ingress-per-unit-remote-0-service": {
+                        "loadBalancer": {"servers": [{"url": "http://10.1.10.1:9000"}]}
+                    }
+                },
+            }
+        }
+
+        self.assertEqual(conf, expected)
 
         self.assertEqual(
             requirer.urls,
@@ -277,13 +278,11 @@ class TestTraefikIngressCharm(unittest.TestCase):
         self.harness.update_config({"external_hostname": "testhostname"})
         self.harness.set_leader(True)
         self.harness.begin_with_initial_hooks()
-
         self.harness.container_pebble_ready("traefik")
 
         requirer = MockIPURequirer(self.harness)
         relation = requirer.relate()
         requirer.request(host="10.1.10.1", port=9000)
-
         assert requirer.is_available(relation)
         assert requirer.is_ready(relation)
 
@@ -301,10 +300,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
             self.harness.charm.unit.status, WaitingStatus("gateway address unavailable")
         )
 
-        self.assertEqual(
-            requirer.urls,
-            {"ingress-per-unit-remote/0": ""},
-        )
+        self.assertEqual(requirer.urls, {"ingress-per-unit-remote/0": ""})
 
     def test_relation_broken(self):
         self.test_pebble_ready_with_gateway_address_from_config_and_path_routing_mode()
