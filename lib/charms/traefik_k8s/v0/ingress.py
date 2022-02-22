@@ -47,16 +47,8 @@ from serialized_data_interface import EndpointWrapper
 from serialized_data_interface.errors import RelationDataError, UnversionedRelation
 from serialized_data_interface.events import EndpointWrapperEvents
 
-try:
-    # introduced in 3.9
-    from functools import cache  # type: ignore
-except ImportError:
-    from functools import lru_cache
-
-    cache = lru_cache(maxsize=None)
-
 # The unique Charmhub library identifier, never change it
-LIBID = "7ef06111da2945ed84f4f5d4eb5b353b"  # can't register a library until the charm is in the store 9_9
+LIBID = "DERP"  # can't register a library until the charm is in the store 9_9
 
 # Increment this major API version when introducing breaking changes
 LIBAPI = 0
@@ -80,10 +72,6 @@ INGRESS_SCHEMA = {
                 },
                 "required": ["model", "name", "host", "port"],
             },
-            # Without this empty "unit" declaration, the requirer (but not
-            # the provider!) fails with a serialized_data_interface.errors.MissingSchemaError
-            # when looking up the schema for single units (although no schema is needed)
-            "unit": {"type": "object", "properties": {}},
         },
         "provides": {
             "app": {
@@ -98,7 +86,6 @@ INGRESS_SCHEMA = {
                 },
                 "required": ["ingress"],
             },
-            "unit": {"type": "object", "properties": {}},
         },
     }
 }
