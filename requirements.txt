@@ -1,4 +1,7 @@
 ops >= 1.3.0
 lightkube >= 0.8.1
 lightkube-models >= 1.22.0.4
-serialized-data-interface>=0.4.0
+# TODO(jnsgruk): Change this when https://github.com/canonical/serialized-data-interface/pull/37
+#                is merged
+# serialized-data-interface>=0.4.0
+git+https://github.com/canonical/serialized-data-interface@fix-handle-relation-leader-only
