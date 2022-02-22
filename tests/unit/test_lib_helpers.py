@@ -84,8 +84,8 @@ class MockIPAProvider(MockRemoteRelationMixin, IngressPerAppProvider):
 class MockIngressPerAppRequest(IngressPerAppRequest):
     """Testing wrapper for an IngressPerAppRequest.
 
-    Exactly the same as the normal IngressPerAppRequest but acts as if it's on the
-    remote side of any relation, and it automatically triggers events when
+    Exactly the same as the normal IngressPerAppRequest but acts as if it's on
+    the remote side of any relation, and it automatically triggers events when
     responses are sent.
     """
 

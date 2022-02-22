@@ -82,19 +82,20 @@ class TestTraefikIngressCharm(unittest.TestCase):
         assert requirer.is_available(relation)
 
         traefik_container = self.harness.charm.unit.get_container("traefik")
+        self.maxDiff = None
         self.assertEqual(
             traefik_container.pull(
                 f"/opt/traefik/juju/juju_ingress_{relation.name}_{relation.id}_{relation.app.name}.yaml"
             ).read(),
             """http:
   routers:
-    juju-test-model-ingress-per-unit-remote-router:
+    juju-test-model-ingress-remote-router:
       entryPoints:
       - web
-      rule: PathPrefix(`/test-model-ingress-per-unit-remote`)
-      service: juju-test-model-ingress-per-unit-remote-service
+      rule: PathPrefix(`/test-model-ingress-remote`)
+      service: juju-test-model-ingress-remote-service
   services:
-    juju-test-model-ingress-per-unit-remote-service:
+    juju-test-model-ingress-remote-service:
       loadBalancer:
         servers:
         - url: http://foo.bar:3000
@@ -103,7 +104,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
         self.assertEqual(
             requirer.url,
-            "http://testhostname:80/test-model-ingress-per-unit-remote",
+            "http://testhostname:80/test-model-ingress-remote",
         )
         self.assertEqual(self.harness.charm.unit.status, ActiveStatus())
 

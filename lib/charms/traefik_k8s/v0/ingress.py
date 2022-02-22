@@ -44,7 +44,7 @@ from ops.charm import CharmBase, RelationEvent, RelationRole
 from ops.framework import EventSource
 from ops.model import Relation
 from serialized_data_interface import EndpointWrapper
-from serialized_data_interface.errors import RelationDataError
+from serialized_data_interface.errors import RelationDataError, UnversionedRelation
 from serialized_data_interface.events import EndpointWrapperEvents
 
 try:
@@ -150,19 +150,22 @@ class IngressPerAppProvider(EndpointWrapper):
         """Get the IngressPerAppRequest for the given Relation."""
         return IngressPerAppRequest(self, relation)
 
-    @cache
     def is_failed(self, relation: Relation = None):
         """Checks whether the given relation, or any relation if not specified, has an error."""
         if relation is None:
             return any(self.is_failed(relation) for relation in self.relations)
         if super().is_failed(relation):
             return True
-        data = self.unwrap(relation)
+        try:
+            data = self.unwrap(relation)
+        except UnversionedRelation:
+            return False
+
         prev_fields = None
 
         other_app = relation.app
 
-        new_fields = {field: data[other_app][field] for field in ("model", "port")}
+        new_fields = {field: data[other_app][field] for field in ("model", "port") if field in data[other_app]}
         if prev_fields is None:
             prev_fields = new_fields
         if new_fields != prev_fields:
@@ -182,7 +185,7 @@ class IngressPerAppRequest:
     @property
     def model(self):
         """The name of the model the request was made from."""
-        return self._data[self._relation.app].get("model")
+        return self._data[self.app].get("model")
 
     @property
     def app(self):
@@ -196,17 +199,17 @@ class IngressPerAppRequest:
         Note: This is not the same as `self.app.name` when using CMR relations,
         since `self.app.name` is replaced by a `remote-{UUID}` pattern.
         """
-        return self._data[self._relation.app].get("app")
+        return self._relation.app.name
 
     @property
     def host(self):
         """The hostname to be used to route to the application."""
-        return self._data[self._relation.app].get("host")
+        return self._data[self.app].get("host")
 
     @property
     def port(self):
         """The port to be used to route to the application."""
-        return self._data[self._relation.app].get("port")
+        return self._data[self.app].get("port")
 
     def respond(self, url: str):
         """Send URL back for the application.
@@ -214,7 +217,7 @@ class IngressPerAppRequest:
         Note: only the leader can send URLs.
         """
         ingress = self._data[self._provider.charm.app].setdefault("ingress", {})
-        ingress.setdefault("url", None)["url"] = url
+        ingress["url"] = url
         self._provider.wrap(self._relation, self._data)
 
 
@@ -269,12 +272,12 @@ class IngressPerAppRequirer(EndpointWrapper):
             )
 
         return {
-            self.charm.unit: {
+            self.app: {
                 "model": self.model.name,
                 "name": self.charm.unit.name,
                 "host": host,
                 "port": port,
-            },
+            }
         }
 
     def request(self, *, host: str = None, port: int):
