@@ -8,6 +8,7 @@
 
 import enum
 import logging
+from typing import Optional, Tuple
 
 import yaml
 from charms.observability_libs.v0.kubernetes_service_patch import KubernetesServicePatch
@@ -50,7 +51,7 @@ logger = logging.getLogger(__name__)
 _TRAEFIK_CONTAINER_NAME = _TRAEFIK_LAYER_NAME = _TRAEFIK_SERVICE_NAME = "traefik"
 # We watch the parent folder of where we store the configuration files,
 # as that is usually safer for Traefik
-_TRAEFIK_INGRESS_CONFIGURATIONS_DIRECTORY = "/opt/traefik/juju"
+_CONFIG_DIRECTORY = "/opt/traefik/juju"
 
 
 class _RoutingMode(enum.Enum):
@@ -121,7 +122,7 @@ class TraefikIngressCharm(CharmBase):
         # routes.
         try:
             for ingress_relation_configuration_file in self.traefik_container.list_files(
-                path=_TRAEFIK_INGRESS_CONFIGURATIONS_DIRECTORY, pattern="juju_*.yaml"
+                path=_CONFIG_DIRECTORY, pattern="juju_*.yaml"
             ):
                 self.traefik_container.remove_path(ingress_relation_configuration_file.path)
                 logger.debug(
@@ -153,7 +154,7 @@ class TraefikIngressCharm(CharmBase):
                 "ping": {"entryPoint": "diagnostics"},
                 "providers": {
                     "file": {
-                        "directory": _TRAEFIK_INGRESS_CONFIGURATIONS_DIRECTORY,
+                        "directory": _CONFIG_DIRECTORY,
                         "watch": True,
                     }
                 },
@@ -249,85 +250,31 @@ class TraefikIngressCharm(CharmBase):
         if isinstance(self.unit.status, MaintenanceStatus):
             self.unit.status = ActiveStatus()
 
-    def _process_ingress_relation(self, relation: Relation):
+    def _process_ingress_relation(self, rel: Relation):
         # There's a chance that we're processing a relation event
         # which was deferred until after the relation was broken.
-        relation_type = _get_relation_type(relation)
+        per_app = _get_relation_type(rel) == _IngressRelationType.per_app
 
-        if relation_type == _IngressRelationType.per_app and not self.ingress_per_app.is_ready(
-            relation
-        ):
+        if per_app and not self.ingress_per_app.is_ready(rel):
             return
-        elif relation_type == _IngressRelationType.per_unit and not self.ingress_per_unit.is_ready(
-            relation
-        ):
+        if not per_app and not self.ingress_per_unit.is_ready(rel):
             return
 
-        self.unit.status = MaintenanceStatus(
-            "updating the ingress configurations for the "
-            f"'{relation.name}:{relation.id}' relation"
-        )
-        logger.debug(
-            "Updating the ingress configurations for the "
-            f"'{relation.name}:{relation.id}' relation"
-        )
+        msg = f"updating the ingress configurations for the '{rel.name}:{rel.id}' relation"
+        self.unit.status = MaintenanceStatus(msg)
+        logger.debug(msg)
 
         request = (
-            self.ingress_per_app.get_request(relation)
-            if relation_type == _IngressRelationType.per_app
-            else self.ingress_per_unit.get_request(relation)
+            self.ingress_per_app.get_request(rel)
+            if per_app
+            else self.ingress_per_unit.get_request(rel)
         )
 
-        if self.unit.is_leader():
-            if not (gateway_address := self._external_host):
-                service = f"{self.app.name}.{self.model.name}.svc.cluster.local"
+        if not (gateway_address := self._check_gateway_address(per_app, request)):
+            return
 
-                if relation_type == _IngressRelationType.per_app:
-                    request.respond("")
-                else:
-                    for unit in request.units:
-                        request.respond(unit, "")
-
-                self.unit.status = WaitingStatus(
-                    f"loadbalancer address not found on the '{service}' Kubernetes service"
-                )
-                return
-
-        ingress_relation_configuration = {
-            "http": {
-                "routers": {},
-                "services": {},
-            }
-        }
-
-        external_host = self._external_host
-
-        routing_mode = _RoutingMode(self.config["routing_mode"])
-
-        if relation_type == _IngressRelationType.per_app:
-            app_prefix = f"{request.model}-{request.app_name}"
-            app_ingress_address = request.host
-            app_port = request.port
-            traefik_router_name = f"juju-{app_prefix}-router"
-            traefik_service_name = f"juju-{app_prefix}-service"
-
-            if routing_mode == _RoutingMode.path:
-                route_rule = f"PathPrefix(`/{app_prefix}`)"
-                app_url = f"http://{gateway_address}:{self._port}/{app_prefix}"
-            elif routing_mode == _RoutingMode.subdomain:
-                route_rule = f"Host(`{app_prefix}.{external_host}`)"
-                app_url = f"http://{app_prefix}.{gateway_address}:{self._port}/"
-
-            ingress_relation_configuration["http"]["routers"][traefik_router_name] = {
-                "rule": route_rule,
-                "service": traefik_service_name,
-                "entryPoints": ["web"],
-            }
-
-            ingress_relation_configuration["http"]["services"][traefik_service_name] = {
-                "loadBalancer": {"servers": [{"url": f"http://{app_ingress_address}:{app_port}"}]}
-            }
-
+        if per_app:
+            config, app_url = self._generate_per_app_config(request, gateway_address)
             if self.unit.is_leader():
                 request.respond(app_url)
         else:
@@ -337,43 +284,97 @@ class TraefikIngressCharm(CharmBase):
             # routing for a remote unit before the leader unit of ingress has
             # communicated the url.
             for unit in request.units:
-                unit_name = request.get_unit_name(unit).replace("/", "-")
-                unit_prefix = f"{request.model}-{unit_name}"
-                unit_ingress_address = request.get_host(unit)
-                unit_port = request.port
-                traefik_router_name = f"juju-{unit_prefix}-router"
-                traefik_service_name = f"juju-{unit_prefix}-service"
-
-                if routing_mode == _RoutingMode.path:
-                    route_rule = f"PathPrefix(`/{unit_prefix}`)"
-                    unit_url = f"http://{gateway_address}:{self._port}/{unit_prefix}"
-                elif routing_mode == _RoutingMode.subdomain:
-                    route_rule = f"Host(`{unit_prefix}.{external_host}`)"
-                    unit_url = f"http://{unit_prefix}.{gateway_address}:{self._port}/"
-
-                ingress_relation_configuration["http"]["routers"][traefik_router_name] = {
-                    "rule": route_rule,
-                    "service": traefik_service_name,
-                    "entryPoints": ["web"],
-                }
-
-                ingress_relation_configuration["http"]["services"][traefik_service_name] = {
-                    "loadBalancer": {
-                        "servers": [{"url": f"http://{unit_ingress_address}:{unit_port}"}]
-                    }
-                }
-
+                config, unit_url = self._generate_per_unit_config(request, gateway_address, unit)
                 if self.unit.is_leader():
                     request.respond(unit, unit_url)
 
-        ingress_relation_configuration_path = f"{_TRAEFIK_INGRESS_CONFIGURATIONS_DIRECTORY}/{self._ingress_config_file_name(relation)}"
-        self.traefik_container.push(
-            ingress_relation_configuration_path,
-            yaml.dump(ingress_relation_configuration),
-            make_dirs=True,
-        )
+        config_filename = f"{_CONFIG_DIRECTORY}/{self._ingress_config_file_name(rel)}"
 
-        logger.debug(f"Updated ingress configuration file: {ingress_relation_configuration_path}")
+        self.traefik_container.push(config_filename, yaml.dump(config), make_dirs=True)
+
+        logger.debug(f"Updated ingress configuration file: {config_filename}")
+
+    def _check_gateway_address(self, per_app: bool, request) -> Optional[str]:
+        if self.unit.is_leader():
+            if not (gateway_address := self._external_host):
+                service = f"{self.app.name}.{self.model.name}.svc.cluster.local"
+
+                if per_app:
+                    request.respond("")
+                else:
+                    for unit in request.units:
+                        request.respond(unit, "")
+
+                msg = f"loadbalancer address not found on the '{service}' Kubernetes service"
+                self.unit.status = WaitingStatus(msg)
+                return None
+            return gateway_address
+
+    def _generate_per_unit_config(self, request, gateway_address, unit) -> Tuple[dict, str]:
+        """Generate a config dict for a given unit for IngressPerUnit."""
+        # Base config
+        config = {"http": {"routers": {}, "services": {}}}
+
+        unit_name = request.get_unit_name(unit).replace("/", "-")
+        prefix = f"{request.model}-{unit_name}"
+
+        if self._routing_mode == _RoutingMode.path:
+            route_rule = f"PathPrefix(`/{prefix}`)"
+            unit_url = f"http://{gateway_address}:{self._port}/{prefix}"
+        elif self._routing_mode == _RoutingMode.subdomain:
+            route_rule = f"Host(`{prefix}.{self._external_host}`)"
+            unit_url = f"http://{prefix}.{gateway_address}:{self._port}/"
+
+        traefik_router_name = f"juju-{prefix}-router"
+        traefik_service_name = f"juju-{prefix}-service"
+
+        config["http"]["routers"][traefik_router_name] = {
+            "rule": route_rule,
+            "service": traefik_service_name,
+            "entryPoints": ["web"],
+        }
+
+        config["http"]["services"][traefik_service_name] = {
+            "loadBalancer": {
+                "servers": [{"url": f"http://{request.get_host(unit)}:{request.port}"}]
+            }
+        }
+
+        return config, unit_url
+
+    def _generate_per_app_config(self, request, gateway_address) -> Tuple[dict, str]:
+        id = f"{request.model}-{request.app_name}"
+
+        if self._routing_mode == _RoutingMode.path:
+            route_rule = f"PathPrefix(`/{id}`)"
+            app_url = f"http://{gateway_address}:{self._port}/{id}"
+        elif self._routing_mode == _RoutingMode.subdomain:
+            route_rule = f"Host(`{id}.{self.external_host}`)"
+            app_url = f"http://{id}.{gateway_address}:{self._port}/"
+
+        traefik_router_name = f"juju-{id}-router"
+        traefik_service_name = f"juju-{id}-service"
+
+        config = {
+            "http": {
+                "routers": {
+                    traefik_router_name: {
+                        "rule": route_rule,
+                        "service": traefik_service_name,
+                        "entryPoints": ["web"],
+                    }
+                },
+                "services": {
+                    traefik_service_name: {
+                        "loadBalancer": {
+                            "servers": [{"url": f"http://{request.host}:{request.port}"}]
+                        }
+                    }
+                },
+            }
+        }
+
+        return config, app_url
 
     def _handle_ingress_failure(self, event: RelationEvent):
         self.unit.status = (
@@ -408,7 +409,9 @@ class TraefikIngressCharm(CharmBase):
         # during _on_traefik_pebble_ready .
         if self.traefik_container.can_connect():
             try:
-                ingress_relation_configuration_path = f"{_TRAEFIK_INGRESS_CONFIGURATIONS_DIRECTORY}/{self._ingress_config_file_name(relation)}"
+                ingress_relation_configuration_path = (
+                    f"{_CONFIG_DIRECTORY}/{self._ingress_config_file_name(relation)}"
+                )
 
                 self.traefik_container.remove_path(ingress_relation_configuration_path)
                 logger.debug(
@@ -505,6 +508,14 @@ class TraefikIngressCharm(CharmBase):
                 return external_hostname
 
         return _get_loadbalancer_status(namespace=self.model.name, service_name=self.app.name)
+
+    @property
+    def _routing_mode(self) -> _RoutingMode:
+        """Return the current routing mode for the ingress.
+
+        The two modes are 'subdomain' and 'path', where 'path' is the default.
+        """
+        return _RoutingMode(self.config["routing_mode"])
 
 
 def _get_loadbalancer_status(namespace: str, service_name: str):
