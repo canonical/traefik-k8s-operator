@@ -178,9 +178,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
         self.assertEqual(
             self.harness.charm.unit.status,
-            BlockedStatus(
-                "'FOOBAR' is not a valid routing_mode value; see debug logs for more information"
-            ),
+            BlockedStatus("invalid routing mode: FOOBAR; see logs."),
         )
 
         self.harness.update_config(
@@ -199,7 +197,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
         self.harness.begin_with_initial_hooks()
 
         self.assertEqual(
-            self.harness.charm.unit.status, WaitingStatus("gateway address not available")
+            self.harness.charm.unit.status, WaitingStatus("gateway address unavailable")
         )
 
         self.harness.container_pebble_ready("traefik")
@@ -212,7 +210,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
         assert not requirer.is_ready(relation)
 
         self.assertEqual(
-            self.harness.charm.unit.status, WaitingStatus("gateway address not available")
+            self.harness.charm.unit.status, WaitingStatus("gateway address unavailable")
         )
 
     @patch("charm._get_loadbalancer_status", lambda **unused: "10.0.0.1")
@@ -300,7 +298,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
         self.harness.update_config(unset=["external_hostname"])
 
         self.assertEqual(
-            self.harness.charm.unit.status, WaitingStatus("gateway address not available")
+            self.harness.charm.unit.status, WaitingStatus("gateway address unavailable")
         )
 
         self.assertEqual(
