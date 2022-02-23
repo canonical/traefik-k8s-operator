@@ -33,8 +33,14 @@ storage:
     type: filesystem
 
 provides:
+  ingress:
+    interface: ingress
+    description: |
+      Provides ingress-like routing to the related Juju application, load-balancing across all units
   ingress-per-unit:
     interface: ingress_per_unit
+    description: |
+      Provides ingress-like routing to the single units of the related Juju application
   metrics-endpoint:
     interface: prometheus_scrape
     description: |

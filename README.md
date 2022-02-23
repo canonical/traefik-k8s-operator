@@ -1,8 +1,8 @@
-# Traefik Ingress Charmed Operator
+# Traefik Kubernetes Charmed Operator
 
-## Description
-
-This [Juju](https://juju.is) charmed operator written with the [Operator Lifecycle Manager Framework](https://juju.is/docs/olm), powering ingress-like capabilities on Kubernetes.
+This [Juju](https://juju.is) charmed operator written with the [Operator Lifecycle Manager Framework](https://juju.is/docs/olm), powering _ingress controller-like_ capabilities on Kubernetes.
+By _ingress controller-like_ capabilities, we mean that the Traefik Kubernetes charmed operator exposes Juju applications to the outside of a Kubernetes cluster, **without** relying on the [`ingress` resource](https://kubernetes.io/docs/concepts/services-networking/ingress/) of Kubernetes.
+Rather, Traefik is instructed to expose Juju applications by means of relations with them.
 
 ## Setup
 
@@ -63,11 +63,11 @@ juju deploy ./traefik-k8s_ubuntu-20.04-amd64.charm traefik-ingress --trust --res
 
 ### Providing ingress proxying
 
-This charm can be related via the `ingress-per-unit` relation with the `prometheus-k8s` charm built from the [`ingress` branch](https://github.com/canonical/prometheus-operator/tree/ingress):
+This charmed operator supports two types of proxying:
 
-```sh
-juju add-relation traefik-ingress:ingress-per-unit prometheus-k8s
-```
+* `per-app`: This is the "classic" proxying logic of an ingress-controller, load-balancing incoming connections to the various units of the Juju application related via the `ingress` relation by routing over the latter's Kubernetes service.
+* `per-unit`: Traefik will have routes to the single pods of the proxied Juju application related to it via the `ingress-per-unit` relation.
+  This type of routing, while somewhat unconventional in Kubernetes, is necessary for applications like Prometheus (where each remote-write endpoint needs to be routed to separately) and beneficial to databases, the clients of which can perform client-side load balancing
 
 ### Monitoring Traefik itself
 

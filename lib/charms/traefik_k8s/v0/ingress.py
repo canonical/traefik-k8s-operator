@@ -1,11 +1,11 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-"""# Interface Library for ingress_per_unit.
+"""# Interface Library for ingress.
 
-This library wraps relation endpoints using the `ingress_per_unit` interface
-and provides a Python API for both requesting and providing per-unit
-ingress.
+This library wraps relation endpoints using the `ingress` interface
+and provides a Python API for both requesting and providing per-application
+ingress, with load-balancing occurring across all units.
 
 ## Getting Started
 
@@ -15,7 +15,7 @@ that you also need to add the `serialized_data_interface` dependency to your cha
 
 ```shell
 cd some-charm
-charmcraft fetch-lib charms.traefik-k8s.v0.ingress_per_unit
+charmcraft fetch-lib charms.traefik-k8s.v0.ingress
 echo "serialized_data_interface" >> requirements.txt
 ```
 
@@ -23,17 +23,17 @@ Then, to initialise the library:
 
 ```python
 # ...
-from charms.traefik-k8s.v0.ingress_per_unit import IngressPerUnitRequirer
+from charms.traefik-k8s.v0.ingress import IngressPerAppRequirer
 
 class SomeCharm(CharmBase):
   def __init__(self, *args):
     # ...
-    self.ingress_per_unit = IngressPerUnitRequirer(self, port=80)
-    self.framework.observe(self.ingress_per_unit.on.ready, self._handle_ingress_per_unit)
+    self.ingress = IngressPerAppRequirer(self, port=80)
+    self.framework.observe(self.ingress.on.ready, self._handle_ingress)
     # ...
 
-    def _handle_ingress_per_unit(self, event):
-        log.info("This unit's ingress URL: %s", self.ingress_per_unit.url)
+    def _handle_ingress(self, event):
+        log.info("This app's ingress URL: %s", self.ingress.url)
 ```
 """
 
@@ -42,21 +42,13 @@ from typing import Optional
 
 from ops.charm import CharmBase, RelationEvent, RelationRole
 from ops.framework import EventSource
-from ops.model import Relation, Unit
+from ops.model import Relation
 from serialized_data_interface import EndpointWrapper
-from serialized_data_interface.errors import RelationDataError
+from serialized_data_interface.errors import RelationDataError, UnversionedRelation
 from serialized_data_interface.events import EndpointWrapperEvents
 
-try:
-    # introduced in 3.9
-    from functools import cache  # type: ignore
-except ImportError:
-    from functools import lru_cache
-
-    cache = lru_cache(maxsize=None)
-
 # The unique Charmhub library identifier, never change it
-LIBID = "7ef06111da2945ed84f4f5d4eb5b353a"  # can't register a library until the charm is in the store 9_9
+LIBID = "DERP"  # can't register a library until the charm is in the store 9_9
 
 # Increment this major API version when introducing breaking changes
 LIBAPI = 0
@@ -70,7 +62,7 @@ log = logging.getLogger(__name__)
 INGRESS_SCHEMA = {
     "v1": {
         "requires": {
-            "unit": {
+            "app": {
                 "type": "object",
                 "properties": {
                     "model": {"type": "string"},
@@ -79,7 +71,7 @@ INGRESS_SCHEMA = {
                     "port": {"type": "integer"},
                 },
                 "required": ["model", "name", "host", "port"],
-            }
+            },
         },
         "provides": {
             "app": {
@@ -87,51 +79,47 @@ INGRESS_SCHEMA = {
                 "properties": {
                     "ingress": {
                         "type": "object",
-                        "patternProperties": {
-                            "": {
-                                "type": "object",
-                                "properties": {"url": {"type": "string"}},
-                                "required": ["url"],
-                            }
+                        "properties": {
+                            "url": {"type": "string"},
                         },
                     }
                 },
                 "required": ["ingress"],
-            }
+            },
         },
     }
 }
 
 
-class IngressPerUnitRequestEvent(RelationEvent):
+class IngressPerAppRequestEvent(RelationEvent):
     """Event representing an incoming request.
 
     This is equivalent to the "ready" event, but is more semantically meaningful.
     """
 
 
-class IngressPerUnitProviderEvents(EndpointWrapperEvents):
+class IngressPerAppProviderEvents(EndpointWrapperEvents):
     """Container for IUP events."""
 
-    request = EventSource(IngressPerUnitRequestEvent)
+    request = EventSource(IngressPerAppRequestEvent)
 
 
-class IngressPerUnitProvider(EndpointWrapper):
-    """Implementation of the provider of ingress_per_unit."""
+class IngressPerAppProvider(EndpointWrapper):
+    """Implementation of the provider of ingress."""
 
     ROLE = RelationRole.provides.name
-    INTERFACE = "ingress_per_unit"
+    INTERFACE = "ingress"
     SCHEMA = INGRESS_SCHEMA
 
-    on = IngressPerUnitProviderEvents()
+    on = IngressPerAppProviderEvents()
 
     def __init__(self, charm: CharmBase, endpoint: str = None):
-        """Constructor for IngressPerUnitProvider.
+        """Constructor for IngressPerAppProvider.
 
         Args:
             charm: The charm that is instantiating the instance.
             endpoint: The name of the relation endpoint to bind to
-                (defaults to "ingress-per-unit").
+                (defaults to "ingress").
         """
         super().__init__(charm, endpoint)
         self.framework.observe(self.on.ready, self._emit_request_event)
@@ -140,35 +128,40 @@ class IngressPerUnitProvider(EndpointWrapper):
         self.on.request.emit(event.relation)
 
     def get_request(self, relation: Relation):
-        """Get the IngressRequest for the given Relation."""
-        return IngressRequest(self, relation)
+        """Get the IngressPerAppRequest for the given Relation."""
+        return IngressPerAppRequest(self, relation)
 
-    @cache
     def is_failed(self, relation: Relation = None):
         """Checks whether the given relation, or any relation if not specified, has an error."""
         if relation is None:
             return any(self.is_failed(relation) for relation in self.relations)
-        if not relation.units:
-            return False
         if super().is_failed(relation):
             return True
-        data = self.unwrap(relation)
+        try:
+            data = self.unwrap(relation)
+        except UnversionedRelation:
+            return False
+
         prev_fields = None
-        for unit in relation.units:
-            if not data[unit]:
-                continue
-            new_fields = {field: data[unit][field] for field in ("model", "port")}
-            if prev_fields is None:
-                prev_fields = new_fields
-            if new_fields != prev_fields:
-                raise RelationDataMismatchError(relation, unit)
+
+        other_app = relation.app
+
+        new_fields = {
+            field: data[other_app][field]
+            for field in ("model", "port")
+            if field in data[other_app]
+        }
+        if prev_fields is None:
+            prev_fields = new_fields
+        if new_fields != prev_fields:
+            raise RelationDataMismatchError(relation, other_app)
         return False
 
 
-class IngressRequest:
-    """A request for per-unit ingress."""
+class IngressPerAppRequest:
+    """A request for per-application ingress."""
 
-    def __init__(self, provider: IngressPerUnitProvider, relation: Relation):
+    def __init__(self, provider: IngressPerAppProvider, relation: Relation):
         """Construct an IngressRequest."""
         self._provider = provider
         self._relation = relation
@@ -177,7 +170,7 @@ class IngressRequest:
     @property
     def model(self):
         """The name of the model the request was made from."""
-        return self._get_data_from_first_unit("model")
+        return self._data[self.app].get("model")
 
     @property
     def app(self):
@@ -191,63 +184,25 @@ class IngressRequest:
         Note: This is not the same as `self.app.name` when using CMR relations,
         since `self.app.name` is replaced by a `remote-{UUID}` pattern.
         """
-        first_unit_name = self._get_data_from_first_unit("name")
-
-        if first_unit_name:
-            return first_unit_name.split("/")[0]
-
-        return None
+        return self._relation.app.name
 
     @property
-    def units(self):
-        """The remote units."""
-        return sorted(self._relation.units, key=lambda unit: unit.name)
+    def host(self):
+        """The hostname to be used to route to the application."""
+        return self._data[self.app].get("host")
 
     @property
     def port(self):
-        """The backend port."""
-        return self._get_data_from_first_unit("port")
+        """The port to be used to route to the application."""
+        return self._data[self.app].get("port")
 
-    def get_host(self, unit: Unit):
-        """The hostname (DNS address, ip) of the given unit."""
-        return self._get_unit_data(unit, "host")
-
-    def get_unit_name(self, unit: Unit):
-        """The name of the remote unit.
-
-        Note: This is not the same as `self.unit.name` when using CMR relations,
-        since `self.unit.name` is replaced by a `remote-{UUID}` pattern.
-        """
-        return self._get_unit_data(unit, "name")
-
-    def _get_data_from_first_unit(self, key: str):
-        if self.units:
-            first_unit_data = self._data[self.units[0]]
-
-            if key in first_unit_data:
-                return first_unit_data[key]
-
-        return None
-
-    def _get_unit_data(self, unit: Unit, key: str):
-        if self.units:
-            if unit in self.units:
-                unit_data = self._data[unit]
-
-                if key in unit_data:
-                    return unit_data[key]
-
-        return None
-
-    def respond(self, unit: Unit, url: str):
-        """Send URL back for the given unit.
+    def respond(self, url: str):
+        """Send URL back for the application.
 
         Note: only the leader can send URLs.
         """
-        # Can't use `unit.name` because with CMR it's a UUID.
-        remote_unit_name = self.get_unit_name(unit)
         ingress = self._data[self._provider.charm.app].setdefault("ingress", {})
-        ingress.setdefault(remote_unit_name, {})["url"] = url
+        ingress["url"] = url
         self._provider.wrap(self._relation, self._data)
 
 
@@ -255,11 +210,11 @@ class RelationDataMismatchError(RelationDataError):
     """Data from different units do not match where they should."""
 
 
-class IngressPerUnitRequirer(EndpointWrapper):
-    """Implementation of the requirer of ingress_per_unit."""
+class IngressPerAppRequirer(EndpointWrapper):
+    """Implementation of the requirer of the ingress relation."""
 
     ROLE = RelationRole.requires.name
-    INTERFACE = "ingress_per_unit"
+    INTERFACE = "ingress"
     SCHEMA = INGRESS_SCHEMA
     LIMIT = 1
 
@@ -280,38 +235,41 @@ class IngressPerUnitRequirer(EndpointWrapper):
 
         Args:
             charm: the charm that is instantiating the library.
-            endpoint: the name of the relation endpoint to bind to
-                (defaults to "ingress-per-unit"; relation must be of interface type
-                "ingress_per_unit" and have "limit: 1")
-            host: Hostname to be used by the ingress provider to address the requirer
-                unit; if unspecified, the pod ip of the unit will be used instead
+            endpoint: the name of the relation endpoint to bind to (defaults to `ingress`);
+                relation must be of interface type `ingress` and have "limit: 1")
+            host: Hostname to be used by the ingress provider to address the requiring
+                application; if unspecified, the default Kubernetes service name will be used.
+
         Request Args:
             port: the port of the service
         """
         super().__init__(charm, endpoint)
-        if port:
+        if port and charm.unit.is_leader():
             self.auto_data = self._complete_request(host or "", port)
 
     def _complete_request(self, host: Optional[str], port: int):
         if not host:
-            binding = self.charm.model.get_binding(self.endpoint)
-            host = str(binding.network.bind_address)
+            # TODO Make host mandatory?
+            host = "{app_name}.{model_name}.svc.cluster.local".format(
+                app_name=self.app.name,
+                model_name=self.model.name,
+            )
 
         return {
-            self.charm.unit: {
+            self.app: {
                 "model": self.model.name,
                 "name": self.charm.unit.name,
                 "host": host,
                 "port": port,
-            },
+            }
         }
 
     def request(self, *, host: str = None, port: int):
-        """Request ingress to this unit.
+        """Request ingress to this application.
 
         Args:
-            host: Hostname to be used by the ingress provider to address the requirer
-                unit; if unspecified, the pod ip of the unit will be used instead
+            host: Hostname to be used by the ingress provider to address the requirer; if
+                unspecified, the Kubernetes service address is used.
             port: the port of the service (required)
         """
         self.wrap(self.relation, self._complete_request(host, port))
@@ -322,23 +280,13 @@ class IngressPerUnitRequirer(EndpointWrapper):
         return self.relations[0] if self.relations else None
 
     @property
-    def urls(self):
-        """The full ingress URLs to reach every unit.
-
-        May return an empty dict if the URLs aren't available yet.
-        """
-        if not self.is_ready():
-            return {}
-        data = self.unwrap(self.relation)
-        ingress = data[self.relation.app].get("ingress", {})
-        return {unit_name: unit_data["url"] for unit_name, unit_data in ingress.items()}
-
-    @property
     def url(self):
         """The full ingress URL to reach the current unit.
 
         May return None if the URL isn't available yet.
         """
-        if not self.urls:
-            return None
-        return self.urls.get(self.charm.unit.name)
+        if not self.is_ready():
+            return {}
+        data = self.unwrap(self.relation)
+        ingress = data[self.relation.app].get("ingress", {})
+        return ingress.get("url")
