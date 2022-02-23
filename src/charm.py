@@ -306,17 +306,17 @@ class TraefikIngressCharm(CharmBase):
         return config, unit_url
 
     def _generate_per_app_config(self, request, gateway_address) -> Tuple[dict, str]:
-        id = f"{request.model}-{request.app_name}"
+        prefix = f"{request.model}-{request.app_name}"
 
         if self._routing_mode == _RoutingMode.path:
-            route_rule = f"PathPrefix(`/{id}`)"
-            app_url = f"http://{gateway_address}:{self._port}/{id}"
+            route_rule = f"PathPrefix(`/{prefix}`)"
+            app_url = f"http://{gateway_address}:{self._port}/{prefix}"
         elif self._routing_mode == _RoutingMode.subdomain:
-            route_rule = f"Host(`{id}.{self.external_host}`)"
-            app_url = f"http://{id}.{gateway_address}:{self._port}/"
+            route_rule = f"Host(`{prefix}.{self.external_host}`)"
+            app_url = f"http://{prefix}.{gateway_address}:{self._port}/"
 
-        traefik_router_name = f"juju-{id}-router"
-        traefik_service_name = f"juju-{id}-service"
+        traefik_router_name = f"juju-{prefix}-router"
+        traefik_service_name = f"juju-{prefix}-service"
 
         config = {
             "http": {
