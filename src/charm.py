@@ -312,7 +312,7 @@ class TraefikIngressCharm(CharmBase):
             route_rule = f"PathPrefix(`/{prefix}`)"
             app_url = f"http://{gateway_address}:{self._port}/{prefix}"
         elif self._routing_mode == _RoutingMode.subdomain:
-            route_rule = f"Host(`{prefix}.{self.external_host}`)"
+            route_rule = f"Host(`{prefix}.{self._external_host}`)"
             app_url = f"http://{prefix}.{gateway_address}:{self._port}/"
 
         traefik_router_name = f"juju-{prefix}-router"
