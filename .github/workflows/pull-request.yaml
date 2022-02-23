@@ -20,7 +20,21 @@ jobs:
       
       - name: Run linters
         run: tox -e lint
-  
+
+  unit-test:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0  
+      - name: Check libraries
+        uses: canonical/charming-actions/check-libraries@1.0.0
+        with:
+          credentials: "${{ secrets.CHARMHUB_TOKEN }}"
+          github-token: "${{ secrets.GITHUB_TOKEN }}"
+
   unit-test:
     name: Unit tests
     runs-on: ubuntu-latest
@@ -35,7 +49,7 @@ jobs:
       - name: Run tests
         run: tox -e unit
   
-  integration-test-microk8s:
+  integration-test:
     name: Integration tests (microk8s)
     runs-on: ubuntu-latest
     steps:
@@ -56,3 +70,33 @@ jobs:
         if: failure()
         with:
           app: traefik-k8s
+
+  release-to-charmhub:
+    name: Release to CharmHub
+    needs: 
+      - lint
+      - unit-test
+      - integration-test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Select charmhub channel
+        uses: canonical/charming-actions/channel@1.0.0
+        id: channel
+
+      - name: Upload charm to charmhub
+        uses: canonical/charming-actions/upload-charm@1.0.0
+        with:
+          credentials: "${{ secrets.CHARMHUB_TOKEN }}"
+          github-token: "${{ secrets.GITHUB_TOKEN }}"
+          upload-image: "true"
+          channel: "${{ steps.channel.outputs.name }}"
+
+      - name: Upload to edge channel
+        uses: canonical/charmhub-upload-action@0.2.0
+        with:
+          credentials: "${{ secrets.CHARMHUB_TOKEN }}"
