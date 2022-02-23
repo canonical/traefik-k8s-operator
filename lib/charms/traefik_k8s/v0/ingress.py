@@ -244,7 +244,7 @@ class IngressPerAppRequirer(EndpointWrapper):
             port: the port of the service
         """
         super().__init__(charm, endpoint)
-        if port:
+        if port and charm.unit.is_leader():
             self.auto_data = self._complete_request(host or "", port)
 
     def _complete_request(self, host: Optional[str], port: int):
