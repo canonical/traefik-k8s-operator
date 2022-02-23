@@ -240,16 +240,16 @@ class TraefikIngressCharm(CharmBase):
         if not (gateway_address := self._validate_gateway_address(relation, request)):
             return
 
+        # FIXME Ideally, follower units could instead watch for the data in the
+        # ingress app data bag, but Juju does not allow non-leader units to read
+        # the application data bag on their side of the relation, so we may start
+        # routing for a remote unit before the leader unit of ingress has
+        # communicated the url.
         if provider == self.ingress_per_app:
             config, app_url = self._generate_per_app_config(request, gateway_address)
             if self.unit.is_leader():
                 request.respond(app_url)
         else:
-            # FIXME Ideally, follower units could instead watch for the data in the
-            # ingress app data bag, but Juju does not allow non-leader units to read
-            # the application data bag on their side of the relation, so we may start
-            # routing for a remote unit before the leader unit of ingress has
-            # communicated the url.
             for unit in request.units:
                 config, unit_url = self._generate_per_unit_config(request, gateway_address, unit)
                 if self.unit.is_leader():
