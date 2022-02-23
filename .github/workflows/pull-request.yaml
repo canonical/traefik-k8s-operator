@@ -21,8 +21,8 @@ jobs:
       - name: Run linters
         run: tox -e lint
 
-  unit-test:
-    name: Unit tests
+  check-libraries:
+    name: Check libraries
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
