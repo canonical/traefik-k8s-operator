@@ -206,7 +206,7 @@ class TraefikIngressCharm(CharmBase):
             self.unit.status = ActiveStatus()
         else:
             self.unit.status = BlockedStatus("setup of some ingress relation failed")
-            logger.error("the setup of some ingress relation failed, see previous logs")
+            logger.error("The setup of some ingress relation failed, see previous logs")
 
     def _handle_ingress_request(self, event: RelationEvent):
         if not self._external_host:
@@ -233,7 +233,7 @@ class TraefikIngressCharm(CharmBase):
 
         rel = f"{relation.name}:{relation.id}"
         self.unit.status = MaintenanceStatus(f"updating ingress configuration for '{rel}'")
-        logger.debug("updating ingress for relation '%s'", rel)
+        logger.debug("Updating ingress for relation '%s'", rel)
 
         request = provider.get_request(relation)
 
@@ -257,7 +257,7 @@ class TraefikIngressCharm(CharmBase):
 
         config_filename = f"{_CONFIG_DIRECTORY}/{self._relation_config_file(relation)}"
         self.container.push(config_filename, yaml.dump(config), make_dirs=True)
-        logger.debug("updated ingress configuration file: %s", config_filename)
+        logger.debug("Updated ingress configuration file: %s", config_filename)
 
     def _validate_gateway_address(self, relation: Relation, request) -> Optional[str]:
         if self.unit.is_leader():
