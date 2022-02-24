@@ -48,7 +48,7 @@ from serialized_data_interface.errors import RelationDataError, UnversionedRelat
 from serialized_data_interface.events import EndpointWrapperEvents
 
 # The unique Charmhub library identifier, never change it
-LIBID = "DERP"  # can't register a library until the charm is in the store 9_9
+LIBID = "e6de2a5cd5b34422a204668f3b8f90d2"
 
 # Increment this major API version when introducing breaking changes
 LIBAPI = 0
