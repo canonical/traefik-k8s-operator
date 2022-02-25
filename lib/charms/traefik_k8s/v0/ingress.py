@@ -29,7 +29,13 @@ class SomeCharm(CharmBase):
   def __init__(self, *args):
     # ...
     self.ingress = IngressPerAppRequirer(self, port=80)
-    self.framework.observe(self.ingress.on.ready, self._handle_ingress)
+    # The following event is triggered when the ingress URL to be used
+    # by this deployment of the `SomeCharm` changes or there is no longer
+    # an ingress URL available, that is, `self.ingress_per_unit` would
+    # return `None`.
+    self.framework.observe(
+        self.ingress.on.ingress_change, self._handle_ingress
+    )
     # ...
 
     def _handle_ingress(self, event):
@@ -41,7 +47,7 @@ import logging
 from typing import Optional
 
 from ops.charm import CharmBase, RelationEvent, RelationRole
-from ops.framework import EventSource
+from ops.framework import EventSource, StoredState
 from ops.model import Relation
 from serialized_data_interface import EndpointWrapper
 from serialized_data_interface.errors import RelationDataError, UnversionedRelation
@@ -210,8 +216,21 @@ class RelationDataMismatchError(RelationDataError):
     """Data from different units do not match where they should."""
 
 
+class IngressPerAppConfigurationChangeEvent(RelationEvent):
+    """Event representing a change in the data sent by the ingress."""
+
+
+class IngressPerAppRequirerEvents(EndpointWrapperEvents):
+    """Container for IUP events."""
+
+    ingress_changed = EventSource(IngressPerAppConfigurationChangeEvent)
+
+
 class IngressPerAppRequirer(EndpointWrapper):
     """Implementation of the requirer of the ingress relation."""
+
+    on = IngressPerAppRequirerEvents()
+    _stored = StoredState()
 
     ROLE = RelationRole.requires.name
     INTERFACE = "ingress"
@@ -244,8 +263,25 @@ class IngressPerAppRequirer(EndpointWrapper):
             port: the port of the service
         """
         super().__init__(charm, endpoint)
+
+        self._stored.set_default(current_url=None)
+
         if port and charm.unit.is_leader():
             self.auto_data = self._complete_request(host or "", port)
+
+        self.framework.observe(
+            self.charm.on[self.endpoint].relation_changed, self._emit_ingress_change_event
+        )
+        self.framework.observe(
+            self.charm.on[self.endpoint].relation_broken, self._emit_ingress_change_event
+        )
+
+    def _emit_ingress_change_event(self, event):
+        # Avoid spurious events, emit only when URL changes
+        new_url = self.url
+        if self._stored.current_url != new_url:
+            self._stored.current_url = new_url
+            self.on.ingress_changed.emit(self.relation)
 
     def _complete_request(self, host: Optional[str], port: int):
         if not host:
