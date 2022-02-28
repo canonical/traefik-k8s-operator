@@ -26,6 +26,15 @@ class TestTraefikIngressCharm(unittest.TestCase):
         self.harness.begin_with_initial_hooks()
         self.harness.container_pebble_ready("traefik")
 
+        traefik_container = self.harness.charm.unit.get_container("traefik")
+        try:
+            yaml.safe_load(traefik_container.pull("/opt/traefik/juju").read())
+            raise Exception("The previous line should have failed")
+        except IsADirectoryError:
+            # If the directory did not exist, the method would have thrown
+            # a FileNotFoundError instead.
+            pass
+
         self.assertEqual(self.harness.charm.unit.status, ActiveStatus())
 
         requirer = MockIPURequirer(self.harness)

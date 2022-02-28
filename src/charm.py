@@ -148,6 +148,7 @@ class TraefikIngressCharm(CharmBase):
         )
 
         self.container.push("/etc/traefik/traefik.yaml", basic_configurations, make_dirs=True)
+        self.container.make_dir(_CONFIG_DIRECTORY, make_parents=True)
         self._restart_traefik()
         self._process_status_and_configurations()
 
