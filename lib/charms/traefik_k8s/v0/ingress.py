@@ -61,7 +61,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 1
+LIBPATCH = 2
 
 log = logging.getLogger(__name__)
 
@@ -162,6 +162,29 @@ class IngressPerAppProvider(EndpointWrapper):
         if new_fields != prev_fields:
             raise RelationDataMismatchError(relation, other_app)
         return False
+
+    @property
+    def proxied_endpoints(self):
+        """Returns the ingress settings provided to applications by this IngressPerAppProvider.
+
+        For example, when this IngressPerAppProvider has provided the
+        `http://foo.bar/my-model.my-app` URL to the my-app application, the returned dictionary
+        will be:
+
+        ```
+        {
+            "my-app": {
+                "url": "http://foo.bar/my-model.my-app"
+            }
+        }
+        ```
+        """
+        return {
+            ingress_relation.app.name: self.unwrap(ingress_relation)[self.charm.app].get(
+                "ingress", {}
+            )
+            for ingress_relation in self.charm.model.relations[self.endpoint]
+        }
 
 
 class IngressPerAppRequest:

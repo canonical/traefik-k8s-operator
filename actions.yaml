@@ -1,0 +1,3 @@
+show-proxied-endpoints:
+  description: |
+    Returns a list of endpoints proxied by this Traefik proxy.

@@ -1,10 +1,12 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 
+import json
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import yaml
+from ops.charm import ActionEvent
 from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
 from ops.testing import Harness
 from test_lib_helpers import MockIPARequirer, MockIPURequirer
@@ -373,3 +375,62 @@ class TestTraefikIngressCharm(unittest.TestCase):
             raise Exception("The line above should fail")
         except FileNotFoundError:
             pass
+
+    @patch("charm._get_loadbalancer_status", lambda **unused: None)
+    @patch("charm.KubernetesServicePatch", lambda **unused: None)
+    def test_show_proxied_endpoints_action_no_relations(self):
+        self.harness.begin_with_initial_hooks()
+
+        action_event = Mock(spec=ActionEvent)
+        self.harness.charm._on_show_proxied_endpoints(action_event)
+        action_event.set_results.assert_called_once_with({"proxied-endpoints": "{}"})
+
+    @patch("charm._get_loadbalancer_status", lambda **unused: None)
+    @patch("charm.KubernetesServicePatch", lambda **unused: None)
+    def test_show_proxied_endpoints_action_only_ingress_per_app_relations(self):
+        self.harness.set_leader(True)
+        self.harness.update_config({"external_hostname": "testhostname"})
+        self.harness.begin_with_initial_hooks()
+
+        requirer = MockIPARequirer(self.harness)
+        requirer.relate()
+        requirer.request(host="10.0.0.1", port=3000)
+
+        self.harness.container_pebble_ready("traefik")
+
+        action_event = Mock(spec=ActionEvent)
+        self.harness.charm._on_show_proxied_endpoints(action_event)
+        action_event.set_results.assert_called_once_with(
+            {
+                "proxied-endpoints": json.dumps(
+                    {"ingress-remote": {"url": "http://testhostname:80/test-model-ingress-remote"}}
+                )
+            }
+        )
+
+    @patch("charm._get_loadbalancer_status", lambda **unused: None)
+    @patch("charm.KubernetesServicePatch", lambda **unused: None)
+    def test_show_proxied_endpoints_action_only_ingress_per_unit_relations(self):
+        self.harness.set_leader(True)
+        self.harness.update_config({"external_hostname": "testhostname"})
+        self.harness.begin_with_initial_hooks()
+
+        requirer = MockIPURequirer(self.harness)
+        requirer.relate()
+        requirer.request(host="10.0.0.1", port=3000)
+
+        self.harness.container_pebble_ready("traefik")
+
+        action_event = Mock(spec=ActionEvent)
+        self.harness.charm._on_show_proxied_endpoints(action_event)
+        action_event.set_results.assert_called_once_with(
+            {
+                "proxied-endpoints": json.dumps(
+                    {
+                        "ingress-per-unit-remote/0": {
+                            "url": "http://testhostname:80/test-model-ingress-per-unit-remote-0"
+                        }
+                    }
+                )
+            }
+        )

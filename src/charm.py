@@ -5,6 +5,7 @@
 """Charm Traefik."""
 
 import enum
+import json
 import logging
 from typing import Optional, Tuple
 
@@ -16,6 +17,7 @@ from charms.traefik_k8s.v0.ingress_per_unit import IngressPerUnitProvider
 from lightkube import Client
 from lightkube.resources.core_v1 import Service
 from ops.charm import (
+    ActionEvent,
     CharmBase,
     ConfigChangedEvent,
     PebbleReadyEvent,
@@ -98,6 +100,22 @@ class TraefikIngressCharm(CharmBase):
         self.framework.observe(self.ingress_per_unit.on.request, self._handle_ingress_request)
         self.framework.observe(self.ingress_per_unit.on.failed, self._handle_ingress_failure)
         self.framework.observe(self.ingress_per_unit.on.broken, self._handle_ingress_broken)
+
+        # Action handlers
+        self.framework.observe(
+            self.on.show_proxied_endpoints_action, self._on_show_proxied_endpoints
+        )
+
+    def _on_show_proxied_endpoints(self, event: ActionEvent):
+        try:
+            result = {}
+            result.update(self.ingress_per_unit.proxied_endpoints)
+            result.update(self.ingress_per_app.proxied_endpoints)
+
+            event.set_results({"proxied-endpoints": json.dumps(result)})
+        except Exception as e:
+            logger.exception("Action 'show-proxied-endpoints' failed")
+            event.fail(str(e))
 
     def _on_traefik_pebble_ready(self, _: PebbleReadyEvent):
         # The the Traefik container comes up, e.g., after a pod churn, we
