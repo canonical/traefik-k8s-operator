@@ -48,9 +48,19 @@ from typing import Optional
 from ops.charm import CharmBase, RelationEvent, RelationRole
 from ops.framework import EventSource
 from ops.model import Relation, Unit
-from serialized_data_interface import EndpointWrapper
-from serialized_data_interface.errors import RelationDataError
-from serialized_data_interface.events import EndpointWrapperEvents
+
+try:
+    from serialized_data_interface import EndpointWrapper
+    from serialized_data_interface.errors import RelationDataError
+    from serialized_data_interface.events import EndpointWrapperEvents
+except ImportError:
+    import os
+
+    library_name = os.path.basename(__file__)
+    raise ModuleNotFoundError(
+        "To use the '{}' library, you must include "
+        "the '{}' package in your dependencies".format(library_name, "serialized_data_interface")
+    ) from None  # Suppress original ImportError
 
 try:
     # introduced in 3.9
