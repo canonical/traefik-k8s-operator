@@ -1,7 +1,7 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-"""# Interface Library for ingress_per_unit.
+r"""# Interface Library for ingress_per_unit.
 
 This library wraps relation endpoints using the `ingress_per_unit` interface
 and provides a Python API for both requesting and providing per-unit
@@ -9,21 +9,21 @@ ingress.
 
 ## Getting Started
 
-To get started using the library, you just need to fetch the library using `charmcraft`. **Note
-that you also need to add the `serialized_data_interface` dependency to your charm's
-`requirements.txt`.**
+To get started using the library, you just need to fetch the library using `charmcraft`.
+**Note that you also need to add the `serialized_data_interface` dependency to your
+charm's `requirements.txt`.**
 
 ```shell
 cd some-charm
-charmcraft fetch-lib charms.traefik-k8s.v0.ingress_per_unit
-echo "serialized_data_interface" >> requirements.txt
+charmcraft fetch-lib charms.traefik_k8s.v0.ingress_per_unit
+echo -e "serialized_data_interface\n" >> requirements.txt
 ```
 
 Then, to initialise the library:
 
 ```python
 # ...
-from charms.traefik-k8s.v0.ingress_per_unit import IngressPerUnitRequirer
+from charms.traefik_k8s.v0.ingress_per_unit import IngressPerUnitRequirer
 
 class SomeCharm(CharmBase):
   def __init__(self, *args):
@@ -33,12 +33,12 @@ class SomeCharm(CharmBase):
     # by this unit of `SomeCharm` changes or there is no longer an ingress
     # URL available, that is, `self.ingress_per_unit` would return `None`.
     self.framework.observe(
-        self.ingress_per_unit.on.ingress_change, self._handle_ingress_per_unit
+        self.ingress_per_unit.on.ingress_changed, self._handle_ingress_per_unit
     )
     # ...
 
     def _handle_ingress_per_unit(self, event):
-        log.info("This unit's ingress URL: %s", self.ingress_per_unit.url)
+        logger.info("This unit's ingress URL: %s", self.ingress_per_unit.url)
 ```
 """
 

@@ -1,7 +1,7 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-"""# Interface Library for ingress.
+r"""# Interface Library for ingress.
 
 This library wraps relation endpoints using the `ingress` interface
 and provides a Python API for both requesting and providing per-application
@@ -9,21 +9,21 @@ ingress, with load-balancing occurring across all units.
 
 ## Getting Started
 
-To get started using the library, you just need to fetch the library using `charmcraft`. **Note
-that you also need to add the `serialized_data_interface` dependency to your charm's
-`requirements.txt`.**
+To get started using the library, you just need to fetch the library using `charmcraft`.
+**Note that you also need to add the `serialized_data_interface` dependency to your
+charm's `requirements.txt`.**
 
 ```shell
 cd some-charm
-charmcraft fetch-lib charms.traefik-k8s.v0.ingress
-echo "serialized_data_interface" >> requirements.txt
+charmcraft fetch-lib charms.traefik_k8s.v0.ingress
+echo -e "serialized_data_interface\n" >> requirements.txt
 ```
 
 Then, to initialise the library:
 
 ```python
 # ...
-from charms.traefik-k8s.v0.ingress import IngressPerAppRequirer
+from charms.traefik_k8s.v0.ingress import IngressPerAppRequirer
 
 class SomeCharm(CharmBase):
   def __init__(self, *args):
@@ -34,12 +34,12 @@ class SomeCharm(CharmBase):
     # an ingress URL available, that is, `self.ingress_per_unit` would
     # return `None`.
     self.framework.observe(
-        self.ingress.on.ingress_change, self._handle_ingress
+        self.ingress.on.ingress_changed, self._handle_ingress
     )
     # ...
 
     def _handle_ingress(self, event):
-        log.info("This app's ingress URL: %s", self.ingress.url)
+        logger.info("This app's ingress URL: %s", self.ingress.url)
 ```
 """
 
