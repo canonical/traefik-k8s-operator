@@ -19,6 +19,15 @@ charmcraft fetch-lib charms.traefik_k8s.v0.ingress
 echo -e "serialized_data_interface\n" >> requirements.txt
 ```
 
+In the `metadata.yaml` of the charm, add the following:
+
+```yaml
+requires:
+    ingress:
+        interface: ingress
+        limit: 1
+```
+
 Then, to initialise the library:
 
 ```python
@@ -71,7 +80,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 2
+LIBPATCH = 3
 
 log = logging.getLogger(__name__)
 
