@@ -328,7 +328,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 16
+LIBPATCH = 17
 
 logger = logging.getLogger(__name__)
 
@@ -585,16 +585,15 @@ class JujuTopology:
     def identifier(self) -> str:
         """Format the topology information into a terse string."""
         # This is odd, but may have `None` as a model key
-        return "_".join([str(val) for val in self.as_dict().values()]).replace("/", "_")
+        return "_".join([str(val) for val in self.as_promql_label_dict().values()]).replace(
+            "/", "_"
+        )
 
     @property
     def promql_labels(self) -> str:
         """Format the topology information into a verbose string."""
         return ", ".join(
-            [
-                'juju_{}="{}"'.format(key, value)
-                for key, value in self.as_dict(rename_keys={"charm_name": "charm"}).items()
-            ]
+            ['{}="{}"'.format(key, value) for key, value in self.as_promql_label_dict().items()]
         )
 
     def as_dict(self, rename_keys: Optional[Dict[str, str]] = None) -> OrderedDict:
@@ -634,6 +633,10 @@ class JujuTopology:
             "juju_{}".format(key): val
             for key, val in self.as_dict(rename_keys={"charm_name": "charm"}).items()
         }
+        # The leader is the only unit that sets alert rules, if "juju_unit" is present,
+        # then the rules will only be evaluated for that unit
+        if "juju_unit" in vals:
+            vals.pop("juju_unit")
 
         return vals
 
@@ -683,9 +686,7 @@ class ProviderTopology(JujuTopology):
         """Format the topology information into a scrape identifier."""
         # This is used only by Metrics[Consumer|Provider] and does not need a
         # unit name, so only check for the charm name
-        return "juju_{}_prometheus_scrape".format(
-            "_".join([self.model, self.model_uuid[:7], self.application, self.charm_name])  # type: ignore
-        )
+        return "juju_{}_prometheus_scrape".format(self.identifier)
 
 
 class InvalidAlertRulePathError(Exception):
@@ -852,6 +853,23 @@ class AlertRules:
         # filter to remove empty strings
         return "_".join(filter(None, group_name_parts))
 
+    @classmethod
+    def _multi_suffix_glob(
+        cls, dir_path: Path, suffixes: List[str], recursive: bool = True
+    ) -> list:
+        """Helper function for getting all files in a directory that have a matching suffix.
+
+        Args:
+            dir_path: path to the directory to glob from.
+            suffixes: list of suffixes to include in the glob (items should begin with a period).
+            recursive: a flag indicating whether a glob is recursive (nested) or not.
+
+        Returns:
+            List of files in `dir_path` that have one of the suffixes specified in `suffixes`.
+        """
+        all_files_in_dir = dir_path.glob("**/*" if recursive else "*")
+        return list(filter(lambda f: f.is_file() and f.suffix in suffixes, all_files_in_dir))
+
     def _from_dir(self, dir_path: Path, recursive: bool) -> List[dict]:
         """Read all rule files in a directory.
 
@@ -870,8 +888,7 @@ class AlertRules:
         alert_groups = []  # type: List[dict]
 
         # Gather all alerts into a list of groups
-        paths = dir_path.glob("**/*.rule" if recursive else "*.rule")
-        for file_path in filter(Path.is_file, paths):
+        for file_path in self._multi_suffix_glob(dir_path, [".rule", ".rules"], recursive):
             alert_groups_from_file = self._from_file(dir_path, file_path)
             if alert_groups_from_file:
                 logger.debug("Reading alert rule from %s", file_path)
