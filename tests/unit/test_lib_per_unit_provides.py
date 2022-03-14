@@ -2,7 +2,10 @@
 # See LICENSE file for licensing details.
 
 from textwrap import dedent
+from unittest import TestCase
 from unittest.mock import Mock
+
+import pytest
 
 from charms.traefik_k8s.v1.ingress_per_unit import IngressPerUnitProvider
 from ops.charm import CharmBase
@@ -27,15 +30,32 @@ class MockProviderCharm(CharmBase):
         self.ipu = IngressPerUnitProvider(self)
 
 
-def test_ingress_unit_provider(monkeypatch):
+@pytest.fixture(autouse=True, scope="function")
+def patch_network(monkeypatch):
     monkeypatch.setattr(Binding, "network", Mock(bind_address="10.10.10.10"))
+
+
+@pytest.fixture(scope="function")
+def harness():
     harness = Harness(MockProviderCharm, meta=MockProviderCharm.META)
     harness._backend.model_name = "test-model"
     harness.set_leader(False)
     harness.begin_with_initial_hooks()
-    provider = harness.charm.ipu
-    requirer = MockIPURequirer(harness)
+    return harness
 
+
+@pytest.fixture(scope="function")
+def requirer(harness):
+    return MockIPURequirer(harness)
+
+
+@pytest.fixture(scope="function")
+def provider(harness):
+    provider = harness.charm.ipu
+    return provider
+
+
+def test_ingress_unit_provider_uninitialized(provider, requirer):
     assert not provider.is_available()
     assert not provider.is_ready()
     assert not provider.is_failed()
@@ -43,6 +63,8 @@ def test_ingress_unit_provider(monkeypatch):
     assert not requirer.is_ready()
     assert not requirer.is_failed()
 
+
+def test_ingress_unit_provider_related(provider, requirer):
     relation = requirer.relate()
     assert provider.is_available(relation)
     assert not provider.is_ready(relation)
@@ -51,6 +73,9 @@ def test_ingress_unit_provider(monkeypatch):
     assert not requirer.is_ready(relation)
     assert requirer.is_failed(relation)  # because it has a unit but no versions
 
+
+def test_ingress_unit_provider_leader(provider, requirer, harness):
+    relation = requirer.relate()
     harness.set_leader(True)
     assert provider.is_available(relation)
     assert not provider.is_ready(relation)
@@ -59,6 +84,10 @@ def test_ingress_unit_provider(monkeypatch):
     assert not requirer.is_ready(relation)
     assert not requirer.is_failed(relation)
 
+
+def test_ingress_unit_provider_request(provider, requirer, harness):
+    relation = requirer.relate()
+    harness.set_leader(True)
     requirer.request(port=80)
     assert provider.is_available(relation)
     assert provider.is_ready(relation)
@@ -67,6 +96,11 @@ def test_ingress_unit_provider(monkeypatch):
     assert not requirer.is_ready(relation)
     assert not requirer.is_failed(relation)
 
+
+def test_ingress_unit_provider_request_response(provider, requirer, harness):
+    relation = requirer.relate()
+    harness.set_leader(True)
+    requirer.request(port=80)
     request = provider.get_request(relation)
     assert request.units[0] is requirer.charm.unit
     assert request.app_name == "ingress-per-unit-remote"
