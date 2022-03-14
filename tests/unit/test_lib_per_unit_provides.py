@@ -66,7 +66,10 @@ def test_ingress_unit_provider_uninitialized(provider, requirer):
 
 def test_ingress_unit_provider_related(provider, requirer):
     relation = requirer.relate()
-    assert provider.is_available(relation)
+    # TODO: double check: used to be flipped; but provider is not leader,
+    #  so it cannot possibly have set its version data yet,
+    #  how can it be available?
+    assert not provider.is_available(relation)
     assert not provider.is_ready(relation)
     assert not provider.is_failed(relation)
     assert not requirer.is_available(relation)
