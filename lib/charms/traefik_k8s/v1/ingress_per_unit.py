@@ -197,7 +197,8 @@ class IngressPerUnitProvider(Object):
             self._send_versions(relation)
 
     def _send_versions(self, relation: Relation):
-        relation.data[self.app][SUPPORTED_VERSIONS_KEY] = '- v1'
+        if self.unit.is_leader():
+            relation.data[self.app][SUPPORTED_VERSIONS_KEY] = '- v1'
 
     def _emit_request_event(self, event):
         self.on.request.emit(event.relation)
@@ -288,11 +289,13 @@ class IngressPerUnitProvider(Object):
         # we start by looking at the provider's app databag
         if self.unit.is_leader():
             # only leaders can read their app's data
-            deserialized = json.loads(relation.data[self.app])
-            if validate:
-                jsonschema.validate(instance=deserialized,
-                                    schema=INGRESS_PROVIDES_APP_SCHEMA)
+            data = relation.data[self.app].get('data')
+            deserialized = json.loads(data)
+            if validate and deserialized:
+                schema = INGRESS_PROVIDES_APP_SCHEMA
+                jsonschema.validate(instance=deserialized, schema=schema)
             unwrapped[self.app] = deserialized
+
         else:
             # non-leader units cannot read/write the app databag
             unwrapped[self.app] = {}
@@ -303,15 +306,16 @@ class IngressPerUnitProvider(Object):
                                 obj is not self.unit]
         schema = INGRESS_REQUIRES_UNIT_SCHEMA
         for remote_unit in related_remote_units:
-            deserialized = json.loads(relation.data[remote_unit])
-            if validate:
-                jsonschema.validate(instance=deserialized,
-                                    schema=schema)
+            remote_data = relation.data[remote_unit].get('data', '{}')
+            deserialized = json.loads(remote_data)
+            if validate and deserialized:
+                jsonschema.validate(instance=deserialized, schema=schema)
             unwrapped[remote_unit] = deserialized
 
         return unwrapped
 
-    @cached_property
+    # @cached_property # caching broke some tests
+    @property
     def relations(self):
         """The list of Relation instances associated with this endpoint."""
         return list(self.charm.model.relations[self.endpoint])
