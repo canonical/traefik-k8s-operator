@@ -7,8 +7,6 @@ from functools import cached_property, partial
 from inspect import getmembers
 from unittest.mock import patch
 
-from serialized_data_interface import MockRemoteRelationMixin as MockRemoteIPAMixin
-
 from charms.traefik_k8s.v0.ingress import (
     IngressPerAppProvider,
     IngressPerAppRequest,
@@ -24,6 +22,7 @@ from charms.traefik_k8s.v1.ingress_per_unit import (
 )
 from ops.charm import CharmBase, CharmEvents, CharmMeta
 from ops.model import Relation
+from serialized_data_interface import MockRemoteRelationMixin as MockRemoteIPAMixin
 
 
 class MockRemoteIPUMixin:
@@ -69,7 +68,7 @@ class MockRemoteIPUMixin:
         self.get_version = self._get_version
 
     def _remove_caching(self):
-        # We use the cacheing helpers from functools to save recalculations, but during
+        # We use the caching helpers from functools to save recalculations, but during
         # tests they can interfere with seeing the updated state, so we strip them off.
         is_ew = lambda v: isinstance(v, IPUBase)  # noqa: E731
         is_cp = lambda v: isinstance(v, cached_property)  # noqa: E731

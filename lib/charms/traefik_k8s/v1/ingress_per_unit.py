@@ -455,9 +455,10 @@ class IngressPerUnitProvider(IPUBase):
             # only leaders can read their app's data
             data = relation.data[this_app].get("data")
             deserialized = {}
-            if validate and data:
+            if data:
                 deserialized = _deserialize_data(data)
-                _validate_data(deserialized, INGRESS_PROVIDES_APP_SCHEMA)
+                if validate:
+                    _validate_data(deserialized, INGRESS_PROVIDES_APP_SCHEMA)
             ingress_data[this_app] = deserialized
         else:
             # non-leader units cannot read/write the app databag
