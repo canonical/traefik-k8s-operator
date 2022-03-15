@@ -2,15 +2,14 @@
 # See LICENSE file for licensing details.
 
 from textwrap import dedent
-from unittest import TestCase
 from unittest.mock import Mock
 
 import pytest
-
-from charms.traefik_k8s.v1.ingress_per_unit import IngressPerUnitProvider
 from ops.charm import CharmBase
 from ops.model import Binding
 from ops.testing import Harness
+
+from charms.traefik_k8s.v1.ingress_per_unit import IngressPerUnitProvider
 from test_lib_helpers import MockIPURequirer
 
 

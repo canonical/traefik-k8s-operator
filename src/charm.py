@@ -299,13 +299,16 @@ class TraefikIngressCharm(CharmBase):
     def _generate_per_unit_config(self, request, gateway_address, unit) -> Tuple[dict, str]:
         """Generate a config dict for a given unit for IngressPerUnit."""
         config = {"http": {"routers": {}, "services": {}}}
-        unit_name = request.get_unit_name(unit).replace("/", "-")
+        name = request.get_unit_name(unit)
+        if name is None:
+            raise RuntimeError(f"unable to get unit name for {unit!r}")
+        unit_name = name.replace("/", "-")
         prefix = f"{request.model}-{unit_name}"
 
         if self._routing_mode == _RoutingMode.path:
             route_rule = f"PathPrefix(`/{prefix}`)"
             unit_url = f"http://{gateway_address}:{self._port}/{prefix}"
-        elif self._routing_mode == _RoutingMode.subdomain:
+        else: # _RoutingMode.subdomain
             route_rule = f"Host(`{prefix}.{self._external_host}`)"
             unit_url = f"http://{prefix}.{gateway_address}:{self._port}/"
 
