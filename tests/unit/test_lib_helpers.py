@@ -2,6 +2,13 @@
 # See LICENSE file for licensing details.
 """Helpers for unit testing charms which use this library."""
 import typing
+from contextlib import contextmanager
+from functools import cached_property, partial
+from inspect import getmembers
+from unittest.mock import patch
+
+from ops.charm import CharmBase, CharmEvents, CharmMeta
+from ops.model import Relation
 
 from charms.traefik_k8s.v0.ingress import (
     IngressPerAppProvider,
@@ -13,15 +20,6 @@ from charms.traefik_k8s.v1.ingress_per_unit import (
     IngressPerUnitRequirer,
     IngressRequest, ENDPOINT, INTERFACE, IPUBase,
 )
-from ops.model import Relation
-from contextlib import contextmanager
-from functools import cached_property
-from inspect import getmembers
-from typing import Dict, Union
-from unittest.mock import patch
-
-from ops.charm import CharmBase, CharmEvents, CharmMeta
-from ops.model import Application, Relation, Unit
 
 
 class MockRemoteRelationMixin:
@@ -76,7 +74,8 @@ class MockRemoteRelationMixin:
             IngressPerUnitRequirer,
             IngressPerUnitProvider,
             type(self),
-            *[type(instance) for _, instance in getmembers(self.harness.charm, is_ew)],
+            *[type(instance) for _, instance in
+              getmembers(self.harness.charm, is_ew)],
         ]
         for cls in classes:
             for attr, prop in getmembers(cls, lambda v: is_cp(v) or is_cf(v)):
@@ -113,13 +112,13 @@ class MockRemoteRelationMixin:
         remote charm instead.
         """
         with patch.multiple(
-            self.harness._backend,
-            app_name=self.app.name,
-            unit_name=getattr(self.unit, "name", None),
-            is_leader=lambda: True,
+                self.harness._backend,
+                app_name=self.app.name,
+                unit_name=getattr(self.unit, "name", None),
+                is_leader=lambda: True,
         ):
             with patch.multiple(
-                relation, app=self.harness.charm.app,
+                    relation, app=self.harness.charm.app,
                     units={self.harness.charm.unit}
             ):
                 with patch.object(self.unit, "_is_our_unit", True):
@@ -150,7 +149,8 @@ class MockRemoteRelationMixin:
     def is_available(self, relation: Relation = None):
         """Same as EndpointWrapper.is_available, but with the remote context."""
         if relation is None:
-            return any(self.is_available(relation) for relation in self.relations)
+            return any(
+                self.is_available(relation) for relation in self.relations)
         with self.remote_context(relation):
             return super().is_available(relation)
 
@@ -170,25 +170,6 @@ class MockRemoteRelationMixin:
         with self.remote_context(relation):
             return super().is_failed(relation)
 
-    def wrap(self, relation: Relation, data: Dict[Union[Application, Unit], dict]):
-        """Same as EndpointWrapper.wrap, but ensures the Harness is updated."""
-        with self.remote_context(relation):
-            super().wrap(relation, data)
-        # Updating the relation data directly doesn't trigger hooks, so we have
-        # to call update_relation_data explicitly to trigger them.
-        for entity in (self.app, self.unit):
-            if entity in data:
-                self.harness.update_relation_data(
-                    relation.id,
-                    entity.name,
-                    dict(relation.data[entity]),
-                )
-
-    def unwrap(self, relation: Relation):
-        """Same as EndpointWrapper.unwrap, but from the remote context."""
-        with self.remote_context(relation):
-            return super().unwrap(relation)
-
 
 class MockIPUProvider(MockRemoteRelationMixin, IngressPerUnitProvider):
     """Class to help with unit testing ingress requirer charms.
@@ -200,10 +181,20 @@ class MockIPUProvider(MockRemoteRelationMixin, IngressPerUnitProvider):
     ROLE = 'provides'
     LIMIT = None
 
+    def _mock_respond(self, unit, url, _respond, _relation):
+        with self.remote_context(_relation):
+            _respond(unit, url)
+
     def get_request(self, relation: Relation):
         """Get the IngressRequest for the given Relation."""
         # reflect the relation for the request so that it appears remote
-        return MockIngressPerUnitRequest(self, relation)
+        with self.remote_context(relation):
+            request = MockIngressPerUnitRequest(
+                self, relation, self._fetch_ingress_data(relation))
+            request.respond = partial(self._mock_respond,
+                                      _respond=request.respond,
+                                      _relation=relation)
+            return request
 
 
 class MockIngressPerUnitRequest(IngressRequest):

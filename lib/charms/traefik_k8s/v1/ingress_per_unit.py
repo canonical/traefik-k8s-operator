@@ -57,7 +57,8 @@ import jsonschema
 import yaml
 from ops.charm import CharmBase, RelationEvent
 from ops.framework import EventSource, Object, ObjectEvents
-from ops.model import Relation, Unit, Application
+from ops.model import Relation, Unit, Application, BlockedStatus, WaitingStatus, \
+    ActiveStatus
 
 try:
     # introduced in 3.9
@@ -276,6 +277,23 @@ class IPUBase(Object):
             self.on.available.emit(event.relation)
         elif self.is_failed(event.relation):
             self.on.failed.emit(event.relation)
+
+    @cache
+    def get_status(self, relation: Relation):
+        """Get the suggested status for the given Relation."""
+        if self.is_failed(relation):
+            return BlockedStatus(f"Error handling relation: {relation.name}")
+        elif not self.is_available(relation):
+            if relation.units:
+                # If we have remote units but still no version, then there's
+                # probably something wrong and we should be blocked.
+                return BlockedStatus(f"Missing relation versions: {relation.name}")
+            else:
+                # Otherwise, we might just not have seen the versions yet.
+                return WaitingStatus(f"Waiting on relation: {relation.name}")
+        elif not self.is_ready(relation):
+            return WaitingStatus(f"Waiting on relation: {relation.name}")
+        return ActiveStatus()
 
     def _handle_relation_broken(self, event):
         self.on.broken.emit(event.relation)
@@ -618,6 +636,10 @@ class IngressRequest:
             raise RelationException(self._relation, self.app)
 
         remote_unit_name = self.get_unit_name(unit)
+        if remote_unit_name is None:
+            raise IngressPerUnitException(
+                f"Unable to get name of {unit!r}."
+            )
         ingress = self._data[self._provider.charm.app].setdefault("ingress", {})
         ingress.setdefault(remote_unit_name, {})["url"] = url
         self._provider.publish_ingress_data(self._relation, self._data)
@@ -668,8 +690,10 @@ class IngressPerUnitRequirer(IPUBase):
 
         # if instantiated with a port, and we are related, then
         # we immediately publish our ingress data  to speed up the process.
-        if port and self.relation:
-            self._publish_ingress_data(host, port)
+        if port:
+            self._auto_data = host, port
+        else:
+            self._auto_data = None
 
         self.framework.observe(
             self.charm.on[self.endpoint].relation_changed,
@@ -679,6 +703,20 @@ class IngressPerUnitRequirer(IPUBase):
             self.charm.on[self.endpoint].relation_broken,
             self._emit_ingress_change_event
         )
+
+    def _publish_auto_data(self, relation: Relation):
+        if self._auto_data and self.is_available(relation):
+            self._publish_ingress_data(*self._auto_data)
+
+    def _handle_relation(self, event):
+        super()._handle_relation(event)
+        self._publish_auto_data(event.relation)
+
+    def _handle_upgrade_or_leader(self, event):
+        auto_data = self._auto_data
+        for relation in self.relations:
+            self._publish_versions(relation)
+            self._publish_auto_data(relation)
 
     @property
     def relation(self) -> Optional[Relation]:
