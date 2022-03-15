@@ -57,8 +57,14 @@ import jsonschema
 import yaml
 from ops.charm import CharmBase, RelationEvent
 from ops.framework import EventSource, Object, ObjectEvents
-from ops.model import Relation, Unit, Application, BlockedStatus, WaitingStatus, \
-    ActiveStatus
+from ops.model import (
+    ActiveStatus,
+    Application,
+    BlockedStatus,
+    Relation,
+    Unit,
+    WaitingStatus,
+)
 
 try:
     # introduced in 3.9
@@ -84,9 +90,9 @@ log = logging.getLogger(__name__)
 #      LIBRARY GLOBS      #
 # ======================= #
 
-SUPPORTED_VERSIONS_KEY = '_supported_versions'
-INTERFACE = 'ingress_per_unit'
-ENDPOINT = INTERFACE.replace('_', '-')
+SUPPORTED_VERSIONS_KEY = "_supported_versions"
+INTERFACE = "ingress_per_unit"
+ENDPOINT = INTERFACE.replace("_", "-")
 INGRESS_REQUIRES_UNIT_SCHEMA = {
     "type": "object",
     "properties": {
@@ -141,6 +147,7 @@ def _validate_data(data, schema):
 #       EXCEPTIONS        #
 # ======================= #
 
+
 class IngressPerUnitException(RuntimeError):
     """Base class for errors raised by Ingress Per Unit."""
 
@@ -157,8 +164,7 @@ class RelationException(IngressPerUnitException):
         entity: The Application or Unit which caused the exception.
     """
 
-    def __init__(self, relation: Relation,
-                 entity: typing.Union[Application, Unit]):
+    def __init__(self, relation: Relation, entity: typing.Union[Application, Unit]):
         super().__init__(relation)
         self.args = (
             f"There is an error with the relation {relation.name}:"
@@ -177,11 +183,9 @@ class RelationPermissionError(IngressPerUnitException):
     permissions.
     """
 
-    def __init__(self, relation: Relation,
-                 entity: typing.Union[Application, Unit]):
+    def __init__(self, relation: Relation, entity: typing.Union[Application, Unit]):
         self.args = (
-            f"Unable to write data to {relation.name}:{relation.id} for "
-            f"{entity.name}",
+            f"Unable to write data to {relation.name}:{relation.id} for " f"{entity.name}",
         )
         self.relation = relation
 
@@ -189,6 +193,7 @@ class RelationPermissionError(IngressPerUnitException):
 # ======================= #
 #         EVENTS          #
 # ======================= #
+
 
 class RelationAvailableEvent(RelationEvent):
     """Event triggered when a relation is ready for requests."""
@@ -230,6 +235,7 @@ class IngressPerUnitProviderEvents(IPUEvents):
 
 class IPUBase(Object):
     """Base class for IPU."""
+
     _IPUEvtType = typing.TypeVar("_IPUEvtType", bound=IPUEvents)
     on: _IPUEvtType
 
@@ -310,17 +316,15 @@ class IPUBase(Object):
             return None
 
         try:
-            compatible = (set(_deserialize_data(local_data)) &
-                          set(_deserialize_data(remote_data)))
+            compatible = set(_deserialize_data(local_data)) & set(_deserialize_data(remote_data))
         except Exception as e:
             raise RelationDataMismatchError(relation, self.app) from e
         if compatible:
-            return 'v1'  # mocked
+            return "v1"  # mocked
 
     def _publish_versions(self, relation: Relation):
         if self.unit.is_leader():
-            relation.data[self.app][SUPPORTED_VERSIONS_KEY] = \
-                _serialize_data(['v1'])
+            relation.data[self.app][SUPPORTED_VERSIONS_KEY] = _serialize_data(["v1"])
 
     def _emit_request_event(self, event):
         self.on.request.emit(event.relation)
@@ -331,8 +335,7 @@ class IPUBase(Object):
         is available.
         """
         if relation is None:
-            return any(
-                self.is_available(relation) for relation in self.relations)
+            return any(self.is_available(relation) for relation in self.relations)
         if relation.app.name == "":  # type: ignore
             # Juju doesn't provide JUJU_REMOTE_APP during relation-broken
             # hooks. See https://github.com/canonical/operator/issues/693
@@ -355,7 +358,7 @@ class IPUBase(Object):
             return False
 
     def is_failed(self, relation: Relation = None):
-        raise NotImplementedError('implement in subclass')
+        raise NotImplementedError("implement in subclass")
 
 
 class IngressPerUnitProvider(IPUBase):
@@ -382,7 +385,11 @@ class IngressPerUnitProvider(IPUBase):
 
         A given relation is ready if the remote side has sent valid data.
         """
-        if super().is_ready is False:
+
+        if relation is None:
+            return any(self.is_ready(relation) for relation in self.relations)
+
+        if super().is_ready(relation) is False:
             return False
 
         try:
@@ -392,9 +399,7 @@ class IngressPerUnitProvider(IPUBase):
             return False
 
         own_entities = (self.app, self.unit)
-        return any(
-            data[entity] for entity in data if entity not in own_entities
-        )
+        return any(data[entity] for entity in data if entity not in own_entities)
 
     @cache
     def is_failed(self, relation: Relation = None):
@@ -422,8 +427,7 @@ class IngressPerUnitProvider(IPUBase):
         for unit in relation.units:
             if not data[unit]:
                 continue
-            new_fields = {field: data[unit][field]
-                          for field in ("model", "port")}
+            new_fields = {field: data[unit][field] for field in ("model", "port")}
             if prev_fields is None:
                 prev_fields = new_fields
             if new_fields != prev_fields:
@@ -432,8 +436,7 @@ class IngressPerUnitProvider(IPUBase):
 
     def get_request(self, relation: Relation):
         """Get the IngressRequest for the given Relation."""
-        return IngressRequest(self, relation,
-                              self._fetch_ingress_data(relation))
+        return IngressRequest(self, relation, self._fetch_ingress_data(relation))
 
     def _fetch_ingress_data(self, relation: Relation, validate=False):
         """Fetch and validate the provider's app databag and the
@@ -450,7 +453,7 @@ class IngressPerUnitProvider(IPUBase):
         # we start by looking at the provider's app databag
         if this_unit.is_leader():
             # only leaders can read their app's data
-            data = relation.data[this_app].get('data')
+            data = relation.data[this_app].get("data")
             deserialized = {}
             if validate and data:
                 deserialized = _deserialize_data(data)
@@ -461,25 +464,24 @@ class IngressPerUnitProvider(IPUBase):
             ingress_data[this_app] = {}
 
         # then look at the requirer's (thus remote) unit databags
-        remote_units = [obj for obj in relation.data
-                        if isinstance(obj, Unit) and
-                        obj is not this_unit]
+        remote_units = [
+            obj for obj in relation.data if isinstance(obj, Unit) and obj is not this_unit
+        ]
 
         for remote_unit in remote_units:
-            remote_data = relation.data[remote_unit].get('data')
+            remote_data = relation.data[remote_unit].get("data")
             remote_deserialized = {}
             if remote_data:
                 remote_deserialized = _deserialize_data(remote_data)
                 if validate:
-                    _validate_data(remote_deserialized,
-                                   INGRESS_REQUIRES_UNIT_SCHEMA)
+                    _validate_data(remote_deserialized, INGRESS_REQUIRES_UNIT_SCHEMA)
             ingress_data[remote_unit] = remote_deserialized
 
         return ingress_data
 
     def publish_ingress_data(
-            self, relation: Relation,
-            data: typing.Dict[typing.Union[Unit, Application], dict]):
+        self, relation: Relation, data: typing.Dict[typing.Union[Unit, Application], dict]
+    ):
         """Publishes ingress data to the relation databag.
         :param: `data`
         """
@@ -517,8 +519,7 @@ class IngressPerUnitProvider(IPUBase):
                 this_unit_data = data[this_unit]
                 _validate_data(this_unit_data, INGRESS_PROVIDES_APP_SCHEMA)
 
-                relation.data[this_unit]["data"] = _serialize_data(
-                    this_unit_data)
+                relation.data[this_unit]["data"] = _serialize_data(this_unit_data)
 
     @property
     def proxied_endpoints(self):
@@ -553,8 +554,7 @@ class IngressPerUnitProvider(IPUBase):
 class IngressRequest:
     """A request for per-unit ingress."""
 
-    def __init__(self, provider: IngressPerUnitProvider, relation: Relation,
-                 data):
+    def __init__(self, provider: IngressPerUnitProvider, relation: Relation, data):
         """Construct an IngressRequest."""
         self._provider = provider
         self._relation = relation
@@ -632,14 +632,12 @@ class IngressRequest:
         """
         # Can't use `unit.name` because with CMR it's a UUID.
         if not self.units:
-            log.exception('This app has no units; cannot respond.')
+            log.exception("This app has no units; cannot respond.")
             raise RelationException(self._relation, self.app)
 
         remote_unit_name = self.get_unit_name(unit)
         if remote_unit_name is None:
-            raise IngressPerUnitException(
-                f"Unable to get name of {unit!r}."
-            )
+            raise IngressPerUnitException(f"Unable to get name of {unit!r}.")
         ingress = self._data[self._provider.charm.app].setdefault("ingress", {})
         ingress.setdefault(remote_unit_name, {})["url"] = url
         self._provider.publish_ingress_data(self._relation, self._data)
@@ -661,12 +659,12 @@ class IngressPerUnitRequirer(IPUBase):
     on = IngressPerUnitRequirerEvents()
 
     def __init__(
-            self,
-            charm: CharmBase,
-            endpoint: str = ENDPOINT,
-            *,
-            host: str = None,
-            port: int = None,
+        self,
+        charm: CharmBase,
+        endpoint: str = ENDPOINT,
+        *,
+        host: str = None,
+        port: int = None,
     ):
         """Constructor for IngressRequirer.
 
@@ -696,12 +694,10 @@ class IngressPerUnitRequirer(IPUBase):
             self._auto_data = None
 
         self.framework.observe(
-            self.charm.on[self.endpoint].relation_changed,
-            self._emit_ingress_change_event
+            self.charm.on[self.endpoint].relation_changed, self._emit_ingress_change_event
         )
         self.framework.observe(
-            self.charm.on[self.endpoint].relation_broken,
-            self._emit_ingress_change_event
+            self.charm.on[self.endpoint].relation_broken, self._emit_ingress_change_event
         )
 
     def _publish_auto_data(self, relation: Relation):
@@ -720,8 +716,7 @@ class IngressPerUnitRequirer(IPUBase):
 
     @property
     def relation(self) -> Optional[Relation]:
-        """The established Relation instance, or None.
-        """
+        """The established Relation instance, or None."""
         return self.relations[0] if self.relations else None
 
     def is_ready(self, relation: Relation = None):
@@ -756,7 +751,7 @@ class IngressPerUnitRequirer(IPUBase):
 
         try:
             # grab the data and validate it; might raise
-            raw = self.relation.data[self.unit].get('data')
+            raw = self.relation.data[self.unit].get("data")
         except Exception as e:
             log.exception(f"Error accessing relation databag: {e}")
             return True
@@ -787,7 +782,7 @@ class IngressPerUnitRequirer(IPUBase):
             "host": host,
             "port": port,
         }
-        self.relation.data[self.unit]['data'] = _serialize_data(data)
+        self.relation.data[self.unit]["data"] = _serialize_data(data)
 
     def request(self, *, host: str = None, port: int):
         """Request ingress to this unit.
@@ -807,16 +802,16 @@ class IngressPerUnitRequirer(IPUBase):
         May return an empty dict if the URLs aren't available yet.
         """
         relation = self.relation
-        raw = relation.data.get(relation.app, {}).get('data')
+        raw = relation.data.get(relation.app, {}).get("data")
 
         if not raw:
             return {}
 
         data = _deserialize_data(raw)
+        _validate_data(data, INGRESS_PROVIDES_APP_SCHEMA)
 
         ingress = data.get("ingress", {})
-        return {unit_name: unit_data["url"] for unit_name, unit_data in
-                ingress.items()}
+        return {unit_name: unit_data["url"] for unit_name, unit_data in ingress.items()}
 
     @property
     def url(self):

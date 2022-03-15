@@ -7,6 +7,8 @@ from functools import cached_property, partial
 from inspect import getmembers
 from unittest.mock import patch
 
+from serialized_data_interface import MockRemoteRelationMixin as MockRemoteIPAMixin
+
 from charms.traefik_k8s.v0.ingress import (
     IngressPerAppProvider,
     IngressPerAppRequest,
@@ -24,7 +26,7 @@ from ops.charm import CharmBase, CharmEvents, CharmMeta
 from ops.model import Relation
 
 
-class MockRemoteRelationMixin:
+class MockRemoteIPUMixin:
     """Adds unit testing helpers to EndpointWrapper."""
 
     ROLE: str
@@ -171,7 +173,7 @@ class MockRemoteRelationMixin:
             return super().is_failed(relation)
 
 
-class MockIPUProvider(MockRemoteRelationMixin, IngressPerUnitProvider):
+class MockIPUProvider(MockRemoteIPUMixin, IngressPerUnitProvider):
     """Class to help with unit testing ingress requirer charms.
 
     Exactly the same as the normal IngressPerUnitProvider but, acts as if it's on
@@ -216,7 +218,7 @@ class MockIngressPerUnitRequest(IngressRequest):
         return [self._provider.harness.charm.unit]
 
 
-class MockIPURequirer(MockRemoteRelationMixin, IngressPerUnitRequirer):
+class MockIPURequirer(MockRemoteIPUMixin, IngressPerUnitRequirer):
     """Class to help with unit testing ingress provider charms.
 
     Exactly the same as the normal IngressPerUnitRequirer, but acts as if it's on
@@ -234,10 +236,11 @@ class MockIPURequirer(MockRemoteRelationMixin, IngressPerUnitRequirer):
 
     def request(self, *, host: str = None, port: int):
         with self.remote_context(self.relation):
-            return super().request(host=host, port=port)
+            req = super().request(host=host, port=port)
+        self.harness._charm.on.ingress_per_unit_relation_changed.emit(self.relation)
 
 
-class MockIPAProvider(MockRemoteRelationMixin, IngressPerAppProvider):
+class MockIPAProvider(MockRemoteIPAMixin, IngressPerAppProvider):
     """Class to help with unit testing ingress requirer charms.
 
     Exactly the same as the normal IngressPerAppProvider but, acts as if it's on
@@ -265,7 +268,7 @@ class MockIngressPerAppRequest(IngressPerAppRequest):
         return self._provider.harness.charm.app
 
 
-class MockIPARequirer(MockRemoteRelationMixin, IngressPerAppRequirer):
+class MockIPARequirer(MockRemoteIPAMixin, IngressPerAppRequirer):
     """Class to help with unit testing ingress provider charms.
 
     Exactly the same as the normal IngressPerAppRequirer, but acts as if it's on

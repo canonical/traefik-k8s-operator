@@ -308,7 +308,7 @@ class TraefikIngressCharm(CharmBase):
         if self._routing_mode == _RoutingMode.path:
             route_rule = f"PathPrefix(`/{prefix}`)"
             unit_url = f"http://{gateway_address}:{self._port}/{prefix}"
-        else: # _RoutingMode.subdomain
+        else:  # _RoutingMode.subdomain
             route_rule = f"Host(`{prefix}.{self._external_host}`)"
             unit_url = f"http://{prefix}.{gateway_address}:{self._port}/"
 
