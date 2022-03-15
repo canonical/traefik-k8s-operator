@@ -55,6 +55,14 @@ class TestTraefikIngressCharm(unittest.TestCase):
                         "entryPoints": ["web"],
                         "rule": "PathPrefix(`/test-model-ingress-per-unit-remote-0`)",
                         "service": "juju-test-model-ingress-per-unit-remote-0-service",
+                        "middlewares": {
+                            "juju-sidecar-noprefix": {
+                                "stripPrefix": {
+                                    "prefixes": ["/test-model-ingress-per-unit-remote-0"],
+                                    "forceSlash": False,
+                                }
+                            }
+                        },
                     }
                 },
                 "services": {
@@ -101,6 +109,14 @@ class TestTraefikIngressCharm(unittest.TestCase):
                         "entryPoints": ["web"],
                         "rule": "PathPrefix(`/test-model-ingress-remote`)",
                         "service": "juju-test-model-ingress-remote-service",
+                        "middlewares": {
+                            "juju-sidecar-noprefix": {
+                                "stripPrefix": {
+                                    "prefixes": ["/test-model-ingress-remote"],
+                                    "forceSlash": False,
+                                }
+                            }
+                        },
                     }
                 },
                 "services": {
@@ -208,7 +224,6 @@ class TestTraefikIngressCharm(unittest.TestCase):
                 },
             }
         }
-
         self.assertEqual(conf, expected)
 
         self.assertEqual(
