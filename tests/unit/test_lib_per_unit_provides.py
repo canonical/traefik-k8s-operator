@@ -73,7 +73,8 @@ def test_ingress_unit_provider_related(provider, requirer):
     assert not provider.is_failed(relation)
     assert not requirer.is_available(relation)
     assert not requirer.is_ready(relation)
-    assert requirer.is_failed(relation)  # because it has a unit but no versions
+    # because it has a unit but no versions, since it is not leader
+    assert requirer.is_failed(relation)
 
 
 def test_ingress_unit_provider_leader(provider, requirer, harness):

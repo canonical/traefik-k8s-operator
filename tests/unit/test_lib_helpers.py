@@ -132,7 +132,8 @@ class MockRemoteRelationMixin:
         # to call update_relation_data explicitly to trigger them.
         self.harness.update_relation_data(
             self.relation_id,
-            self.app_name,
+            self.app.name,
+            # self.app_name,
             dict(relation.data[relation.app]),
         )
 
@@ -162,6 +163,8 @@ class MockRemoteRelationMixin:
 
     def is_failed(self, relation: Relation = None):
         """Same as EndpointWrapper.is_failed, but with the remote context."""
+        if not self.relations:
+            return False
         if relation is None:
             return any(self.is_failed(relation) for relation in self.relations)
         with self.remote_context(relation):

@@ -666,9 +666,9 @@ class IngressPerUnitRequirer(IPUBase):
         """
         super().__init__(charm, endpoint)
 
-        # if instantiated with a port, we immediately publish our ingress data
-        # to speed up the process.
-        if port:
+        # if instantiated with a port, and we are related, then
+        # we immediately publish our ingress data  to speed up the process.
+        if port and self.relation:
             self._publish_ingress_data(host, port)
 
         self.framework.observe(
@@ -702,6 +702,9 @@ class IngressPerUnitRequirer(IPUBase):
         """Checks whether the given relation, or any relation if not specified,
         has an error.
         """
+        if not self.relations:  # can't fail if you can't try
+            return False
+
         if relation is None:
             return any(self.is_failed(relation) for relation in self.relations)
 
