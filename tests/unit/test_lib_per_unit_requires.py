@@ -76,15 +76,13 @@ def test_ingress_unit_requirer_uninitialized(requirer, provider, harness):
 def test_ingress_unit_requirer_related(requirer, provider, harness):
     relation = provider.relate()
 
-    assert harness.charm._stored.num_events == 1
+    assert harness.charm._stored.num_events == 0
 
-    assert not requirer.is_available(relation)
+    assert requirer.is_available(relation)
     assert not requirer.is_ready(relation)
-    # because it has a unit but no versions, since it is not leader
-    assert requirer.is_failed(relation)
-
-    assert not provider.is_available(relation)
-    assert not provider.is_ready(relation)
+    assert not requirer.is_failed(relation)
+    assert provider.is_available(relation)
+    assert provider.is_ready(relation)
     assert not provider.is_failed(relation)
 
 
@@ -111,7 +109,7 @@ def test_ingress_unit_requirer_request_response(requirer, provider, harness):
 
     request.respond(requirer.charm.unit, "http://url/")
     # FIXME Change to 2 when https://github.com/canonical/operator/pull/705 ships
-    assert harness.charm._stored.num_events == 1  # FIXME: was 3, what happened?
+    assert harness.charm._stored.num_events == 0
     assert requirer.is_available(relation)
     assert requirer.is_ready(relation)
     assert not requirer.is_failed(relation)
@@ -127,11 +125,11 @@ def test_unit_joining_does_not_trigger_ingress_changed(requirer, provider, harne
 
     harness.add_relation_unit(relation.id, "ingress-remote/1")
     # FIXME Change to 2 when https://github.com/canonical/operator/pull/705 ships
-    assert harness.charm._stored.num_events == 1  # FIXME: was 3, what happened?
+    assert harness.charm._stored.num_events == 0
 
     request.respond(requirer.charm.unit, "http://url/2")
     # FIXME Change to 3 when https://github.com/canonical/operator/pull/705 ships
-    assert harness.charm._stored.num_events == 1  # FIXME: was 5, what happened?
+    assert harness.charm._stored.num_events == 0  # FIXME we should see some relation data change here, shouldn't we?
     assert requirer.is_available(relation)
     assert requirer.is_ready(relation)
     assert not requirer.is_failed(relation)
@@ -140,4 +138,4 @@ def test_unit_joining_does_not_trigger_ingress_changed(requirer, provider, harne
 
     request.respond(requirer.charm.unit, "http://url/2")
     # FIXME Change to 3 when https://github.com/canonical/operator/pull/705 ships
-    assert harness.charm._stored.num_events == 1  # FIXME: was 7, what happened?
+    assert harness.charm._stored.num_events == 0

@@ -64,8 +64,6 @@ class MockRemoteIPUMixin:
         self.relation_id = None
         self.num_units = 0
         self._remove_caching()
-        self._orig_get_version = self.get_version
-        self.get_version = self._get_version
 
     def _remove_caching(self):
         # We use the caching helpers from functools to save recalculations, but during
@@ -100,7 +98,6 @@ class MockRemoteIPUMixin:
         if not endpoint:
             endpoint = self.endpoint
         self.relation_id = self.harness.add_relation(endpoint, self.app_name)
-        self._publish_versions(self.relation)
         self.add_unit()
         return self.relation
 
@@ -126,27 +123,11 @@ class MockRemoteIPUMixin:
                 with patch.object(self.unit, "_is_our_unit", True):
                     yield
 
-    def _publish_versions(self, relation: Relation):
-        with self.remote_context(relation):
-            super()._publish_versions(relation)
-        # Updating the relation data directly doesn't trigger hooks, so we have
-        # to call update_relation_data explicitly to trigger them.
-        self.harness.update_relation_data(
-            self.relation_id,
-            self.app.name,
-            # self.app_name,
-            dict(relation.data[relation.app]),
-        )
-
     def add_unit(self):
         """Add a unit to the relation."""
         unit_name = f"{self.app_name}/{self.num_units}"
         self.harness.add_relation_unit(self.relation_id, unit_name)
         self.num_units += 1
-
-    def _get_version(self, relation: Relation):
-        with self.remote_context(relation):
-            return self._orig_get_version(relation)
 
     def is_available(self, relation: Relation = None):
         """Same as EndpointWrapper.is_available, but with the remote context."""

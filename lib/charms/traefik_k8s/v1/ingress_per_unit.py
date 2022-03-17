@@ -90,7 +90,6 @@ log = logging.getLogger(__name__)
 #      LIBRARY GLOBS      #
 # ======================= #
 
-SUPPORTED_VERSIONS_KEY = "_supported_versions"
 INTERFACE = "ingress_per_unit"
 ENDPOINT = INTERFACE.replace("_", "-")
 INGRESS_REQUIRES_UNIT_SCHEMA = {
@@ -276,7 +275,6 @@ class IPUBase(Object):
         return list(self.charm.model.relations[self.endpoint])
 
     def _handle_relation(self, event):
-        self._publish_versions(event.relation)
         if self.is_ready(event.relation):
             self.on.ready.emit(event.relation)
         elif self.is_available(event.relation):
@@ -290,13 +288,7 @@ class IPUBase(Object):
         if self.is_failed(relation):
             return BlockedStatus(f"Error handling relation: {relation.name}")
         elif not self.is_available(relation):
-            if relation.units:
-                # If we have remote units but still no version, then there's
-                # probably something wrong and we should be blocked.
-                return BlockedStatus(f"Missing relation versions: {relation.name}")
-            else:
-                # Otherwise, we might just not have seen the versions yet.
-                return WaitingStatus(f"Waiting on relation: {relation.name}")
+            return WaitingStatus(f"Waiting on relation: {relation.name}")
         elif not self.is_ready(relation):
             return WaitingStatus(f"Waiting on relation: {relation.name}")
         return ActiveStatus()
@@ -305,26 +297,7 @@ class IPUBase(Object):
         self.on.broken.emit(event.relation)
 
     def _handle_upgrade_or_leader(self, event):
-        for relation in self.relations:
-            self._publish_versions(relation)
-
-    def get_version(self, relation: Relation):
-        data = relation.data
-        local_data = data[self.app].get(SUPPORTED_VERSIONS_KEY)
-        remote_data = data[relation.app].get(SUPPORTED_VERSIONS_KEY)
-        if not (local_data and remote_data):
-            return None
-
-        try:
-            compatible = set(_deserialize_data(local_data)) & set(_deserialize_data(remote_data))
-        except Exception as e:
-            raise RelationDataMismatchError(relation, self.app) from e
-        if compatible:
-            return "v1"  # mocked
-
-    def _publish_versions(self, relation: Relation):
-        if self.unit.is_leader():
-            relation.data[self.app][SUPPORTED_VERSIONS_KEY] = _serialize_data(["v1"])
+        pass
 
     def _emit_request_event(self, event):
         self.on.request.emit(event.relation)
@@ -340,7 +313,7 @@ class IPUBase(Object):
             # Juju doesn't provide JUJU_REMOTE_APP during relation-broken
             # hooks. See https://github.com/canonical/operator/issues/693
             return False
-        return bool(self.get_version(relation))
+        return True
 
     @cache
     def is_ready(self, relation: Relation = None):
@@ -712,7 +685,6 @@ class IngressPerUnitRequirer(IPUBase):
     def _handle_upgrade_or_leader(self, event):
         auto_data = self._auto_data
         for relation in self.relations:
-            self._publish_versions(relation)
             self._publish_auto_data(relation)
 
     @property
@@ -746,9 +718,6 @@ class IngressPerUnitRequirer(IPUBase):
             # Juju doesn't provide JUJU_REMOTE_APP during relation-broken
             # hooks. See https://github.com/canonical/operator/issues/693
             return False
-
-        if not self.get_version(relation):
-            return True
 
         try:
             # grab the data and validate it; might raise
