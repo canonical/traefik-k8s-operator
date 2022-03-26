@@ -85,7 +85,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 5
+LIBPATCH = 6
 
 log = logging.getLogger(__name__)
 
@@ -397,7 +397,7 @@ class IngressPerUnitRequirer(EndpointWrapper):
     @property
     def relation(self):
         """The established Relation instance, or None."""
-        return self.relations[0] if self.relations and not self.is_relation_broken else None
+        return self.relations[0] if self.relations else None
 
     @property
     def urls(self):
