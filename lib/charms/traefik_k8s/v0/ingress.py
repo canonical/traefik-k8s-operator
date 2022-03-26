@@ -55,7 +55,7 @@ class SomeCharm(CharmBase):
 import logging
 from typing import Optional
 
-from ops.charm import CharmBase, RelationEvent, RelationRole
+from ops.charm import CharmBase, RelationBrokenEvent, RelationEvent, RelationRole
 from ops.framework import EventSource, StoredState
 from ops.model import Relation
 
@@ -80,7 +80,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 3
+LIBPATCH = 4
 
 log = logging.getLogger(__name__)
 
@@ -306,6 +306,10 @@ class IngressPerAppRequirer(EndpointWrapper):
         """
         super().__init__(charm, endpoint)
 
+        # Workaround for SDI not marking the EndpointWrapper as not
+        # ready upon a relation broken event
+        self.is_relation_broken = False
+
         self._stored.set_default(current_url=None)
 
         if port and charm.unit.is_leader():
@@ -319,6 +323,9 @@ class IngressPerAppRequirer(EndpointWrapper):
         )
 
     def _emit_ingress_change_event(self, event):
+        if isinstance(event, RelationBrokenEvent):
+            self.is_relation_broken = True
+
         # Avoid spurious events, emit only when URL changes
         new_url = self.url
         if self._stored.current_url != new_url:
@@ -355,7 +362,7 @@ class IngressPerAppRequirer(EndpointWrapper):
     @property
     def relation(self):
         """The established Relation instance, or None."""
-        return self.relations[0] if self.relations else None
+        return self.relations[0] if self.relations and not self.is_relation_broken else None
 
     @property
     def url(self):
@@ -363,7 +370,7 @@ class IngressPerAppRequirer(EndpointWrapper):
 
         May return None if the URL isn't available yet.
         """
-        if not self.is_ready():
+        if self.is_relation_broken or not self.is_ready():
             return {}
         data = self.unwrap(self.relation)
         ingress = data[self.relation.app].get("ingress", {})
