@@ -216,7 +216,7 @@ class MockIPURequirer(MockRemoteIPUMixin, IngressPerUnitRequirer):
 
     def request(self, *, host: str = None, port: int):
         with self.remote_context(self.relation):
-            req = super().request(host=host, port=port)
+            super().request(host=host, port=port)
         self.harness._charm.on.ingress_per_unit_relation_changed.emit(self.relation)
 
 

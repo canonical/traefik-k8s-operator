@@ -5,8 +5,10 @@ from textwrap import dedent
 from unittest.mock import Mock
 
 import pytest
-from charms.traefik_k8s.v0.ingress_per_unit import IngressPerUnitProvider, \
-    RelationPermissionError
+from charms.traefik_k8s.v0.ingress_per_unit import (
+    IngressPerUnitProvider,
+    RelationPermissionError,
+)
 from ops.charm import CharmBase
 from ops.model import Binding
 from ops.testing import Harness
@@ -61,7 +63,8 @@ def test_ingress_unit_provider_uninitialized(provider, requirer):
     assert not requirer.is_ready()
     assert not requirer.is_failed()
 
-@pytest.mark.parametrize('leader', (True, False))
+
+@pytest.mark.parametrize("leader", (True, False))
 def test_ingress_unit_provider_related(provider, requirer, harness, leader):
     relation = requirer.relate()
     if leader:
@@ -87,8 +90,7 @@ def test_ingress_unit_provider_request(provider, requirer, harness):
     assert not requirer.is_failed(relation)
 
 
-def test_ingress_unit_provider_request_response_nonleader(
-        provider, requirer, harness):
+def test_ingress_unit_provider_request_response_nonleader(provider, requirer, harness):
     relation = requirer.relate()
     requirer.request(port=80)
     request = provider.get_request(relation)

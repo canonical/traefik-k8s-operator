@@ -178,9 +178,7 @@ class RelationDataMismatchError(RelationException):
 
 
 class RelationPermissionError(IngressPerUnitException):
-    """Raised when the ingress is requested to do something for which it lacks
-    permissions.
-    """
+    """Ingress is requested to do something for which it lacks permissions."""
 
     def __init__(self, relation: Relation, entity: typing.Union[Application, Unit]):
         self.args = (
@@ -305,8 +303,9 @@ class IPUBase(Object):
 
     @cache
     def is_available(self, relation: Relation = None):
-        """Checks whether the given relation, or any relation if not specified,
-        is available.
+        """Check whether the given relation is available.
+
+        Or any relation if not specified.
         """
         if relation is None:
             return any(self.is_available(relation) for relation in self.relations)
@@ -318,9 +317,9 @@ class IPUBase(Object):
 
     @cache
     def is_ready(self, relation: Relation = None):
-        """Checks whether the given relation, or any relation if not specified,
-        is ready.
+        """Checks whether the given relation is ready.
 
+        Or any relation if not specified.
         A given relation is ready if the remote side has sent valid data.
         """
         if relation is None:
@@ -332,6 +331,10 @@ class IPUBase(Object):
             return False
 
     def is_failed(self, relation: Relation = None):
+        """Checks whether the given relation is failed.
+
+        Or any relation if not specified.
+        """
         raise NotImplementedError("implement in subclass")
 
 
@@ -354,12 +357,11 @@ class IngressPerUnitProvider(IPUBase):
 
     @cache
     def is_ready(self, relation: Relation = None):
-        """Checks whether the given relation, or any relation if not specified,
-        is ready.
+        """Checks whether the given relation is ready.
 
+        Or any relation if not specified.
         A given relation is ready if the remote side has sent valid data.
         """
-
         if relation is None:
             return any(self.is_ready(relation) for relation in self.relations)
 
@@ -377,8 +379,9 @@ class IngressPerUnitProvider(IPUBase):
 
     @cache
     def is_failed(self, relation: Relation = None):
-        """Checks whether the given relation, or any relation if not specified,
-        has an error.
+        """Checks whether the given relation is failed.
+
+        Or any relation if not specified.
         """
         if relation is None:
             return any(self.is_failed(relation) for relation in self.relations)
@@ -413,8 +416,10 @@ class IngressPerUnitProvider(IPUBase):
         return IngressRequest(self, relation, self._fetch_ingress_data(relation))
 
     def _fetch_ingress_data(self, relation: Relation, validate=False):
-        """Fetch and validate the provider's app databag and the
-        requirers' units databags.
+        """Fetch and validate the databags.
+
+        For the provider side: the application databag.
+        For the requirer side: the unit databag.
         """
         this_unit = self.unit
         this_app = self.app
@@ -457,9 +462,7 @@ class IngressPerUnitProvider(IPUBase):
     def publish_ingress_data(
         self, relation: Relation, data: typing.Dict[typing.Union[Unit, Application], dict]
     ):
-        """Publishes ingress data to the relation databag.
-        :param: `data`
-        """
+        """Publish ingress data to the relation databag."""
         this_app = self.app
         this_unit = self.unit
 
@@ -498,8 +501,7 @@ class IngressPerUnitProvider(IPUBase):
 
     @property
     def proxied_endpoints(self):
-        """Returns the ingress settings provided to units by this
-        IngressPerUnitProvider.
+        """Returns the ingress settings provided to units by this provider.
 
         For example, when this IngressPerUnitProvider has provided the
         `http://foo.bar/my-model.my-app-1` and
@@ -680,7 +682,6 @@ class IngressPerUnitRequirer(IPUBase):
         self._publish_auto_data(event.relation)
 
     def _handle_upgrade_or_leader(self, event):
-        auto_data = self._auto_data
         for relation in self.relations:
             self._publish_auto_data(relation)
 
@@ -694,9 +695,9 @@ class IngressPerUnitRequirer(IPUBase):
         return self.relations[0] if self.relations else None
 
     def is_ready(self, relation: Relation = None):
-        """Checks whether the given relation, or any relation if not specified,
-        is ready.
+        """Checks whether the given relation is ready.
 
+        Or any relation if not specified.
         A given relation is ready if the remote side has sent valid data.
         """
         if super().is_ready(relation) is False:
@@ -706,8 +707,9 @@ class IngressPerUnitRequirer(IPUBase):
 
     @cache
     def is_failed(self, relation: Relation = None):
-        """Checks whether the given relation, or any relation if not specified,
-        has an error.
+        """Checks whether the given relation is failed.
+
+        Or any relation if not specified.
         """
         if not self.relations:  # can't fail if you can't try
             return False
