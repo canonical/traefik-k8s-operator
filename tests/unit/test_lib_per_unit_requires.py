@@ -6,7 +6,7 @@ from textwrap import dedent
 from unittest.mock import Mock
 
 import pytest
-from charms.traefik_k8s.v1.ingress_per_unit import IngressPerUnitRequirer
+from charms.traefik_k8s.v0.ingress_per_unit import IngressPerUnitRequirer
 from ops.charm import CharmBase
 from ops.framework import StoredState
 from ops.model import Binding

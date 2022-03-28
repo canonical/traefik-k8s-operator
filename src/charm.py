@@ -13,7 +13,7 @@ import yaml
 from charms.observability_libs.v0.kubernetes_service_patch import KubernetesServicePatch
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 from charms.traefik_k8s.v0.ingress import IngressPerAppProvider
-from charms.traefik_k8s.v1.ingress_per_unit import IngressPerUnitProvider
+from charms.traefik_k8s.v0.ingress_per_unit import IngressPerUnitProvider
 from lightkube import Client
 from lightkube.resources.core_v1 import Service
 from ops.charm import (

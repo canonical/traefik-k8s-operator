@@ -12,7 +12,7 @@ from charms.traefik_k8s.v0.ingress import (
     IngressPerAppRequest,
     IngressPerAppRequirer,
 )
-from charms.traefik_k8s.v1.ingress_per_unit import (
+from charms.traefik_k8s.v0.ingress_per_unit import (
     ENDPOINT,
     INTERFACE,
     IngressPerUnitProvider,
