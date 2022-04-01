@@ -14,6 +14,7 @@ from charms.observability_libs.v0.kubernetes_service_patch import KubernetesServ
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 from charms.traefik_k8s.v0.ingress import IngressPerAppProvider
 from charms.traefik_k8s.v0.ingress_per_unit import IngressPerUnitProvider
+from deepmerge import always_merger
 from lightkube import Client
 from lightkube.resources.core_v1 import Service
 from ops.charm import (
@@ -100,6 +101,10 @@ class TraefikIngressCharm(CharmBase):
         self.framework.observe(self.ingress_per_unit.on.request, self._handle_ingress_request)
         self.framework.observe(self.ingress_per_unit.on.failed, self._handle_ingress_failure)
         self.framework.observe(self.ingress_per_unit.on.broken, self._handle_ingress_broken)
+        # Work around SDI not handling scale-down
+        self.framework.observe(
+            self.on["ingress-per-unit"].relation_departed, self._handle_ingress_request
+        )
 
         # Action handlers
         self.framework.observe(
@@ -244,10 +249,25 @@ class TraefikIngressCharm(CharmBase):
             self.unit.status = ActiveStatus()
 
     def _process_ingress_relation(self, relation: Relation):
-        # There's a chance that we're processing a relation event
-        # which was deferred until after the relation was broken.
-        # Select the right per_app/per_unit provider and check it is ready before continuing
-        if not (provider := self._provider_from_relation(relation)).is_ready(relation):
+        # There's a chance that we're processing a relation event which was deferred until after
+        # the relation was broken. Select the right per_app/per_unit provider and check it is ready
+        # before continuing. However, the provider will NOT be ready if there are no units on the
+        # other side, which is the case for the RelationDeparted for the last unit (i.e., the
+        # proxied application scales to zero).
+
+        relation_provider = self._provider_from_relation(relation)
+        if not (provider := relation_provider).is_ready(relation):
+            # TODO Cleanup: the provider for ingress_per_unit will NOT be ready if there are no
+            # units on the other side, which is the case for the RelationDeparted for the last unit
+            # (i.e., the proxied application scales to zero).
+
+            if relation_provider == self.ingress_per_unit and not relation.units:
+                logger.debug(
+                    "No units found in the ingress-per-unit relation; resetting ingress configurations"
+                )
+
+                self._push_configurations(relation, {})
+
             return
 
         rel = f"{relation.name}:{relation.id}"
@@ -268,15 +288,33 @@ class TraefikIngressCharm(CharmBase):
             config, app_url = self._generate_per_app_config(request, gateway_address)
             if self.unit.is_leader():
                 request.respond(app_url)
+            self._push_configurations(relation, config)
         else:
+            config = {}
             for unit in request.units:
-                config, unit_url = self._generate_per_unit_config(request, gateway_address, unit)
-                if self.unit.is_leader():
-                    request.respond(unit, unit_url)
+                unit_config, unit_url = self._generate_per_unit_config(
+                    request, gateway_address, unit
+                )
 
-        config_filename = f"{_CONFIG_DIRECTORY}/{self._relation_config_file(relation)}"
-        self.container.push(config_filename, yaml.dump(config), make_dirs=True)
-        logger.debug("Updated ingress configuration file: %s", config_filename)
+                if unit_url:
+                    if self.unit.is_leader():
+                        request.respond(unit, unit_url)
+
+                if unit_config:
+                    always_merger.merge(config, unit_config)
+
+            # Note: We might be pushing an empty configuration if, for example,
+            # none of the units has yet written their part of the data into the
+            # relation. Traefik is fine with it :-)
+            self._push_configurations(relation, config)
+
+    def _push_configurations(self, relation: Relation, config: str):
+        if config:
+            config_filename = f"{_CONFIG_DIRECTORY}/{self._relation_config_file(relation)}"
+            self.container.push(config_filename, yaml.dump(config), make_dirs=True)
+            logger.debug("Updated ingress configuration file: %s", config_filename)
+        else:
+            self._wipe_ingress_for_relation(relation)
 
     def _validate_gateway_address(self, relation: Relation, request) -> Optional[str]:
         if self.unit.is_leader():
@@ -297,8 +335,31 @@ class TraefikIngressCharm(CharmBase):
     def _generate_per_unit_config(self, request, gateway_address, unit) -> Tuple[dict, str]:
         """Generate a config dict for a given unit for IngressPerUnit."""
         config = {"http": {"routers": {}, "services": {}}}
-        unit_name = request.get_unit_name(unit).replace("/", "-")
+
+        raw_unit_name = request.get_unit_name(unit)
+        model = request.model
+
+        if not raw_unit_name or not model:
+            # This might happen when we get the RelationChanged event after the
+            # RelationJoined event for the unit, but the unit has not yet written
+            # data into the relation.
+            logger.debug(
+                "Cannot generate unit config, model or unit name are None; "
+                f"model: {model}, unit_name: {raw_unit_name}"
+            )
+            return None, None
+
+        unit_name = raw_unit_name.replace("/", "-")
         prefix = f"{request.model}-{unit_name}"
+
+        unit_address = request.get_host(unit)
+
+        if not unit_address:
+            # This might happen when we get the RelationChanged event after the
+            # RelationJoined event for the unit, but the unit has not yet written
+            # data into the relation or it has not yet access to its pod ip.
+            logger.debug("Cannot generate unit config, unit_address not available yet")
+            return None, None
 
         if self._routing_mode == _RoutingMode.path:
             route_rule = f"PathPrefix(`/{prefix}`)"
@@ -317,9 +378,7 @@ class TraefikIngressCharm(CharmBase):
         }
 
         config["http"]["services"][traefik_service_name] = {
-            "loadBalancer": {
-                "servers": [{"url": f"http://{request.get_host(unit)}:{request.port}"}]
-            }
+            "loadBalancer": {"servers": [{"url": f"http://{unit_address}:{request.port}"}]}
         }
 
         return config, unit_url
@@ -389,7 +448,7 @@ class TraefikIngressCharm(CharmBase):
                 config_path = f"{_CONFIG_DIRECTORY}/{self._relation_config_file(relation)}"
                 self.container.remove_path(config_path, recursive=True)
                 logger.debug(f"Deleted orphaned {config_path} ingress configuration file")
-            except PathError:
+            except (PathError, FileNotFoundError):
                 logger.debug("Configurations for '%s:%s' not found", relation.name, relation.id)
 
         # Wipe URLs sent to the requesting apps and units, as they are based on a gateway

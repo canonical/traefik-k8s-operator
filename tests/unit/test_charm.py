@@ -5,6 +5,7 @@ import json
 import unittest
 from unittest.mock import Mock, patch
 
+import ops.testing
 import yaml
 from ops.charm import ActionEvent
 from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
@@ -12,6 +13,8 @@ from ops.testing import Harness
 from test_lib_helpers import MockIPARequirer, MockIPURequirer
 
 from charm import TraefikIngressCharm
+
+ops.testing.SIMULATE_CAN_CONNECT = True
 
 
 class TestTraefikIngressCharm(unittest.TestCase):
