@@ -37,6 +37,12 @@ from ops.model import (
 )
 from ops.pebble import APIError, PathError
 
+from charms.traefik_route_k8s.v0.traefik_route import (
+    TraefikRouteProvider,
+    TraefikRouteRequestEvent,
+    _deserialize_data as deserialize_traefik_route_data
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -87,6 +93,7 @@ class TraefikIngressCharm(CharmBase):
 
         self.ingress_per_app = IngressPerAppProvider(charm=self)
         self.ingress_per_unit = IngressPerUnitProvider(charm=self)
+        self.traefik_route = TraefikRouteProvider(charm=self)
 
         self.framework.observe(self.on.traefik_pebble_ready, self._on_traefik_pebble_ready)
         self.framework.observe(self.on.start, self._on_start)
@@ -100,6 +107,8 @@ class TraefikIngressCharm(CharmBase):
         self.framework.observe(self.ingress_per_unit.on.request, self._handle_ingress_request)
         self.framework.observe(self.ingress_per_unit.on.failed, self._handle_ingress_failure)
         self.framework.observe(self.ingress_per_unit.on.broken, self._handle_ingress_broken)
+
+        self.framework.observe(self.traefik_route.on.request, self._handle_traefik_route_request)
 
         # Action handlers
         self.framework.observe(
@@ -147,7 +156,7 @@ class TraefikIngressCharm(CharmBase):
                 },
                 # We always start the Prometheus endpoint for simplicity
                 # TODO: Generate this file in the dynamic configuration folder when the
-                # metrics-endpoint relation is established?
+                #  metrics-endpoint relation is established?
                 "metrics": {
                     "prometheus": {
                         "addRoutersLabels": True,
@@ -242,6 +251,48 @@ class TraefikIngressCharm(CharmBase):
 
         if isinstance(self.unit.status, MaintenanceStatus):
             self.unit.status = ActiveStatus()
+
+    def _handle_traefik_route_request(self, event: TraefikRouteRequestEvent):
+        """A traefik_route charm has requested ingress.
+        {
+            'ingress': {
+                'model': 'cos',
+                'unit': 'prometheus-k8s/0',
+                'host': 'foo/bar',
+                'port': 42
+            },
+            'config': {
+                'rule': 'Host(`foo.bar/{{juju_unit}}`)'
+            }
+        }
+        """
+        request = event.relation.data[event.relation.app]
+        config = request['config']
+        # 'config': {
+        #     'rule': 'Host(`foo.bar/{{juju_unit}}`)'
+        # }
+        # todo make serialize/deserialize functions public
+
+        ingress = deserialize_traefik_route_data(request['ingress']['data'])
+        # 'ingress': {
+        #     'model': 'cos',
+        #     'unit': 'prometheus-k8s/0',
+        #     'host': 'foo/bar',
+        #     'port': 42
+        # }
+
+        # todo make proper jinja2 thing here
+        rule = config['rule']
+        for key, value in (
+                ('{{juju_model}}', ingress['model']),
+                ('{{juju_unit}}', ingress['unit']),
+                ('{{port}}', ingress['port']),  # probably not necessary
+                ('{{host}}', ingress['host'])
+        ):
+            if key in rule:
+                rule = rule.replace(key, value)
+
+        logger.info(f"unit requesting ingress with rule: {rule}")
 
     def _process_ingress_relation(self, relation: Relation):
         # There's a chance that we're processing a relation event

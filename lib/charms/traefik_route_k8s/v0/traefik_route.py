@@ -1,0 +1,1 @@
+/home/pietro/canonical/traefik-route-k8s-operator/lib/charms/traefik_route_k8s/v0/traefik_route.py
