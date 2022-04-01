@@ -74,6 +74,8 @@ except ImportError:
 
     cache = lru_cache(maxsize=None)
 
+__all__ = ("IPUBase", "IngressPerUnitProvider", "IngressPerUnitRequirer")
+
 # The unique Charmhub library identifier, never change it
 LIBID = "7ef06111da2945ed84f4f5d4eb5b353a"  # can't register a library until the charm is in the store 9_9
 
@@ -584,22 +586,20 @@ class IngressRequest:
         return self._get_unit_data(unit, "name")
 
     def _get_data_from_first_unit(self, key: str):
-        if self.units:
-            first_unit_data = self._data[self.units[0]]
-
-            if key in first_unit_data:
-                return first_unit_data[key]
-
-        return None
+        return self._get_unit_data(self.units[0], key)
 
     def _get_unit_data(self, unit: Unit, key: str):
-        if self.units:
-            if unit in self.units:
-                unit_data = self._data[unit]
+        if unit in self.units:
+            unit_data = self._data[unit]
 
-                if key in unit_data:
-                    return unit_data[key]
-
+            if key in unit_data:
+                return unit_data[key]
+            else:
+                log.warning(f'unable to get {key!r} from {unit}: '
+                            f'key not in relation databag')
+        else:
+            log.warning(f'unable to get unit data for {unit}: '
+                        f'unit is not in relation')
         return None
 
     def respond(self, unit: Unit, url: str):
@@ -607,14 +607,16 @@ class IngressRequest:
 
         Note: only the leader can send URLs.
         """
-        # Can't use `unit.name` because with CMR it's a UUID.
+        # Can't use `unit.name` because with cross-model-relations it's a UUID.
         if not self.units:
             log.exception("This app has no units; cannot respond.")
             raise RelationException(self._relation, self.app)
 
         remote_unit_name = self.get_unit_name(unit)
-        if remote_unit_name is None:
-            raise IngressPerUnitException(f"Unable to get name of {unit!r}.")
+
+        # FIXME: this should not happen in production
+        assert remote_unit_name, f"unable to get remote unit name for {unit}"
+
         ingress = self._data[self._provider.charm.app].setdefault("ingress", {})
         ingress.setdefault(remote_unit_name, {})["url"] = url
         self._provider.publish_ingress_data(self._relation, self._data)
