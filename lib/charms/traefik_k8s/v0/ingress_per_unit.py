@@ -357,16 +357,17 @@ class IngressPerUnitProvider(IPUBase):
         observe(self.charm.on[endpoint].relation_joined,
                 self._share_version_info)
 
-    def _share_version_info(self, relation):
+    def _share_version_info(self, event):
         """Backwards-compatibility shim for version negotiation.
 
         Allows older versions of IPU (requirer side) to interact with this
         provider without breaking.
         Will be removed in a future version of this library.
         Do not use."""
+        relation = event.relation
         if self.charm.unit.is_leader():
             log.info("shared supported_versions shim information")
-            relation.data[relation.app]["_supported_versions"] = "- v1"
+            relation.data[self.charm.app]["_supported_versions"] = "- v1"
 
     @cache
     def is_ready(self, relation: Relation = None):

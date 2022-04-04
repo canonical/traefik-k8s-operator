@@ -66,10 +66,10 @@ def test_ingress_unit_provider_uninitialized(provider, requirer):
 
 @pytest.mark.parametrize("leader", (True, False))
 def test_ingress_unit_provider_related(provider, requirer, harness, leader):
-    relation = requirer.relate()
     if leader:
         # no app data to write yet, so leadership shouldn't matter.
         harness.set_leader(True)
+    relation = requirer.relate()
 
     assert provider.is_available(relation)
     assert not provider.is_ready(relation)
@@ -77,6 +77,15 @@ def test_ingress_unit_provider_related(provider, requirer, harness, leader):
     assert requirer.is_available(relation)
     assert not requirer.is_ready(relation)
     assert not requirer.is_failed(relation)
+
+
+@pytest.mark.parametrize("leader", (True, False))
+def test_ingress_unit_provider_supported_versions_shim(provider, requirer, harness, leader):
+    if leader:
+        harness.set_leader(True)
+    relation = requirer.relate()
+    if leader:
+        assert relation.data[provider.charm.app]["_supported_versions"] == "- v1"
 
 
 def test_ingress_unit_provider_request(provider, requirer, harness):
