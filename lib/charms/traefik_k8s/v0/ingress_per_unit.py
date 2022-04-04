@@ -55,7 +55,7 @@ from typing import Optional
 
 import jsonschema
 import yaml
-from ops.charm import CharmBase, RelationEvent
+from ops.charm import CharmBase, RelationEvent, RelationBrokenEvent
 from ops.framework import EventSource, Object, ObjectEvents
 from ops.model import (
     ActiveStatus,
@@ -82,7 +82,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 4
+LIBPATCH = 6
 
 log = logging.getLogger(__name__)
 
@@ -684,6 +684,10 @@ class IngressPerUnitRequirer(IPUBase):
         else:
             self._auto_data = None
 
+        # Workaround for SDI not marking the EndpointWrapper as not
+        # ready upon a relation broken event
+        self.is_relation_broken = False
+
         self.framework.observe(
             self.charm.on[self.endpoint].relation_changed, self._emit_ingress_change_event
         )
@@ -755,6 +759,9 @@ class IngressPerUnitRequirer(IPUBase):
         return False
 
     def _emit_ingress_change_event(self, event):
+        if isinstance(event, RelationBrokenEvent):
+            self.is_relation_broken = True
+
         # TODO Avoid spurious events, emit only when URL changes
         self.on.ingress_changed.emit(self.relation)
 
@@ -789,7 +796,7 @@ class IngressPerUnitRequirer(IPUBase):
         May return an empty dict if the URLs aren't available yet.
         """
         relation = self.relation
-        if not relation:
+        if not relation or self.is_relation_broken:
             return {}
         raw = relation.data.get(relation.app, {}).get("data")
         if not raw:
