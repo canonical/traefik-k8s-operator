@@ -55,13 +55,14 @@ from typing import Optional
 
 import jsonschema
 import yaml
-from ops.charm import CharmBase, RelationEvent, RelationBrokenEvent
+from ops.charm import CharmBase, RelationBrokenEvent, RelationEvent
 from ops.framework import EventSource, Object, ObjectEvents
 from ops.model import (
     ActiveStatus,
     Application,
     BlockedStatus,
     Relation,
+    StatusBase,
     Unit,
     WaitingStatus,
 )
@@ -166,8 +167,9 @@ class RelationException(IngressPerUnitException):
     def __init__(self, relation: Relation, entity: typing.Union[Application, Unit]):
         super().__init__(relation)
         self.args = (
-            f"There is an error with the relation {relation.name}:"
-            f"{relation.id} from {entity.name}",
+            "There is an error with the relation {}:{} with {}".format(
+                relation.name, relation.id, entity.name
+            ),
         )
         self.relation = relation
         self.entity = entity
@@ -181,8 +183,8 @@ class RelationPermissionError(IngressPerUnitException):
     """Ingress is requested to do something for which it lacks permissions."""
 
     def __init__(self, relation: Relation, entity: typing.Union[Application, Unit]):
-        self.args = (
-            f"Unable to write data to {relation.name}:{relation.id} for " f"{entity.name}",
+        self.args = "Unable to write data to relation {}:{} with {}".format(
+            relation.name, relation.id, entity.name
         )
         self.relation = relation
 
@@ -201,10 +203,6 @@ class RelationFailedEvent(RelationEvent):
 
 
 class RelationReadyEvent(RelationEvent):
-    """Event triggered when a remote relation has the expected data."""
-
-
-class RelationBrokenEvent(RelationEvent):
     """Event triggered when a remote relation has the expected data."""
 
 
@@ -282,20 +280,22 @@ class IPUBase(Object):
             self.on.failed.emit(event.relation)
 
     @cache
-    def get_status(self, relation: Relation):
+    def get_status(self, relation: Relation) -> StatusBase:
         """Get the suggested status for the given Relation."""
         if self.is_failed(relation):
-            return BlockedStatus(f"Error handling relation: {relation.name}")
+            return BlockedStatus(
+                "Error handling relation {}:{}".format(relation.name, relation.id)
+            )
         elif not self.is_available(relation):
-            return WaitingStatus(f"Waiting on relation: {relation.name}")
+            return WaitingStatus("Waiting on relation {}:{}".format(relation.name, relation.id))
         elif not self.is_ready(relation):
-            return WaitingStatus(f"Waiting on relation: {relation.name}")
+            return WaitingStatus("Waiting on relation {}:{}".format(relation.name, relation.id))
         return ActiveStatus()
 
     def _handle_relation_broken(self, event):
         self.on.broken.emit(event.relation)
 
-    def _handle_upgrade_or_leader(self, event):
+    def _handle_upgrade_or_leader(self, _):
         pass
 
     def _emit_request_event(self, event):
@@ -330,7 +330,7 @@ class IPUBase(Object):
             # hooks. See https://github.com/canonical/operator/issues/693
             return False
 
-    def is_failed(self, relation: Relation = None):
+    def is_failed(self, _: Relation = None):
         """Checks whether the given relation is failed.
 
         Or any relation if not specified.
@@ -354,8 +354,7 @@ class IngressPerUnitProvider(IPUBase):
         super().__init__(charm, endpoint)
         observe = self.framework.observe
         observe(self.on.ready, self._emit_request_event)
-        observe(self.charm.on[endpoint].relation_joined,
-                self._share_version_info)
+        observe(self.charm.on[endpoint].relation_joined, self._share_version_info)
 
     def _share_version_info(self, event):
         """Backwards-compatibility shim for version negotiation.
@@ -363,7 +362,8 @@ class IngressPerUnitProvider(IPUBase):
         Allows older versions of IPU (requirer side) to interact with this
         provider without breaking.
         Will be removed in a future version of this library.
-        Do not use."""
+        Do not use.
+        """
         relation = event.relation
         if self.charm.unit.is_leader():
             log.info("shared supported_versions shim information")
@@ -384,8 +384,8 @@ class IngressPerUnitProvider(IPUBase):
 
         try:
             data = self._fetch_ingress_data(relation)
-        except Exception as e:
-            log.exception(e)
+        except Exception:
+            log.exception("Cannot fetch ingress data for the '{}' relation".format(relation))
             return False
 
         own_entities = (self.app, self.unit)
@@ -409,7 +409,7 @@ class IngressPerUnitProvider(IPUBase):
             # grab the data and validate it; might raise
             data = self._fetch_ingress_data(relation, validate=True)
         except DataValidationError as e:
-            log.warning(f"Failed to validate relation data: {e}")
+            log.warning("Failed to validate relation data for {} relation: {}".format(relation, e))
             return True
 
         # verify that all remote units (requirer's side) publish the same
@@ -474,7 +474,7 @@ class IngressPerUnitProvider(IPUBase):
         return ingress_data
 
     def publish_ingress_data(
-            self, relation: Relation, data: typing.Dict[typing.Union[Unit, Application], dict]
+        self, relation: Relation, data: typing.Dict[typing.Union[Unit, Application], dict]
     ):
         """Publish ingress data to the relation databag."""
         this_app = self.app
@@ -628,8 +628,9 @@ class IngressRequest:
 
         remote_unit_name = self.get_unit_name(unit)
         if remote_unit_name is None:
-            raise IngressPerUnitException(f"Unable to get name of {unit!r}. "
-                                          f"This unit has not responded yet.")
+            raise IngressPerUnitException(
+                "Unable to get name of unit {}: this unit has not responded yet.".format(unit)
+            )
         ingress = self._data[self._provider.charm.app].setdefault("ingress", {})
         ingress.setdefault(remote_unit_name, {})["url"] = url
         self._provider.publish_ingress_data(self._relation, self._data)
@@ -744,8 +745,8 @@ class IngressPerUnitRequirer(IPUBase):
         try:
             # grab the data and validate it; might raise
             raw = self.relation.data[self.unit].get("data")
-        except Exception as e:
-            log.exception(f"Error accessing relation databag: {e}")
+        except Exception:
+            log.exception("Error accessing relation databag")
             return True
 
         if raw:
@@ -753,8 +754,8 @@ class IngressPerUnitRequirer(IPUBase):
             data = _deserialize_data(raw)
             try:
                 _validate_data(data, INGRESS_REQUIRES_UNIT_SCHEMA)
-            except jsonschema.ValidationError as e:
-                log.exception(f"Error validating relation data: {e}")
+            except jsonschema.ValidationError:
+                log.exception("Error validating relation data")
                 return True
 
         return False

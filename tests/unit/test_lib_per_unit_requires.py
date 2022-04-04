@@ -152,7 +152,7 @@ def test_ipu_on_new_related_unit_nonready(requirer, provider, harness):
     request.respond(requirer.charm.unit, "http://url/")
 
     relation_id = harness._backend._relation_ids_map["ingress-per-unit"][0]
-    harness.add_relation_unit(relation_id, remote_unit_name='remote/1')
+    harness.add_relation_unit(relation_id, remote_unit_name="remote/1")
 
     relation = harness.charm.model.relations["ingress-per-unit"][0]
     # provider reports ready even though remote/1 has shared no ingress data yet
