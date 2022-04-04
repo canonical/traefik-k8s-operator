@@ -374,7 +374,7 @@ class IngressPerUnitProvider(IPUBase):
         """Checks whether the given relation is ready.
 
         Or any relation if not specified.
-        A given relation is ready if the remote side has sent valid data.
+        A given relation is ready if SOME remote side has sent valid data.
         """
         if relation is None:
             return any(self.is_ready(relation) for relation in self.relations)
@@ -628,7 +628,8 @@ class IngressRequest:
 
         remote_unit_name = self.get_unit_name(unit)
         if remote_unit_name is None:
-            raise IngressPerUnitException(f"Unable to get name of {unit!r}.")
+            raise IngressPerUnitException(f"Unable to get name of {unit!r}. "
+                                          f"This unit has not responded yet.")
         ingress = self._data[self._provider.charm.app].setdefault("ingress", {})
         ingress.setdefault(remote_unit_name, {})["url"] = url
         self._provider.publish_ingress_data(self._relation, self._data)

@@ -127,6 +127,7 @@ def test_unit_joining_does_not_trigger_ingress_changed(requirer, provider, harne
     # FIXME Change to 2 when https://github.com/canonical/operator/pull/705 ships
     assert harness.charm._stored.num_events == 0
 
+    # respond with new url: should trigger data changed.
     request.respond(requirer.charm.unit, "http://url/2")
     # FIXME Change to 3 when https://github.com/canonical/operator/pull/705 ships
     assert (
@@ -138,6 +139,25 @@ def test_unit_joining_does_not_trigger_ingress_changed(requirer, provider, harne
     assert requirer.urls == {"test-requirer/0": "http://url/2"}
     assert requirer.url == "http://url/2"
 
+    # respond with same url: should not trigger another event
     request.respond(requirer.charm.unit, "http://url/2")
     # FIXME Change to 3 when https://github.com/canonical/operator/pull/705 ships
     assert harness.charm._stored.num_events == 0
+
+
+def test_ipu_on_new_related_unit_nonready(requirer, provider, harness):
+    relation = provider.relate()
+    harness.set_leader(True)
+    request = provider.get_request(relation)
+    request.respond(requirer.charm.unit, "http://url/")
+
+    relation_id = harness._backend._relation_ids_map["ingress-per-unit"][0]
+    harness.add_relation_unit(relation_id, remote_unit_name='remote/1')
+
+    relation = harness.charm.model.relations["ingress-per-unit"][0]
+    # provider reports ready even though remote/1 has shared no ingress data yet
+    assert provider.is_ready()
+    assert len(relation.units) == 2
+    new_unit = next(u for u in relation.units if u is not requirer.charm.unit)
+
+    request.respond(new_unit, "foo")
