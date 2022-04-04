@@ -245,7 +245,7 @@ class IPUBase(Object):
                 (defaults to "ingress-per-unit").
         """
         super().__init__(charm, endpoint)
-        self.charm = charm
+        self.charm: CharmBase = charm
         self.endpoint = endpoint
 
         observe = self.framework.observe
@@ -354,6 +354,19 @@ class IngressPerUnitProvider(IPUBase):
         super().__init__(charm, endpoint)
         observe = self.framework.observe
         observe(self.on.ready, self._emit_request_event)
+        observe(self.charm.on[endpoint].relation_joined,
+                self._share_version_info)
+
+    def _share_version_info(self, relation):
+        """Backwards-compatibility shim for version negotiation.
+
+        Allows older versions of IPU (requirer side) to interact with this
+        provider without breaking.
+        Will be removed in a future version of this library.
+        Do not use."""
+        if self.charm.unit.is_leader():
+            log.info("shared supported_versions shim information")
+            relation.data[relation.app]["_supported_versions"] = "- v1"
 
     @cache
     def is_ready(self, relation: Relation = None):
@@ -460,7 +473,7 @@ class IngressPerUnitProvider(IPUBase):
         return ingress_data
 
     def publish_ingress_data(
-        self, relation: Relation, data: typing.Dict[typing.Union[Unit, Application], dict]
+            self, relation: Relation, data: typing.Dict[typing.Union[Unit, Application], dict]
     ):
         """Publish ingress data to the relation databag."""
         this_app = self.app
