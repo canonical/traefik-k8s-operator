@@ -308,10 +308,13 @@ class _IngressPerUnitBase(Object):
         """
         if relation is None:
             return any(self.is_available(relation) for relation in self.relations)
-        if relation.app.name == "":  # type: ignore
+
+        if not relation.app.name:
             # Juju doesn't provide JUJU_REMOTE_APP during relation-broken
-            # hooks. See https://github.com/canonical/operator/issues/693
+            # hooks. See https://github.com/canonical/operator/issues/693.
+            # Relation in the process of breaking cannot be available.
             return False
+
         return True
 
     def is_ready(self, relation: Relation = None):
@@ -323,7 +326,7 @@ class _IngressPerUnitBase(Object):
         if relation is None:
             return any(self.is_ready(relation) for relation in self.relations)
 
-        if relation.app.name == "":  # type: ignore
+        if not relation.app.name:  # type: ignore
             # Juju doesn't provide JUJU_REMOTE_APP during relation-broken
             # hooks. See https://github.com/canonical/operator/issues/693
             return False
@@ -395,9 +398,13 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
         if relation is None:
             return any(self.is_failed(relation) for relation in self.relations)
 
-        if not relation.units or not relation.app.name:
+        if not relation.app.name:  # type: ignore
             # Juju doesn't provide JUJU_REMOTE_APP during relation-broken
             # hooks. See https://github.com/canonical/operator/issues/693
+            return False
+
+        if not relation.units:
+            # Relations without requiring units cannot be in failed state
             return False
 
         try:
@@ -440,7 +447,9 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
         this_app = self.app
 
         if not relation.app or not relation.app.name:
-            # Handle edge case where remote app name can be missing.
+            # Handle edge case where remote app name can be missing, e.g.,
+            # relation_broken events.
+            # FIXME https://github.com/canonical/traefik-k8s-operator/issues/34
             return {}, {}
 
         provider_app_data = {}
@@ -525,7 +534,6 @@ class IngressRequest:
         self._relation = relation
         self._provider_app_data = provider_app_data
         self._requirers_unit_data = requirers_unit_data
-        self.app = relation.app
 
     @property
     def model(self):
@@ -536,8 +544,9 @@ class IngressRequest:
     def app_name(self):
         """The name of the remote app.
 
-        Note: This is not the same as `self.app.name` when using CMR relations,
-        since `self.app.name` is replaced by a `remote-{UUID}` pattern.
+        Note: This is not the same for the other charm as `self.app.name`
+        when using cross-model relations (CMRs), since `self.app.name` is
+        replaced by a `remote-{UUID}` pattern on the other side of a CMR.
         """
         first_unit_name = self._get_data_from_first_unit("name")
 
@@ -754,9 +763,12 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
         if relation is None:
             return any(self.is_failed(relation) for relation in self.relations)
 
-        if not relation.units or relation.app.name == "":
+        if not relation.app.name:  # type: ignore
             # Juju doesn't provide JUJU_REMOTE_APP during relation-broken
             # hooks. See https://github.com/canonical/operator/issues/693
+            return False
+
+        if not relation.units:
             return False
 
         try:
@@ -817,7 +829,13 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
         relation = self.relation
         if not relation or self.is_relation_broken:
             return {}
-        raw = relation.data.get(relation.app, {}).get("data")
+
+        raw = None
+        if relation.app.name:  # type: ignore
+            # FIXME Workaround for https://github.com/canonical/operator/issues/693
+            # We must be in a relation_broken hook
+            raw = relation.data.get(relation.app, {}).get("data")
+
         if not raw:
             return {}
 
