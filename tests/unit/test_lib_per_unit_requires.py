@@ -98,7 +98,8 @@ def test_ingress_unit_requirer_leader(requirer, provider, harness):
 
     request = provider.get_request(relation)
     assert request.units[0] is requirer.charm.unit
-    assert request.app_name == "test-requirer"
+    assert request.units[0] in request._relation.units
+    assert request.app_name == requirer.charm.app.name
 
 
 def test_ingress_unit_requirer_request_response(requirer, provider, harness):
