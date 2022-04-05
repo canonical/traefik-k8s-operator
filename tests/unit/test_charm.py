@@ -223,6 +223,58 @@ class TestTraefikIngressCharm(unittest.TestCase):
         self.assertEqual(self.harness.charm.unit.status, ActiveStatus())
 
     @patch("charm.KubernetesServicePatch", lambda **unused: None)
+    def test_pebble_ready_no_leader_with_gateway_address_from_config_and_subdomain_routing_mode(
+        self,
+    ):
+        """Test round-trip bootstrap and relation with a consumer."""
+        # TODO Make parametric to avoid duplication with
+        # test_pebble_ready_with_gateway_address_from_config_and_subdomain_routing_mode
+        self.harness.update_config({"external_hostname": "testhostname"})
+        self.harness.set_leader(False)
+        self.harness.begin_with_initial_hooks()
+
+        self.harness.update_config(
+            {
+                "external_hostname": "testhostname",
+                "routing_mode": "subdomain",
+            }
+        )
+
+        self.harness.container_pebble_ready("traefik")
+
+        self.assertEqual(self.harness.charm.unit.status, ActiveStatus())
+
+        requirer = MockIPURequirer(self.harness)
+        relation = requirer.relate()
+        requirer.request(host="10.1.10.1", port=9000)
+        assert requirer.is_available(relation)
+
+        traefik_container = self.harness.charm.unit.get_container("traefik")
+        file = f"/opt/traefik/juju/juju_ingress_{relation.name}_{relation.id}_{relation.app.name}.yaml"
+        conf = yaml.safe_load(traefik_container.pull(file).read())
+
+        expected = {
+            "http": {
+                "routers": {
+                    "juju-test-model-ingress-per-unit-remote-0-router": {
+                        "entryPoints": ["web"],
+                        "rule": "Host(`test-model-ingress-per-unit-remote-0.testhostname`)",
+                        "service": "juju-test-model-ingress-per-unit-remote-0-service",
+                    }
+                },
+                "services": {
+                    "juju-test-model-ingress-per-unit-remote-0-service": {
+                        "loadBalancer": {"servers": [{"url": "http://10.1.10.1:9000"}]}
+                    }
+                },
+            }
+        }
+
+        self.assertEqual(conf, expected)
+
+        self.assertEqual(self.harness.charm.unit.status, ActiveStatus())
+
+    @patch("charm.KubernetesServicePatch", lambda **unused: None)
     def test_bad_routing_mode_config_and_recovery(self):
         """Test round-trip bootstrap and relation with a consumer."""
         self.harness.update_config({"external_hostname": "testhostname"})
