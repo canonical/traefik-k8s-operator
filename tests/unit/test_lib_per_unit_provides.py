@@ -4,7 +4,11 @@
 from textwrap import dedent
 from unittest.mock import Mock
 
-from charms.traefik_k8s.v0.ingress_per_unit import IngressPerUnitProvider
+import pytest
+from charms.traefik_k8s.v0.ingress_per_unit import (
+    IngressPerUnitProvider,
+    RelationPermissionError,
+)
 from ops.charm import CharmBase
 from ops.model import Binding
 from ops.testing import Harness
@@ -27,15 +31,31 @@ class MockProviderCharm(CharmBase):
         self.ipu = IngressPerUnitProvider(self)
 
 
-def test_ingress_unit_provider(monkeypatch):
+@pytest.fixture(autouse=True, scope="function")
+def patch_network(monkeypatch):
     monkeypatch.setattr(Binding, "network", Mock(bind_address="10.10.10.10"))
+
+
+@pytest.fixture(scope="function")
+def harness():
     harness = Harness(MockProviderCharm, meta=MockProviderCharm.META)
     harness._backend.model_name = "test-model"
-    harness.set_leader(False)
     harness.begin_with_initial_hooks()
-    provider = harness.charm.ipu
-    requirer = MockIPURequirer(harness)
+    return harness
 
+
+@pytest.fixture(scope="function")
+def requirer(harness):
+    return MockIPURequirer(harness)
+
+
+@pytest.fixture(scope="function")
+def provider(harness):
+    provider = harness.charm.ipu
+    return provider
+
+
+def test_ingress_unit_provider_uninitialized(provider, requirer):
     assert not provider.is_available()
     assert not provider.is_ready()
     assert not provider.is_failed()
@@ -43,15 +63,12 @@ def test_ingress_unit_provider(monkeypatch):
     assert not requirer.is_ready()
     assert not requirer.is_failed()
 
-    relation = requirer.relate()
-    assert provider.is_available(relation)
-    assert not provider.is_ready(relation)
-    assert not provider.is_failed(relation)
-    assert not requirer.is_available(relation)
-    assert not requirer.is_ready(relation)
-    assert requirer.is_failed(relation)  # because it has a unit but no versions
 
-    harness.set_leader(True)
+@pytest.mark.parametrize("leader", (True, False))
+def test_ingress_unit_provider_related(provider, requirer, harness, leader):
+    harness.set_leader(leader)
+    relation = requirer.relate()
+
     assert provider.is_available(relation)
     assert not provider.is_ready(relation)
     assert not provider.is_failed(relation)
@@ -59,6 +76,17 @@ def test_ingress_unit_provider(monkeypatch):
     assert not requirer.is_ready(relation)
     assert not requirer.is_failed(relation)
 
+
+@pytest.mark.parametrize("leader", (True, False))
+def test_ingress_unit_provider_supported_versions_shim(provider, requirer, harness, leader):
+    harness.set_leader(leader)
+    relation = requirer.relate()
+    if leader:
+        assert relation.data[provider.charm.app]["_supported_versions"] == "- v1"
+
+
+def test_ingress_unit_provider_request(provider, requirer, harness):
+    relation = requirer.relate()
     requirer.request(port=80)
     assert provider.is_available(relation)
     assert provider.is_ready(relation)
@@ -67,6 +95,22 @@ def test_ingress_unit_provider(monkeypatch):
     assert not requirer.is_ready(relation)
     assert not requirer.is_failed(relation)
 
+
+def test_ingress_unit_provider_request_response_nonleader(provider, requirer, harness):
+    relation = requirer.relate()
+    requirer.request(port=80)
+    request = provider.get_request(relation)
+    assert request.units[0] is requirer.charm.unit
+    assert request.app_name == "ingress-per-unit-remote"
+    # fails because unit isn't leader
+    with pytest.raises(RelationPermissionError):
+        request.respond(requirer.charm.unit, "http://url/")
+
+
+def test_ingress_unit_provider_request_response(provider, requirer, harness):
+    relation = requirer.relate()
+    harness.set_leader(True)
+    requirer.request(port=80)
     request = provider.get_request(relation)
     assert request.units[0] is requirer.charm.unit
     assert request.app_name == "ingress-per-unit-remote"

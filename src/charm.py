@@ -234,6 +234,7 @@ class TraefikIngressCharm(CharmBase):
 
     def _handle_ingress_request(self, event: RelationEvent):
         if not self._external_host:
+            self._wipe_ingress_for_all_relations()
             self.unit.status = WaitingStatus("gateway address unavailable")
             event.defer()
             return
@@ -254,6 +255,8 @@ class TraefikIngressCharm(CharmBase):
         # before continuing. However, the provider will NOT be ready if there are no units on the
         # other side, which is the case for the RelationDeparted for the last unit (i.e., the
         # proxied application scales to zero).
+        gateway_address = self._external_host
+        assert gateway_address, "No gateway address available"
 
         relation_provider = self._provider_from_relation(relation)
         if not (provider := relation_provider).is_ready(relation):
@@ -275,9 +278,6 @@ class TraefikIngressCharm(CharmBase):
         logger.debug("Updating ingress for relation '%s'", rel)
 
         request = provider.get_request(relation)
-
-        if not (gateway_address := self._validate_gateway_address(relation, request)):
-            return
 
         # FIXME Ideally, follower units could instead watch for the data in the
         # ingress app data bag, but Juju does not allow non-leader units to read
@@ -316,23 +316,9 @@ class TraefikIngressCharm(CharmBase):
         else:
             self._wipe_ingress_for_relation(relation)
 
-    def _validate_gateway_address(self, relation: Relation, request) -> Optional[str]:
-        if self.unit.is_leader():
-            if not (gateway_address := self._external_host):
-                service = f"{self.app.name}.{self.model.name}.svc.cluster.local"
-
-                if _get_relation_type(relation) == _IngressRelationType.per_app:
-                    request.respond("")
-                else:
-                    for unit in request.units:
-                        request.respond(unit, "")
-
-                msg = f"loadbalancer address not found on the '{service}' Kubernetes service"
-                self.unit.status = WaitingStatus(msg)
-                return None
-            return gateway_address
-
-    def _generate_per_unit_config(self, request, gateway_address, unit) -> Tuple[dict, str]:
+    def _generate_per_unit_config(
+        self, request, gateway_address, unit
+    ) -> Tuple[Optional[dict], Optional[str]]:
         """Generate a config dict for a given unit for IngressPerUnit."""
         config = {"http": {"routers": {}, "services": {}}}
 
@@ -352,7 +338,7 @@ class TraefikIngressCharm(CharmBase):
         unit_name = raw_unit_name.replace("/", "-")
         prefix = f"{request.model}-{unit_name}"
 
-        unit_address = request.get_host(unit)
+        unit_address = request.get_unit_host(unit)
 
         if not unit_address:
             # This might happen when we get the RelationChanged event after the
@@ -364,7 +350,7 @@ class TraefikIngressCharm(CharmBase):
         if self._routing_mode == _RoutingMode.path:
             route_rule = f"PathPrefix(`/{prefix}`)"
             unit_url = f"http://{gateway_address}:{self._port}/{prefix}"
-        elif self._routing_mode == _RoutingMode.subdomain:
+        else:  # _RoutingMode.subdomain
             route_rule = f"Host(`{prefix}.{self._external_host}`)"
             unit_url = f"http://{prefix}.{gateway_address}:{self._port}/"
 
@@ -389,7 +375,7 @@ class TraefikIngressCharm(CharmBase):
         if self._routing_mode == _RoutingMode.path:
             route_rule = f"PathPrefix(`/{prefix}`)"
             app_url = f"http://{gateway_address}:{self._port}/{prefix}"
-        elif self._routing_mode == _RoutingMode.subdomain:
+        else:  # _RoutingMode.subdomain
             route_rule = f"Host(`{prefix}.{self._external_host}`)"
             app_url = f"http://{prefix}.{gateway_address}:{self._port}/"
 
@@ -463,7 +449,7 @@ class TraefikIngressCharm(CharmBase):
                     request.respond(unit, "")
 
     def _relation_config_file(self, relation: Relation):
-        # Using both the relation it and the app name in the file to facilitate
+        # Using both the relation id and the app name in the file to facilitate
         # the debugging experience somewhat when snooping into the container at runtime:
         # Apps not in the same model as Traefik (i.e., if `relation` is a CRM) will have
         # some `remote_...` as app name. Relation name and id are handy when one is
