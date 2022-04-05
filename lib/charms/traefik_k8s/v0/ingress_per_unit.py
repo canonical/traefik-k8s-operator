@@ -17,6 +17,8 @@ charm's `requirements.txt`.**
 charmcraft fetch-lib charms.traefik_k8s.v0.ingress_per_unit
 ```
 
+Add the `jsonschema` dependency to the `requirements.txt` of your charm.
+
 ```yaml
 requires:
     ingress:
@@ -50,7 +52,14 @@ import logging
 import warnings
 from typing import Dict, Optional, Tuple, TypeVar, Union
 
-import jsonschema
+try:
+    import jsonschema
+except ModuleNotFoundError:
+    raise Exception(
+        "The ingress_per_unit library needs the jsonschema package as dependency; "
+        "add 'jsonschema' to the 'requirements.txt' of your charm."
+    )
+
 import yaml
 from ops.charm import CharmBase, RelationBrokenEvent, RelationEvent
 from ops.framework import EventSource, Object, ObjectEvents
@@ -65,14 +74,14 @@ from ops.model import (
 )
 
 # The unique Charmhub library identifier, never change it
-LIBID = "7ef06111da2945ed84f4f5d4eb5b353a"  # can't register a library until the charm is in the store 9_9
+LIBID = "7ef06111da2945ed84f4f5d4eb5b353a"
 
 # Increment this major API version when introducing breaking changes
 LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 7
+LIBPATCH = 8
 
 log = logging.getLogger(__name__)
 
