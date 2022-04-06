@@ -13,7 +13,8 @@ import yaml
 from charms.observability_libs.v0.kubernetes_service_patch import KubernetesServicePatch
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 from charms.traefik_k8s.v0.ingress import IngressPerAppProvider
-from charms.traefik_k8s.v0.ingress_per_unit import IngressPerUnitProvider
+from charms.traefik_k8s.v0.ingress_per_unit import IngressPerUnitProvider, \
+    RequirerData, DataValidationError
 from deepmerge import always_merger
 from lightkube import Client
 from lightkube.resources.core_v1 import Service
@@ -34,7 +35,7 @@ from ops.model import (
     MaintenanceStatus,
     ModelError,
     Relation,
-    WaitingStatus,
+    WaitingStatus, Unit,
 )
 from ops.pebble import APIError, PathError
 
@@ -277,36 +278,53 @@ class TraefikIngressCharm(CharmBase):
         self.unit.status = MaintenanceStatus(f"updating ingress configuration for '{rel}'")
         logger.debug("Updating ingress for relation '%s'", rel)
 
-        request = provider.get_request(relation)
+        # TODO: once also IngressPerApp is SDI-free,
+        #  abstract the common logic here and remove this branch
+        if provider is self.ingress_per_app:
+            request = provider.get_request(relation)
+            config, app_url = self._generate_per_app_config(request, gateway_address)
+            if self.unit.is_leader():
+                request.respond(app_url)
+            self._push_configurations(relation, config)
 
+        else:
+            self._provide_ingress_per_unit(relation)
+
+    def _provide_ingress_per_unit(self, relation: Relation,
+                                  provider: IngressPerUnitProvider):
         # FIXME Ideally, follower units could instead watch for the data in the
         # ingress app data bag, but Juju does not allow non-leader units to read
         # the application data bag on their side of the relation, so we may start
         # routing for a remote unit before the leader unit of ingress has
         # communicated the url.
-        if provider == self.ingress_per_app:
-            config, app_url = self._generate_per_app_config(request, gateway_address)
-            if self.unit.is_leader():
-                request.respond(app_url)
-            self._push_configurations(relation, config)
-        else:
-            config = {}
-            for unit in request.units:
-                unit_config, unit_url = self._generate_per_unit_config(
-                    request, gateway_address, unit
-                )
+        config = {}
+        for unit in relation.units:
+            if not provider.is_unit_ready(relation, unit):
+                continue
+            # if the unit is ready, it's implied that the data is there.
+            # but we should still ensure it's valid, hence...
+            try:
+                data: RequirerData = provider.get_data(relation, unit, validate=True)
+            except DataValidationError as e:
+                # is_unit_ready should guard against no data being there yet,
+                # but if the data is invalid...
+                logger.error(f"invalid data shared through {relation} by {unit}... Error: {e}.")
+                continue
+            unit_config, unit_url = self._generate_per_unit_config(
+                unit, data
+            )
 
-                if unit_url:
-                    if self.unit.is_leader():
-                        request.respond(unit, unit_url)
+            if unit_url:
+                if self.unit.is_leader():
+                    pass
 
-                if unit_config:
-                    always_merger.merge(config, unit_config)
+            if unit_config:
+                always_merger.merge(config, unit_config)
 
-            # Note: We might be pushing an empty configuration if, for example,
-            # none of the units has yet written their part of the data into the
-            # relation. Traefik is fine with it :-)
-            self._push_configurations(relation, config)
+        # Note: We might be pushing an empty configuration if, for example,
+        # none of the units has yet written their part of the data into the
+        # relation. Traefik is fine with it :-)
+        self._push_configurations(relation, config)
 
     def _push_configurations(self, relation: Relation, config: str):
         if config:
@@ -317,42 +335,26 @@ class TraefikIngressCharm(CharmBase):
             self._wipe_ingress_for_relation(relation)
 
     def _generate_per_unit_config(
-        self, request, gateway_address, unit
+        self, unit: Unit, data: RequirerData
     ) -> Tuple[Optional[dict], Optional[str]]:
         """Generate a config dict for a given unit for IngressPerUnit."""
         config = {"http": {"routers": {}, "services": {}}}
 
-        raw_unit_name = request.get_unit_name(unit)
-        model = request.model
-
-        if not raw_unit_name or not model:
-            # This might happen when we get the RelationChanged event after the
-            # RelationJoined event for the unit, but the unit has not yet written
-            # data into the relation.
-            logger.debug(
-                "Cannot generate unit config, model or unit name are None; "
-                f"model: {model}, unit_name: {raw_unit_name}"
-            )
-            return None, None
+        raw_unit_name = data['name']
+        model = data['model']
 
         unit_name = raw_unit_name.replace("/", "-")
-        prefix = f"{request.model}-{unit_name}"
+        prefix = f"{model}-{unit_name}"
 
-        unit_address = request.get_unit_host(unit)
+        unit_address = data['host']
 
-        if not unit_address:
-            # This might happen when we get the RelationChanged event after the
-            # RelationJoined event for the unit, but the unit has not yet written
-            # data into the relation or it has not yet access to its pod ip.
-            logger.debug("Cannot generate unit config, unit_address not available yet")
-            return None, None
-
+        host = self._external_host
         if self._routing_mode == _RoutingMode.path:
             route_rule = f"PathPrefix(`/{prefix}`)"
-            unit_url = f"http://{gateway_address}:{self._port}/{prefix}"
+            unit_url = f"http://{host}:{self._port}/{prefix}"
         else:  # _RoutingMode.subdomain
-            route_rule = f"Host(`{prefix}.{self._external_host}`)"
-            unit_url = f"http://{prefix}.{gateway_address}:{self._port}/"
+            route_rule = f"Host(`{prefix}.{host}`)"
+            unit_url = f"http://{prefix}.{host}:{self._port}/"
 
         traefik_router_name = f"juju-{prefix}-router"
         traefik_service_name = f"juju-{prefix}-service"
@@ -364,7 +366,7 @@ class TraefikIngressCharm(CharmBase):
         }
 
         config["http"]["services"][traefik_service_name] = {
-            "loadBalancer": {"servers": [{"url": f"http://{unit_address}:{request.port}"}]}
+            "loadBalancer": {"servers": [{"url": f"http://{unit_address}:{data['port']}"}]}
         }
 
         return config, unit_url

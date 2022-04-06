@@ -47,6 +47,7 @@ class SomeCharm(CharmBase):
 ```
 """
 import logging
+import typing
 import warnings
 from typing import Any, Dict, List, Optional, Tuple, TypeVar, Union
 
@@ -120,9 +121,16 @@ INGRESS_PROVIDES_APP_SCHEMA = {
 #          TYPES          #
 # ======================= #
 
+if typing.TYPE_CHECKING:
+    from typing import TypedDict
+    class RequirerData(TypedDict):
+        model: str
+        name: str
+        host: str
+        port: int
 
+RequirerUnitData = Dict[Unit, 'RequirerData']
 KeyValueMapping = Dict[str, str]
-RequirerUnitData = Dict[Unit, KeyValueMapping]
 ProviderApplicationData = Dict[str, KeyValueMapping]
 
 
@@ -443,6 +451,22 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
         """Get the IngressRequest for the given Relation."""
         provider_app_data, requirer_unit_data = self._fetch_relation_data(relation)
         return IngressRequest(self, relation, provider_app_data, requirer_unit_data)
+
+    def is_unit_ready(self, relation: Relation, unit: Unit) -> bool:
+        """Whether the given unit has shared its side of the data."""
+        assert unit in relation.units, "attempting to get ready state for unit that does not belong to relation"
+        if relation.data.get(unit, {}).get('data'):
+            # TODO consider doing schema-based validation here
+            return True
+        return False
+
+    def get_data(self, relation: Relation, unit: Unit, validate:bool = False) -> RequirerData:
+        """Fetch the data shared by this unit via the relation (Requirer side)."""
+        # todo: should we validate here?
+        data = _deserialize_data(relation.data[unit]['data'])
+        if validate:
+            _validate_data(data, INGRESS_REQUIRES_UNIT_SCHEMA)
+        return data
 
     def _fetch_relation_data(
         self, relation: Relation, validate=False
@@ -805,7 +829,7 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
             data = _deserialize_data(raw)
             try:
                 _validate_data(data, INGRESS_REQUIRES_UNIT_SCHEMA)
-            except jsonschema.ValidationError:
+            except DataValidationError:
                 log.exception("Error validating relation data")
                 return True
 
