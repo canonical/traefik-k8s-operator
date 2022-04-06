@@ -178,8 +178,8 @@ class MockIngressPerUnitRequest(IngressRequest):
     ):
         super().__init__(provider, relation, provider_app_data, requirers_unit_data)
 
-        self._relation.units = set((provider.harness.charm.unit, ))
         self.app = self._provider.harness.charm.app
+        self._related_units = {self._provider.harness.charm.unit}
 
 
 class MockIPURequirer(MockRemoteIPUMixin, IngressPerUnitRequirer):

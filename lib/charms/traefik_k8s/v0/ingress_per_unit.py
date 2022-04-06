@@ -545,6 +545,7 @@ class IngressRequest:
         self._relation = relation
         self._provider_app_data = provider_app_data
         self._requirer_unit_data = requirer_unit_data
+        self._related_units = relation.units
 
     @property
     def model(self) -> Optional[str]:
@@ -569,7 +570,7 @@ class IngressRequest:
     @property
     def units(self) -> List[Unit]:
         """The remote units that have posted requests, i.e., those that have provided the name."""
-        ready_units = filter(self.is_unit_ready, self._relation.units)
+        ready_units = filter(self.is_unit_ready, self._related_units)
         return sorted(ready_units, key=lambda unit: unit.name)
 
     def is_unit_ready(self, unit: Unit) -> bool:
@@ -577,15 +578,23 @@ class IngressRequest:
         self._check_unit_belongs_to_relation(unit)
 
         return all(
-            (self.get_unit_host(unit),
-            self.get_unit_name(unit),
-            self.get_unit_model(unit),
-            self.get_unit_port(unit))
+            (
+                self.get_unit_host(unit),
+                self.get_unit_name(unit),
+                self.get_unit_model(unit),
+                self.get_unit_port(unit),
+            )
         )
 
     @property
     def port(self) -> Optional[int]:
         """The backend port."""
+        warnings.warn(
+            "The 'port' method is deprecated, as it is not guaranteed that all"
+            "units have the same port. use 'get_unit_port' instead",
+            DeprecationWarning,
+        )
+
         return self._get_data_from_first_unit("port")
 
     # deprecated
@@ -630,7 +639,11 @@ class IngressRequest:
         return self._get_unit_data(unit, "name")
 
     def _get_data_from_first_unit(self, key: str) -> Any:
-        return self._get_unit_data(self.units[0], key)
+        # We search among the ready units, which are those known to
+        # have put their side of the data in the relation, see is_unit_ready
+        ready_units = self.units
+        if ready_units:
+            return self._get_unit_data(ready_units[0], key)
 
     def _get_unit_data(self, unit: Unit, key: str) -> Any:
         """Fetch from the unit databag the value associated with `key`.
@@ -670,7 +683,7 @@ class IngressRequest:
 
     def _check_unit_belongs_to_relation(self, unit: Unit):
         """Checks that `unit` belongs to the relation this response manages."""
-        if unit not in self._relation.units:
+        if unit not in self._related_units:
             raise UnknownUnitException(self._relation, unit)
 
 
