@@ -547,12 +547,12 @@ class IngressRequest:
         self._requirer_unit_data = requirer_unit_data
 
     @property
-    def model(self) -> str:
+    def model(self) -> Optional[str]:
         """The name of the model the request was made from."""
         return self._get_data_from_first_unit("model")
 
     @property
-    def app_name(self) -> str:
+    def app_name(self) -> Optional[str]:
         """The name of the remote app.
 
         Note: This is not the same for the other charm as `self.app.name`
@@ -576,27 +576,27 @@ class IngressRequest:
         """Whether the given unit has provided its name, model, host and port data."""
         self._check_unit_belongs_to_relation(unit)
 
-        return bool(
-            self.get_unit_host(unit)
-            and self.get_unit_name(unit)
-            and self.get_unit_model(unit)
-            and self.get_unit_port(unit)
+        return all(
+            (self.get_unit_host(unit),
+            self.get_unit_name(unit),
+            self.get_unit_model(unit),
+            self.get_unit_port(unit))
         )
 
     @property
-    def port(self) -> int:
+    def port(self) -> Optional[int]:
         """The backend port."""
         return self._get_data_from_first_unit("port")
 
     # deprecated
-    def get_host(self, unit: Unit):
+    def get_host(self, unit: Unit) -> Optional[str]:
         """The hostname (DNS address, ip) of the given unit."""
         warnings.warn(
             "The 'get_host' method is deprecated, use 'get_unit_host' instead", DeprecationWarning
         )
         return self.get_unit_host(unit)
 
-    def get_unit_host(self, unit: Unit):
+    def get_unit_host(self, unit: Unit) -> Optional[str]:
         """The hostname (DNS address, ip) of the given unit."""
         self._check_unit_belongs_to_relation(unit)
 
@@ -669,6 +669,7 @@ class IngressRequest:
         self._provider.publish_ingress_data(self._relation, self._provider_app_data)
 
     def _check_unit_belongs_to_relation(self, unit: Unit):
+        """Checks that `unit` belongs to the relation this response manages."""
         if unit not in self._relation.units:
             raise UnknownUnitException(self._relation, unit)
 
