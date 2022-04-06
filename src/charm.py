@@ -304,7 +304,7 @@ class TraefikIngressCharm(CharmBase):
             # if the unit is ready, it's implied that the data is there.
             # but we should still ensure it's valid, hence...
             try:
-                data: RequirerData = provider.get_data(relation, unit, validate=True)
+                data: 'RequirerData' = provider.get_data(relation, unit, validate=True)
             except DataValidationError as e:
                 # is_unit_ready should guard against no data being there yet,
                 # but if the data is invalid...
@@ -335,21 +335,15 @@ class TraefikIngressCharm(CharmBase):
             self._wipe_ingress_for_relation(relation)
 
     def _generate_per_unit_config(
-        self, unit: Unit, data: RequirerData
+        self, unit: Unit, data: 'RequirerData'
     ) -> Tuple[Optional[dict], Optional[str]]:
         """Generate a config dict for a given unit for IngressPerUnit."""
         config = {"http": {"routers": {}, "services": {}}}
-
-        raw_unit_name = data['name']
-        model = data['model']
-
-        unit_name = raw_unit_name.replace("/", "-")
-        prefix = f"{model}-{unit_name}"
-
-        unit_address = data['host']
+        name = data['name'].replace("/", "-")
+        prefix = f"{data['model']}-{name}"
 
         host = self._external_host
-        if self._routing_mode == _RoutingMode.path:
+        if self._routing_mode is _RoutingMode.path:
             route_rule = f"PathPrefix(`/{prefix}`)"
             unit_url = f"http://{host}:{self._port}/{prefix}"
         else:  # _RoutingMode.subdomain
@@ -366,7 +360,7 @@ class TraefikIngressCharm(CharmBase):
         }
 
         config["http"]["services"][traefik_service_name] = {
-            "loadBalancer": {"servers": [{"url": f"http://{unit_address}:{data['port']}"}]}
+            "loadBalancer": {"servers": [{"url": f"http://{data['host']}:{data['port']}"}]}
         }
 
         return config, unit_url

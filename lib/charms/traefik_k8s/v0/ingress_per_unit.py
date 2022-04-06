@@ -460,9 +460,8 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
             return True
         return False
 
-    def get_data(self, relation: Relation, unit: Unit, validate:bool = False) -> RequirerData:
+    def get_data(self, relation: Relation, unit: Unit, validate:bool = False) -> 'RequirerData':
         """Fetch the data shared by this unit via the relation (Requirer side)."""
-        # todo: should we validate here?
         data = _deserialize_data(relation.data[unit]['data'])
         if validate:
             _validate_data(data, INGRESS_REQUIRES_UNIT_SCHEMA)
