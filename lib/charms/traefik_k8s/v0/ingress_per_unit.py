@@ -132,12 +132,10 @@ ProviderApplicationData = Dict[str, KeyValueMapping]
 
 
 def _deserialize_data(data):
-    # return json.loads(data) # TODO port to json
     return yaml.safe_load(data)
 
 
 def _serialize_data(data):
-    # return json.dumps(data) # TODO port to json
     return yaml.safe_dump(data, indent=2)
 
 
@@ -490,7 +488,7 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
 
         return provider_app_data, requirer_unit_data
 
-    def publish_ingress_data(self, relation: Relation, data: Dict[str, Dict[str, str]]):
+    def publish_ingress_data(self, relation: Relation, data: ProviderApplicationData):
         """Publish ingress data to the relation databag."""
         if not self.unit.is_leader():
             raise RelationPermissionError(relation, self.unit, "This unit is not the leader")
