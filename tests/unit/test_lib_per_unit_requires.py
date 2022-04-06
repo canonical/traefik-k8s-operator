@@ -162,5 +162,6 @@ def test_ipu_on_new_related_unit_nonready(requirer, provider, harness):
     new_unit = next(u for u in relation.units if u is not requirer.charm.unit)
 
     # we add the unit to the related_units because test_lib_helpers is borked
+    # see https://github.com/canonical/traefik-k8s-operator/issues/39 for more
     request._related_units.add(new_unit)
     assert not request.is_unit_ready(new_unit)
