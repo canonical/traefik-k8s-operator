@@ -76,10 +76,7 @@ LIBPATCH = 8
 
 log = logging.getLogger(__name__)
 
-# ======================= #
-#      LIBRARY GLOBS      #
-# ======================= #
-
+# LIBRARY GLOBS
 RELATION_INTERFACE = "ingress_per_unit"
 DEFAULT_RELATION_NAME = RELATION_INTERFACE.replace("_", "-")
 
@@ -115,22 +112,13 @@ INGRESS_PROVIDES_APP_SCHEMA = {
     "required": ["ingress"],
 }
 
-
-# ======================= #
-#          TYPES          #
-# ======================= #
-
-
+# TYPES
 KeyValueMapping = Dict[str, str]
 RequirerUnitData = Dict[Unit, KeyValueMapping]
 ProviderApplicationData = Dict[str, KeyValueMapping]
 
 
-# ======================= #
-#  SERIALIZATION UTILS    #
-# ======================= #
-
-
+# SERIALIZATION UTILS
 def _deserialize_data(data):
     return yaml.safe_load(data)
 
@@ -146,11 +134,7 @@ def _validate_data(data, schema):
         raise DataValidationError(data, schema) from e
 
 
-# ======================= #
-#       EXCEPTIONS        #
-# ======================= #
-
-
+# EXCEPTIONS
 class IngressPerUnitException(RuntimeError):
     """Base class for errors raised by Ingress Per Unit."""
 
@@ -199,11 +183,7 @@ class RelationPermissionError(IngressPerUnitException):
         self.relation = relation
 
 
-# ======================= #
-#         EVENTS          #
-# ======================= #
-
-
+# EVENTS
 class RelationAvailableEvent(RelationEvent):
     """Event triggered when a relation is ready for requests."""
 
