@@ -288,10 +288,13 @@ class TraefikIngressCharm(CharmBase):
             self._push_configurations(relation, config)
 
         else:
-            self._provide_ingress_per_unit(relation, provider)
+            self._provide_ingress_per_unit(relation)
 
-    def _provide_ingress_per_unit(self, relation: Relation,
-                                  provider: IngressPerUnitProvider):
+    def _provide_ingress_per_unit(self, relation: Relation):
+        # to avoid long-gone units from lingering in the ingress, we wipe it
+        provider = self.ingress_per_unit
+        provider.wipe_ingress_data(relation)
+
         # FIXME Ideally, follower units could instead watch for the data in the
         # ingress app data bag, but Juju does not allow non-leader units to read
         # the application data bag on their side of the relation, so we may start
@@ -439,10 +442,8 @@ class TraefikIngressCharm(CharmBase):
             if request := self.ingress_per_app.get_request(relation):
                 request.respond("")
 
-        if self.ingress_per_unit.is_ready():
-            for unit in (u for u in relation.units if u.app != self.app):
-                if request := self.ingress_per_unit.get_request(relation):
-                    request.respond(unit, "")
+        if self.unit.is_leader() and self.ingress_per_unit.is_ready():
+            self.ingress_per_unit.wipe_ingress_data(relation)
 
     def _relation_config_file(self, relation: Relation):
         # Using both the relation id and the app name in the file to facilitate
