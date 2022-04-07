@@ -13,8 +13,11 @@ import yaml
 from charms.observability_libs.v0.kubernetes_service_patch import KubernetesServicePatch
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 from charms.traefik_k8s.v0.ingress import IngressPerAppProvider
-from charms.traefik_k8s.v0.ingress_per_unit import IngressPerUnitProvider, \
-    RequirerData, DataValidationError
+from charms.traefik_k8s.v0.ingress_per_unit import (
+    DataValidationError,
+    IngressPerUnitProvider,
+    RequirerData,
+)
 from deepmerge import always_merger
 from lightkube import Client
 from lightkube.resources.core_v1 import Service
@@ -35,7 +38,8 @@ from ops.model import (
     MaintenanceStatus,
     ModelError,
     Relation,
-    WaitingStatus, Unit,
+    Unit,
+    WaitingStatus,
 )
 from ops.pebble import APIError, PathError
 
@@ -293,7 +297,8 @@ class TraefikIngressCharm(CharmBase):
     def _provide_ingress_per_unit(self, relation: Relation):
         # to avoid long-gone units from lingering in the ingress, we wipe it
         provider = self.ingress_per_unit
-        provider.wipe_ingress_data(relation)
+        if self.unit.is_leader():
+            provider.wipe_ingress_data(relation)
 
         # FIXME Ideally, follower units could instead watch for the data in the
         # ingress app data bag, but Juju does not allow non-leader units to read
@@ -307,19 +312,17 @@ class TraefikIngressCharm(CharmBase):
             # if the unit is ready, it's implied that the data is there.
             # but we should still ensure it's valid, hence...
             try:
-                data: 'RequirerData' = provider.get_data(relation, unit, validate=True)
+                data: "RequirerData" = provider.get_data(relation, unit, validate=True)
             except DataValidationError as e:
                 # is_unit_ready should guard against no data being there yet,
                 # but if the data is invalid...
                 logger.error(f"invalid data shared through {relation} by {unit}... Error: {e}.")
                 continue
-            unit_config, unit_url = self._generate_per_unit_config(
-                unit, data
-            )
+            unit_config, unit_url = self._generate_per_unit_config(unit, data)
 
             if unit_url:
                 if self.unit.is_leader():
-                    provider.publish_url(relation, data['name'], unit_url)
+                    provider.publish_url(relation, data["name"], unit_url)
 
             if unit_config:
                 always_merger.merge(config, unit_config)
@@ -338,11 +341,11 @@ class TraefikIngressCharm(CharmBase):
             self._wipe_ingress_for_relation(relation)
 
     def _generate_per_unit_config(
-        self, unit: Unit, data: 'RequirerData'
+        self, unit: Unit, data: "RequirerData"
     ) -> Tuple[Optional[dict], Optional[str]]:
         """Generate a config dict for a given unit for IngressPerUnit."""
         config = {"http": {"routers": {}, "services": {}}}
-        name = data['name'].replace("/", "-")
+        name = data["name"].replace("/", "-")
         prefix = f"{data['model']}-{name}"
 
         host = self._external_host

@@ -52,6 +52,7 @@ import warnings
 from typing import Any, Dict, List, Optional, Tuple, TypeVar, Union
 
 import jsonschema
+import ops.model
 import yaml
 from ops.charm import CharmBase, RelationBrokenEvent, RelationEvent
 from ops.framework import EventSource, Object, ObjectEvents
@@ -126,13 +127,15 @@ try:
 except ImportError:
     from typing_extensions import TypedDict  # py35 compat
 
+
 class RequirerData(TypedDict):
     model: str
     name: str
     host: str
     port: int
 
-RequirerUnitData = Dict[Unit, 'RequirerData']
+
+RequirerUnitData = Dict[Unit, "RequirerData"]
 KeyValueMapping = Dict[str, str]
 ProviderApplicationData = Dict[str, KeyValueMapping]
 
@@ -454,15 +457,17 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
 
     def is_unit_ready(self, relation: Relation, unit: Unit) -> bool:
         """Whether the given unit has shared its side of the data."""
-        assert unit in relation.units, "attempting to get ready state for unit that does not belong to relation"
-        if relation.data.get(unit, {}).get('data'):
+        assert (
+            unit in relation.units
+        ), "attempting to get ready state for unit that does not belong to relation"
+        if relation.data.get(unit, {}).get("data"):
             # TODO consider doing schema-based validation here
             return True
         return False
 
-    def get_data(self, relation: Relation, unit: Unit, validate:bool = False) -> 'RequirerData':
+    def get_data(self, relation: Relation, unit: Unit, validate: bool = False) -> "RequirerData":
         """Fetch the data shared by this unit via the relation (Requirer side)."""
-        data = _deserialize_data(relation.data[unit]['data'])
+        data = _deserialize_data(relation.data[unit]["data"])
         if validate:
             _validate_data(data, INGRESS_REQUIRES_UNIT_SCHEMA)
         return data
@@ -472,25 +477,32 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
 
         Assumes that this unit is leader.
         """
-        raw_data = relation.data[self.app].get('data', None)
-        data = _deserialize_data(raw_data) if raw_data else {'ingress': {}}
+        raw_data = relation.data[self.app].get("data", None)
+        data = _deserialize_data(raw_data) if raw_data else {"ingress": {}}
 
         # TODO: is this necessary?
         try:
             _validate_data(data, INGRESS_PROVIDES_APP_SCHEMA)
         except DataValidationError as e:
-            log.error(f"unable to publish url to {unit_name}: "
-                      f"corrupted application databag")
+            log.error(f"unable to publish url to {unit_name}: " f"corrupted application databag")
             return
-        data['ingress'][unit_name] = {'url': url}
-        relation.data[self.app]['data'] = _serialize_data(data)
+        data["ingress"][unit_name] = {"url": url}
+        try:
+            relation.data[self.app]["data"] = _serialize_data(data)
+        except ops.model.RelationDataError:
+            unit = self.unit
+            raise RelationPermissionError(
+                relation,
+                unit,
+                "failed to write application data: leader={}".format(unit.is_leader()),
+            )
 
     def wipe_ingress_data(self, relation):
         """Remove all published ingress data.
 
         Assumes that this unit is leader.
         """
-        relation.data[self.app]['data'] = ""
+        relation.data[self.app]["data"] = ""
 
     def _fetch_relation_data(
         self, relation: Relation, validate=False
@@ -535,17 +547,6 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
             requirer_unit_data[remote_unit] = remote_deserialized
 
         return provider_app_data, requirer_unit_data
-
-    def publish_ingress_data(self, relation: Relation, data: ProviderApplicationData):
-        """Publish ingress data to the relation databag."""
-        if not self.unit.is_leader():
-            raise RelationPermissionError(relation, self.unit, "This unit is not the leader")
-
-        wrapped_data = {"ingress": data}
-
-        _validate_data(wrapped_data, INGRESS_PROVIDES_APP_SCHEMA)
-        # if all is well, write the data
-        relation.data[self.app]["data"] = _serialize_data(wrapped_data)
 
     @property
     def proxied_endpoints(self) -> dict:
@@ -723,8 +724,8 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
         }
         self.relation.data[self.unit]["data"] = _serialize_data(data)
 
-    def request(self, *, host: str = None, port: int):
-        """Request ingress to this unit.
+    def publish_ingress_data(self, *, host: str = None, port: int):
+        """Publishes the data that Traefik needs to provide ingress.
 
         Args:
             host: Hostname to be used by the ingress provider to address the
