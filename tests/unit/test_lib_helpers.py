@@ -3,7 +3,6 @@
 """Helpers for unit testing charms which use this library."""
 import typing
 from contextlib import contextmanager
-from functools import partial
 from unittest.mock import patch
 
 from charms.traefik_k8s.v0.ingress import (

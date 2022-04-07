@@ -47,9 +47,7 @@ class SomeCharm(CharmBase):
 ```
 """
 import logging
-import typing
-import warnings
-from typing import Any, Dict, List, Optional, Tuple, TypeVar, Union
+from typing import Dict, Optional, Tuple, TypeVar, Union
 
 import jsonschema
 import ops.model
@@ -129,6 +127,8 @@ except ImportError:
 
 
 class RequirerData(TypedDict):
+    """Model of the data a unit implementing the requirer will need to provide."""
+
     model: str
     name: str
     host: str
@@ -484,7 +484,11 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
         try:
             _validate_data(data, INGRESS_PROVIDES_APP_SCHEMA)
         except DataValidationError as e:
-            log.error(f"unable to publish url to {unit_name}: " f"corrupted application databag")
+            log.error(
+                "unable to publish url to {}: corrupted application databag ({})".format(
+                    unit_name, e
+                )
+            )
             return
         data["ingress"][unit_name] = {"url": url}
         try:
