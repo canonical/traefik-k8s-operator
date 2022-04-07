@@ -456,7 +456,7 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
         return False
 
     def is_unit_ready(self, relation: Relation, unit: Unit) -> bool:
-        """Whether the given unit has shared its side of the data."""
+        """Report whether the given unit has shared data in its unit data bag."""
         assert (
             unit in relation.units
         ), "attempting to get ready state for unit that does not belong to relation"
