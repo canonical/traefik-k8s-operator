@@ -288,7 +288,7 @@ class TraefikIngressCharm(CharmBase):
             self._push_configurations(relation, config)
 
         else:
-            self._provide_ingress_per_unit(relation)
+            self._provide_ingress_per_unit(relation, provider)
 
     def _provide_ingress_per_unit(self, relation: Relation,
                                   provider: IngressPerUnitProvider):
@@ -316,7 +316,7 @@ class TraefikIngressCharm(CharmBase):
 
             if unit_url:
                 if self.unit.is_leader():
-                    pass
+                    provider.publish_url(relation, data['name'], unit_url)
 
             if unit_config:
                 always_merger.merge(config, unit_config)

@@ -121,13 +121,16 @@ INGRESS_PROVIDES_APP_SCHEMA = {
 #          TYPES          #
 # ======================= #
 
-if typing.TYPE_CHECKING:
+try:
     from typing import TypedDict
-    class RequirerData(TypedDict):
-        model: str
-        name: str
-        host: str
-        port: int
+except ImportError:
+    from typing_extensions import TypedDict  # py35 compat
+
+class RequirerData(TypedDict):
+    model: str
+    name: str
+    host: str
+    port: int
 
 RequirerUnitData = Dict[Unit, 'RequirerData']
 KeyValueMapping = Dict[str, str]
@@ -466,6 +469,23 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
         if validate:
             _validate_data(data, INGRESS_REQUIRES_UNIT_SCHEMA)
         return data
+
+    def publish_url(self, relation: Relation, unit_name: str, url: str):
+        """Publish ingress url to a related unit.
+
+        Assumes that this unit is leader.
+        """
+        raw_data = relation.data[self.app].get('data', None)
+        data = _deserialize_data(raw_data) if raw_data else {'ingress': {}}
+
+        # TODO: is this necessary?
+        try:
+            _validate_data(data, INGRESS_PROVIDES_APP_SCHEMA)
+        except DataValidationError as e:
+            log.error(f"unable to publish url to {unit_name}: "
+                      f"corrupted application databag")
+        data['ingress'][unit_name] = {'url': url}
+        relation.data[self.app]['data'] = _serialize_data(data)
 
     def _fetch_relation_data(
         self, relation: Relation, validate=False
