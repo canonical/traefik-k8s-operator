@@ -475,7 +475,7 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
         return data
 
     def publish_url(self, relation: Relation, unit_name: str, url: str):
-        """Publish ingress url to a related unit.
+        """Place the ingress url in the application data bag for the units on the requires side.
 
         Assumes that this unit is leader.
         """
