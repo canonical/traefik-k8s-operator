@@ -44,7 +44,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
         requirer = MockIPURequirer(self.harness)
         relation = requirer.relate()
-        requirer.request(host="10.1.10.1", port=9000)
+        requirer.publish_ingress_data(host="10.1.10.1", port=9000)
         assert requirer.is_available(relation)
 
         traefik_container = self.harness.charm.unit.get_container("traefik")
@@ -188,7 +188,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
         requirer = MockIPURequirer(self.harness)
         relation = requirer.relate()
-        requirer.request(host="10.1.10.1", port=9000)
+        requirer.publish_ingress_data(host="10.1.10.1", port=9000)
         assert requirer.is_available(relation)
 
         traefik_container = self.harness.charm.unit.get_container("traefik")
@@ -246,7 +246,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
         requirer = MockIPURequirer(self.harness)
         relation = requirer.relate()
-        requirer.request(host="10.1.10.1", port=9000)
+        requirer.publish_ingress_data(host="10.1.10.1", port=9000)
         assert requirer.is_available(relation)
 
         traefik_container = self.harness.charm.unit.get_container("traefik")
@@ -318,7 +318,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
         requirer = MockIPURequirer(self.harness)
         relation = requirer.relate()
-        requirer.request(host="10.1.10.1", port=9000)
+        requirer.publish_ingress_data(host="10.1.10.1", port=9000)
 
         assert requirer.is_available(relation)
         assert not requirer.is_ready(relation)
@@ -335,7 +335,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
         requirer = MockIPURequirer(self.harness)
         relation = requirer.relate()
-        requirer.request(host="10.1.10.1", port=9000)
+        requirer.publish_ingress_data(host="10.1.10.1", port=9000)
 
         self.harness.container_pebble_ready("traefik")
 
@@ -359,7 +359,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
         requirer = MockIPURequirer(self.harness)
         relation = requirer.relate()
-        requirer.request(host="10.1.10.1", port=9000)
+        requirer.publish_ingress_data(host="10.1.10.1", port=9000)
 
         self.harness.container_pebble_ready("traefik")
 
@@ -395,7 +395,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
         requirer = MockIPURequirer(self.harness)
         relation = requirer.relate()
-        requirer.request(host="10.1.10.1", port=9000)
+        requirer.publish_ingress_data(host="10.1.10.1", port=9000)
         assert requirer.is_available(relation)
         assert requirer.is_ready(relation)
 
@@ -413,7 +413,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
             self.harness.charm.unit.status, WaitingStatus("gateway address unavailable")
         )
 
-        self.assertEqual(requirer.urls, {"ingress-per-unit-remote/0": ""})
+        self.assertEqual(requirer.urls, {})
 
     def test_relation_broken(self):
         self.test_pebble_ready_with_gateway_address_from_config_and_path_routing_mode()
@@ -472,7 +472,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
         requirer = MockIPURequirer(self.harness)
         requirer.relate()
-        requirer.request(host="10.0.0.1", port=3000)
+        requirer.publish_ingress_data(host="10.0.0.1", port=3000)
 
         self.harness.container_pebble_ready("traefik")
 

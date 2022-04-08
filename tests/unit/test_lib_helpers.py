@@ -3,7 +3,6 @@
 """Helpers for unit testing charms which use this library."""
 import typing
 from contextlib import contextmanager
-from functools import partial
 from unittest.mock import patch
 
 from charms.traefik_k8s.v0.ingress import (
@@ -16,7 +15,7 @@ from charms.traefik_k8s.v0.ingress_per_unit import (
     RELATION_INTERFACE,
     IngressPerUnitProvider,
     IngressPerUnitRequirer,
-    IngressRequest,
+    ProviderApplicationData,
 )
 from ops.charm import CharmBase, CharmEvents, CharmMeta
 from ops.model import Relation
@@ -141,45 +140,15 @@ class MockIPUProvider(MockRemoteIPUMixin, IngressPerUnitProvider):
     ROLE = "provides"
     LIMIT = None
 
-    def _mock_respond(self, unit, url, _respond, _relation):
-        with self.remote_context(_relation):
-            _respond(unit, url)
+    def publish_url(self, relation: Relation, unit_name: str, url: str):
+        with self.remote_context(self.relation):
+            super().publish_url(relation, unit_name, url)
+        self.harness._charm.on.ingress_per_unit_relation_changed.emit(self.relation)
 
-    def get_request(self, relation: Relation):
-        """Get the IngressRequest for the given Relation."""
-        # reflect the relation for the request so that it appears remote
-        with self.remote_context(relation):
-            provider_app_data, requirers_unit_data = self._fetch_relation_data(relation)
-            request = MockIngressPerUnitRequest(
-                self, relation, provider_app_data, requirers_unit_data
-            )
-            request.respond = partial(
-                self._mock_respond, _respond=request.respond, _relation=relation
-            )
-            return request
-
-
-class MockIngressPerUnitRequest(IngressRequest):
-    """Testing wrapper for an IngressRequest.
-
-    Exactly the same as the normal IngressRequest but acts as if it's on the
-    remote side of any relation, and it automatically triggers events when
-    responses are sent.
-    """
-
-    _provider: MockIPUProvider
-
-    def __init__(
-        self,
-        provider: MockIPUProvider,
-        relation: Relation,
-        provider_app_data: dict,
-        requirers_unit_data: dict,
-    ):
-        super().__init__(provider, relation, provider_app_data, requirers_unit_data)
-
-        self.app = self._provider.harness.charm.app
-        self._related_units = {self._provider.harness.charm.unit}
+    def publish_ingress_data(self, relation: Relation, data: ProviderApplicationData):
+        with self.remote_context(self.relation):
+            super().publish_url(relation, data)
+        self.harness._charm.on.ingress_per_unit_relation_changed.emit(self.relation)
 
 
 class MockIPURequirer(MockRemoteIPUMixin, IngressPerUnitRequirer):
@@ -198,9 +167,9 @@ class MockIPURequirer(MockRemoteIPUMixin, IngressPerUnitRequirer):
         with self.remote_context(self.relation):
             return super().urls
 
-    def request(self, *, host: str = None, port: int):
+    def publish_ingress_data(self, *, host: str = None, port: int):
         with self.remote_context(self.relation):
-            super().request(host=host, port=port)
+            super().publish_ingress_data(host=host, port=port)
         self.harness._charm.on.ingress_per_unit_relation_changed.emit(self.relation)
 
 
