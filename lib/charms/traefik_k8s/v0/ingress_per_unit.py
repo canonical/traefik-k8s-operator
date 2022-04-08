@@ -457,6 +457,8 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
 
     def is_unit_ready(self, relation: Relation, unit: Unit) -> bool:
         """Report whether the given unit has shared data in its unit data bag."""
+        # sanity check: this should not occur in production, but it may happen
+        # during testing: cfr https://github.com/canonical/traefik-k8s-operator/issues/39
         assert (
             unit in relation.units
         ), "attempting to get ready state for unit that does not belong to relation"
