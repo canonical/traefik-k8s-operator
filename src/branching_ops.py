@@ -13,7 +13,7 @@ def load(parent: object, child: CharmBase_):
         if not name.startswith('__'):
             try:
                 setattr(child, name, value)
-            except:
+            except:  # wooosh
                 pass
 
 
