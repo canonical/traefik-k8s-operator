@@ -179,11 +179,7 @@ class MockIngressPerUnitRequest(IngressRequest):
         super().__init__(provider, relation, provider_app_data, requirers_unit_data)
 
         self.app = self._provider.harness.charm.app
-
-    @property
-    def units(self):
-        """The remote units."""
-        return [self._provider.harness.charm.unit]
+        self._related_units = {self._provider.harness.charm.unit}
 
 
 class MockIPURequirer(MockRemoteIPUMixin, IngressPerUnitRequirer):
