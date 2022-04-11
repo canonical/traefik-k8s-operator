@@ -102,7 +102,7 @@ def test_ingress_unit_provider_request_response_nonleader(provider, requirer, ha
     relation = requirer.relate()
     requirer.provide_ingress_requirements(port=port, host=host)
 
-    unit_data = provider.get_data(relation, requirer.charm.unit, validate=True)
+    unit_data = provider.get_data(relation, requirer.charm.unit)
     assert unit_data["model"] == requirer.charm.model.name
     assert unit_data["name"] == requirer.charm.unit.name
     assert unit_data["host"] == host

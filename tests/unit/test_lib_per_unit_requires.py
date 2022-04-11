@@ -99,7 +99,7 @@ def test_ingress_unit_requirer_leader(requirer, provider, harness):
     assert provider.is_ready(relation)
     assert not provider.is_failed(relation)
     provider: IngressPerUnitProvider
-    data = provider.get_data(relation, requirer.charm.unit, True)
+    data = provider.get_data(relation, requirer.charm.unit)
     assert data["name"] == requirer.charm.unit.name
     assert data["model"] == requirer.charm.model.name
 
@@ -110,7 +110,7 @@ def test_ingress_unit_requirer_request_response(requirer, provider, harness, url
     harness.set_leader(True)
     provider: IngressPerUnitProvider
     requirer: IngressPerUnitRequirer
-    data = provider.get_data(relation, requirer.unit, validate=True)
+    data = provider.get_data(relation, requirer.unit)
 
     provider.publish_url(relation, data["name"], url)
 
@@ -131,7 +131,7 @@ def test_unit_joining_does_not_trigger_ingress_changed(requirer, provider, harne
     relation = provider.relate()
     harness.set_leader(True)
 
-    data = provider.get_data(relation, requirer.unit, validate=True)
+    data = provider.get_data(relation, requirer.unit)
     provider.publish_url(relation, data["name"], url)
 
     harness.add_relation_unit(relation.id, "ingress-remote/1")
