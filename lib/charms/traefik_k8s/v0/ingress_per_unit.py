@@ -478,7 +478,8 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
         raw_data = relation.data[self.app].get("data", None)
         data = _deserialize_data(raw_data) if raw_data else {"ingress": {}}
 
-        # TODO: is this necessary?
+        # we ensure that the application databag has the shape we think it
+        # should have; to catch any inconsistencies early on.
         try:
             _validate_data(data, INGRESS_PROVIDES_APP_SCHEMA)
         except DataValidationError as e:
@@ -488,7 +489,14 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
                 )
             )
             return
+
+        # we update the data with a new url
         data["ingress"][unit_name] = {"url": url}
+
+        # we validate the data **again**, to ensure that we respected the schema
+        # and did not accidentally corrupt our own databag.
+        _validate_data(data, INGRESS_PROVIDES_APP_SCHEMA)
+
         try:
             relation.data[self.app]["data"] = _serialize_data(data)
         except ops.model.RelationDataError:
