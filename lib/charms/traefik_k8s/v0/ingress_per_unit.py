@@ -636,7 +636,7 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
 
     def _publish_auto_data(self, relation: Relation):
         if self._auto_data and self.is_available(relation):
-            self._publish_ingress_data(*self._auto_data)
+            self._provide_ingress_requirements(*self._auto_data)
 
     @property
     def relation(self) -> Optional[Relation]:
@@ -698,7 +698,7 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
         # TODO Avoid spurious events, emit only when URL changes
         self.on.ingress_changed.emit(self.relation)
 
-    def _publish_ingress_data(self, host: Optional[str], port: int):
+    def _provide_ingress_requirements(self, host: Optional[str], port: int):
         """Publish the data that the provider needs to provide ingress."""
         if not host:
             binding = self.charm.model.get_binding(self.relation_name)
@@ -712,7 +712,7 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
         }
         self.relation.data[self.unit]["data"] = _serialize_data(data)
 
-    def publish_ingress_data(self, *, host: str = None, port: int):
+    def provide_ingress_requirements(self, *, host: str = None, port: int):
         """Publishes the data that Traefik needs to provide ingress.
 
         Args:
@@ -721,7 +721,7 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
              instead
             port: the port of the service (required)
         """
-        self._publish_ingress_data(host, port)
+        self._provide_ingress_requirements(host, port)
 
     @property
     def urls(self) -> dict:

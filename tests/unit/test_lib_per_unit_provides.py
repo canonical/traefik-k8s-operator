@@ -87,7 +87,7 @@ def test_ingress_unit_provider_supported_versions_shim(provider, requirer, harne
 
 def test_ingress_unit_provider_request(provider, requirer, harness):
     relation = requirer.relate()
-    requirer.publish_ingress_data(port=80)
+    requirer.provide_ingress_requirements(port=80)
     assert provider.is_available(relation)
     assert provider.is_ready(relation)
     assert not provider.is_failed(relation)
@@ -100,7 +100,7 @@ def test_ingress_unit_provider_request(provider, requirer, harness):
 def test_ingress_unit_provider_request_response_nonleader(provider, requirer, harness, port, host):
     provider: IngressPerUnitProvider
     relation = requirer.relate()
-    requirer.publish_ingress_data(port=port, host=host)
+    requirer.provide_ingress_requirements(port=port, host=host)
 
     unit_data = provider.get_data(relation, requirer.charm.unit, validate=True)
     assert unit_data["model"] == requirer.charm.model.name
@@ -117,7 +117,7 @@ def test_ingress_unit_provider_request_response_nonleader(provider, requirer, ha
 def test_ingress_unit_provider_request_response(provider, requirer, harness, url):
     relation = requirer.relate()
     harness.set_leader(True)
-    requirer.publish_ingress_data(port=80)
+    requirer.provide_ingress_requirements(port=80)
 
     provider.publish_url(relation, requirer.unit.name, url)
     assert requirer.is_available(relation)

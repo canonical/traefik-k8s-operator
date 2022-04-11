@@ -145,7 +145,7 @@ class MockIPUProvider(MockRemoteIPUMixin, IngressPerUnitProvider):
             super().publish_url(relation, unit_name, url)
         self.harness._charm.on.ingress_per_unit_relation_changed.emit(self.relation)
 
-    def publish_ingress_data(self, relation: Relation, data: ProviderApplicationData):
+    def provide_ingress_requirements(self, relation: Relation, data: ProviderApplicationData):
         with self.remote_context(self.relation):
             super().publish_url(relation, data)
         self.harness._charm.on.ingress_per_unit_relation_changed.emit(self.relation)
@@ -167,9 +167,9 @@ class MockIPURequirer(MockRemoteIPUMixin, IngressPerUnitRequirer):
         with self.remote_context(self.relation):
             return super().urls
 
-    def publish_ingress_data(self, *, host: str = None, port: int):
+    def provide_ingress_requirements(self, *, host: str = None, port: int):
         with self.remote_context(self.relation):
-            super().publish_ingress_data(host=host, port=port)
+            super().provide_ingress_requirements(host=host, port=port)
         self.harness._charm.on.ingress_per_unit_relation_changed.emit(self.relation)
 
 
