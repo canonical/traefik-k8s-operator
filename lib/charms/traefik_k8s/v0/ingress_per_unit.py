@@ -147,15 +147,6 @@ KeyValueMapping = Dict[str, str]
 ProviderApplicationData = Dict[str, KeyValueMapping]
 
 
-# SERIALIZATION UTILS
-def _deserialize_data(data: str):
-    return yaml.safe_load(data)
-
-
-def _serialize_data(data) -> str:
-    return yaml.safe_dump(data, indent=2)
-
-
 def _validate_data(data, schema):
     if not DO_VALIDATION:
         return
@@ -466,7 +457,7 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
 
     def get_data(self, relation: Relation, unit: Unit) -> "RequirerData":
         """Fetch the data shared by the specified unit on the relation (Requirer side)."""
-        data = _deserialize_data(relation.data[unit]["data"])
+        data = yaml.safe_load(relation.data[unit]["data"])
         _validate_data(data, INGRESS_REQUIRES_UNIT_SCHEMA)
         return data
 
@@ -476,7 +467,7 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
         Assumes that this unit is leader.
         """
         raw_data = relation.data[self.app].get("data", None)
-        data = _deserialize_data(raw_data) if raw_data else {"ingress": {}}
+        data = yaml.safe_load(raw_data) if raw_data else {"ingress": {}}
 
         # we ensure that the application databag has the shape we think it
         # should have; to catch any inconsistencies early on.
@@ -498,7 +489,7 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
         _validate_data(data, INGRESS_PROVIDES_APP_SCHEMA)
 
         try:
-            relation.data[self.app]["data"] = _serialize_data(data)
+            relation.data[self.app]["data"] = yaml.safe_dump(data)
         except ops.model.RelationDataError:
             unit = self.unit
             raise RelationPermissionError(
@@ -538,7 +529,7 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
             data = relation.data[this_app].get("data")
             deserialized = {}
             if data:
-                deserialized = _deserialize_data(data)
+                deserialized = yaml.safe_load(data)
                 _validate_data(deserialized, INGRESS_PROVIDES_APP_SCHEMA)
             provider_app_data = deserialized.get("ingress", {})
 
@@ -550,7 +541,7 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
             remote_data = relation.data[remote_unit].get("data")
             remote_deserialized = {}
             if remote_data:
-                remote_deserialized = _deserialize_data(remote_data)
+                remote_deserialized = yaml.safe_load(remote_data)
                 _validate_data(remote_deserialized, INGRESS_REQUIRES_UNIT_SCHEMA)
             requirer_unit_data[remote_unit] = remote_deserialized
 
@@ -703,7 +694,7 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
 
         if raw:
             # validate data
-            data = _deserialize_data(raw)
+            data = yaml.safe_load(raw)
             try:
                 _validate_data(data, INGRESS_REQUIRES_UNIT_SCHEMA)
             except DataValidationError:
@@ -739,7 +730,7 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
             "port": port,
         }
         _validate_data(data, INGRESS_REQUIRES_UNIT_SCHEMA)
-        self.relation.data[self.unit]["data"] = _serialize_data(data)
+        self.relation.data[self.unit]["data"] = yaml.safe_dump(data)
 
     @property
     def urls(self) -> dict:
@@ -760,7 +751,7 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
         if not raw:
             return {}
 
-        data = _deserialize_data(raw)
+        data = yaml.safe_load(raw)
         _validate_data(data, INGRESS_PROVIDES_APP_SCHEMA)
 
         ingress = data.get("ingress", {})
