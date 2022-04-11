@@ -312,7 +312,7 @@ class TraefikIngressCharm(CharmBase):
             # if the unit is ready, it's implied that the data is there.
             # but we should still ensure it's valid, hence...
             try:
-                data: "RequirerData" = provider.get_data(relation, unit, validate=True)
+                data: "RequirerData" = provider.get_data(relation, unit)
             except DataValidationError as e:
                 # is_unit_ready should guard against no data being there yet,
                 # but if the data is invalid...
