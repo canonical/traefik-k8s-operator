@@ -49,7 +49,6 @@ class SomeCharm(CharmBase):
 import logging
 from typing import Dict, Optional, Tuple, TypeVar, Union
 
-import jsonschema
 import ops.model
 import yaml
 from ops.charm import CharmBase, RelationBrokenEvent, RelationEvent
@@ -75,6 +74,20 @@ LIBAPI = 0
 LIBPATCH = 8
 
 log = logging.getLogger(__name__)
+
+try:
+    import jsonschema
+
+    DO_VALIDATION = True
+except ModuleNotFoundError:
+    log.warning(
+        "The `ingress_per_unit` library needs the `jsonschema` package to be able "
+        "to do runtime data validation; without it, it will still work but validation "
+        "will be disabled. \n"
+        "It is recommended to add `jsonschema` to the 'requirements.txt' of your charm, "
+        "which will enable this feature."
+    )
+    DO_VALIDATION = False
 
 # LIBRARY GLOBS
 RELATION_INTERFACE = "ingress_per_unit"
@@ -135,15 +148,17 @@ ProviderApplicationData = Dict[str, KeyValueMapping]
 
 
 # SERIALIZATION UTILS
-def _deserialize_data(data):
+def _deserialize_data(data: str):
     return yaml.safe_load(data)
 
 
-def _serialize_data(data):
+def _serialize_data(data) -> str:
     return yaml.safe_dump(data, indent=2)
 
 
 def _validate_data(data, schema):
+    if not DO_VALIDATION:
+        return
     try:
         jsonschema.validate(instance=data, schema=schema)
     except jsonschema.ValidationError as e:
@@ -416,7 +431,7 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
 
         try:
             # grab the data and validate it; might raise
-            _, requirer_unit_data = self._fetch_relation_data(relation, validate=True)
+            _, requirer_unit_data = self._fetch_relation_data(relation)
         except DataValidationError as e:
             log.warning("Failed to validate relation data for {} relation: {}".format(relation, e))
             return True
@@ -449,11 +464,10 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
             return True
         return False
 
-    def get_data(self, relation: Relation, unit: Unit, validate: bool = False) -> "RequirerData":
+    def get_data(self, relation: Relation, unit: Unit) -> "RequirerData":
         """Fetch the data shared by the specified unit on the relation (Requirer side)."""
         data = _deserialize_data(relation.data[unit]["data"])
-        if validate:
-            _validate_data(data, INGRESS_REQUIRES_UNIT_SCHEMA)
+        _validate_data(data, INGRESS_REQUIRES_UNIT_SCHEMA)
         return data
 
     def publish_url(self, relation: Relation, unit_name: str, url: str):
@@ -493,7 +507,7 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
         relation.data[self.app]["data"] = ""
 
     def _fetch_relation_data(
-        self, relation: Relation, validate=False
+        self, relation: Relation
     ) -> Tuple[ProviderApplicationData, RequirerUnitData]:
         """Fetch and validate the databags.
 
@@ -517,8 +531,7 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
             deserialized = {}
             if data:
                 deserialized = _deserialize_data(data)
-                if validate:
-                    _validate_data(deserialized, INGRESS_PROVIDES_APP_SCHEMA)
+                _validate_data(deserialized, INGRESS_PROVIDES_APP_SCHEMA)
             provider_app_data = deserialized.get("ingress", {})
 
         # then look at the requirer's (thus remote) unit databags
@@ -530,8 +543,7 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
             remote_deserialized = {}
             if remote_data:
                 remote_deserialized = _deserialize_data(remote_data)
-                if validate:
-                    _validate_data(remote_deserialized, INGRESS_REQUIRES_UNIT_SCHEMA)
+                _validate_data(remote_deserialized, INGRESS_REQUIRES_UNIT_SCHEMA)
             requirer_unit_data[remote_unit] = remote_deserialized
 
         return provider_app_data, requirer_unit_data
@@ -698,8 +710,15 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
         # TODO Avoid spurious events, emit only when URL changes
         self.on.ingress_changed.emit(self.relation)
 
-    def _provide_ingress_requirements(self, host: Optional[str], port: int):
-        """Publish the data that the provider needs to provide ingress."""
+    def provide_ingress_requirements(self, *, host: str = None, port: int):
+        """Publishes the data that Traefik needs to provide ingress.
+
+        Args:
+            host: Hostname to be used by the ingress provider to address the
+             requirer unit; if unspecified, the pod ip of the unit will be used
+             instead
+            port: the port of the service (required)
+        """
         if not host:
             binding = self.charm.model.get_binding(self.relation_name)
             host = str(binding.network.bind_address)
@@ -710,18 +729,8 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
             "host": host,
             "port": port,
         }
+        _validate_data(data, INGRESS_REQUIRES_UNIT_SCHEMA)
         self.relation.data[self.unit]["data"] = _serialize_data(data)
-
-    def provide_ingress_requirements(self, *, host: str = None, port: int):
-        """Publishes the data that Traefik needs to provide ingress.
-
-        Args:
-            host: Hostname to be used by the ingress provider to address the
-             requirer unit; if unspecified, the pod ip of the unit will be used
-             instead
-            port: the port of the service (required)
-        """
-        self._provide_ingress_requirements(host, port)
 
     @property
     def urls(self) -> dict:

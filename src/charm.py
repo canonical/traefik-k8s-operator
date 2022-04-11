@@ -12,7 +12,6 @@ from typing import Optional, Tuple
 import yaml
 from charms.observability_libs.v0.kubernetes_service_patch import KubernetesServicePatch
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
-from charms.traefik_k8s.v0.branching_ops import CharmBase, Branch
 from charms.traefik_k8s.v0.ingress import IngressPerAppProvider
 from charms.traefik_k8s.v0.ingress_per_unit import (
     DataValidationError,
@@ -24,6 +23,7 @@ from lightkube import Client
 from lightkube.resources.core_v1 import Service
 from ops.charm import (
     ActionEvent,
+    CharmBase,
     ConfigChangedEvent,
     PebbleReadyEvent,
     RelationEvent,
@@ -45,7 +45,6 @@ from ops.pebble import APIError, PathError
 
 logger = logging.getLogger(__name__)
 
-
 _TRAEFIK_CONTAINER_NAME = _TRAEFIK_LAYER_NAME = _TRAEFIK_SERVICE_NAME = "traefik"
 # We watch the parent folder of where we store the configuration files,
 # as that is usually safer for Traefik
@@ -58,8 +57,32 @@ class _RoutingMode(enum.Enum):
 
 
 class _IngressRelationType(enum.Enum):
-    per_app = "per_app"
-    per_unit = "per_unit"
+    per_app = "ingress"
+    per_unit = "ingress-per-unit"
+
+
+class Router:
+    def rule(self, prefix, external_host):
+        raise NotImplementedError()
+
+    def app_url(self, gateway_address, port, prefix):
+        raise NotImplementedError()
+
+
+class PathRouter(Router):
+    def rule(self, prefix, external_host):
+        return f"PathPrefix(`/{prefix}`)"
+
+    def app_url(self, gateway_address, port, prefix):
+        return f"http://{gateway_address}:{port}/{prefix}"
+
+
+class SubdomainRouter(Router):
+    def rule(self, prefix, external_host):
+        return f"Host(`{prefix}.{external_host}`)"
+
+    def app_url(self, gateway_address, port, prefix):
+        return f"http://{prefix}.{gateway_address}:{port}/"
 
 
 class TraefikIngressCharm(CharmBase):
@@ -93,6 +116,11 @@ class TraefikIngressCharm(CharmBase):
 
         self.ingress_per_app = IngressPerAppProvider(charm=self)
         self.ingress_per_unit = IngressPerUnitProvider(charm=self)
+
+        # if routingMode is misconfigured, this will raise
+        self.router = (
+            PathRouter() if self._routing_mode is _RoutingMode.path else SubdomainRouter()
+        )
 
         self.framework.observe(self.on.traefik_pebble_ready, self._on_traefik_pebble_ready)
         self.framework.observe(self.on.start, self._on_start)
@@ -187,7 +215,7 @@ class TraefikIngressCharm(CharmBase):
         self._process_status_and_configurations()
 
     def _on_config_changed(self, _: ConfigChangedEvent):
-        # If the external hostname is changed since we last processed it, we need to
+        # If the external hostname is changed since we last processed it, we need
         # to reconsider all data sent over the relations and all configs
         new_external_host = self._external_host
         new_routing_mode = self.config["routing_mode"]
@@ -312,7 +340,7 @@ class TraefikIngressCharm(CharmBase):
             # if the unit is ready, it's implied that the data is there.
             # but we should still ensure it's valid, hence...
             try:
-                data: "RequirerData" = provider.get_data(relation, unit, validate=True)
+                data: "RequirerData" = provider.get_data(relation, unit)
             except DataValidationError as e:
                 # is_unit_ready should guard against no data being there yet,
                 # but if the data is invalid...
@@ -373,13 +401,8 @@ class TraefikIngressCharm(CharmBase):
 
     def _generate_per_app_config(self, request, gateway_address) -> Tuple[dict, str]:
         prefix = f"{request.model}-{request.app_name}"
-
-        if self._routing_mode == _RoutingMode.path:
-            route_rule = f"PathPrefix(`/{prefix}`)"
-            app_url = f"http://{gateway_address}:{self._port}/{prefix}"
-        else:  # _RoutingMode.subdomain
-            route_rule = f"Host(`{prefix}.{self._external_host}`)"
-            app_url = f"http://{prefix}.{gateway_address}:{self._port}/"
+        route_rule = self.router.rule(prefix, self._external_host)
+        app_url = self.router.app_url(gateway_address, self._port, prefix)
 
         traefik_router_name = f"juju-{prefix}-router"
         traefik_service_name = f"juju-{prefix}-service"
