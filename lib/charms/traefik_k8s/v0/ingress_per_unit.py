@@ -648,7 +648,8 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
 
     def _publish_auto_data(self, relation: Relation):
         if self._auto_data and self.is_available(relation):
-            self._provide_ingress_requirements(*self._auto_data)
+            host, port = self._auto_data
+            self.provide_ingress_requirements(host=host, port=port)
 
     @property
     def relation(self) -> Optional[Relation]:
