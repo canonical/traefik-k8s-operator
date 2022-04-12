@@ -333,6 +333,7 @@ class _IngressPerUnitBase(Object):
 
 class IngressPerUnitProvider(_IngressPerUnitBase):
     """Implementation of the provider of ingress_per_unit."""
+
     on = IngressPerUnitEvents()
 
     def __init__(self, charm: CharmBase, relation_name: str = DEFAULT_RELATION_NAME):
