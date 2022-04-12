@@ -148,6 +148,10 @@ ProviderApplicationData = Dict[str, KeyValueMapping]
 
 
 def _validate_data(data, schema):
+    """Checks whether `data` matches `schema`.
+
+    Will raise DataValidationError if the data is not valid, else return None.
+    """
     if not DO_VALIDATION:
         return
     try:
@@ -157,22 +161,11 @@ def _validate_data(data, schema):
 
 
 # EXCEPTIONS
-class IngressPerUnitException(RuntimeError):
-    """Base class for errors raised by Ingress Per Unit."""
-
-
-class DataValidationError(IngressPerUnitException):
+class DataValidationError(RuntimeError):
     """Raised when data validation fails on IPU relation data."""
 
 
-class UnknownUnitException(IngressPerUnitException):
-    """Raised when a unit passed to API methods does not belong to the relation."""
-
-    def __init__(self, relation: Relation, unit: Unit):
-        super().__init__(relation, unit)
-
-
-class RelationException(IngressPerUnitException):
+class RelationException(RuntimeError):
     """Base class for relation exceptions from this library.
 
     Attributes:
@@ -195,19 +188,21 @@ class RelationDataMismatchError(RelationException):
     """Data from different units do not match where they should."""
 
 
-class RelationPermissionError(IngressPerUnitException):
+class RelationPermissionError(RelationException):
     """Ingress is requested to do something for which it lacks permissions."""
 
     def __init__(self, relation: Relation, entity: Union[Application, Unit], message: str):
-        self.args = "Unable to write data to relation '{}:{}' with {}: {}".format(
-            relation.name, relation.id, entity.name, message
+        super(RelationPermissionError, self).__init__(relation, entity)
+        self.args = (
+            "Unable to write data to relation '{}:{}' with {}: {}".format(
+                relation.name, relation.id, entity.name, message
+            ),
         )
-        self.relation = relation
 
 
 # EVENTS
 class RelationAvailableEvent(RelationEvent):
-    """Event triggered when a relation is ready for requests."""
+    """Event triggered when a relation is ready to provide ingress."""
 
 
 class RelationFailedEvent(RelationEvent):
@@ -225,19 +220,6 @@ class IngressPerUnitEvents(ObjectEvents):
     ready = EventSource(RelationReadyEvent)
     failed = EventSource(RelationFailedEvent)
     broken = EventSource(RelationBrokenEvent)
-
-
-class IngressPerUnitRequestEvent(RelationEvent):
-    """Event representing an incoming request.
-
-    This is equivalent to the "ready" event.
-    """
-
-
-class IngressPerUnitProviderEvents(IngressPerUnitEvents):
-    """Container for IUP events."""
-
-    request = EventSource(IngressPerUnitRequestEvent)
 
 
 class _IngressPerUnitBase(Object):
@@ -308,9 +290,6 @@ class _IngressPerUnitBase(Object):
     def _handle_upgrade_or_leader(self, _):
         pass
 
-    def _emit_request_event(self, event):
-        self.on.request.emit(event.relation)
-
     def is_available(self, relation: Relation = None) -> bool:
         """Check whether the given relation is available.
 
@@ -355,8 +334,6 @@ class _IngressPerUnitBase(Object):
 class IngressPerUnitProvider(_IngressPerUnitBase):
     """Implementation of the provider of ingress_per_unit."""
 
-    on = IngressPerUnitProviderEvents()
-
     def __init__(self, charm: CharmBase, relation_name: str = DEFAULT_RELATION_NAME):
         """Constructor for IngressPerUnitProvider.
 
@@ -367,7 +344,6 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
         """
         super().__init__(charm, relation_name)
         observe = self.framework.observe
-        observe(self.on.ready, self._emit_request_event)
         observe(self.charm.on[relation_name].relation_joined, self._share_version_info)
 
     def _share_version_info(self, event):
