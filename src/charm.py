@@ -45,8 +45,7 @@ from ops.model import (
 from ops.pebble import APIError, PathError
 
 from charms.traefik_route_k8s.v0.traefik_route import (
-    TraefikRouteProvider,
-    TraefikRouteRequestEvent, RouteRequest,
+    TraefikRouteProvider, TraefikRouteRequirerReadyEvent
 )
 
 logger = logging.getLogger(__name__)
@@ -278,20 +277,8 @@ class TraefikIngressCharm(CharmBase):
         if isinstance(self.unit.status, MaintenanceStatus):
             self.unit.status = ActiveStatus()
 
-    def _handle_traefik_route_request(self, event: TraefikRouteRequestEvent):
-        """A traefik_route charm has requested ingress.
-        {
-            'ingress': {
-                'model': 'cos',
-                'unit': 'prometheus-k8s/0',
-                'host': 'foo/bar',
-                'port': 42
-            },
-            'config': {
-                'rule': 'Host(`foo.bar/{{juju_unit}}`)'
-            }
-        }
-        """
+    def _handle_traefik_route_request(self, event: TraefikRouteRequirerReadyEvent):
+        """A traefik_route charm has published some ingress data."""
         self._process_ingress_relation(event.relation)
 
     def _process_ingress_relation(self, relation: Relation):
@@ -343,7 +330,6 @@ class TraefikIngressCharm(CharmBase):
             return
         config = self.traefik_route.get_config(relation)
         self._push_configurations(relation, config)
-        self.traefik_route.publish_ingress(relation)
 
     def _provide_ingress_per_unit(self, relation: Relation):
         # to avoid long-gone units from lingering in the ingress, we wipe it
@@ -500,12 +486,8 @@ class TraefikIngressCharm(CharmBase):
             if request := self.ingress_per_app.get_request(relation):
                 request.respond("")
 
-        if self.unit.is_leader():
-            if self.ingress_per_unit.is_ready():
-                self.ingress_per_unit.wipe_ingress_data(relation)
-
-            if self.traefik_route.is_ready(relation):
-                self.traefik_route.wipe_ingress_data(relation)
+        if self.unit.is_leader() and self.ingress_per_unit.is_ready():
+            self.ingress_per_unit.wipe_ingress_data(relation)
 
     def _relation_config_file(self, relation: Relation):
         # Using both the relation id and the app name in the file to facilitate
