@@ -123,7 +123,7 @@ class TraefikIngressCharm(CharmBase):
         self.framework.observe(self.ingress_per_unit.on.broken,
                                self._handle_ingress_broken)
 
-        self.framework.observe(self.traefik_route.on.request,
+        self.framework.observe(self.traefik_route.on.ready,
                                self._handle_traefik_route_request)
 
         # Action handlers
@@ -337,8 +337,13 @@ class TraefikIngressCharm(CharmBase):
             self._provide_ingress_per_unit(relation)
 
     def _provide_routed_ingress(self, relation: Relation):
-        route = self.traefik_route
-
+        """Provide ingress to a unit related through TraefikRoute."""
+        if not self.traefik_route.is_ready(relation):
+            logger.info(f'TR not ready on {relation}')
+            return
+        config = self.traefik_route.get_config(relation)
+        self._push_configurations(relation, config)
+        self.traefik_route.publish_ingress(relation)
 
     def _provide_ingress_per_unit(self, relation: Relation):
         # to avoid long-gone units from lingering in the ingress, we wipe it
@@ -415,6 +420,7 @@ class TraefikIngressCharm(CharmBase):
         }
         return config, unit_url
 
+    # todo reuse types from TraefikRoute
     def _generate_per_app_config(self, request, gateway_address) -> Tuple[
         dict, str]:
         prefix = f"{request.model}-{request.app_name}"
@@ -494,8 +500,12 @@ class TraefikIngressCharm(CharmBase):
             if request := self.ingress_per_app.get_request(relation):
                 request.respond("")
 
-        if self.unit.is_leader() and self.ingress_per_unit.is_ready():
-            self.ingress_per_unit.wipe_ingress_data(relation)
+        if self.unit.is_leader():
+            if self.ingress_per_unit.is_ready():
+                self.ingress_per_unit.wipe_ingress_data(relation)
+
+            if self.traefik_route.is_ready(relation):
+                self.traefik_route.wipe_ingress_data(relation)
 
     def _relation_config_file(self, relation: Relation):
         # Using both the relation id and the app name in the file to facilitate
