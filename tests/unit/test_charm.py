@@ -5,6 +5,7 @@ import json
 import unittest
 from unittest.mock import Mock, patch
 
+import ops.testing
 import yaml
 from ops.charm import ActionEvent
 from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
@@ -12,6 +13,8 @@ from ops.testing import Harness
 from test_lib_helpers import MockIPARequirer, MockIPURequirer
 
 from charm import TraefikIngressCharm
+
+ops.testing.SIMULATE_CAN_CONNECT = True
 
 
 class TestTraefikIngressCharm(unittest.TestCase):
@@ -41,7 +44,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
         requirer = MockIPURequirer(self.harness)
         relation = requirer.relate()
-        requirer.request(host="10.1.10.1", port=9000)
+        requirer.provide_ingress_requirements(host="10.1.10.1", port=9000)
         assert requirer.is_available(relation)
 
         traefik_container = self.harness.charm.unit.get_container("traefik")
@@ -185,7 +188,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
         requirer = MockIPURequirer(self.harness)
         relation = requirer.relate()
-        requirer.request(host="10.1.10.1", port=9000)
+        requirer.provide_ingress_requirements(host="10.1.10.1", port=9000)
         assert requirer.is_available(relation)
 
         traefik_container = self.harness.charm.unit.get_container("traefik")
@@ -217,6 +220,58 @@ class TestTraefikIngressCharm(unittest.TestCase):
                 "ingress-per-unit-remote/0": "http://test-model-ingress-per-unit-remote-0.testhostname:80/"
             },
         )
+        self.assertEqual(self.harness.charm.unit.status, ActiveStatus())
+
+    @patch("charm.KubernetesServicePatch", lambda **unused: None)
+    def test_pebble_ready_no_leader_with_gateway_address_from_config_and_subdomain_routing_mode(
+        self,
+    ):
+        """Test round-trip bootstrap and relation with a consumer."""
+        # TODO Make parametric to avoid duplication with
+        # test_pebble_ready_with_gateway_address_from_config_and_subdomain_routing_mode
+        self.harness.update_config({"external_hostname": "testhostname"})
+        self.harness.set_leader(False)
+        self.harness.begin_with_initial_hooks()
+
+        self.harness.update_config(
+            {
+                "external_hostname": "testhostname",
+                "routing_mode": "subdomain",
+            }
+        )
+
+        self.harness.container_pebble_ready("traefik")
+
+        self.assertEqual(self.harness.charm.unit.status, ActiveStatus())
+
+        requirer = MockIPURequirer(self.harness)
+        relation = requirer.relate()
+        requirer.provide_ingress_requirements(host="10.1.10.1", port=9000)
+        assert requirer.is_available(relation)
+
+        traefik_container = self.harness.charm.unit.get_container("traefik")
+        file = f"/opt/traefik/juju/juju_ingress_{relation.name}_{relation.id}_{relation.app.name}.yaml"
+        conf = yaml.safe_load(traefik_container.pull(file).read())
+
+        expected = {
+            "http": {
+                "routers": {
+                    "juju-test-model-ingress-per-unit-remote-0-router": {
+                        "entryPoints": ["web"],
+                        "rule": "Host(`test-model-ingress-per-unit-remote-0.testhostname`)",
+                        "service": "juju-test-model-ingress-per-unit-remote-0-service",
+                    }
+                },
+                "services": {
+                    "juju-test-model-ingress-per-unit-remote-0-service": {
+                        "loadBalancer": {"servers": [{"url": "http://10.1.10.1:9000"}]}
+                    }
+                },
+            }
+        }
+
+        self.assertEqual(conf, expected)
+
         self.assertEqual(self.harness.charm.unit.status, ActiveStatus())
 
     @patch("charm.KubernetesServicePatch", lambda **unused: None)
@@ -263,7 +318,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
         requirer = MockIPURequirer(self.harness)
         relation = requirer.relate()
-        requirer.request(host="10.1.10.1", port=9000)
+        requirer.provide_ingress_requirements(host="10.1.10.1", port=9000)
 
         assert requirer.is_available(relation)
         assert not requirer.is_ready(relation)
@@ -280,7 +335,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
         requirer = MockIPURequirer(self.harness)
         relation = requirer.relate()
-        requirer.request(host="10.1.10.1", port=9000)
+        requirer.provide_ingress_requirements(host="10.1.10.1", port=9000)
 
         self.harness.container_pebble_ready("traefik")
 
@@ -304,7 +359,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
         requirer = MockIPURequirer(self.harness)
         relation = requirer.relate()
-        requirer.request(host="10.1.10.1", port=9000)
+        requirer.provide_ingress_requirements(host="10.1.10.1", port=9000)
 
         self.harness.container_pebble_ready("traefik")
 
@@ -340,7 +395,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
         requirer = MockIPURequirer(self.harness)
         relation = requirer.relate()
-        requirer.request(host="10.1.10.1", port=9000)
+        requirer.provide_ingress_requirements(host="10.1.10.1", port=9000)
         assert requirer.is_available(relation)
         assert requirer.is_ready(relation)
 
@@ -358,7 +413,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
             self.harness.charm.unit.status, WaitingStatus("gateway address unavailable")
         )
 
-        self.assertEqual(requirer.urls, {"ingress-per-unit-remote/0": ""})
+        self.assertEqual(requirer.urls, {})
 
     def test_relation_broken(self):
         self.test_pebble_ready_with_gateway_address_from_config_and_path_routing_mode()
@@ -417,7 +472,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
         requirer = MockIPURequirer(self.harness)
         requirer.relate()
-        requirer.request(host="10.0.0.1", port=3000)
+        requirer.provide_ingress_requirements(host="10.0.0.1", port=3000)
 
         self.harness.container_pebble_ready("traefik")
 

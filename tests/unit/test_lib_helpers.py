@@ -3,8 +3,6 @@
 """Helpers for unit testing charms which use this library."""
 import typing
 from contextlib import contextmanager
-from functools import cached_property, partial
-from inspect import getmembers
 from unittest.mock import patch
 
 from charms.traefik_k8s.v0.ingress import (
@@ -13,12 +11,11 @@ from charms.traefik_k8s.v0.ingress import (
     IngressPerAppRequirer,
 )
 from charms.traefik_k8s.v0.ingress_per_unit import (
-    ENDPOINT,
-    INTERFACE,
+    DEFAULT_RELATION_NAME,
+    RELATION_INTERFACE,
     IngressPerUnitProvider,
     IngressPerUnitRequirer,
-    IngressRequest,
-    IPUBase,
+    ProviderApplicationData,
 )
 from ops.charm import CharmBase, CharmEvents, CharmMeta
 from ops.model import Relation
@@ -33,7 +30,7 @@ class MockRemoteIPUMixin:
 
     def __init__(self, harness):
         """Initialize the mock provider / requirer."""
-        self.app_name = f"{ENDPOINT}-remote"
+        self.app_name = f"{DEFAULT_RELATION_NAME}-remote"
         self.unit_name = f"{self.app_name}/0"
 
         class MRRMTestEvents(CharmEvents):
@@ -45,9 +42,9 @@ class MockRemoteIPUMixin:
             meta = CharmMeta(
                 {
                     self.ROLE: {
-                        ENDPOINT: {
+                        DEFAULT_RELATION_NAME: {
                             "role": self.ROLE,
-                            "interface": INTERFACE,
+                            "interface": RELATION_INTERFACE,
                             "limit": self.LIMIT,
                         },
                     },
@@ -63,41 +60,20 @@ class MockRemoteIPUMixin:
         self.harness = harness
         self.relation_id = None
         self.num_units = 0
-        self._remove_caching()
-
-    def _remove_caching(self):
-        # We use the caching helpers from functools to save recalculations, but during
-        # tests they can interfere with seeing the updated state, so we strip them off.
-        is_ew = lambda v: isinstance(v, IPUBase)  # noqa: E731
-        is_cp = lambda v: isinstance(v, cached_property)  # noqa: E731
-        is_cf = lambda v: hasattr(v, "cache_clear")  # noqa: E731
-        classes = [
-            IPUBase,
-            IngressPerUnitRequirer,
-            IngressPerUnitProvider,
-            type(self),
-            *[type(instance) for _, instance in getmembers(self.harness.charm, is_ew)],
-        ]
-        for cls in classes:
-            for attr, prop in getmembers(cls, lambda v: is_cp(v) or is_cf(v)):
-                if is_cp(prop):
-                    setattr(cls, attr, property(prop.func))
-                else:
-                    setattr(cls, attr, prop.__wrapped__)
 
     @property
     def relation(self):
         """The Relation instance, if created."""
-        return self.harness.model.get_relation(self.endpoint, self.relation_id)
+        return self.harness.model.get_relation(self.relation_name, self.relation_id)
 
-    def relate(self, endpoint: str = None):
+    def relate(self, relation_name: str = None):
         """Create a relation to the charm under test.
 
         Starts the version negotiation, and returns the Relation instance.
         """
-        if not endpoint:
-            endpoint = self.endpoint
-        self.relation_id = self.harness.add_relation(endpoint, self.app_name)
+        if not relation_name:
+            relation_name = self.relation_name
+        self.relation_id = self.harness.add_relation(relation_name, self.app_name)
         self.add_unit()
         return self.relation
 
@@ -164,38 +140,15 @@ class MockIPUProvider(MockRemoteIPUMixin, IngressPerUnitProvider):
     ROLE = "provides"
     LIMIT = None
 
-    def _mock_respond(self, unit, url, _respond, _relation):
-        with self.remote_context(_relation):
-            _respond(unit, url)
+    def publish_url(self, relation: Relation, unit_name: str, url: str):
+        with self.remote_context(self.relation):
+            super().publish_url(relation, unit_name, url)
+        self.harness._charm.on.ingress_per_unit_relation_changed.emit(self.relation)
 
-    def get_request(self, relation: Relation):
-        """Get the IngressRequest for the given Relation."""
-        # reflect the relation for the request so that it appears remote
-        with self.remote_context(relation):
-            request = MockIngressPerUnitRequest(self, relation, self._fetch_ingress_data(relation))
-            request.respond = partial(
-                self._mock_respond, _respond=request.respond, _relation=relation
-            )
-            return request
-
-
-class MockIngressPerUnitRequest(IngressRequest):
-    """Testing wrapper for an IngressRequest.
-
-    Exactly the same as the normal IngressRequest but acts as if it's on the
-    remote side of any relation, and it automatically triggers events when
-    responses are sent.
-    """
-
-    @property
-    def app(self):
-        """The remote application."""
-        return self._provider.harness.charm.app
-
-    @property
-    def units(self):
-        """The remote units."""
-        return [self._provider.harness.charm.unit]
+    def provide_ingress_requirements(self, relation: Relation, data: ProviderApplicationData):
+        with self.remote_context(self.relation):
+            super().publish_url(relation, data)
+        self.harness._charm.on.ingress_per_unit_relation_changed.emit(self.relation)
 
 
 class MockIPURequirer(MockRemoteIPUMixin, IngressPerUnitRequirer):
@@ -214,9 +167,9 @@ class MockIPURequirer(MockRemoteIPUMixin, IngressPerUnitRequirer):
         with self.remote_context(self.relation):
             return super().urls
 
-    def request(self, *, host: str = None, port: int):
+    def provide_ingress_requirements(self, *, host: str = None, port: int):
         with self.remote_context(self.relation):
-            super().request(host=host, port=port)
+            super().provide_ingress_requirements(host=host, port=port)
         self.harness._charm.on.ingress_per_unit_relation_changed.emit(self.relation)
 
 
