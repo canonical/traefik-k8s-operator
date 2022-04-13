@@ -260,6 +260,10 @@ class TraefikIngressCharm(CharmBase):
         """A traefik_route charm has published some ingress data."""
         self._process_ingress_relation(event.relation)
 
+        # go to active if we're in maintenance
+        if isinstance(self.unit.status, MaintenanceStatus):
+            self.unit.status = ActiveStatus()
+
     def _process_ingress_relation(self, relation: Relation):
         # There's a chance that we're processing a relation event which was deferred until after
         # the relation was broken. Select the right per_app/per_unit provider and check it is ready
