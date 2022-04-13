@@ -7,7 +7,7 @@
 import enum
 import json
 import logging
-from typing import Optional, Tuple
+from typing import Tuple
 
 import yaml
 from charms.observability_libs.v0.kubernetes_service_patch import KubernetesServicePatch
@@ -42,7 +42,6 @@ from ops.model import (
     MaintenanceStatus,
     ModelError,
     Relation,
-    Unit,
     WaitingStatus,
 )
 from ops.pebble import APIError, PathError
