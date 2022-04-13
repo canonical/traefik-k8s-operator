@@ -10,14 +10,17 @@ import logging
 from typing import Optional, Tuple
 
 import yaml
-from charms.observability_libs.v0.kubernetes_service_patch import \
-    KubernetesServicePatch
+from charms.observability_libs.v0.kubernetes_service_patch import KubernetesServicePatch
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 from charms.traefik_k8s.v0.ingress import IngressPerAppProvider
 from charms.traefik_k8s.v0.ingress_per_unit import (
     DataValidationError,
     IngressPerUnitProvider,
     RequirerData,
+)
+from charms.traefik_route_k8s.v0.traefik_route import (
+    TraefikRouteProvider,
+    TraefikRouteRequirerReadyEvent,
 )
 from deepmerge import always_merger
 from lightkube import Client
@@ -43,10 +46,6 @@ from ops.model import (
     WaitingStatus,
 )
 from ops.pebble import APIError, PathError
-
-from charms.traefik_route_k8s.v0.traefik_route import (
-    TraefikRouteProvider, TraefikRouteRequirerReadyEvent
-)
 
 logger = logging.getLogger(__name__)
 
@@ -77,8 +76,7 @@ class TraefikIngressCharm(CharmBase):
     def __init__(self, *args):
         super().__init__(*args)
 
-        self._stored.set_default(current_external_host=None,
-                                 current_routing_mode=None)
+        self._stored.set_default(current_external_host=None, current_routing_mode=None)
 
         self.container = self.unit.get_container(_TRAEFIK_CONTAINER_NAME)
 
@@ -92,8 +90,7 @@ class TraefikIngressCharm(CharmBase):
             self,
             jobs=[
                 {
-                    "static_configs": [
-                        {"targets": [f"*:{self._diagnostics_port}"]}],
+                    "static_configs": [{"targets": [f"*:{self._diagnostics_port}"]}],
                 },
             ],
         )
@@ -102,33 +99,24 @@ class TraefikIngressCharm(CharmBase):
         self.ingress_per_unit = IngressPerUnitProvider(charm=self)
         self.traefik_route = TraefikRouteProvider(charm=self)
 
-        self.framework.observe(self.on.traefik_pebble_ready,
-                               self._on_traefik_pebble_ready)
+        self.framework.observe(self.on.traefik_pebble_ready, self._on_traefik_pebble_ready)
         self.framework.observe(self.on.start, self._on_start)
         self.framework.observe(self.on.update_status, self._on_update_status)
         self.framework.observe(self.on.config_changed, self._on_config_changed)
 
-        self.framework.observe(self.ingress_per_app.on.request,
-                               self._handle_ingress_request)
-        self.framework.observe(self.ingress_per_app.on.failed,
-                               self._handle_ingress_failure)
-        self.framework.observe(self.ingress_per_app.on.broken,
-                               self._handle_ingress_broken)
+        self.framework.observe(self.ingress_per_app.on.request, self._handle_ingress_request)
+        self.framework.observe(self.ingress_per_app.on.failed, self._handle_ingress_failure)
+        self.framework.observe(self.ingress_per_app.on.broken, self._handle_ingress_broken)
 
-        self.framework.observe(self.ingress_per_unit.on.ready,
-                               self._handle_ingress_request)
-        self.framework.observe(self.ingress_per_unit.on.failed,
-                               self._handle_ingress_failure)
-        self.framework.observe(self.ingress_per_unit.on.broken,
-                               self._handle_ingress_broken)
+        self.framework.observe(self.ingress_per_unit.on.ready, self._handle_ingress_request)
+        self.framework.observe(self.ingress_per_unit.on.failed, self._handle_ingress_failure)
+        self.framework.observe(self.ingress_per_unit.on.broken, self._handle_ingress_broken)
 
-        self.framework.observe(self.traefik_route.on.ready,
-                               self._handle_traefik_route_request)
+        self.framework.observe(self.traefik_route.on.ready, self._handle_traefik_route_ready)
 
         # Action handlers
         self.framework.observe(
-            self.on.show_proxied_endpoints_action,
-            self._on_show_proxied_endpoints
+            self.on.show_proxied_endpoints_action, self._on_show_proxied_endpoints
         )
 
     def _on_show_proxied_endpoints(self, event: ActionEvent):
@@ -154,11 +142,9 @@ class TraefikIngressCharm(CharmBase):
         # we start traefik we clean up all Juju-generated config files to avoid spurious
         # routes.
         try:
-            for file in self.container.list_files(path=_CONFIG_DIRECTORY,
-                                                  pattern="juju_*.yaml"):
+            for file in self.container.list_files(path=_CONFIG_DIRECTORY, pattern="juju_*.yaml"):
                 self.container.remove_path(file.path)
-                logger.debug("Deleted orphaned ingress configuration file: %s",
-                             file.path)
+                logger.debug("Deleted orphaned ingress configuration file: %s", file.path)
         except (FileNotFoundError, APIError):
             pass
 
@@ -192,8 +178,7 @@ class TraefikIngressCharm(CharmBase):
             }
         )
 
-        self.container.push("/etc/traefik/traefik.yaml", basic_configurations,
-                            make_dirs=True)
+        self.container.push("/etc/traefik/traefik.yaml", basic_configurations, make_dirs=True)
         self.container.make_dir(_CONFIG_DIRECTORY, make_parents=True)
         self._restart_traefik()
         self._process_status_and_configurations()
@@ -211,8 +196,8 @@ class TraefikIngressCharm(CharmBase):
         new_routing_mode = self.config["routing_mode"]
 
         if (
-                self._stored.current_external_host != new_external_host
-                or self._stored.current_routing_mode != new_routing_mode
+            self._stored.current_external_host != new_external_host
+            or self._stored.current_routing_mode != new_routing_mode
         ):
             self._stored.current_external_host = new_external_host
             self._stored.current_routing_mode = new_routing_mode
@@ -225,8 +210,7 @@ class TraefikIngressCharm(CharmBase):
         except ValueError:
             self.unit.status = MaintenanceStatus("resetting ingress relations")
             self._wipe_ingress_for_all_relations()
-            self.unit.status = BlockedStatus(
-                f"invalid routing mode: {routing_mode}; see logs.")
+            self.unit.status = BlockedStatus(f"invalid routing mode: {routing_mode}; see logs.")
 
             logger.error(
                 "'%s' is not a valid routing_mode value; valid values are: %s",
@@ -242,8 +226,7 @@ class TraefikIngressCharm(CharmBase):
             return
 
         if not self._is_traefik_service_running():
-            self.unit.status = WaitingStatus(
-                f"waiting for service: '{_TRAEFIK_SERVICE_NAME}'")
+            self.unit.status = WaitingStatus(f"waiting for service: '{_TRAEFIK_SERVICE_NAME}'")
             return
 
         self.unit.status = MaintenanceStatus("updating ingress configurations")
@@ -254,10 +237,8 @@ class TraefikIngressCharm(CharmBase):
         if isinstance(self.unit.status, MaintenanceStatus):
             self.unit.status = ActiveStatus()
         else:
-            self.unit.status = BlockedStatus(
-                "setup of some ingress relation failed")
-            logger.error(
-                "The setup of some ingress relation failed, see previous logs")
+            self.unit.status = BlockedStatus("setup of some ingress relation failed")
+            logger.error("The setup of some ingress relation failed, see previous logs")
 
     def _handle_ingress_request(self, event: RelationEvent):
         if not self._external_host:
@@ -267,8 +248,7 @@ class TraefikIngressCharm(CharmBase):
             return
 
         if not self._is_traefik_service_running():
-            self.unit.status = WaitingStatus(
-                f"waiting for service: '{_TRAEFIK_SERVICE_NAME}'")
+            self.unit.status = WaitingStatus(f"waiting for service: '{_TRAEFIK_SERVICE_NAME}'")
             event.defer()
             return
 
@@ -277,7 +257,7 @@ class TraefikIngressCharm(CharmBase):
         if isinstance(self.unit.status, MaintenanceStatus):
             self.unit.status = ActiveStatus()
 
-    def _handle_traefik_route_request(self, event: TraefikRouteRequirerReadyEvent):
+    def _handle_traefik_route_ready(self, event: TraefikRouteRequirerReadyEvent):
         """A traefik_route charm has published some ingress data."""
         self._process_ingress_relation(event.relation)
 
@@ -306,8 +286,7 @@ class TraefikIngressCharm(CharmBase):
             return
 
         rel = f"{relation.name}:{relation.id}"
-        self.unit.status = MaintenanceStatus(
-            f"updating ingress configuration for '{rel}'")
+        self.unit.status = MaintenanceStatus(f"updating ingress configuration for '{rel}'")
         logger.debug("Updating ingress for relation '%s'", rel)
 
         # TODO: once also IngressPerApp is SDI-free,
@@ -326,7 +305,7 @@ class TraefikIngressCharm(CharmBase):
     def _provide_routed_ingress(self, relation: Relation):
         """Provide ingress to a unit related through TraefikRoute."""
         if not self.traefik_route.is_ready(relation):
-            logger.info(f'TR not ready on {relation}')
+            logger.info(f"TR not ready on {relation}")
             return
         config = self.traefik_route.get_config(relation)
         self._push_configurations(relation, config)
@@ -377,9 +356,7 @@ class TraefikIngressCharm(CharmBase):
         else:
             self._wipe_ingress_for_relation(relation)
 
-    def _generate_per_unit_config(
-        self, data: "RequirerData"
-    ) -> Tuple[dict, str]:
+    def _generate_per_unit_config(self, data: "RequirerData") -> Tuple[dict, str]:
         """Generate a config dict for a given unit for IngressPerUnit."""
         config = {"http": {"routers": {}, "services": {}}}
         name = data["name"].replace("/", "-")
@@ -407,8 +384,7 @@ class TraefikIngressCharm(CharmBase):
         return config, unit_url
 
     # todo reuse types from TraefikRoute
-    def _generate_per_app_config(self, request, gateway_address) -> Tuple[
-        dict, str]:
+    def _generate_per_app_config(self, request, gateway_address) -> Tuple[dict, str]:
         prefix = f"{request.model}-{request.app_name}"
 
         if self._routing_mode == _RoutingMode.path:
@@ -433,8 +409,7 @@ class TraefikIngressCharm(CharmBase):
                 "services": {
                     traefik_service_name: {
                         "loadBalancer": {
-                            "servers": [{
-                                            "url": f"http://{request.host}:{request.port}"}]
+                            "servers": [{"url": f"http://{request.host}:{request.port}"}]
                         }
                     }
                 },
@@ -449,8 +424,7 @@ class TraefikIngressCharm(CharmBase):
 
     def _handle_ingress_broken(self, event: RelationEvent):
         if not self._is_traefik_service_running():
-            self.unit.status = WaitingStatus(
-                f"service '{_TRAEFIK_CONTAINER_NAME}' not ready yet")
+            self.unit.status = WaitingStatus(f"service '{_TRAEFIK_CONTAINER_NAME}' not ready yet")
             event.defer()
             return
 
@@ -459,13 +433,11 @@ class TraefikIngressCharm(CharmBase):
         self.unit.status = ActiveStatus()
 
     def _wipe_ingress_for_all_relations(self):
-        for relation in self.model.relations["ingress"] + self.model.relations[
-            "ingress-per-unit"]:
+        for relation in self.model.relations["ingress"] + self.model.relations["ingress-per-unit"]:
             self._wipe_ingress_for_relation(relation)
 
     def _wipe_ingress_for_relation(self, relation: Relation):
-        logger.debug(
-            f"Wiping the ingress setup for the '{relation.name}:{relation.id}' relation")
+        logger.debug(f"Wiping the ingress setup for the '{relation.name}:{relation.id}' relation")
 
         # Delete configuration files for the relation. In case of Traefik pod
         # churns, and depending on the event ordering, we might be executing this
@@ -505,8 +477,7 @@ class TraefikIngressCharm(CharmBase):
             # FIXME We cannot check by looking got the _TRAEFIK_SERVICE_NAME in
             # `self.traefik_container.get_services()` because it would wrongly fail
             # in the test Harness, see https://github.com/canonical/operator/issues/694
-            return self.container.get_service(
-                _TRAEFIK_SERVICE_NAME).is_running()
+            return self.container.get_service(_TRAEFIK_SERVICE_NAME).is_running()
         except ModelError:
             return False
 
@@ -526,12 +497,9 @@ class TraefikIngressCharm(CharmBase):
 
         current_pebble_layer = self.container.get_plan().to_dict()
 
-        if _TRAEFIK_SERVICE_NAME not in current_pebble_layer.get("services",
-                                                                 {}):
-            self.unit.status = MaintenanceStatus(
-                f"creating the '{_TRAEFIK_SERVICE_NAME}' service")
-            self.container.add_layer(_TRAEFIK_LAYER_NAME, updated_pebble_layer,
-                                     combine=True)
+        if _TRAEFIK_SERVICE_NAME not in current_pebble_layer.get("services", {}):
+            self.unit.status = MaintenanceStatus(f"creating the '{_TRAEFIK_SERVICE_NAME}' service")
+            self.container.add_layer(_TRAEFIK_LAYER_NAME, updated_pebble_layer, combine=True)
 
         self.container.replan()
 
@@ -558,8 +526,7 @@ class TraefikIngressCharm(CharmBase):
             if external_hostname := self.model.config["external_hostname"]:
                 return external_hostname
 
-        return _get_loadbalancer_status(namespace=self.model.name,
-                                        service_name=self.app.name)
+        return _get_loadbalancer_status(namespace=self.model.name, service_name=self.app.name)
 
     @property
     def _routing_mode(self) -> _RoutingMode:
@@ -572,8 +539,7 @@ class TraefikIngressCharm(CharmBase):
 
 def _get_loadbalancer_status(namespace: str, service_name: str):
     client = Client()
-    traefik_service = client.get(Service, name=service_name,
-                                 namespace=namespace)
+    traefik_service = client.get(Service, name=service_name, namespace=namespace)
 
     if status := traefik_service.status:
         if load_balancer_status := status.loadBalancer:

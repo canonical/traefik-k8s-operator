@@ -44,6 +44,7 @@ class SomeCharm(CharmBase):
 ```
 """
 import logging
+from typing import Optional
 
 import yaml
 from ops.charm import CharmBase, RelationEvent, CharmEvents
@@ -119,15 +120,15 @@ class TraefikRouteProvider(Object):
             self.on.ready.emit(event.relation)
 
     @staticmethod
-    def is_ready(relation: Relation):
+    def is_ready(relation: Relation) -> bool:
         """Whether TraefikRoute is ready on this relation: i.e. the remote app shared the config."""
         return 'config' in relation.data[relation.app]
 
     @staticmethod
-    def get_config(relation: Relation):
+    def get_config(relation: Relation) -> Optional[str]:
         """Retrieve the config published by the remote application."""
         # todo validate this config
-        return relation.data[relation.app]['config']
+        return relation.data[relation.app].get('config')
 
 
 class TraefikRouteRequirer(Object):
@@ -154,7 +155,7 @@ class TraefikRouteRequirer(Object):
         self._charm = charm
         self._relation = relation
 
-    def is_ready(self):
+    def is_ready(self) -> bool:
         """Is the TraefikRouteRequirer ready to submit data to Traefik?"""
         return self._relation is not None
 
