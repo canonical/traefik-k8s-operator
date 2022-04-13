@@ -304,7 +304,7 @@ class TraefikIngressCharm(CharmBase):
     def _provide_routed_ingress(self, relation: Relation):
         """Provide ingress to a unit related through TraefikRoute."""
         if not self.traefik_route.is_ready(relation):
-            logger.info(f"TR not ready on {relation}")
+            logger.info("traefik-route not ready on %s", relation)
             return
         config = self.traefik_route.get_config(relation)
         self._push_configurations(relation, config)
