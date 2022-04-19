@@ -87,7 +87,7 @@ def test_ingress_unit_provider_supported_versions_shim(provider, requirer, harne
 
 def test_ingress_unit_provider_request(provider, requirer, harness):
     relation = requirer.relate()
-    requirer.request(port=80)
+    requirer.provide_ingress_requirements(port=80)
     assert provider.is_available(relation)
     assert provider.is_ready(relation)
     assert not provider.is_failed(relation)
@@ -96,27 +96,32 @@ def test_ingress_unit_provider_request(provider, requirer, harness):
     assert not requirer.is_failed(relation)
 
 
-def test_ingress_unit_provider_request_response_nonleader(provider, requirer, harness):
+@pytest.mark.parametrize("port, host", ((80, "1.1.1.1"), (81, "10.1.10.1")))
+def test_ingress_unit_provider_request_response_nonleader(provider, requirer, harness, port, host):
+    provider: IngressPerUnitProvider
     relation = requirer.relate()
-    requirer.request(port=80)
-    request = provider.get_request(relation)
-    assert request.units[0] is requirer.charm.unit
-    assert request.app_name == "ingress-per-unit-remote"
-    # fails because unit isn't leader
+    requirer.provide_ingress_requirements(port=port, host=host)
+
+    unit_data = provider.get_data(relation, requirer.charm.unit)
+    assert unit_data["model"] == requirer.charm.model.name
+    assert unit_data["name"] == requirer.charm.unit.name
+    assert unit_data["host"] == host
+    assert unit_data["port"] == port
+
+    # fail because unit isn't leader
     with pytest.raises(RelationPermissionError):
-        request.respond(requirer.charm.unit, "http://url/")
+        provider.publish_url(relation, unit_data["name"], "http://url/")
 
 
-def test_ingress_unit_provider_request_response(provider, requirer, harness):
+@pytest.mark.parametrize("url", ("http://url/", "http://url2/"))
+def test_ingress_unit_provider_request_response(provider, requirer, harness, url):
     relation = requirer.relate()
     harness.set_leader(True)
-    requirer.request(port=80)
-    request = provider.get_request(relation)
-    assert request.units[0] is requirer.charm.unit
-    assert request.app_name == "ingress-per-unit-remote"
-    request.respond(requirer.charm.unit, "http://url/")
+    requirer.provide_ingress_requirements(port=80)
+
+    provider.publish_url(relation, requirer.unit.name, url)
     assert requirer.is_available(relation)
     assert requirer.is_ready(relation)
     assert not requirer.is_failed(relation)
-    assert requirer.urls == {"ingress-per-unit-remote/0": "http://url/"}
-    assert requirer.url == "http://url/"
+    assert requirer.urls == {"ingress-per-unit-remote/0": url}
+    assert requirer.url == url
