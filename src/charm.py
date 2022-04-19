@@ -7,7 +7,7 @@
 import enum
 import json
 import logging
-from typing import Optional, Tuple
+from typing import Tuple
 
 import yaml
 from charms.observability_libs.v0.kubernetes_service_patch import KubernetesServicePatch
@@ -17,6 +17,10 @@ from charms.traefik_k8s.v0.ingress_per_unit import (
     DataValidationError,
     IngressPerUnitProvider,
     RequirerData,
+)
+from charms.traefik_route_k8s.v0.traefik_route import (
+    TraefikRouteProvider,
+    TraefikRouteRequirerReadyEvent,
 )
 from deepmerge import always_merger
 from lightkube import Client
@@ -38,13 +42,11 @@ from ops.model import (
     MaintenanceStatus,
     ModelError,
     Relation,
-    Unit,
     WaitingStatus,
 )
 from ops.pebble import APIError, PathError
 
 logger = logging.getLogger(__name__)
-
 
 _TRAEFIK_CONTAINER_NAME = _TRAEFIK_LAYER_NAME = _TRAEFIK_SERVICE_NAME = "traefik"
 # We watch the parent folder of where we store the configuration files,
@@ -60,6 +62,7 @@ class _RoutingMode(enum.Enum):
 class _IngressRelationType(enum.Enum):
     per_app = "per_app"
     per_unit = "per_unit"
+    routed = "routed"
 
 
 class TraefikIngressCharm(CharmBase):
@@ -93,6 +96,7 @@ class TraefikIngressCharm(CharmBase):
 
         self.ingress_per_app = IngressPerAppProvider(charm=self)
         self.ingress_per_unit = IngressPerUnitProvider(charm=self)
+        self.traefik_route = TraefikRouteProvider(charm=self)
 
         self.framework.observe(self.on.traefik_pebble_ready, self._on_traefik_pebble_ready)
         self.framework.observe(self.on.start, self._on_start)
@@ -106,10 +110,8 @@ class TraefikIngressCharm(CharmBase):
         self.framework.observe(self.ingress_per_unit.on.ready, self._handle_ingress_request)
         self.framework.observe(self.ingress_per_unit.on.failed, self._handle_ingress_failure)
         self.framework.observe(self.ingress_per_unit.on.broken, self._handle_ingress_broken)
-        # Work around SDI not handling scale-down
-        self.framework.observe(
-            self.on["ingress-per-unit"].relation_departed, self._handle_ingress_request
-        )
+
+        self.framework.observe(self.traefik_route.on.ready, self._handle_traefik_route_ready)
 
         # Action handlers
         self.framework.observe(
@@ -157,7 +159,7 @@ class TraefikIngressCharm(CharmBase):
                 },
                 # We always start the Prometheus endpoint for simplicity
                 # TODO: Generate this file in the dynamic configuration folder when the
-                # metrics-endpoint relation is established?
+                #  metrics-endpoint relation is established?
                 "metrics": {
                     "prometheus": {
                         "addRoutersLabels": True,
@@ -254,6 +256,14 @@ class TraefikIngressCharm(CharmBase):
         if isinstance(self.unit.status, MaintenanceStatus):
             self.unit.status = ActiveStatus()
 
+    def _handle_traefik_route_ready(self, event: TraefikRouteRequirerReadyEvent):
+        """A traefik_route charm has published some ingress data."""
+        self._process_ingress_relation(event.relation)
+
+        # go to active if we're in maintenance
+        if isinstance(self.unit.status, MaintenanceStatus):
+            self.unit.status = ActiveStatus()
+
     def _process_ingress_relation(self, relation: Relation):
         # There's a chance that we're processing a relation event which was deferred until after
         # the relation was broken. Select the right per_app/per_unit provider and check it is ready
@@ -290,9 +300,18 @@ class TraefikIngressCharm(CharmBase):
             if self.unit.is_leader():
                 request.respond(app_url)
             self._push_configurations(relation, config)
-
+        elif provider is self.traefik_route:
+            self._provide_routed_ingress(relation)
         else:
             self._provide_ingress_per_unit(relation)
+
+    def _provide_routed_ingress(self, relation: Relation):
+        """Provide ingress to a unit related through TraefikRoute."""
+        if not self.traefik_route.is_ready(relation):
+            logger.info("traefik-route not ready on %s", relation)
+            return
+        config = self.traefik_route.get_config(relation)
+        self._push_configurations(relation, config)
 
     def _provide_ingress_per_unit(self, relation: Relation):
         # to avoid long-gone units from lingering in the ingress, we wipe it
@@ -318,7 +337,7 @@ class TraefikIngressCharm(CharmBase):
                 # but if the data is invalid...
                 logger.error(f"invalid data shared through {relation} by {unit}... Error: {e}.")
                 continue
-            unit_config, unit_url = self._generate_per_unit_config(unit, data)
+            unit_config, unit_url = self._generate_per_unit_config(data)
 
             if unit_url:
                 if self.unit.is_leader():
@@ -332,7 +351,7 @@ class TraefikIngressCharm(CharmBase):
         # relation. Traefik is fine with it :-)
         self._push_configurations(relation, config)
 
-    def _push_configurations(self, relation: Relation, config: str):
+    def _push_configurations(self, relation: Relation, config: dict):
         if config:
             config_filename = f"{_CONFIG_DIRECTORY}/{self._relation_config_file(relation)}"
             self.container.push(config_filename, yaml.dump(config), make_dirs=True)
@@ -340,9 +359,7 @@ class TraefikIngressCharm(CharmBase):
         else:
             self._wipe_ingress_for_relation(relation)
 
-    def _generate_per_unit_config(
-        self, unit: Unit, data: "RequirerData"
-    ) -> Tuple[Optional[dict], Optional[str]]:
+    def _generate_per_unit_config(self, data: "RequirerData") -> Tuple[dict, str]:
         """Generate a config dict for a given unit for IngressPerUnit."""
         config = {"http": {"routers": {}, "services": {}}}
         name = data["name"].replace("/", "-")
@@ -364,13 +381,12 @@ class TraefikIngressCharm(CharmBase):
             "service": traefik_service_name,
             "entryPoints": ["web"],
         }
-
         config["http"]["services"][traefik_service_name] = {
             "loadBalancer": {"servers": [{"url": f"http://{data['host']}:{data['port']}"}]}
         }
-
         return config, unit_url
 
+    # todo reuse types from TraefikRoute
     def _generate_per_app_config(self, request, gateway_address) -> Tuple[dict, str]:
         prefix = f"{request.model}-{request.app_name}"
 
@@ -494,8 +510,10 @@ class TraefikIngressCharm(CharmBase):
         """Returns the correct IngressProvider based on a relation."""
         if _get_relation_type(relation) == _IngressRelationType.per_app:
             return self.ingress_per_app
-        else:
+        elif _get_relation_type(relation) == _IngressRelationType.per_unit:
             return self.ingress_per_unit
+        else:
+            return self.traefik_route
 
     @property
     def _external_host(self):
@@ -538,8 +556,10 @@ def _get_loadbalancer_status(namespace: str, service_name: str):
 def _get_relation_type(relation: Relation) -> _IngressRelationType:
     if relation.name == "ingress":
         return _IngressRelationType.per_app
-    else:
+    elif relation.name == "ingress-per-unit":
         return _IngressRelationType.per_unit
+    else:  # traefik-route
+        return _IngressRelationType.routed
 
 
 if __name__ == "__main__":
