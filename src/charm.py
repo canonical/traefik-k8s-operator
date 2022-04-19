@@ -292,7 +292,7 @@ class TraefikIngressCharm(CharmBase):
         self.unit.status = MaintenanceStatus(f"updating ingress configuration for '{rel}'")
         logger.debug("Updating ingress for relation '%s'", rel)
 
-        # TODO: once also IngressPerApp is SDI-free,
+        # TODO: once IngressPerApp is also SDI-free,
         #  abstract the common logic here and remove this branch
         if provider is self.ingress_per_app:
             request = provider.get_request(relation)
