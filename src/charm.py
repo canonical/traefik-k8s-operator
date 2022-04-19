@@ -159,7 +159,7 @@ class TraefikIngressCharm(CharmBase):
                 },
                 # We always start the Prometheus endpoint for simplicity
                 # TODO: Generate this file in the dynamic configuration folder when the
-                #  metrics-endpoint relation is established?
+                # metrics-endpoint relation is established?
                 "metrics": {
                     "prometheus": {
                         "addRoutersLabels": True,
@@ -260,7 +260,6 @@ class TraefikIngressCharm(CharmBase):
         """A traefik_route charm has published some ingress data."""
         self._process_ingress_relation(event.relation)
 
-        # go to active if we're in maintenance
         if isinstance(self.unit.status, MaintenanceStatus):
             self.unit.status = ActiveStatus()
 
