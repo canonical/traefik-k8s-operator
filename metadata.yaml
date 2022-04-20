@@ -46,3 +46,8 @@ provides:
     description: |
       Exposes the Prometheus metrics endpoint providing telemetry about the
       Traefik instance
+  traefik-route:
+    interface: traefik_route
+    description: |
+      Provides endpoint for a traefik-route charm to sit between Traefik and a
+      charm in need of ingress, configuring the relation on a per-unit basis.
