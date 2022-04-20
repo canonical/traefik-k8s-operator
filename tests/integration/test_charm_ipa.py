@@ -6,6 +6,7 @@ import logging
 
 import pytest
 import yaml
+from charms.traefik_k8s.v0.ingress import INGRESS_SCHEMA
 from charms.traefik_k8s.v0.ingress_per_unit import (
     INGRESS_REQUIRES_UNIT_SCHEMA,
     _validate_data,
@@ -16,10 +17,12 @@ from tests.integration.conftest import REQUIRER_MOCK_CHARM, TRAEFIK_CHARM
 from tests.integration.helpers import (
     APP_NAME,
     RESOURCES,
+    assert_app_databag_equals,
     assert_status_reached,
     fast_forward,
 )
 
+INGRESS_PROVIDES_APP_SCHEMA = INGRESS_SCHEMA["v1"]["provides"]["app"]
 logger = logging.getLogger(__name__)
 REQUIRER_MOCK_APP_NAME = "ingress-requirer-mock"
 HOSTNAME = "foo.bar"
@@ -88,14 +91,6 @@ async def test_requirer_app_databag(ops_test: OpsTest):
     assert ingress_data == expected_requirer_unit_data
 
 
-def assert_requirer_app_databag_matches(raw, remote_unit, expected):
-    requirer_app_databag = yaml.safe_load(raw)[remote_unit]["relation-info"][0]["application-data"]
-    ingress_data = yaml.safe_load(requirer_app_databag["data"])
-
-    # todo: add validation once IPA too is SDI-free
-    assert ingress_data == expected
-
-
 async def test_provider_app_databag(ops_test: OpsTest):
     remote_unit = REQUIRER_MOCK_APP_NAME + "/0"
     _, info, _ = await ops_test.juju("show-unit", remote_unit)
@@ -105,14 +100,16 @@ async def test_provider_app_databag(ops_test: OpsTest):
         "ingress": {"url": f"http://{HOSTNAME}:{PORT}/{model_name}-{REQUIRER_MOCK_APP_NAME}"}
     }
 
-    assert_requirer_app_databag_matches(info, remote_unit, expected_requirer_app_data)
+    assert_app_databag_equals(
+        info, remote_unit, expected_requirer_app_data, INGRESS_PROVIDES_APP_SCHEMA
+    )
 
 
 async def test_scale_up_requirer(ops_test: OpsTest):
     # add two units of requirer mock
     await ops_test.juju("add-unit", REQUIRER_MOCK_APP_NAME, "-n2")
-    await ops_test.model.wait_for_idle(
-        [REQUIRER_MOCK_APP_NAME], status="active", wait_for_exact_units=3
+    await assert_status_reached(
+        apps=[REQUIRER_MOCK_APP_NAME], status="active", wait_for_exact_units=3
     )
 
 
@@ -125,14 +122,16 @@ async def test_traefik_relation_data_after_upscale(ops_test: OpsTest):
         "ingress": {"url": f"http://{HOSTNAME}:{PORT}/{model_name}-{REQUIRER_MOCK_APP_NAME}"}
     }
 
-    assert_requirer_app_databag_matches(info, remote_unit, expected_requirer_app_data)
+    assert_app_databag_equals(
+        info, remote_unit, expected_requirer_app_data, INGRESS_PROVIDES_APP_SCHEMA
+    )
 
 
 async def test_scale_down_requirer(ops_test: OpsTest):
     # remove one unit; there should be two left
     await ops_test.juju("remove-unit", REQUIRER_MOCK_APP_NAME, "--num-units", "1")
-    await ops_test.model.wait_for_idle(
-        [REQUIRER_MOCK_APP_NAME], status="active", wait_for_exact_units=2
+    await assert_status_reached(
+        ops_test, apps=[REQUIRER_MOCK_APP_NAME], status="active", wait_for_exact_units=2
     )
 
 
@@ -145,12 +144,18 @@ async def test_traefik_relation_data_after_downscale(ops_test: OpsTest):
         "ingress": {"url": f"http://{HOSTNAME}:{PORT}/{model_name}-{REQUIRER_MOCK_APP_NAME}"}
     }
 
-    assert_requirer_app_databag_matches(info, remote_unit, expected_requirer_app_data)
+    assert_app_databag_equals(
+        info, remote_unit, expected_requirer_app_data, INGRESS_PROVIDES_APP_SCHEMA
+    )
 
 
 # cleanup before closing this test module: unrelate applications, scale requirer
 # mock back down to 1 and check final status
 async def test_reset_to_initial_state(ops_test):
+    await ops_test.juju("remove-unit", REQUIRER_MOCK_APP_NAME, "--num-units", "1")
+    async with fast_forward(ops_test):
+        await assert_status_reached(ops_test, "active", apps=[REQUIRER_MOCK_APP_NAME])
+
     await ops_test.juju(
         "remove-relation", f"{REQUIRER_MOCK_APP_NAME}:ingress-per-app", f"{APP_NAME}:ingress"
     )
@@ -161,8 +166,3 @@ async def test_reset_to_initial_state(ops_test):
             assert_status_reached(ops_test, "blocked", apps=[REQUIRER_MOCK_APP_NAME]),
             assert_status_reached(ops_test, "active", apps=[APP_NAME]),
         )
-
-    await ops_test.juju("remove-unit", REQUIRER_MOCK_APP_NAME, "--num-units", "1")
-    await ops_test.model.wait_for_idle(
-        [REQUIRER_MOCK_APP_NAME], status="blocked", raise_on_blocked=False, wait_for_exact_units=1
-    )

@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Sequence
 
 import yaml
+from charms.traefik_k8s.v0.ingress_per_unit import _validate_data
 from pytest_operator.plugin import OpsTest
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
@@ -31,6 +32,7 @@ async def assert_status_reached(
     apps: Sequence[str] = (APP_NAME,),
     raise_on_blocked=True,
     timeout=600,
+    wait_for_exact_units=-1,
 ):
     """Wait for all `apps` to reach the given status."""
     print(f"waiting for {apps} to reach {status}...")
@@ -40,7 +42,19 @@ async def assert_status_reached(
         status=status,
         timeout=timeout,
         raise_on_blocked=False if status == "blocked" else raise_on_blocked,
+        wait_for_exact_units=wait_for_exact_units,
     )
 
     for app in apps:
         assert ops_test.model.applications[app].units[0].workload_status == status
+
+
+def assert_app_databag_equals(raw, unit, expected, schema=None):
+    databag = yaml.safe_load(raw)[unit]["relation-info"][0]["application-data"]
+
+    if schema:
+        # let's ensure it matches our own schema
+        _validate_data(expected, schema)
+
+    ingress_data = yaml.safe_load(databag["data"])
+    assert ingress_data == expected
