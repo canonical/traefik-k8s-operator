@@ -108,8 +108,12 @@ async def test_provider_app_databag(ops_test: OpsTest):
 async def test_scale_up_requirer(ops_test: OpsTest):
     # add two units of requirer mock
     await ops_test.juju("add-unit", REQUIRER_MOCK_APP_NAME, "-n2")
-    await assert_status_reached(ops_test,
-        apps=[REQUIRER_MOCK_APP_NAME], status="active", raise_on_blocked=False, wait_for_exact_units=3
+    await assert_status_reached(
+        ops_test,
+        apps=[REQUIRER_MOCK_APP_NAME],
+        status="active",
+        raise_on_blocked=False,
+        wait_for_exact_units=3,
     )
 
 
