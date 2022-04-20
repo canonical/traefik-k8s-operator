@@ -12,4 +12,8 @@ requires:
     ingress-per-unit:
         interface: ingress_per_unit
         limit: 1
-        optional: false
+        optional: true
+    ingress-per-app:
+        interface: ingress
+        limit: 1
+        optional: true

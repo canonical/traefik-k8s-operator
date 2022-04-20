@@ -6,6 +6,7 @@
 
 import logging
 
+from charms.traefik_k8s.v0.ingress import IngressPerAppRequirer
 from charms.traefik_k8s.v0.ingress_per_unit import IngressPerUnitRequirer
 from ops.charm import CharmBase
 from ops.main import main
@@ -19,20 +20,44 @@ class TraefikMockCharm(CharmBase):
 
     def __init__(self, *args):
         super().__init__(*args)
-        ingress = IngressPerUnitRequirer(charm=self)
         model: Model = self.model
-        ipu_relations = model.relations.get("ingress-per-unit")
 
-        if ipu_relations:
-            ipu_relation = ipu_relations[0]
-            ingress.provide_ingress_requirements(host="0.0.0.0", port=80)
-
-            if ingress.is_ready(ipu_relation):
-                self.unit.status = ActiveStatus("all good!")
-            else:
-                self.unit.status = WaitingStatus("ipu not ready yet")
+        # todo: abstract and simplify this once IPA too is SDI-free
+        if relations := model.relations.get("ingress-per-unit"):
+            self.ipu(relations)
+        elif relations := model.relations.get("ingress-per-app"):
+            self.ipa(relations)
         else:
-            self.unit.status = BlockedStatus("ipu not related")
+            self.unit.status = BlockedStatus("not related yet via ipa or ipu")
+
+    def ipu(self, relations):
+        relation = relations[0]
+        ipu_ingress = IngressPerUnitRequirer(charm=self)
+
+        ipu_ingress.provide_ingress_requirements(host="0.0.0.0", port=80)
+        self.unit.status = WaitingStatus("ipu not ready yet")
+
+        try:
+            if ipu_ingress.is_ready(relation):
+                self.unit.status = ActiveStatus("ipu all good!")
+        except Exception as e:
+            print("IPU error:", e)
+
+    def ipa(self, relations):
+        relation = relations[0]
+        ipa_ingress = IngressPerAppRequirer(charm=self, endpoint="ingress-per-app")
+        try:
+            ipa_ingress.request(host="0.0.0.0", port=80)
+            # can raise UnversionedRelation error if we're in a departed hook
+        except Exception as e:
+            print(f"error requesting ingress: {e}")
+
+        self.unit.status = WaitingStatus("ipa not ready yet")
+        try:
+            if ipa_ingress.is_ready(relation):
+                self.unit.status = ActiveStatus("ipa all good!")
+        except Exception as e:
+            print("IPA error:", e)
 
 
 if __name__ == "__main__":

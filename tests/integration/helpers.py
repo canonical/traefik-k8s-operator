@@ -30,7 +30,7 @@ async def assert_status_reached(
     status: str,
     apps: Sequence[str] = (APP_NAME,),
     raise_on_blocked=True,
-    timeout=180,
+    timeout=600,
 ):
     """Wait for all `apps` to reach the given status."""
     print(f"waiting for {apps} to reach {status}...")

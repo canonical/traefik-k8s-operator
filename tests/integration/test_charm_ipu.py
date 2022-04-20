@@ -1,11 +1,8 @@
 #!/usr/bin/env python3
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
-
-
+import asyncio
 import logging
-import shutil
-from os import unlink
 
 import pytest
 import yaml
@@ -16,12 +13,7 @@ from charms.traefik_k8s.v0.ingress_per_unit import (
 )
 from pytest_operator.plugin import OpsTest
 
-from tests.integration.helpers import (
-    APP_NAME,
-    RESOURCES,
-    assert_status_reached,
-    fast_forward,
-)
+from tests.integration.helpers import APP_NAME, assert_status_reached, fast_forward
 
 logger = logging.getLogger(__name__)
 REQUIRER_MOCK_APP_NAME = "ingress-requirer-mock"
@@ -29,44 +21,13 @@ HOSTNAME = "foo.bar"
 PORT = 80
 
 
-@pytest.mark.abort_on_fail
-async def test_build_and_deploy_traefik(ops_test: OpsTest):
-    """Build traefik-k8s and deploy it together with a tester charm."""
-    # build and deploy charm from local source folder
-    charm = await ops_test.build_charm(".")
-    await ops_test.model.deploy(charm, resources=RESOURCES, application_name=APP_NAME)
-    await ops_test.juju("config", APP_NAME, f"external_hostname={HOSTNAME}")
-
-    async with fast_forward(ops_test):
-        await assert_status_reached(ops_test, "active")
-
-
-@pytest.fixture(scope="session", autouse=True)
-def copy_libs_to_tester_charm():
-    install_paths = []
-    for lib in ("ingress_per_unit", "ingress"):
-        library_path = f"lib/charms/traefik_k8s/v0/{lib}.py"
-        install_path = f"tests/integration/ingress-requirer-mock/{library_path}"
-        install_paths.append(install_path)
-        shutil.copyfile(library_path, install_path)
-
-    yield
-
-    # be nice and clean up
-    for install_path in install_paths:
-        unlink(install_path)
-
-
-@pytest.mark.abort_on_fail
-async def test_build_and_deploy_requirer_mock(ops_test: OpsTest):
-    """Build traefik-k8s and deploy it together with a tester charm."""
-    # build and deploy ingress-requirer-mock tester charm
-    charm = await ops_test.build_charm("./tests/integration/ingress-requirer-mock")
-    await ops_test.model.deploy(charm, application_name=REQUIRER_MOCK_APP_NAME)
-
-    async with fast_forward(ops_test):
-        # is blocked until related
-        await assert_status_reached(ops_test, "blocked", apps=[REQUIRER_MOCK_APP_NAME])
+# assume that ipa_tests have been run before this; so the status at this point is:
+# apps are deployed but not related; requirer-mock is blocked.
+async def test_initial_status(ops_test: OpsTest):
+    await asyncio.gather(
+        assert_status_reached(ops_test, "blocked", apps=[REQUIRER_MOCK_APP_NAME]),
+        assert_status_reached(ops_test, "active", apps=[APP_NAME]),
+    )
 
 
 @pytest.mark.abort_on_fail
@@ -77,8 +38,11 @@ async def test_relate(ops_test: OpsTest):
     )
 
     async with fast_forward(ops_test):
-        # now should go to active
-        await assert_status_reached(ops_test, "active", apps=[REQUIRER_MOCK_APP_NAME])
+        # now should go to active; but this might race with us checking for
+        # active --> we don't raise on blocked
+        await assert_status_reached(
+            ops_test, "active", apps=[REQUIRER_MOCK_APP_NAME], raise_on_blocked=False
+        )
 
 
 async def test_requirer_unit_databag(ops_test: OpsTest):
@@ -179,3 +143,22 @@ async def test_traefik_relation_data_after_downscale(ops_test: OpsTest):
     }
 
     assert_requirer_app_databag_matches(info, remote_unit, expected_requirer_app_data)
+
+
+# cleanup before closing this test module: unrelate applications and check final status
+async def test_unrelate_apps(ops_test):
+    await ops_test.juju(
+        "remove-relation", f"{REQUIRER_MOCK_APP_NAME}:ingress-per-unit", f"{APP_NAME}:ingress"
+    )
+
+    async with fast_forward(ops_test):
+        # wait for it to get back to blocked; verify traefik goes to active
+        await asyncio.gather(
+            assert_status_reached(ops_test, "blocked", apps=[REQUIRER_MOCK_APP_NAME]),
+            assert_status_reached(ops_test, "active", apps=[APP_NAME]),
+        )
+
+    await ops_test.juju("remove-unit", REQUIRER_MOCK_APP_NAME, "--num-units", "1")
+    await ops_test.model.wait_for_idle(
+        [REQUIRER_MOCK_APP_NAME], status="blocked", raise_on_blocked=False, wait_for_exact_units=1
+    )
