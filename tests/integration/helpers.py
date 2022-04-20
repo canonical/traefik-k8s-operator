@@ -57,4 +57,4 @@ def assert_app_databag_equals(raw, unit, expected, schema=None):
         _validate_data(expected, schema)
 
     ingress_data = yaml.safe_load(databag["data"])
-    assert ingress_data == expected
+    assert ingress_data == expected, f"{ingress_data} != {expected}"
