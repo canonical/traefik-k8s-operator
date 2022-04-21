@@ -108,6 +108,7 @@ class TraefikIngressCharm(CharmBase):
         self.framework.observe(self.ingress_per_app.on.broken, self._handle_ingress_broken)
 
         self.framework.observe(self.ingress_per_unit.on.ready, self._handle_ingress_request)
+        self.framework.observe(self.on.ingress_per_unit_relation_departed, self._handle_ingress_request)
         self.framework.observe(self.ingress_per_unit.on.failed, self._handle_ingress_failure)
         self.framework.observe(self.ingress_per_unit.on.broken, self._handle_ingress_broken)
 
