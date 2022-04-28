@@ -10,8 +10,6 @@ ingress.
 ## Getting Started
 
 To get started using the library, you just need to fetch the library using `charmcraft`.
-**Note that you also need to add the `serialized_data_interface` dependency to your
-charm's `requirements.txt`.**
 
 ```shell
 charmcraft fetch-lib charms.traefik_k8s.v0.ingress_per_unit
