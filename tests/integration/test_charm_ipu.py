@@ -150,6 +150,34 @@ async def test_traefik_relation_data_after_downscale(ops_test: OpsTest):
     )
 
 
+async def test_cycle_relation(ops_test):
+    # unrelate, re-relate, verify all goes back to normal
+
+    await ops_test.juju(
+        "remove-relation",
+        f"{REQUIRER_MOCK_APP_NAME}:ingress-per-unit",
+        f"{APP_NAME}:ingress-per-unit",
+    )
+
+    async with fast_forward(ops_test):
+        # wait for mock to get back to blocked; verify traefik goes to active
+        await asyncio.gather(
+            assert_status_reached(ops_test, "blocked", apps=[REQUIRER_MOCK_APP_NAME]),
+            assert_status_reached(ops_test, "active", apps=[APP_NAME]),
+        )
+
+    await ops_test.juju(
+        "relate", f"{REQUIRER_MOCK_APP_NAME}:ingress-per-unit", f"{APP_NAME}:ingress-per-unit"
+    )
+
+    async with fast_forward(ops_test):
+        # wait for both to return to active
+        # we don't raise on blocked to avoid races
+        await assert_status_reached(
+            ops_test, "active", raise_on_blocked=False, apps=[REQUIRER_MOCK_APP_NAME, APP_NAME]
+        ),
+
+
 # cleanup before closing this test module: unrelate applications and check final status
 async def test_reset_to_initial_state(ops_test):
     await ops_test.juju("remove-unit", REQUIRER_MOCK_APP_NAME, "--num-units", "1")
