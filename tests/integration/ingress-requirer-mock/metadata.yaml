@@ -1,0 +1,19 @@
+# Copyright 2022 pietro
+# See LICENSE file for licensing details.
+
+# For a complete list of supported options, see:
+# https://juju.is/docs/sdk/metadata-reference
+name: ingress-requirer-mock
+display-name: ingress-requirer-mock
+description: charm requesting ingress, for testing
+summary: foo
+
+requires:
+    ingress-per-unit:
+        interface: ingress_per_unit
+        limit: 1
+        optional: true
+    ingress-per-app:
+        interface: ingress
+        limit: 1
+        optional: true
