@@ -112,15 +112,15 @@ INGRESS_PROVIDES_APP_SCHEMA = {
                 "": {
                     "type": "object",
                     "properties": {
-                        # Optional key for backwards compatibility
-                        # with legacy requirers based on SDI
-                        "_supported_versions": {"type": "string"},
                         "url": {"type": "string"},
                     },
                     "required": ["url"],
                 }
             },
-        }
+        },
+        # Optional key for backwards compatibility
+        # with legacy requirers based on SDI
+        "_supported_versions": {"type": "string"},
     },
     "required": ["ingress"],
 }
@@ -374,7 +374,7 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
             return False
 
         try:
-            _, requirer_unit_data = self._fetch_relation_data(relation)
+            requirer_unit_data = self._requirer_unit_data(relation)
         except Exception:
             log.exception("Cannot fetch ingress data for the '{}' relation".format(relation))
             return False
@@ -400,7 +400,7 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
 
         try:
             # grab the data and validate it; might raise
-            _, requirer_unit_data = self._fetch_relation_data(relation)
+            requirer_unit_data = self._requirer_unit_data(relation)
         except DataValidationError as e:
             log.warning("Failed to validate relation data for {} relation: {}".format(relation, e))
             return True
@@ -483,36 +483,16 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
         """
         relation.data[self.app]["data"] = ""
 
-    def _fetch_relation_data(
-        self, relation: Relation
-    ) -> Tuple[ProviderApplicationData, RequirerUnitData]:
-        """Fetch and validate the databags.
-
-        For the provider side: the application databag.
-        For the requirer side: the unit databag.
-        """
-        this_unit = self.unit
-        this_app = self.app
+    def _requirer_unit_data(self, relation: Relation) -> RequirerUnitData:
+        """Fetch and validate the requirer's unit databag."""
 
         if not relation.app or not relation.app.name:
             # Handle edge case where remote app name can be missing, e.g.,
             # relation_broken events.
             # FIXME https://github.com/canonical/traefik-k8s-operator/issues/34
-            return {}, {}
+            return {}
 
-        provider_app_data = {}
-        # we start by looking at the provider's app databag
-        if this_unit.is_leader():
-            # only leaders can read their app's data
-            data = relation.data[this_app].get("data")
-            deserialized = {}
-            if data:
-                deserialized = yaml.safe_load(data)
-                _validate_data(deserialized, INGRESS_PROVIDES_APP_SCHEMA)
-            provider_app_data = deserialized.get("ingress", {})
-
-        # then look at the requirer's (thus remote) unit databags
-        remote_units = [unit for unit in relation.units if unit.app is not this_app]
+        remote_units = [unit for unit in relation.units if unit.app is not self.app]
 
         requirer_unit_data = {}
         for remote_unit in remote_units:
@@ -522,8 +502,28 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
                 remote_deserialized = yaml.safe_load(remote_data)
                 _validate_data(remote_deserialized, INGRESS_REQUIRES_UNIT_SCHEMA)
             requirer_unit_data[remote_unit] = remote_deserialized
+        return requirer_unit_data
 
-        return provider_app_data, requirer_unit_data
+    def _provider_app_data(self, relation: Relation) -> ProviderApplicationData:
+        """Fetch and validate the provider's app databag."""
+        if not relation.app or not relation.app.name:
+            # Handle edge case where remote app name can be missing, e.g.,
+            # relation_broken events.
+            # FIXME https://github.com/canonical/traefik-k8s-operator/issues/34
+            return {}
+
+        provider_app_data = {}
+        # we start by looking at the provider's app databag
+        if self.unit.is_leader():
+            # only leaders can read their app's data
+            data = relation.data[self.app].get("data")
+            deserialized = {}
+            if data:
+                deserialized = yaml.safe_load(data)
+                _validate_data(deserialized, INGRESS_PROVIDES_APP_SCHEMA)
+            provider_app_data = deserialized.get("ingress", {})
+
+        return provider_app_data
 
     @property
     def proxied_endpoints(self) -> dict:
@@ -548,7 +548,7 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
         results = {}
 
         for ingress_relation in self.relations:
-            provider_app_data, _ = self._fetch_relation_data(ingress_relation)
+            provider_app_data = self._provider_app_data(ingress_relation)
             results.update(provider_app_data)
 
         return results
