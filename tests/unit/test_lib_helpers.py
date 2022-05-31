@@ -5,21 +5,22 @@ import typing
 from contextlib import contextmanager
 from unittest.mock import patch
 
-from charms.traefik_k8s.v0.ingress import (
-    IngressPerAppProvider,
-    IngressPerAppRequirer,
-    RELATION_INTERFACE as IPA_RELATION_INTERFACE,
-    DEFAULT_RELATION_NAME as IPA_RELATION_NAME
-)
+from charms.traefik_k8s.v0.ingress import DEFAULT_RELATION_NAME as IPA_RELATION_NAME
+from charms.traefik_k8s.v0.ingress import RELATION_INTERFACE as IPA_RELATION_INTERFACE
+from charms.traefik_k8s.v0.ingress import IngressPerAppProvider, IngressPerAppRequirer
 from charms.traefik_k8s.v0.ingress_per_unit import (
     DEFAULT_RELATION_NAME as IPU_RELATION_NAME,
+)
+from charms.traefik_k8s.v0.ingress_per_unit import (
     RELATION_INTERFACE as IPU_RELATION_INTERFACE,
+)
+from charms.traefik_k8s.v0.ingress_per_unit import (
     IngressPerUnitProvider,
     IngressPerUnitRequirer,
     ProviderApplicationData,
 )
 from ops.charm import CharmBase, CharmEvents, CharmMeta
-from ops.model import Relation, Application, Unit
+from ops.model import Application, Relation, Unit
 
 
 class MockRemoteIPUMixin:
@@ -266,7 +267,8 @@ class MockIPAProvider(MockRemoteIPAMixin, IngressPerAppProvider):
     the remote side of any relation, and it automatically triggers events when
     responses are sent.
     """
-    ROLE = 'provides'
+
+    ROLE = "provides"
     LIMIT = None
 
     def is_ready(self, relation: Relation = None):
@@ -289,7 +291,8 @@ class MockIPARequirer(MockRemoteIPAMixin, IngressPerAppRequirer):
     the remote side of any relation, and it automatically triggers events when
     requests are sent.
     """
-    ROLE = 'requires'
+
+    ROLE = "requires"
     LIMIT = 1
 
     @property

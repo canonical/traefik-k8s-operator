@@ -5,11 +5,9 @@ from textwrap import dedent
 from unittest.mock import Mock
 
 import pytest
-from ops.model import Binding
-
-from charms.traefik_k8s.v0.ingress import IngressPerAppProvider, \
-    IngressPerAppRequirer
+from charms.traefik_k8s.v0.ingress import IngressPerAppProvider
 from ops.charm import CharmBase
+from ops.model import Binding
 from ops.testing import Harness
 from test_lib_helpers import MockIPARequirer
 
@@ -54,30 +52,31 @@ def provider(harness):
     return provider
 
 
-def test_ingress_app_provider_uninitialized(provider: IngressPerAppProvider,
-                                            requirer: MockIPARequirer):
+def test_ingress_app_provider_uninitialized(
+    provider: IngressPerAppProvider, requirer: MockIPARequirer
+):
     assert not provider.relations
     assert not provider.is_ready()
     assert not requirer.relations
     assert not requirer.is_ready()
 
 
-def test_ingress_app_provider_related(provider: IngressPerAppProvider,
-                                      requirer: MockIPARequirer):
+def test_ingress_app_provider_related(provider: IngressPerAppProvider, requirer: MockIPARequirer):
     relation = requirer.relate()
     assert not provider.is_ready(relation)
     assert not requirer.is_ready(relation)
 
 
-def test_ingress_app_provider_relate_provide(provider: IngressPerAppProvider,
-                                             requirer: MockIPARequirer, harness):
+def test_ingress_app_provider_relate_provide(
+    provider: IngressPerAppProvider, requirer: MockIPARequirer, harness
+):
     harness.set_leader(True)
     relation = requirer.relate()
-    requirer.provide_ingress_requirements(host='host', port=42)
+    requirer.provide_ingress_requirements(host="host", port=42)
     assert provider.is_ready(relation)
     assert not requirer.is_ready(relation)
 
-    provider.publish_url(relation, 'foo.com')
+    provider.publish_url(relation, "foo.com")
     assert requirer.is_ready(relation)
 
 

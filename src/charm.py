@@ -47,8 +47,8 @@ from ops.model import (
 from ops.pebble import APIError, PathError
 
 if typing.TYPE_CHECKING:
-    from charms.traefik_k8s.v0.ingress_per_unit import RequirerData as RequirerData_IPU
     from charms.traefik_k8s.v0.ingress import RequirerData as RequirerData_IPA
+    from charms.traefik_k8s.v0.ingress_per_unit import RequirerData as RequirerData_IPU
 
 logger = logging.getLogger(__name__)
 
@@ -107,8 +107,12 @@ class TraefikIngressCharm(CharmBase):
         self.framework.observe(self.on.update_status, self._on_update_status)
         self.framework.observe(self.on.config_changed, self._on_config_changed)
 
-        self.framework.observe(self.ingress_per_app.on.data_provided, self._handle_ingress_data_provided)
-        self.framework.observe(self.ingress_per_app.on.data_removed, self._handle_ingress_data_removed)
+        self.framework.observe(
+            self.ingress_per_app.on.data_provided, self._handle_ingress_data_provided
+        )
+        self.framework.observe(
+            self.ingress_per_app.on.data_removed, self._handle_ingress_data_removed
+        )
 
         self.framework.observe(self.ingress_per_unit.on.ready, self._handle_ingress_request)
         self.framework.observe(self.ingress_per_unit.on.failed, self._handle_ingress_failure)
@@ -246,7 +250,7 @@ class TraefikIngressCharm(CharmBase):
     def ready(self) -> bool:
         """Check whether we have an external host set, and traefik is running."""
         if not self._external_host:
-            self._wipe_ingress_for_all_relations() # fixme: no side-effects in prop
+            self._wipe_ingress_for_all_relations()  # fixme: no side-effects in prop
             self.unit.status = WaitingStatus("gateway address unavailable")
             return False
         if not self._is_traefik_service_running():

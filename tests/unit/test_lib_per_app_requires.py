@@ -5,11 +5,10 @@ from textwrap import dedent
 from unittest.mock import Mock
 
 import pytest
-from ops.model import Binding
-
 from charms.traefik_k8s.v0.ingress import IngressPerAppRequirer
 from ops.charm import CharmBase
 from ops.framework import StoredState
+from ops.model import Binding
 from ops.testing import Harness
 from test_lib_helpers import MockIPAProvider
 
@@ -63,9 +62,8 @@ def requirer(harness):
 
 
 def test_ingress_app_requirer_uninitialized(
-        requirer: IngressPerAppRequirer,
-        provider: MockIPAProvider,
-        harness):
+    requirer: IngressPerAppRequirer, provider: MockIPAProvider, harness
+):
     assert not requirer.is_ready()
     assert not provider.is_ready()
 
@@ -73,9 +71,8 @@ def test_ingress_app_requirer_uninitialized(
 
 
 def test_ingress_app_requirer_related(
-        requirer: IngressPerAppRequirer,
-        provider: MockIPAProvider,
-        harness):
+    requirer: IngressPerAppRequirer, provider: MockIPAProvider, harness
+):
     harness.set_leader(True)
     relation = provider.relate()
 
@@ -84,23 +81,23 @@ def test_ingress_app_requirer_related(
     # auto-data feature...
     assert provider.is_ready(relation)
 
-    requirer.provide_ingress_requirements(host='foo', port=42)
+    requirer.provide_ingress_requirements(host="foo", port=42)
     assert provider.is_ready(relation)
     assert not requirer.is_ready()
 
     assert harness.charm._stored.num_events == 0
-    provider.publish_url(relation, 'url')
+    provider.publish_url(relation, "url")
     assert harness.charm._stored.num_events == 1
 
     assert provider.is_ready(relation)
     assert requirer.is_ready()
 
-    assert requirer.url == 'url'
+    assert requirer.url == "url"
 
     assert harness.charm._stored.num_events == 1
-    provider.publish_url(relation, 'url2')
+    provider.publish_url(relation, "url2")
     assert harness.charm._stored.num_events == 2
 
     assert provider.is_ready(relation)
     assert requirer.is_ready()
-    assert requirer.url == 'url2'
+    assert requirer.url == "url2"

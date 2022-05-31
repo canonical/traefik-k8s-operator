@@ -53,12 +53,12 @@ class SomeCharm(CharmBase):
 """
 
 import logging
-from typing import Optional, TypeVar, Dict
+from typing import Optional
 
 import yaml
-from ops.charm import CharmBase, RelationBrokenEvent, RelationEvent, RelationRole
-from ops.framework import EventSource, StoredState, Object, ObjectEvents
-from ops.model import Relation, Unit
+from ops.charm import CharmBase, RelationEvent
+from ops.framework import EventSource, Object, ObjectEvents, StoredState
+from ops.model import Relation
 
 # The unique Charmhub library identifier, never change it
 LIBID = "e6de2a5cd5b34422a204668f3b8f90d2"
@@ -103,17 +103,12 @@ INGRESS_REQUIRES_APP_SCHEMA = {
 INGRESS_PROVIDES_APP_SCHEMA = {
     "type": "object",
     "properties": {
-        "ingress": {
-            "type": "object",
-            "properties": {
-                "url": {"type": "string"}
-            }
-        },
+        "ingress": {"type": "object", "properties": {"url": {"type": "string"}}},
         # Optional key for backwards compatibility
         # with legacy requirers based on SDI
-        "_supported_versions": {"type": "string"}
+        "_supported_versions": {"type": "string"},
     },
-    "required": ["ingress"]
+    "required": ["ingress"],
 }
 
 try:
@@ -132,10 +127,14 @@ class RequirerData(TypedDict):
 
 
 class ProviderIngressData(TypedDict):
+    """Provider ingress data model."""
+
     url: str
 
 
 class ProviderApplicationData(TypedDict):
+    """Provider application databag model."""
+
     ingress: ProviderIngressData
     # don't include _supported_versions as that is deprecated anyway
 
@@ -159,10 +158,8 @@ class DataValidationError(RuntimeError):
 
 class _IngressPerAppBase(Object):
     """Base class for IngressPerUnit interface classes."""
-    def __init__(
-            self,
-            charm: CharmBase,
-            relation_name: str = DEFAULT_RELATION_NAME):
+
+    def __init__(self, charm: CharmBase, relation_name: str = DEFAULT_RELATION_NAME):
         super().__init__(charm, relation_name)
 
         self.charm: CharmBase = charm
@@ -258,7 +255,6 @@ class IngressPerAppProvider(_IngressPerAppBase):
 
     def _get_requirer_data(self, relation: Relation) -> RequirerData:
         """Fetch and validate the requirer's app databag."""
-
         if not relation.app or not relation.app.name:
             # Handle edge case where remote app name can be missing, e.g.,
             # relation_broken events.
@@ -270,15 +266,14 @@ class IngressPerAppProvider(_IngressPerAppBase):
             return {}
 
         remote_deserialized = yaml.safe_load(remote_data)
-        _validate_data(remote_deserialized,
-                       INGRESS_REQUIRES_APP_SCHEMA)
+        _validate_data(remote_deserialized, INGRESS_REQUIRES_APP_SCHEMA)
         return remote_deserialized
 
     def get_data(self, relation: Relation) -> RequirerData:
         """Fetch the remote app's databag, i.e. the requirer data."""
         return self._get_requirer_data(relation)
 
-    def is_ready(self, relation: Relation=None):
+    def is_ready(self, relation: Relation = None):
         """The Provider is ready if the requirer has sent valid data."""
         if not relation:
             return any(map(self.is_ready, self.relations))
