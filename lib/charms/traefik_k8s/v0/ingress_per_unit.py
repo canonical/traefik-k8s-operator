@@ -47,7 +47,7 @@ class SomeCharm(CharmBase):
 ```
 """
 import logging
-from typing import Dict, Optional, Tuple, TypeVar, Union
+from typing import Dict, Optional, TypeVar, Union
 
 import ops.model
 import yaml
@@ -485,7 +485,6 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
 
     def _requirer_unit_data(self, relation: Relation) -> RequirerUnitData:
         """Fetch and validate the requirer's unit databag."""
-
         if not relation.app or not relation.app.name:
             # Handle edge case where remote app name can be missing, e.g.,
             # relation_broken events.
