@@ -2,6 +2,10 @@
 # See LICENSE file for licensing details.
 
 from textwrap import dedent
+from unittest.mock import Mock
+
+import pytest
+from ops.model import Binding
 
 from charms.traefik_k8s.v0.ingress import IngressPerAppRequirer
 from ops.charm import CharmBase
@@ -27,72 +31,76 @@ class MockRequirerCharm(CharmBase):
         super().__init__(*args)
         self._stored.set_default(num_events=0)
         self.ipa = IngressPerAppRequirer(self, port=80)
-        self.framework.observe(self.ipa.on.ingress_changed, self.record_events)
+        self.framework.observe(self.ipa.on.ready, self.record_events)
+        self.framework.observe(self.ipa.on.revoked, self.record_events)
 
     def record_events(self, _):
         self._stored.num_events += 1
 
 
-def test_ingress_app_requirer():
+@pytest.fixture(autouse=True, scope="function")
+def patch_network(monkeypatch):
+    monkeypatch.setattr(Binding, "network", Mock(bind_address="10.10.10.10"))
+
+
+@pytest.fixture(scope="function")
+def harness():
     harness = Harness(MockRequirerCharm, meta=MockRequirerCharm.META)
     harness._backend.model_name = "test-model"
-    harness.set_leader(False)
     harness.begin_with_initial_hooks()
-    requirer = harness.charm.ipa
-    provider = MockIPAProvider(harness)
+    return harness
 
-    assert not requirer.is_available()
+
+@pytest.fixture(scope="function")
+def provider(harness):
+    return MockIPAProvider(harness)
+
+
+@pytest.fixture(scope="function")
+def requirer(harness):
+    requirer = harness.charm.ipa
+    return requirer
+
+
+def test_ingress_app_requirer_uninitialized(
+        requirer: IngressPerAppRequirer,
+        provider: MockIPAProvider,
+        harness):
     assert not requirer.is_ready()
-    assert not requirer.is_failed()
-    assert not provider.is_available()
     assert not provider.is_ready()
-    assert not provider.is_failed()
 
     assert harness.charm._stored.num_events == 0
 
+
+def test_ingress_app_requirer_related(
+        requirer: IngressPerAppRequirer,
+        provider: MockIPAProvider,
+        harness):
+    harness.set_leader(True)
     relation = provider.relate()
 
+    assert not requirer.is_ready()
+    # provider goes to ready immediately because we inited ipa with port=80.
+    # auto-data feature...
+    assert provider.is_ready(relation)
+
+    requirer.provide_ingress_requirements(host='foo', port=42)
+    assert provider.is_ready(relation)
+    assert not requirer.is_ready()
+
+    assert harness.charm._stored.num_events == 0
+    provider.publish_url(relation, 'url')
     assert harness.charm._stored.num_events == 1
 
-    assert requirer.is_available(relation)
-    assert not requirer.is_ready(relation)
-    assert not requirer.is_failed(relation)
-    assert not provider.is_available(relation)
-    assert not provider.is_ready(relation)
-    assert provider.is_failed(relation)  # because it has no versions
+    assert provider.is_ready(relation)
+    assert requirer.is_ready()
 
-    harness.set_leader(True)
-    assert requirer.is_available(relation)
-    assert not requirer.is_ready(relation)
-    assert not requirer.is_failed(relation)
-    assert provider.is_available(relation)
-    # assert provider.is_ready(relation)
-    assert not provider.is_failed(relation)
+    assert requirer.url == 'url'
 
-    request = provider.get_request(relation)
-
-    assert request.app_name == "ingress-remote"
     assert harness.charm._stored.num_events == 1
-    request.respond("http://url/")
-    # FIXME Change to 2 when https://github.com/canonical/operator/pull/705 ships
-    assert harness.charm._stored.num_events == 2
-    assert requirer.is_available(relation)
-    assert requirer.is_ready(relation)
-    assert not requirer.is_failed(relation)
-    assert requirer.url == "http://url/"
-
-    # Test that an ingress unit joining does not trigger a new ingress_changed event
-    harness.add_relation_unit(relation.id, "ingress-remote/1")
+    provider.publish_url(relation, 'url2')
     assert harness.charm._stored.num_events == 2
 
-    request.respond("http://url2/")
-    # FIXME Change to 3 when https://github.com/canonical/operator/pull/705 ships
-    assert harness.charm._stored.num_events == 3
-    assert requirer.is_available(relation)
-    assert requirer.is_ready(relation)
-    assert not requirer.is_failed(relation)
-    assert requirer.url == "http://url2/"
-
-    request.respond("http://url2/")
-    # FIXME Change to 2 when https://github.com/canonical/operator/pull/705 ships
-    assert harness.charm._stored.num_events == 3
+    assert provider.is_ready(relation)
+    assert requirer.is_ready()
+    assert requirer.url == 'url2'
