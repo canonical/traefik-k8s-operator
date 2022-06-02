@@ -5,6 +5,7 @@ import asyncio
 from dataclasses import dataclass
 from pathlib import Path
 from subprocess import PIPE, Popen
+from time import sleep
 
 import pytest
 import yaml
@@ -14,8 +15,18 @@ _JUJU_KEYS = ("egress-subnets", "ingress-address", "private-address")
 
 
 @pytest.fixture(autouse=True, scope="session")
+@pytest.mark.abort_on_fail
 def traefik_charm():
-    Popen(["charmcraft", "pack"]).wait()
+    proc = Popen(["charmcraft", "pack"], stdout=PIPE, stderr=PIPE)
+    proc.wait()
+    while proc.returncode is None:  # wait() does not quite wait
+        print(proc.stdout.read().decode('utf-8'))
+        sleep(1)
+    if proc.returncode != 0:
+        raise ValueError('charmcraft pack failed with code: ',
+                         proc.returncode,
+                         proc.stderr.read().decode('utf-8'))
+
     charms = tuple(map(str, Path().glob("*.charm")))
     assert len(charms) == 1, (
         f"too many charms {charms}" if charms else f"no charm found at {Path().absolute()}"
@@ -28,7 +39,7 @@ def traefik_charm():
 
     yield charm_path
 
-    # Popen(['rm', str(charm_path)])
+    Popen(['rm', str(charm_path)]).wait()
 
 
 def purge(data: dict):
@@ -82,9 +93,11 @@ def get_relation_by_endpoint(relations, endpoint, remote_obj):
         r for r in relations if r["endpoint"] == endpoint and remote_obj in r["related-units"]
     ]
     if not relations:
-        raise ValueError(f"no relations found with endpoint==" f"{endpoint}")
+        raise ValueError(f"no relations found with endpoint==" f"{endpoint} "
+                         f"in {remote_obj} (relations={relations})")
     if len(relations) > 1:
-        raise ValueError("multiple relations found with endpoint==" f"{endpoint}")
+        raise ValueError("multiple relations found with endpoint==" f"{endpoint} "
+                         f"in {remote_obj} (relations={relations})")
     return relations[0]
 
 
