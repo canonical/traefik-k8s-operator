@@ -36,20 +36,20 @@ async def test_relate(ops_test: OpsTest):
 # @retry(wait=wait_exponential(multiplier=1, min=0, max=10))
 @pytest.mark.abort_on_fail
 async def test_relation_data_shape():
-    data = await get_relation_data(
+    data = get_relation_data(
         requirer_endpoint="prometheus-k8s/0:ingress",
         provider_endpoint="traefik-k8s/0:ingress-per-unit",
     )
 
-    requirer_app_data = yaml.safe_load(data.requirer.unit_data["data"])
+    requirer_unit_data = yaml.safe_load(data.requirer.unit_data["data"])
     # example:
     # host: 10.1.232.176
     # model: foo
     # name: prometheus-k8s/0
     # port: 9090
-    model = requirer_app_data["model"]
-    host = requirer_app_data["host"]
-    assert requirer_app_data == {
+    model = requirer_unit_data["model"]
+    host = requirer_unit_data["host"]
+    assert requirer_unit_data == {
         "host": host,
         "model": model,
         "name": "prometheus-k8s/0",

@@ -50,7 +50,7 @@ def purge(data: dict):
             del data[key]
 
 
-async def grab_unit_info(unit_name: str) -> dict:
+def get_unit_info(unit_name: str) -> dict:
     """Returns unit-info data structure.
 
      for example:
@@ -74,8 +74,8 @@ async def grab_unit_info(unit_name: str) -> dict:
       provider-id: traefik-k8s-0
       address: 10.1.232.144
     """
-    if cached_data := _JUJU_DATA_CACHE.get(unit_name):
-        return cached_data
+    # if cached_data := _JUJU_DATA_CACHE.get(unit_name):
+    #     return cached_data
 
     proc = Popen(f"juju show-unit {unit_name}".split(" "), stdout=PIPE)
     raw_data = proc.stdout.read().decode("utf-8").strip()
@@ -86,8 +86,12 @@ async def grab_unit_info(unit_name: str) -> dict:
         )
 
     data = yaml.safe_load(raw_data)
-    _JUJU_DATA_CACHE[unit_name] = data
-    return data
+    if not unit_name in data:
+        raise KeyError(unit_name, f'not in {data!r}')
+
+    unit_data = data[unit_name]
+    _JUJU_DATA_CACHE[unit_name] = unit_data
+    return unit_data
 
 
 def get_relation_by_endpoint(relations, endpoint, remote_obj):
@@ -118,14 +122,14 @@ class UnitRelationData:
     unit_data: dict
 
 
-async def get_content(
+def get_content(
     obj: str, other_obj, include_default_juju_keys: bool = False
 ) -> UnitRelationData:
     """Get the content of the databag of `obj`, as seen from `other_obj`."""
     unit_name, endpoint = obj.split(":")
     other_unit_name, other_endpoint = other_obj.split(":")
 
-    unit_data, app_data, leader = await get_databags(unit_name, other_unit_name, other_endpoint)
+    unit_data, app_data, leader = get_databags(unit_name, other_unit_name, other_endpoint)
 
     if not include_default_juju_keys:
         purge(unit_data)
@@ -133,20 +137,20 @@ async def get_content(
     return UnitRelationData(unit_name, endpoint, leader, app_data, unit_data)
 
 
-async def get_databags(local_unit, remote_unit, remote_endpoint):
+def get_databags(local_unit, remote_unit, remote_endpoint):
     """Gets the databags of local unit and its leadership status.
 
     Given a remote unit and the remote endpoint name.
     """
-    local_data = (await grab_unit_info(local_unit))[local_unit]
+    local_data = get_unit_info(local_unit)
     leader = local_data["leader"]
 
-    data = (await grab_unit_info(remote_unit))[remote_unit]
-    relation_infos = data.get("relation-info")
-    if not relation_infos:
+    data = get_unit_info(remote_unit)
+    relation_info = data.get("relation-info")
+    if not relation_info:
         raise RuntimeError(f"{remote_unit} has no relations")
 
-    raw_data = get_relation_by_endpoint(relation_infos, remote_endpoint, local_unit)
+    raw_data = get_relation_by_endpoint(relation_info, remote_endpoint, local_unit)
     unit_data = raw_data["related-units"][local_unit]["data"]
     app_data = raw_data["application-data"]
     return unit_data, app_data, leader
@@ -158,15 +162,13 @@ class RelationData:
     requirer: UnitRelationData
 
 
-async def get_relation_data(
+def get_relation_data(
     *, provider_endpoint: str, requirer_endpoint: str, include_default_juju_keys: bool = False
 ):
     """Get relation databags for a juju relation.
 
     >>> get_relation_data('prometheus/0:ingress', 'traefik/1:ingress-per-unit')
     """
-    provider_data, requirer_data = await asyncio.gather(
-        get_content(provider_endpoint, requirer_endpoint, include_default_juju_keys),
-        get_content(requirer_endpoint, provider_endpoint, include_default_juju_keys),
-    )
-    return RelationData(provider_data, requirer_data)
+    provider_data = get_content(provider_endpoint, requirer_endpoint, include_default_juju_keys)
+    requirer_data = get_content(requirer_endpoint, provider_endpoint, include_default_juju_keys)
+    return RelationData(provider=provider_data, requirer=requirer_data)
