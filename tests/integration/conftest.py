@@ -20,12 +20,14 @@ def traefik_charm():
     proc = Popen(["charmcraft", "pack"], stdout=PIPE, stderr=PIPE)
     proc.wait()
     while proc.returncode is None:  # wait() does not quite wait
-        print(proc.stdout.read().decode('utf-8'))
+        print(proc.stdout.read().decode("utf-8"))
         sleep(1)
     if proc.returncode != 0:
-        raise ValueError('charmcraft pack failed with code: ',
-                         proc.returncode,
-                         proc.stderr.read().decode('utf-8'))
+        raise ValueError(
+            "charmcraft pack failed with code: ",
+            proc.returncode,
+            proc.stderr.read().decode("utf-8"),
+        )
 
     charms = tuple(map(str, Path().glob("*.charm")))
     assert len(charms) == 1, (
@@ -39,7 +41,7 @@ def traefik_charm():
 
     yield charm_path
 
-    Popen(['rm', str(charm_path)]).wait()
+    Popen(["rm", str(charm_path)]).wait()
 
 
 def purge(data: dict):
@@ -93,11 +95,17 @@ def get_relation_by_endpoint(relations, endpoint, remote_obj):
         r for r in relations if r["endpoint"] == endpoint and remote_obj in r["related-units"]
     ]
     if not relations:
-        raise ValueError(f"no relations found with endpoint==" f"{endpoint} "
-                         f"in {remote_obj} (relations={relations})")
+        raise ValueError(
+            f"no relations found with endpoint=="
+            f"{endpoint} "
+            f"in {remote_obj} (relations={relations})"
+        )
     if len(relations) > 1:
-        raise ValueError("multiple relations found with endpoint==" f"{endpoint} "
-                         f"in {remote_obj} (relations={relations})")
+        raise ValueError(
+            "multiple relations found with endpoint=="
+            f"{endpoint} "
+            f"in {remote_obj} (relations={relations})"
+        )
     return relations[0]
 
 
@@ -122,15 +130,16 @@ async def get_content(
     if not include_default_juju_keys:
         purge(unit_data)
 
-    return UnitRelationData(unit_name, endpoint,
-                            leader, app_data, unit_data)
+    return UnitRelationData(unit_name, endpoint, leader, app_data, unit_data)
 
 
 async def get_databags(local_unit, remote_unit, remote_endpoint):
-    """Gets the databags of local unit and its leadership status; given a remote unit and the
-    remote endpoint name."""
+    """Gets the databags of local unit and its leadership status.
+
+    Given a remote unit and the remote endpoint name.
+    """
     local_data = (await grab_unit_info(local_unit))[local_unit]
-    leader = local_data['leader']
+    leader = local_data["leader"]
 
     data = (await grab_unit_info(remote_unit))[remote_unit]
     relation_infos = data.get("relation-info")
@@ -141,6 +150,7 @@ async def get_databags(local_unit, remote_unit, remote_endpoint):
     unit_data = raw_data["related-units"][local_unit]["data"]
     app_data = raw_data["application-data"]
     return unit_data, app_data, leader
+
 
 @dataclass
 class RelationData:
