@@ -113,42 +113,34 @@ class UnitRelationData:
 async def get_content(
     obj: str, other_obj, include_default_juju_keys: bool = False
 ) -> UnitRelationData:
-    """Get the content of the databag of `obj`, relative to `other_obj`."""
-    endpoint = None
-    other_unit_name = other_obj.split(":")[0] if ":" in other_obj else other_obj
-    if ":" in obj:
-        unit_name, endpoint = obj.split(":")
-    else:
-        unit_name = obj
-    data = (await grab_unit_info(unit_name))[unit_name]
-    is_leader = data["leader"]
+    """Get the content of the databag of `obj`, as seen from `other_obj`."""
+    unit_name, endpoint = obj.split(":")
+    other_unit_name, other_endpoint = other_obj.split(":")
 
-    relation_infos = data.get("relation-info")
-    if not relation_infos:
-        raise RuntimeError(f"{unit_name} has no relations")
-
-    if not endpoint:
-        relation_data_raw = relation_infos[0]
-        endpoint = relation_data_raw["endpoint"]
-    else:
-        relation_data_raw = get_relation_by_endpoint(relation_infos, endpoint, other_unit_name)
-
-    related_units_data_raw = relation_data_raw["related-units"]
-
-    other_unit_name = next(iter(related_units_data_raw.keys()))
-    other_unit_info = await grab_unit_info(other_unit_name)
-    other_unit_relation_infos = other_unit_info[other_unit_name]["relation-info"]
-    remote_data_raw = get_relation_by_endpoint(
-        other_unit_relation_infos, relation_data_raw["related-endpoint"], unit_name
-    )
-    this_unit_data = remote_data_raw["related-units"][unit_name]["data"]
-    this_app_data = remote_data_raw["application-data"]
+    unit_data, app_data, leader = await get_databags(unit_name, other_unit_name, other_endpoint)
 
     if not include_default_juju_keys:
-        purge(this_unit_data)
+        purge(unit_data)
 
-    return UnitRelationData(unit_name, endpoint, is_leader, this_app_data, this_unit_data)
+    return UnitRelationData(unit_name, endpoint,
+                            leader, app_data, unit_data)
 
+
+async def get_databags(local_unit, remote_unit, remote_endpoint):
+    """Gets the databags of local unit and its leadership status; given a remote unit and the
+    remote endpoint name."""
+    local_data = (await grab_unit_info(local_unit))[local_unit]
+    leader = local_data['leader']
+
+    data = (await grab_unit_info(remote_unit))[remote_unit]
+    relation_infos = data.get("relation-info")
+    if not relation_infos:
+        raise RuntimeError(f"{remote_unit} has no relations")
+
+    raw_data = get_relation_by_endpoint(relation_infos, remote_endpoint, local_unit)
+    unit_data = raw_data["related-units"][local_unit]["data"]
+    app_data = raw_data["application-data"]
+    return unit_data, app_data, leader
 
 @dataclass
 class RelationData:
