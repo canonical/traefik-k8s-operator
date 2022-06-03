@@ -34,8 +34,7 @@ async def test_relate(ops_test: OpsTest):
 # @retry(wait=wait_exponential(multiplier=1, min=0, max=10))
 async def test_relation_data_shape(ops_test: OpsTest):
     data = get_relation_data(
-        requirer_endpoint="spring-music/0:ingress",
-        provider_endpoint="traefik-k8s/0:ingress"
+        requirer_endpoint="spring-music/0:ingress", provider_endpoint="traefik-k8s/0:ingress"
     )
 
     requirer_app_data = yaml.safe_load(data.requirer.application_data["data"])

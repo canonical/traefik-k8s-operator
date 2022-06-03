@@ -1,7 +1,6 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-import asyncio
 from dataclasses import dataclass
 from pathlib import Path
 from subprocess import PIPE, Popen
@@ -86,8 +85,8 @@ def get_unit_info(unit_name: str) -> dict:
         )
 
     data = yaml.safe_load(raw_data)
-    if not unit_name in data:
-        raise KeyError(unit_name, f'not in {data!r}')
+    if unit_name not in data:
+        raise KeyError(unit_name, f"not in {data!r}")
 
     unit_data = data[unit_name]
     _JUJU_DATA_CACHE[unit_name] = unit_data
@@ -122,9 +121,7 @@ class UnitRelationData:
     unit_data: dict
 
 
-def get_content(
-    obj: str, other_obj, include_default_juju_keys: bool = False
-) -> UnitRelationData:
+def get_content(obj: str, other_obj, include_default_juju_keys: bool = False) -> UnitRelationData:
     """Get the content of the databag of `obj`, as seen from `other_obj`."""
     unit_name, endpoint = obj.split(":")
     other_unit_name, other_endpoint = other_obj.split(":")
