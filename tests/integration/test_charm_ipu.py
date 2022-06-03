@@ -33,7 +33,6 @@ async def test_relate(ops_test: OpsTest):
         await ops_test.model.wait_for_idle(["traefik-k8s", "prometheus-k8s"])
 
 
-# @retry(wait=wait_exponential(multiplier=1, min=0, max=10))
 @pytest.mark.abort_on_fail
 async def test_relation_data_shape():
     data = get_relation_data(
