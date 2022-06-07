@@ -19,7 +19,10 @@ async def deployment(ops_test: OpsTest, traefik_charm):
     if not ops_test.model.applications.get("traefik-k8s"):
         await ops_test.model.deploy(traefik_charm, resources=resources)
     await ops_test.model.applications["traefik-k8s"].set_config({"external_hostname": "foo.bar"})
-    await ops_test.juju("deploy", "prometheus-k8s", "--channel=edge")
+
+    # we pin revision 36 to prevent upstream changes breaking our itests,
+    #   bump this version sometime in the future.
+    await ops_test.juju("deploy", "prometheus-k8s", "--channel=edge", "--revision=36")
     async with ops_test.fast_forward():
         await ops_test.model.wait_for_idle(
             ["traefik-k8s", "prometheus-k8s"], status="active", timeout=1000
