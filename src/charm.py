@@ -8,7 +8,7 @@ import enum
 import json
 import logging
 import typing
-from typing import Tuple
+from typing import Tuple, Union
 
 import yaml
 from charms.observability_libs.v0.kubernetes_service_patch import KubernetesServicePatch
@@ -387,10 +387,11 @@ class TraefikIngressCharm(CharmBase):
         # relation. Traefik is fine with it :-)
         self._push_configurations(relation, config)
 
-    def _push_configurations(self, relation: Relation, config: dict):
+    def _push_configurations(self, relation: Relation, config: Union[dict, str]):
         if config:
+            yaml_config = yaml.dump(config) if not isinstance(config, str) else config
             config_filename = f"{_CONFIG_DIRECTORY}/{self._relation_config_file(relation)}"
-            self.container.push(config_filename, yaml.dump(config), make_dirs=True)
+            self.container.push(config_filename, yaml_config, make_dirs=True)
             logger.debug("Updated ingress configuration file: %s", config_filename)
         else:
             self._wipe_ingress_for_relation(relation)
@@ -495,8 +496,7 @@ class TraefikIngressCharm(CharmBase):
         # Wipe URLs sent to the requesting apps and units, as they are based on a gateway
         # address that is no longer valid.
         if self.ingress_per_app.is_ready():
-            if request := self.ingress_per_app.get_request(relation):
-                request.respond("")
+            self.ingress_per_app.wipe_ingress_data(relation)
 
         if self.unit.is_leader() and self.ingress_per_unit.is_ready():
             self.ingress_per_unit.wipe_ingress_data(relation)
