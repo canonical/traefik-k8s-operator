@@ -7,6 +7,7 @@
 import enum
 import json
 import logging
+import typing
 from typing import Tuple
 
 import yaml
@@ -16,7 +17,6 @@ from charms.traefik_k8s.v0.ingress import IngressPerAppProvider
 from charms.traefik_k8s.v0.ingress_per_unit import (
     DataValidationError,
     IngressPerUnitProvider,
-    RequirerData,
 )
 from charms.traefik_route_k8s.v0.traefik_route import (
     TraefikRouteProvider,
@@ -45,6 +45,10 @@ from ops.model import (
     WaitingStatus,
 )
 from ops.pebble import APIError, PathError
+
+if typing.TYPE_CHECKING:
+    from charms.traefik_k8s.v0.ingress import RequirerData as RequirerData_IPA
+    from charms.traefik_k8s.v0.ingress_per_unit import RequirerData as RequirerData_IPU
 
 logger = logging.getLogger(__name__)
 
@@ -103,9 +107,12 @@ class TraefikIngressCharm(CharmBase):
         self.framework.observe(self.on.update_status, self._on_update_status)
         self.framework.observe(self.on.config_changed, self._on_config_changed)
 
-        self.framework.observe(self.ingress_per_app.on.request, self._handle_ingress_request)
-        self.framework.observe(self.ingress_per_app.on.failed, self._handle_ingress_failure)
-        self.framework.observe(self.ingress_per_app.on.broken, self._handle_ingress_broken)
+        self.framework.observe(
+            self.ingress_per_app.on.data_provided, self._handle_ingress_data_provided
+        )
+        self.framework.observe(
+            self.ingress_per_app.on.data_removed, self._handle_ingress_data_removed
+        )
 
         self.framework.observe(self.ingress_per_unit.on.ready, self._handle_ingress_request)
         self.framework.observe(self.ingress_per_unit.on.failed, self._handle_ingress_failure)
@@ -239,15 +246,34 @@ class TraefikIngressCharm(CharmBase):
             self.unit.status = BlockedStatus("setup of some ingress relation failed")
             logger.error("The setup of some ingress relation failed, see previous logs")
 
-    def _handle_ingress_request(self, event: RelationEvent):
+    @property
+    def ready(self) -> bool:
+        """Check whether we have an external host set, and traefik is running."""
         if not self._external_host:
-            self._wipe_ingress_for_all_relations()
+            self._wipe_ingress_for_all_relations()  # fixme: no side-effects in prop
             self.unit.status = WaitingStatus("gateway address unavailable")
-            event.defer()
-            return
-
+            return False
         if not self._is_traefik_service_running():
             self.unit.status = WaitingStatus(f"waiting for service: '{_TRAEFIK_SERVICE_NAME}'")
+            return False
+        return True
+
+    def _handle_ingress_data_provided(self, event: RelationEvent):
+        """A unit has provided data requesting ipu."""
+        if not self.ready:
+            event.defer()
+            return
+        self._process_ingress_relation(event.relation)
+
+        if isinstance(self.unit.status, MaintenanceStatus):
+            self.unit.status = ActiveStatus()
+
+    def _handle_ingress_data_removed(self, event: RelationEvent):
+        """A unit has removed the data we need to provide ipu."""
+        self._wipe_ingress_for_relation(event.relation)
+
+    def _handle_ingress_request(self, event: RelationEvent):
+        if not self.ready:
             event.defer()
             return
 
@@ -294,11 +320,7 @@ class TraefikIngressCharm(CharmBase):
         # TODO: once IngressPerApp is also SDI-free,
         #  abstract the common logic here and remove this branch
         if provider is self.ingress_per_app:
-            request = provider.get_request(relation)
-            config, app_url = self._generate_per_app_config(request, gateway_address)
-            if self.unit.is_leader():
-                request.respond(app_url)
-            self._push_configurations(relation, config)
+            self._provide_ingress_per_app(relation)
         elif provider is self.traefik_route:
             self._provide_routed_ingress(relation)
         else:
@@ -310,6 +332,24 @@ class TraefikIngressCharm(CharmBase):
             logger.info("traefik-route not ready on %s", relation)
             return
         config = self.traefik_route.get_config(relation)
+        self._push_configurations(relation, config)
+
+    def _provide_ingress_per_app(self, relation: Relation):
+        # to avoid long-gone units from lingering in the ingress, we wipe it
+        provider = self.ingress_per_app
+        if self.unit.is_leader():
+            provider.wipe_ingress_data(relation)
+
+        try:
+            data: "RequirerData_IPA" = provider.get_data(relation)
+        except DataValidationError as e:
+            logger.error(f"invalid data shared through {relation}... Error: {e}.")
+            return
+
+        config, app_url = self._generate_per_app_config(data)
+        if self.unit.is_leader():
+            provider.publish_url(relation, app_url)
+
         self._push_configurations(relation, config)
 
     def _provide_ingress_per_unit(self, relation: Relation):
@@ -330,20 +370,17 @@ class TraefikIngressCharm(CharmBase):
             # if the unit is ready, it's implied that the data is there.
             # but we should still ensure it's valid, hence...
             try:
-                data: "RequirerData" = provider.get_data(relation, unit)
+                data: "RequirerData_IPU" = provider.get_data(relation, unit)
             except DataValidationError as e:
                 # is_unit_ready should guard against no data being there yet,
                 # but if the data is invalid...
                 logger.error(f"invalid data shared through {relation} by {unit}... Error: {e}.")
                 continue
+
             unit_config, unit_url = self._generate_per_unit_config(data)
-
-            if unit_url:
-                if self.unit.is_leader():
-                    provider.publish_url(relation, data["name"], unit_url)
-
-            if unit_config:
-                always_merger.merge(config, unit_config)
+            if self.unit.is_leader():
+                provider.publish_url(relation, data["name"], unit_url)
+            always_merger.merge(config, unit_config)
 
         # Note: We might be pushing an empty configuration if, for example,
         # none of the units has yet written their part of the data into the
@@ -358,7 +395,7 @@ class TraefikIngressCharm(CharmBase):
         else:
             self._wipe_ingress_for_relation(relation)
 
-    def _generate_per_unit_config(self, data: "RequirerData") -> Tuple[dict, str]:
+    def _generate_per_unit_config(self, data: "RequirerData_IPU") -> Tuple[dict, str]:
         """Generate a config dict for a given unit for IngressPerUnit."""
         config = {"http": {"routers": {}, "services": {}}}
         name = data["name"].replace("/", "-")
@@ -385,16 +422,17 @@ class TraefikIngressCharm(CharmBase):
         }
         return config, unit_url
 
-    # todo reuse types from TraefikRoute
-    def _generate_per_app_config(self, request, gateway_address) -> Tuple[dict, str]:
-        prefix = f"{request.model}-{request.app_name}"
+    def _generate_per_app_config(self, data: "RequirerData_IPA") -> Tuple[dict, str]:
+        host = self._external_host
+        port = self._port
+        prefix = f"{data['model']}-{data['name']}"
 
         if self._routing_mode == _RoutingMode.path:
             route_rule = f"PathPrefix(`/{prefix}`)"
-            app_url = f"http://{gateway_address}:{self._port}/{prefix}"
+            app_url = f"http://{host}:{port}/{prefix}"
         else:  # _RoutingMode.subdomain
-            route_rule = f"Host(`{prefix}.{self._external_host}`)"
-            app_url = f"http://{prefix}.{gateway_address}:{self._port}/"
+            route_rule = f"Host(`{prefix}.{host}`)"
+            app_url = f"http://{prefix}.{host}:{port}/"
 
         traefik_router_name = f"juju-{prefix}-router"
         traefik_service_name = f"juju-{prefix}-service"
@@ -411,7 +449,7 @@ class TraefikIngressCharm(CharmBase):
                 "services": {
                     traefik_service_name: {
                         "loadBalancer": {
-                            "servers": [{"url": f"http://{request.host}:{request.port}"}]
+                            "servers": [{"url": f"http://{data['host']}:{data['port']}"}]
                         }
                     }
                 },

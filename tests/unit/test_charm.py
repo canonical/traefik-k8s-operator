@@ -90,8 +90,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
         requirer = MockIPARequirer(self.harness)
         relation = requirer.relate()
-        requirer.request(host="foo.bar", port=3000)
-        assert requirer.is_available(relation)
+        requirer.provide_ingress_requirements(host="foo.bar", port=3000)
 
         traefik_container = self.harness.charm.unit.get_container("traefik")
         file = f"/opt/traefik/juju/juju_ingress_{relation.name}_{relation.id}_{relation.app.name}.yaml"
@@ -137,8 +136,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
         requirer = MockIPARequirer(self.harness)
         relation = requirer.relate()
-        requirer.request(host="foo.bar", port=3000)
-        assert requirer.is_available(relation)
+        requirer.provide_ingress_requirements(host="foo.bar", port=3000)
 
         traefik_container = self.harness.charm.unit.get_container("traefik")
         file = f"/opt/traefik/juju/juju_ingress_{relation.name}_{relation.id}_{relation.app.name}.yaml"
@@ -449,7 +447,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
         requirer = MockIPARequirer(self.harness)
         requirer.relate()
-        requirer.request(host="10.0.0.1", port=3000)
+        requirer.provide_ingress_requirements(host="10.0.0.1", port=3000)
 
         self.harness.container_pebble_ready("traefik")
 
