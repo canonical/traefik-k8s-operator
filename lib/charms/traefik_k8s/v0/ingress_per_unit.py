@@ -48,7 +48,7 @@ class SomeCharm(CharmBase):
 """
 import logging
 import typing
-from typing import Dict, Optional, Union, Type
+from typing import Dict, Optional, Union
 
 import ops.model
 import yaml
@@ -227,8 +227,10 @@ class _IngressPerUnitBase(Object):
     """Base class for IngressPerUnit interface classes."""
 
     if typing.TYPE_CHECKING:
+
         @property
-        def on(self) -> IngressPerUnitEvents: ...  # noqa
+        def on(self) -> IngressPerUnitEvents:
+            ...  # noqa
 
     def __init__(self, charm: CharmBase, relation_name: str = DEFAULT_RELATION_NAME):
         """Constructor for _IngressPerUnitBase.
@@ -630,7 +632,7 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
     def relation(self) -> Optional[Relation]:
         """The established Relation instance, or None if still unrelated."""
         if len(self.relations) > 1:
-            raise ValueError('Multiple ingress-per-unit relations found.')
+            raise ValueError("Multiple ingress-per-unit relations found.")
         return self.relations[0] if self.relations else None
 
     def is_ready(self, relation: Optional[Relation] = None) -> bool:
