@@ -47,7 +47,8 @@ class SomeCharm(CharmBase):
 ```
 """
 import logging
-from typing import Dict, Optional, TypeVar, Union
+import typing
+from typing import Dict, Optional, Union, Type
 
 import ops.model
 import yaml
@@ -133,7 +134,7 @@ except ImportError:
     from typing_extensions import TypedDict  # py35 compat
 
 
-class RequirerData(TypedDict):
+class RequirerData(TypedDict):  # pyright: reportGeneralTypeIssues=false
     """Model of the data a unit implementing the requirer will need to provide."""
 
     model: str
@@ -225,8 +226,9 @@ class IngressPerUnitEvents(ObjectEvents):
 class _IngressPerUnitBase(Object):
     """Base class for IngressPerUnit interface classes."""
 
-    _IngressPerUnitEventType = TypeVar("_IngressPerUnitEventType", bound=IngressPerUnitEvents)
-    on: _IngressPerUnitEventType
+    if typing.TYPE_CHECKING:
+        @property
+        def on(self) -> IngressPerUnitEvents: ...  # noqa
 
     def __init__(self, charm: CharmBase, relation_name: str = DEFAULT_RELATION_NAME):
         """Constructor for _IngressPerUnitBase.
@@ -290,14 +292,15 @@ class _IngressPerUnitBase(Object):
     def _handle_upgrade_or_leader(self, _):
         pass
 
-    def is_available(self, relation: Relation = None) -> bool:
+    def is_available(self, relation: Optional[Relation] = None) -> bool:
         """Check whether the given relation is available.
 
         Or any relation if not specified.
         """
         if relation is None:
             return any(map(self.is_available, self.relations))
-
+        if relation.app is None:
+            return False
         if not relation.app.name:
             # Juju doesn't provide JUJU_REMOTE_APP during relation-broken
             # hooks. See https://github.com/canonical/operator/issues/693.
@@ -306,24 +309,20 @@ class _IngressPerUnitBase(Object):
 
         return True
 
-    def is_ready(self, relation: Relation = None) -> bool:
+    def is_ready(self, relation: Optional[Relation] = None) -> bool:
         """Checks whether the given relation is ready.
 
         Or any relation if not specified.
         A given relation is ready if the remote side has sent valid data.
+        The base implementation does nothing but check that the relation is
+        available. It's up to subclasses to decide what it means for the
+        relation to be actually 'ready'.
         """
         if relation is None:
             return any(map(self.is_ready, self.relations))
-        if relation.app is None:
-            # No idea why, but this happened once.
-            return False
-        if not relation.app.name:  # type: ignore
-            # Juju doesn't provide JUJU_REMOTE_APP during relation-broken
-            # hooks. See https://github.com/canonical/operator/issues/693
-            return False
-        return True
+        return self.is_available(relation)
 
-    def is_failed(self, _: Relation = None) -> bool:
+    def is_failed(self, _: Optional[Relation] = None) -> bool:
         """Checks whether the given relation is failed.
 
         Or any relation if not specified.
@@ -361,7 +360,7 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
             log.info("shared supported_versions shim information")
             relation.data[self.charm.app]["_supported_versions"] = "- v1"
 
-    def is_ready(self, relation: Relation = None) -> bool:
+    def is_ready(self, relation: Optional[Relation] = None) -> bool:
         """Checks whether the given relation is ready.
 
         Or any relation if not specified.
@@ -381,7 +380,7 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
 
         return any(requirer_unit_data.values())
 
-    def is_failed(self, relation: Relation = None) -> bool:
+    def is_failed(self, relation: Optional[Relation] = None) -> bool:
         """Checks whether the given relation is failed.
 
         Or any relation if not specified.
@@ -630,9 +629,11 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
     @property
     def relation(self) -> Optional[Relation]:
         """The established Relation instance, or None if still unrelated."""
+        if len(self.relations) > 1:
+            raise ValueError('Multiple ingress-per-unit relations found.')
         return self.relations[0] if self.relations else None
 
-    def is_ready(self, relation: Relation = None) -> bool:
+    def is_ready(self, relation: Optional[Relation] = None) -> bool:
         """Checks whether the given relation is ready.
 
         Or any relation if not specified.
@@ -643,7 +644,7 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
 
         return bool(self.url)
 
-    def is_failed(self, relation: Relation = None) -> bool:
+    def is_failed(self, relation: Optional[Relation] = None) -> bool:
         """Checks whether the given relation is failed.
 
         Or any relation if not specified.
@@ -664,7 +665,7 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
 
         try:
             # grab the data and validate it; might raise
-            raw = self.relation.data[self.unit].get("data")
+            raw = relation.data[self.unit].get("data")
         except Exception:
             log.exception("Error accessing relation databag")
             return True
@@ -707,6 +708,9 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
             "port": port,
         }
         _validate_data(data, INGRESS_REQUIRES_UNIT_SCHEMA)
+
+        if not self.relation:
+            raise RuntimeError("Can't publish ingress data: no relation found.")
         self.relation.data[self.unit]["data"] = yaml.safe_dump(data)
 
     @property
