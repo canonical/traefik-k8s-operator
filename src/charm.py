@@ -495,11 +495,11 @@ class TraefikIngressCharm(CharmBase):
 
         # Wipe URLs sent to the requesting apps and units, as they are based on a gateway
         # address that is no longer valid.
-        if self.ingress_per_app.is_ready():
-            self.ingress_per_app.wipe_ingress_data(relation)
-
-        if self.unit.is_leader() and self.ingress_per_unit.is_ready():
-            self.ingress_per_unit.wipe_ingress_data(relation)
+        if self.unit.is_leader():
+            if self.ingress_per_app.is_ready():
+                self.ingress_per_app.wipe_ingress_data(relation)
+            if self.ingress_per_unit.is_ready():
+                self.ingress_per_unit.wipe_ingress_data(relation)
 
     def _relation_config_file(self, relation: Relation):
         # Using both the relation id and the app name in the file to facilitate
