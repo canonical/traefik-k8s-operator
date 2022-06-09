@@ -67,3 +67,9 @@ async def test_relation_data_shape():
     assert provider_app_data == {
         "ingress": {"prometheus-k8s/0": {"url": f"http://foo.bar:80/{model}-prometheus-k8s-0"}}
     }
+
+
+async def test_remove_relation(ops_test: OpsTest):
+    await ops_test.juju("relate", "prometheus-k8s:ingress", "traefik-k8s:ingress-per-unit")
+    async with ops_test.fast_forward():
+        await ops_test.model.wait_for_idle(["traefik-k8s", "spring-music"], status="active")

@@ -59,3 +59,9 @@ async def test_relation_data_shape(ops_test: OpsTest):
     #    url: http://foo.bar:80/foo-spring-music/0
 
     assert provider_app_data == {"ingress": {"url": f"http://foo.bar:80/{model}-spring-music/0"}}
+
+
+async def test_remove_relation(ops_test: OpsTest):
+    await ops_test.juju("remove-relation", "spring-music:ingress", "traefik-k8s:ingress")
+    async with ops_test.fast_forward():
+        await ops_test.model.wait_for_idle(["traefik-k8s", "spring-music"], status="active")
