@@ -75,14 +75,9 @@ jobs:
         id: channel
 
       - name: Upload charm to charmhub
-        uses: canonical/charming-actions/upload-charm@1.0.0
+        uses: canonical/charming-actions/upload-charm@1.0.3
         with:
           credentials: "${{ secrets.CHARMHUB_TOKEN }}"
           github-token: "${{ secrets.GITHUB_TOKEN }}"
           upload-image: "true"
           channel: "${{ steps.channel.outputs.name }}"
-
-      - name: Upload to edge channel
-        uses: canonical/charmhub-upload-action@0.2.0
-        with:
-          credentials: "${{ secrets.CHARMHUB_TOKEN }}"
