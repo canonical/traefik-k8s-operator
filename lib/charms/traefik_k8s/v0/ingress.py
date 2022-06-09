@@ -10,13 +10,10 @@ ingress, with load-balancing occurring across all units.
 ## Getting Started
 
 To get started using the library, you just need to fetch the library using `charmcraft`.
-**Note that you also need to add the `serialized_data_interface` dependency to your
-charm's `requirements.txt`.**
 
 ```shell
 cd some-charm
 charmcraft fetch-lib charms.traefik_k8s.v0.ingress
-echo -e "serialized_data_interface\n" >> requirements.txt
 ```
 
 In the `metadata.yaml` of the charm, add the following:
@@ -43,7 +40,7 @@ class SomeCharm(CharmBase):
     # an ingress URL available, that is, `self.ingress` would
     # return `None`.
     self.framework.observe(
-        self.ingress.on.ingress_changed, self._handle_ingress
+        self.ingress.on.ready, self._handle_ingress
     )
     # ...
 
@@ -68,7 +65,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 6
+LIBPATCH = 7
 
 DEFAULT_RELATION_NAME = "ingress"
 RELATION_INTERFACE = "ingress"
