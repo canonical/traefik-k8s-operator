@@ -50,6 +50,7 @@ class SomeCharm(CharmBase):
 """
 
 import logging
+import socket
 from typing import Optional
 
 import yaml
@@ -446,8 +447,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         assert self.unit.is_leader(), "only leaders should do this."
 
         if not host:
-            binding = self.charm.model.get_binding(self.relation_name)
-            host = str(binding.network.bind_address)
+            host = socket.getfqdn()
 
         data = {
             "model": self.model.name,

@@ -47,6 +47,7 @@ class SomeCharm(CharmBase):
 ```
 """
 import logging
+import socket
 import typing
 from typing import Dict, Optional, Union
 
@@ -700,8 +701,7 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
             port: the port of the service (required)
         """
         if not host:
-            binding = self.charm.model.get_binding(self.relation_name)
-            host = str(binding.network.bind_address)
+            host = socket.getfqdn()
 
         data = {
             "model": self.model.name,
