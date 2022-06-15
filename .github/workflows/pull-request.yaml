@@ -70,3 +70,6 @@ jobs:
         if: failure()
         with:
           app: traefik-k8s
+
+      - name: Static IPU checks
+        run: tox -e static-ipu
