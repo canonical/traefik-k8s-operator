@@ -2,13 +2,11 @@
 # See LICENSE file for licensing details.
 
 from textwrap import dedent
-from unittest.mock import Mock
 
 import pytest
 from charms.traefik_k8s.v0.ingress import IngressPerAppRequirer
 from ops.charm import CharmBase
 from ops.framework import StoredState
-from ops.model import Binding
 from ops.testing import Harness
 from test_lib_helpers import MockIPAProvider
 
@@ -35,11 +33,6 @@ class MockRequirerCharm(CharmBase):
 
     def record_events(self, _):
         self._stored.num_events += 1
-
-
-@pytest.fixture(autouse=True, scope="function")
-def patch_network(monkeypatch):
-    monkeypatch.setattr(Binding, "network", Mock(bind_address="10.10.10.10"))
 
 
 @pytest.fixture(scope="function")

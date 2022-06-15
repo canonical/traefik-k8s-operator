@@ -2,12 +2,10 @@
 # See LICENSE file for licensing details.
 
 from textwrap import dedent
-from unittest.mock import Mock
 
 import pytest
 from charms.traefik_k8s.v0.ingress import IngressPerAppProvider
 from ops.charm import CharmBase
-from ops.model import Binding
 from ops.testing import Harness
 from test_lib_helpers import MockIPARequirer
 
@@ -26,11 +24,6 @@ class MockProviderCharm(CharmBase):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.ipa = IngressPerAppProvider(self)
-
-
-@pytest.fixture(autouse=True, scope="function")
-def patch_network(monkeypatch):
-    monkeypatch.setattr(Binding, "network", Mock(bind_address="10.10.10.10"))
 
 
 @pytest.fixture(scope="function")
