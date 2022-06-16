@@ -2,7 +2,6 @@
 # See LICENSE file for licensing details.
 
 from textwrap import dedent
-from unittest.mock import Mock
 
 import pytest
 from charms.traefik_k8s.v0.ingress_per_unit import (
@@ -10,9 +9,8 @@ from charms.traefik_k8s.v0.ingress_per_unit import (
     RelationPermissionError,
 )
 from ops.charm import CharmBase
-from ops.model import Binding
 from ops.testing import Harness
-from test_lib_helpers import MockIPURequirer
+from tests.unit.test_lib_helpers import MockIPURequirer
 
 
 class MockProviderCharm(CharmBase):
@@ -29,11 +27,6 @@ class MockProviderCharm(CharmBase):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.ipu = IngressPerUnitProvider(self)
-
-
-@pytest.fixture(autouse=True, scope="function")
-def patch_network(monkeypatch):
-    monkeypatch.setattr(Binding, "network", Mock(bind_address="10.10.10.10"))
 
 
 @pytest.fixture(scope="function")

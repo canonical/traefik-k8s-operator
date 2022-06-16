@@ -47,7 +47,8 @@ class SomeCharm(CharmBase):
 ```
 """
 import logging
-from typing import Dict, Optional, TypeVar, Union
+import socket
+from typing import Dict, Optional, TypeVar, Union, Tuple
 
 import ops.model
 import yaml
@@ -99,7 +100,7 @@ INGRESS_REQUIRES_UNIT_SCHEMA = {
         "model": {"type": "string"},
         "name": {"type": "string"},
         "host": {"type": "string"},
-        "port": {"type": "integer"},
+        "port": {"type": "string"},
     },
     "required": ["model", "name", "host", "port"],
 }
@@ -127,7 +128,7 @@ INGRESS_PROVIDES_APP_SCHEMA = {
 
 # TYPES
 try:
-    from typing import TypedDict
+    from typing import TypedDict, Literal
 except ImportError:
     from typing_extensions import TypedDict, Literal  # py35 compat
 
@@ -527,21 +528,53 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
 
 
 class _IPUEvent(RelationEvent):
-    __attrs__ = ()
+    __attrs__ = ()  # type: Tuple[str]
+
+    __converters__ = (
+        (Unit, "<__unit__>", "get_unit"),
+        (Application, "<__app__>", "get_app"),
+    )
+
+    def __init__(self, handle, relation, **kwargs):
+        super().__init__(handle, relation)
+        for attr, obj in kwargs.items():
+            setattr(self, attr, obj)
+
+    def _deserialize(self, obj, attr):
+        for typ_, marker, meth_name in self.__converters__:
+            if attr.startswith(marker):
+                attr = attr.strip(marker)
+                method = getattr(self.framework.model, meth_name)
+                return method(obj), attr
+        raise TypeError("cannot deserialize {}: no converter".format(type(obj).__name__))
+
+    def _serialize(self, obj, attr):
+        for typ_, marker, _ in self.__converters__:
+            if isinstance(obj, typ_):
+                return obj, marker + attr
+        raise TypeError("cannot serialize {}: no converter".format(type(obj).__name__))
 
     def snapshot(self) -> dict:
         dct = super().snapshot()
         for attr in self.__attrs__:
-            dct[attr] = getattr(self, attr)
+            obj = getattr(self, attr)
+            if isinstance(obj, (Unit, Application)):
+                obj, attr = self._serialize(obj, attr)
+            dct[attr] = obj
         return dct
 
     def restore(self, snapshot: dict) -> None:
         super().restore(snapshot)
         for attr in self.__attrs__:
-            setattr(self, attr, snapshot[attr])
+            obj = snapshot[attr]
+            try:
+                obj, attr = self._deserialize(obj, attr)
+            except TypeError as e:  # mostly safe
+                pass
+            setattr(self, attr, obj)
 
 
-class IngressPerUnitReadyEvent(_IPUEvent, RelationEvent):
+class IngressPerUnitReadyEvent(_IPUEvent):
     """Ingress is ready (or has changed) for some unit."""
     __attrs__ = ('unit_name', )
 
@@ -550,7 +583,7 @@ class IngressPerUnitReadyEvent(_IPUEvent, RelationEvent):
         self.unit_name = unit_name
 
 
-class IngressPerUnitReadyForUnitEvent(_IPUEvent, RelationEvent):
+class IngressPerUnitReadyForUnitEvent(_IPUEvent):
     """Ingress is ready (or has changed) for this unit.
 
     Is only fired on the unit(s) for which ingress has changed.
@@ -596,7 +629,7 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
             *,
             host: str = None,
             port: int = None,
-            listen_to: Literal['only-this-unit', 'all-units', 'both']
+            listen_to: Literal['only-this-unit', 'all-units', 'both'] = 'only-this-unit'
     ):
         """Constructor for IngressRequirer.
 
@@ -697,19 +730,17 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
 
         Args:
             host: Hostname to be used by the ingress provider to address the
-             requirer unit; if unspecified, the pod ip of the unit will be used
-             instead
+             requirer unit; if unspecified, FQDN will be used instead
             port: the port of the service (required)
         """
         if not host:
-            binding = self.charm.model.get_binding(self.relation_name)
-            host = str(binding.network.bind_address)
+            host = socket.getfqdn()
 
         data = {
             "model": self.model.name,
             "name": self.unit.name,
             "host": host,
-            "port": port,
+            "port": str(port),
         }
         _validate_data(data, INGRESS_REQUIRES_UNIT_SCHEMA)
         self.relation.data[self.unit].update(data)
@@ -721,16 +752,17 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
         May return an empty dict if the URLs aren't available yet.
         """
         relation = self.relation
-        if not relation or not self.is_ready(relation):
+        if not relation:
             return {}
 
-        raw = None
-        if relation.app.name:  # type: ignore
+        if not relation.app.name:  # type: ignore
             # FIXME Workaround for https://github.com/canonical/operator/issues/693
             # We must be in a relation_broken hook
-            raw = relation.data.get(relation.app, {}).get("ingress")
+            return {}
 
+        raw = relation.data.get(relation.app, {}).get("ingress")
         if not raw:
+            # remote side didn't send yet
             return {}
 
         data = yaml.safe_load(raw)

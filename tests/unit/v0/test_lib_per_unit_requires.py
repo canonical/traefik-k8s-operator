@@ -11,7 +11,7 @@ from charms.traefik_k8s.v0.ingress_per_unit import (
 from ops.charm import CharmBase
 from ops.framework import StoredState
 from ops.testing import Harness
-from test_lib_helpers import MockIPUProvider
+from tests.unit.test_lib_helpers import MockIPUProvider
 
 
 class MockRequirerCharm(CharmBase):

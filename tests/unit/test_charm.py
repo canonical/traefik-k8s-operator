@@ -10,7 +10,7 @@ import yaml
 from ops.charm import ActionEvent
 from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
 from ops.testing import Harness
-from test_lib_helpers import MockIPARequirer, MockIPURequirer
+from tests.unit.test_lib_helpers import MockIPARequirer, MockIPURequirer
 
 from charm import TraefikIngressCharm
 

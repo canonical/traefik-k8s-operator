@@ -7,7 +7,8 @@ import pytest
 from charms.traefik_k8s.v0.ingress import IngressPerAppProvider
 from ops.charm import CharmBase
 from ops.testing import Harness
-from test_lib_helpers import MockIPARequirer
+
+from tests.unit.test_lib_helpers import MockIPARequirer
 
 
 class MockProviderCharm(CharmBase):
