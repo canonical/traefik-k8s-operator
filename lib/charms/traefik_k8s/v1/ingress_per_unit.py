@@ -494,15 +494,8 @@ class _IPUEvent(RelationEvent):
     def __attrs__(cls):
         return cls.__args__ + tuple(cls.__optional_kwargs__.keys())
 
-    __converters__ = (
-        (Unit, "<__unit__>", "get_unit"),
-        (Application, "<__app__>", "get_app"),
-    )
-
-    def __init__(self, handle, relation, *args, model: Model, **kwargs):
+    def __init__(self, handle, relation, *args, **kwargs):
         super().__init__(handle, relation)
-        assert isinstance(model, Model)  # type: ignore
-        self.model = model
 
         if not len(self.__args__) == len(args):
             raise TypeError("expected {} args, got {}".format(len(self.__args__), len(args)))
@@ -510,56 +503,48 @@ class _IPUEvent(RelationEvent):
         for attr, obj in zip(self.__args__, args):
             setattr(self, attr, obj)
         for attr, default in self.__optional_kwargs__.items():
-            obj = kwargs.get(attr, None)
+            obj = kwargs.get(attr, default)
             setattr(self, attr, obj)
-
-    def _deserialize(self, obj, attr):
-        for typ_, marker, meth_name in self.__converters__:
-            if attr.startswith(marker):
-                attr = attr.strip(marker)
-                method = getattr(self.model, meth_name)
-                return method(obj), attr
-        raise TypeError("cannot deserialize {}: no converter".format(type(obj).__name__))
-
-    def _serialize(self, obj, attr):
-        for typ_, marker, _ in self.__converters__:
-            if isinstance(obj, typ_):
-                return obj, marker + attr
-        raise TypeError("cannot serialize {}: no converter".format(type(obj).__name__))
 
     def snapshot(self) -> dict:
         dct = super().snapshot()
         for attr in self.__attrs__():
             obj = getattr(self, attr)
-            if isinstance(obj, (Unit, Application)):
-                obj, attr = self._serialize(obj, attr)
+            if not isinstance(obj, str):
+                raise TypeError('cannot automagically serialize {}: ({}) '
+                                'override this method and do it '
+                                'manually.'.format(obj, attr))
             dct[attr] = obj
         return dct
 
     def restore(self, snapshot: dict) -> None:
         super().restore(snapshot)
-        for attr in self.__attrs__():
-            obj = snapshot[attr]
-            try:
-                obj, attr = self._deserialize(obj, attr)
-            except TypeError:  # mostly safe
-                pass
+        for attr, obj in snapshot.items():
             setattr(self, attr, obj)
 
 
 class IngressPerUnitReadyEvent(_IPUEvent):
-    """Ingress is ready (or has changed) for some unit."""
+    """Ingress is ready (or has changed) for some unit.
 
-    __args__ = ("unit", "url")
+    Attrs:
+        `unit_name`: name of the unit for which ingress has been
+            provided/has changed.
+        `url`: the (new) url for that unit.
+    """
+
+    __args__ = ("unit_name", "url")
     if typing.TYPE_CHECKING:
-        unit = typing.cast(Unit, None)  # at runtime it will be.
+        unit_name = ''
         url = ""
 
 
 class IngressPerUnitReadyForUnitEvent(_IPUEvent):
     """Ingress is ready (or has changed) for this unit.
 
-    Is only fired on the unit(s) for which ingress has changed.
+    Is only fired on the unit(s) for which ingress has been provided or
+    has changed.
+    Attrs:
+        `url`: the (new) url for this unit.
     """
 
     __args__ = ("url",)
@@ -567,8 +552,17 @@ class IngressPerUnitReadyForUnitEvent(_IPUEvent):
         url = ""
 
 
-class IngressPerUnitRevokedEvent(RelationEvent):
-    """Ingress is revoked (or has changed) for some unit."""
+class IngressPerUnitRevokedEvent(_IPUEvent):
+    """Ingress is revoked (or has changed) for some unit.
+
+    Attrs:
+        `unit_name`: the name of the unit whose ingress has been revoked.
+            this could be "THIS" unit, or a peer.
+    """
+    __args__ = ('unit_name')
+
+    if typing.TYPE_CHECKING:
+        unit_name = ''
 
 
 class IngressPerUnitRevokedForUnitEvent(RelationEvent):
@@ -660,7 +654,7 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
         if self.listen_to in {"only-this-unit", "both"}:
             if this_unit_name in changed:
                 self.on.ready_for_unit.emit(  # type: ignore
-                    self.relation, current_urls[this_unit_name], model=self.model
+                    self.relation, current_urls[this_unit_name]
                 )
 
             if this_unit_name in removed:
@@ -668,13 +662,12 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
 
         if self.listen_to in {"all-units", "both"}:
             for unit_name in changed:
-                unit = self.model.get_unit(unit_name)
                 self.on.ready.emit(  # type: ignore
-                    self.relation, unit, current_urls[unit_name], model=self.model
+                    self.relation, unit_name, current_urls[unit_name]
                 )
 
             for unit_name in removed:
-                self.on.revoked.emit(self.relation)  # type: ignore
+                self.on.revoked.emit(self.relation, unit_name)  # type: ignore
 
         self._stored.current_urls = current_urls  # type: ignore
         self._publish_auto_data(event.relation)

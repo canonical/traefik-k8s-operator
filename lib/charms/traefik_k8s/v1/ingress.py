@@ -197,15 +197,8 @@ class _IPAEvent(RelationEvent):
     def __attrs__(cls):
         return cls.__args__ + tuple(cls.__optional_kwargs__.keys())
 
-    __converters__ = (
-        (Unit, "<__unit__>", "get_unit"),
-        (Application, "<__app__>", "get_app"),
-    )
-
-    def __init__(self, handle, relation, *args, model: Model, **kwargs):
+    def __init__(self, handle, relation, *args, **kwargs):
         super().__init__(handle, relation)
-        assert isinstance(model, Model)  # type: ignore
-        self.model = model
 
         if not len(self.__args__) == len(args):
             raise TypeError("expected {} args, got {}".format(len(self.__args__), len(args)))
@@ -213,40 +206,23 @@ class _IPAEvent(RelationEvent):
         for attr, obj in zip(self.__args__, args):
             setattr(self, attr, obj)
         for attr, default in self.__optional_kwargs__.items():
-            obj = kwargs.get(attr, None)
+            obj = kwargs.get(attr, default)
             setattr(self, attr, obj)
-
-    def _deserialize(self, obj, attr):
-        for typ_, marker, meth_name in self.__converters__:
-            if attr.startswith(marker):
-                attr = attr.strip(marker)
-                method = getattr(self.model, meth_name)
-                return method(obj), attr
-        raise TypeError("cannot deserialize {}: no converter".format(type(obj).__name__))
-
-    def _serialize(self, obj, attr):
-        for typ_, marker, _ in self.__converters__:
-            if isinstance(obj, typ_):
-                return obj, marker + attr
-        raise TypeError("cannot serialize {}: no converter".format(type(obj).__name__))
 
     def snapshot(self) -> dict:
         dct = super().snapshot()
         for attr in self.__attrs__():
             obj = getattr(self, attr)
-            if isinstance(obj, (Unit, Application)):
-                obj, attr = self._serialize(obj, attr)
+            if not isinstance(obj, str):
+                raise TypeError('cannot automagically serialize {}: '
+                                'override this method and do it '
+                                'manually.'.format(obj))
             dct[attr] = obj
         return dct
 
     def restore(self, snapshot: dict) -> None:
         super().restore(snapshot)
-        for attr in self.__attrs__():
-            obj = snapshot[attr]
-            try:
-                obj, attr = self._deserialize(obj, attr)
-            except TypeError:  # mostly safe
-                pass
+        for attr, obj in snapshot.items():
             setattr(self, attr, obj)
 
 
@@ -298,7 +274,6 @@ class IngressPerAppProvider(_IngressPerAppBase):
                 data["model"],
                 data["port"],
                 data["host"],
-                model=self.model,
             )
 
     def _handle_relation_broken(self, event):
@@ -419,7 +394,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
     """Implementation of the requirer of the ingress relation."""
 
     on = IngressPerAppRequirerEvents()
-    # used to prevent spurious urls to be sent out if the event we're currently
+    # used to prevent spur1ious urls to be sent out if the event we're currently
     # handling is a relation-broken one.
     _stored = StoredState()
 
@@ -470,7 +445,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
             new_url = self.url
             if self._stored.current_url != new_url:
                 self._stored.current_url = new_url
-                self.on.ready.emit(event.relation, new_url, model=self.model)
+                self.on.ready.emit(event.relation, new_url)
 
     def _handle_relation_broken(self, event):
         self.on.revoked.emit(event.relation)
