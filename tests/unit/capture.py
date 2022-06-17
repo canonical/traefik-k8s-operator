@@ -8,14 +8,15 @@ _T = TypeVar('_T')
 
 
 @contextmanager
-def capture_events(charm: CharmBase, types=(EventBase,)):
+def capture_events(charm: CharmBase, *types: Type[EventBase]):
+    allowed_types = types or (EventBase, )
+
     captured = []
     _real_emit = charm.framework._emit
 
     def _wrapped_emit(evt):
-        for typ_ in types:
-            if isinstance(evt, typ_):
-                captured.append(evt)
+        if isinstance(evt, allowed_types):
+            captured.append(evt)
         return _real_emit(evt)
 
     charm.framework._emit = _wrapped_emit
@@ -40,7 +41,7 @@ class Captured(Generic[_T]):
 @contextmanager
 def capture(charm: CharmBase, typ_: Type[_T] = EventBase) -> Captured[_T]:
     result = Captured()
-    with capture_events(charm, (typ_,)) as captured:
+    with capture_events(charm, typ_) as captured:
         if not captured:
             yield result
 

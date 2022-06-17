@@ -48,6 +48,7 @@ class SomeCharm(CharmBase):
 """
 import logging
 import socket
+import typing
 from typing import Dict, Optional, TypeVar, Union, Tuple
 
 import ops.model
@@ -288,45 +289,11 @@ class _IngressPerUnitBase(Object):
             return False
         return True
 
-    def is_failed(self, _: Relation = None) -> bool:
-        """Checks whether the given relation is failed.
-
-        Or any relation if not specified.
-        """
-        raise NotImplementedError("implement in subclass")
-
 
 class IngressPerUnitProvider(_IngressPerUnitBase):
     """Implementation of the provider of ingress_per_unit."""
 
     on = IngressPerUnitEvents()
-
-    def __init__(self, charm: CharmBase,
-                 relation_name: str = DEFAULT_RELATION_NAME):
-        """Constructor for IngressPerUnitProvider.
-
-        Args:
-            charm: The charm that is instantiating the instance.
-            relation_name: The name of the relation relation_name to bind to
-                (defaults to "ingress-per-unit").
-        """
-        super().__init__(charm, relation_name)
-        observe = self.framework.observe
-        observe(self.charm.on[relation_name].relation_joined,
-                self._share_version_info)
-
-    def _share_version_info(self, event):
-        """Backwards-compatibility shim for version negotiation.
-
-        Allows older versions of IPU (requirer side) to interact with this
-        provider without breaking.
-        Will be removed in a future version of this library.
-        Do not use.
-        """
-        relation = event.relation
-        if self.charm.unit.is_leader():
-            log.info("shared supported_versions shim information")
-            relation.data[self.charm.app]["_supported_versions"] = "- v1"
 
     def is_ready(self, relation: Relation = None) -> bool:
         """Checks whether the given relation is ready.
@@ -341,55 +308,34 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
             return False
 
         try:
-            requirer_unit_data = self._requirer_unit_data(relation)
+            requirer_units_data = self._requirer_units_data(relation)
         except Exception:
             log.exception(
                 "Cannot fetch ingress data for the '{}' relation".format(
                     relation))
             return False
 
-        return any(requirer_unit_data.values())
+        return any(requirer_units_data.values())
 
-    def is_failed(self, relation: Relation = None) -> bool:
+    def validate(self, relation: Relation = None) -> bool:
         """Checks whether the given relation is failed.
 
         Or any relation if not specified.
         """
-        if relation is None:
-            return any(map(self.is_failed, self.relations))
-
-        if not relation.app.name:  # type: ignore
-            # Juju doesn't provide JUJU_REMOTE_APP during relation-broken
-            # hooks. See https://github.com/canonical/operator/issues/693
-            return False
-
-        if not relation.units:
-            # Relations without requiring units cannot be in failed state
-            return False
-
-        try:
-            # grab the data and validate it; might raise
-            requirer_unit_data = self._requirer_unit_data(relation)
-        except DataValidationError as e:
-            log.warning(
-                "Failed to validate relation data for {} relation: {}".format(
-                    relation, e))
-            return True
-
-        # verify that all remote units (requirer's side) publish the same model.
+         # verify that all remote units (requirer's side) publish the same model.
         # We do not validate the port because, in case of changes to the configuration
         # of the charm or a new version of the charmed workload, e.g. over an upgrade,
         # the remote port may be different among units.
         expected_model = None  # It may be none for units that have not yet written data
 
-        for remote_unit, remote_unit_data in requirer_unit_data.items():
+        remote_units_data = self._requirer_units_data(relation)
+        for remote_unit, remote_unit_data in remote_units_data.items():
             if "model" in remote_unit_data:
                 remote_model = remote_unit_data["model"]
                 if not expected_model:
                     expected_model = remote_model
                 elif expected_model != remote_model:
                     raise RelationDataMismatchError(relation, remote_unit)
-
         return False
 
     def is_unit_ready(self, relation: Relation, unit: Unit) -> bool:
@@ -399,29 +345,31 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
         assert (
                 unit in relation.units
         ), "attempting to get ready state for unit that does not belong to relation"
-        if relation.data.get(unit, {}).get("data"):
-            # TODO consider doing schema-based validation here
-            return True
-        return False
+        try:
+            self._get_requirer_unit_data(relation, unit)
+        except (KeyError, DataValidationError):
+            return False
+        return True
 
     def get_data(self, relation: Relation, unit: Unit) -> "RequirerData":
         """Fetch the data shared by the specified unit on the relation (Requirer side)."""
-        data = yaml.safe_load(relation.data[unit]["data"])
-        _validate_data(data, INGRESS_REQUIRES_UNIT_SCHEMA)
-        return data
+        return self._get_requirer_unit_data(relation, unit)
 
     def publish_url(self, relation: Relation, unit_name: str, url: str):
         """Place the ingress url in the application data bag for the units on the requires side.
 
         Assumes that this unit is leader.
         """
-        raw_data = relation.data[self.app].get("data", None)
-        data = yaml.safe_load(raw_data) if raw_data else {"ingress": {}}
+        assert self.unit.is_leader(), 'only leaders can do this'
+
+        raw_data = relation.data[self.app].get("ingress", None)
+        data = yaml.safe_load(raw_data) if raw_data else {}
+        ingress = {"ingress": data}
 
         # we ensure that the application databag has the shape we think it
         # should have; to catch any inconsistencies early on.
         try:
-            _validate_data(data, INGRESS_PROVIDES_APP_SCHEMA)
+            _validate_data(ingress, INGRESS_PROVIDES_APP_SCHEMA)
         except DataValidationError as e:
             log.error(
                 "unable to publish url to {}: corrupted application databag ({})".format(
@@ -431,32 +379,23 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
             return
 
         # we update the data with a new url
-        data["ingress"][unit_name] = {"url": url}
+        data[unit_name] = {"url": url}
 
         # we validate the data **again**, to ensure that we respected the schema
         # and did not accidentally corrupt our own databag.
-        _validate_data(data, INGRESS_PROVIDES_APP_SCHEMA)
-
-        try:
-            relation.data[self.app]["data"] = yaml.safe_dump(data)
-        except ops.model.RelationDataError:
-            unit = self.unit
-            raise RelationPermissionError(
-                relation,
-                unit,
-                "failed to write application data: leader={}".format(
-                    unit.is_leader()),
-            )
+        _validate_data(ingress, INGRESS_PROVIDES_APP_SCHEMA)
+        relation.data[self.app]["ingress"] = yaml.safe_dump(data)
 
     def wipe_ingress_data(self, relation):
         """Remove all published ingress data.
 
         Assumes that this unit is leader.
         """
-        relation.data[self.app]["data"] = ""
+        assert self.unit.is_leader(), 'only leaders can do this'
+        del relation.data[self.app]["ingress"]
 
-    def _requirer_unit_data(self, relation: Relation) -> RequirerUnitData:
-        """Fetch and validate the requirer's unit databag."""
+    def _requirer_units_data(self, relation: Relation) -> RequirerUnitData:
+        """Fetch and validate the requirer's units databag."""
         if not relation.app or not relation.app.name:
             # Handle edge case where remote app name can be missing, e.g.,
             # relation_broken events.
@@ -466,16 +405,37 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
         remote_units = [unit for unit in relation.units if
                         unit.app is not self.app]
 
-        requirer_unit_data = {}
+        requirer_units_data = {}
         for remote_unit in remote_units:
-            remote_data = relation.data[remote_unit].get("data")
-            remote_deserialized = {}
-            if remote_data:
-                remote_deserialized = yaml.safe_load(remote_data)
-                _validate_data(remote_deserialized,
-                               INGRESS_REQUIRES_UNIT_SCHEMA)
-            requirer_unit_data[remote_unit] = remote_deserialized
-        return requirer_unit_data
+            try:
+                remote_data = self._get_requirer_unit_data(relation, remote_unit)
+            except KeyError:
+                # this remote unit didn't share data yet
+                log.warning('Remote unit {} not ready.'.format(remote_unit.name))
+                continue
+            except DataValidationError:
+                # this remote unit sent invalid data.
+                log.error('Remote unit {} sent invalid data.'.format(remote_unit.name))
+                continue
+
+            remote_data['port'] = int(remote_data['port'])
+            requirer_units_data[remote_unit] = remote_data
+        return requirer_units_data
+
+    def _get_requirer_unit_data(self, relation: Relation, remote_unit: Unit) -> RequirerData:
+        """Attempts to fetch the requirer unit data for this unit.
+
+        May raise KeyError if the remote unit didn't send (some of) the required
+        data yet, or ValidationError if it did share some data, but the data
+        is invalid.
+        """
+        databag = relation.data[remote_unit]
+        remote_data = {k: databag[k] for k in ('port', 'host', 'model', 'name')}
+        _validate_data(remote_data, INGRESS_REQUIRES_UNIT_SCHEMA)
+
+        # do some convenience casting
+        remote_data['port'] = int(remote_data['port'])
+        return remote_data
 
     def _provider_app_data(self, relation: Relation) -> ProviderApplicationData:
         """Fetch and validate the provider's app databag."""
@@ -528,16 +488,27 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
 
 
 class _IPUEvent(RelationEvent):
-    __attrs__ = ()  # type: Tuple[str]
+    __args__ = ()  # type: Tuple[str]
+    __optional_kwargs__ = {}  # type: Dict[str, Any]
+
+    @classmethod
+    def __attrs__(cls):
+        return cls.__args__ + tuple(cls.__optional_kwargs__.keys())
 
     __converters__ = (
         (Unit, "<__unit__>", "get_unit"),
         (Application, "<__app__>", "get_app"),
     )
 
-    def __init__(self, handle, relation, **kwargs):
+    def __init__(self, handle, relation, *args, **kwargs):
         super().__init__(handle, relation)
-        for attr, obj in kwargs.items():
+        if not len(self.__args__) == len(args):
+            raise TypeError("expected {} args, got {}".format(len(self.__args__), len(args)))
+
+        for attr, obj in zip(self.__args__, args):
+            setattr(self, attr, obj)
+        for attr, default in self.__optional_kwargs__.items():
+            obj = kwargs.get(attr, None)
             setattr(self, attr, obj)
 
     def _deserialize(self, obj, attr):
@@ -556,7 +527,7 @@ class _IPUEvent(RelationEvent):
 
     def snapshot(self) -> dict:
         dct = super().snapshot()
-        for attr in self.__attrs__:
+        for attr in self.__attrs__():
             obj = getattr(self, attr)
             if isinstance(obj, (Unit, Application)):
                 obj, attr = self._serialize(obj, attr)
@@ -565,7 +536,7 @@ class _IPUEvent(RelationEvent):
 
     def restore(self, snapshot: dict) -> None:
         super().restore(snapshot)
-        for attr in self.__attrs__:
+        for attr in self.__attrs__():
             obj = snapshot[attr]
             try:
                 obj, attr = self._deserialize(obj, attr)
@@ -576,11 +547,10 @@ class _IPUEvent(RelationEvent):
 
 class IngressPerUnitReadyEvent(_IPUEvent):
     """Ingress is ready (or has changed) for some unit."""
-    __attrs__ = ('unit_name', )
-
-    def __init__(self, unit_name: str, handle, relation):
-        super().__init__(handle, relation)
-        self.unit_name = unit_name
+    __args__ = ('unit', 'url')
+    if typing.TYPE_CHECKING:
+        unit = None  # type: Unit
+        url = None  # type: str
 
 
 class IngressPerUnitReadyForUnitEvent(_IPUEvent):
@@ -588,11 +558,9 @@ class IngressPerUnitReadyForUnitEvent(_IPUEvent):
 
     Is only fired on the unit(s) for which ingress has changed.
     """
-    __attrs__ = ('url', )
-
-    def __init__(self, url: str, handle, relation):
-        super().__init__(handle, relation)
-        self.url = url
+    __args__ = ('url', )
+    if typing.TYPE_CHECKING:
+        url = None  # type: str
 
 
 class IngressPerUnitRevokedEvent(RelationEvent):
@@ -679,7 +647,7 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
         current_urls = self.urls or {}
 
         removed = previous_urls.keys() - current_urls.keys()
-        changed = {a for a in current_urls if current_urls[a] != previous_urls[a]}
+        changed = {a for a in current_urls if current_urls[a] != previous_urls.get(a)}
 
         this_unit_name = self.unit.name
         if self.listen_to in {'only-this-unit', 'both'}:
@@ -692,7 +660,8 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
 
         if self.listen_to in {'all-units', 'both'}:
             for unit_name in changed:
-                self.on.ready.emit(self.relation, current_urls[unit_name])
+                unit = self.model.get_unit(unit_name)
+                self.on.ready.emit(self.relation, unit, current_urls[unit_name])
 
             for unit_name in removed:
                 self.on.revoked.emit(self.relation)
@@ -714,15 +683,16 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
         """The established Relation instance, or None if still unrelated."""
         return self.relations[0] if self.relations else None
 
-    def is_ready(self, relation: Relation = None) -> bool:
+    def is_ready(self) -> bool:
         """Checks whether the given relation is ready.
 
         Or any relation if not specified.
         A given relation is ready if the remote side has sent valid data.
         """
-        if super().is_ready(relation) is False:
+        if not self.relation:
             return False
-
+        if super().is_ready(self.relation) is False:
+            return False
         return bool(self.url)
 
     def provide_ingress_requirements(self, *, host: str = None, port: int):
