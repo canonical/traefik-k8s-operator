@@ -54,7 +54,7 @@ from typing import Any, Dict, Optional, Tuple, Union
 import yaml
 from ops.charm import CharmBase, RelationEvent
 from ops.framework import EventSource, Object, ObjectEvents, StoredState
-from ops.model import Application, Model, Relation, Unit
+from ops.model import Application, Relation, Unit
 
 # The unique Charmhub library identifier, never change it
 LIBID = "7ef06111da2945ed84f4f5d4eb5b353a"
@@ -511,9 +511,11 @@ class _IPUEvent(RelationEvent):
         for attr in self.__attrs__():
             obj = getattr(self, attr)
             if not isinstance(obj, str):
-                raise TypeError('cannot automagically serialize {}: ({}) '
-                                'override this method and do it '
-                                'manually.'.format(obj, attr))
+                raise TypeError(
+                    "cannot automagically serialize {}: ({}) "
+                    "override this method and do it "
+                    "manually.".format(obj, attr)
+                )
             dct[attr] = obj
         return dct
 
@@ -534,7 +536,7 @@ class IngressPerUnitReadyEvent(_IPUEvent):
 
     __args__ = ("unit_name", "url")
     if typing.TYPE_CHECKING:
-        unit_name = ''
+        unit_name = ""
         url = ""
 
 
@@ -559,10 +561,11 @@ class IngressPerUnitRevokedEvent(_IPUEvent):
         `unit_name`: the name of the unit whose ingress has been revoked.
             this could be "THIS" unit, or a peer.
     """
-    __args__ = ('unit_name')
+
+    __args__ = "unit_name"
 
     if typing.TYPE_CHECKING:
-        unit_name = ''
+        unit_name = ""
 
 
 class IngressPerUnitRevokedForUnitEvent(RelationEvent):

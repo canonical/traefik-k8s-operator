@@ -1,11 +1,18 @@
+# Copyright 2022 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 import pytest
 import yaml
-from ops.charm import CharmBase, RelationEvent
+from charms.traefik_k8s.v1.ingress_per_unit import (
+    IngressPerUnitReadyEvent,
+    IngressPerUnitReadyForUnitEvent,
+    IngressPerUnitRequirer,
+    IngressPerUnitRevokedEvent,
+    IngressPerUnitRevokedForUnitEvent,
+)
+from ops.charm import CharmBase
 from ops.testing import Harness
 
-from charms.traefik_k8s.v1.ingress_per_unit import IngressPerUnitRequirer, \
-    IngressPerUnitReadyEvent, IngressPerUnitRevokedEvent, \
-    IngressPerUnitReadyForUnitEvent, IngressPerUnitRevokedForUnitEvent
 from tests.unit.capture import capture_events
 
 
@@ -19,8 +26,7 @@ def charm_cls(listen_to):
     class MyCharm(CharmBase):
         def __init__(self, framework):
             super().__init__(framework, None)
-            self.ipu = IngressPerUnitRequirer(self, host='foo.com', port=80,
-                                              listen_to=listen_to)
+            self.ipu = IngressPerUnitRequirer(self, host="foo.com", port=80, listen_to=listen_to)
 
             self.framework.observe(self.ipu.on.ready, self._on_event)
             self.framework.observe(self.ipu.on.revoked, self._on_event)
@@ -33,10 +39,9 @@ def charm_cls(listen_to):
     return MyCharm
 
 
-META = yaml.safe_dump({
-    'name': 'my_charm',
-    'requires': {'ingress-per-unit': {'interface': 'ingress-per-unit'}}
-})
+META = yaml.safe_dump(
+    {"name": "my_charm", "requires": {"ingress-per-unit": {"interface": "ingress-per-unit"}}}
+)
 
 
 @pytest.fixture
@@ -46,12 +51,12 @@ def harness(charm_cls):
 
 @pytest.fixture
 def charm(harness):
-    harness.set_model_name('unittest_model')
+    harness.set_model_name("unittest_model")
     harness.begin()
     return harness.charm
 
 
-@pytest.fixture(params=('url.com', 'foo.org'))
+@pytest.fixture(params=("url.com", "foo.org"))
 def url(request):
     return request.param
 
@@ -62,29 +67,31 @@ def relate(harness: Harness):
     return harness.model.get_relation("ingress-per-unit", relation_id)
 
 
-def _requirer_provide_ingress(
-        harness: Harness, unit_name: str, url: str, relation
-):
+def _requirer_provide_ingress(harness: Harness, unit_name: str, url: str, relation):
     # same as provider.publish_url(relation, unit_name, url)
     data = harness.get_relation_data(relation.id, "remote").get("ingress")
     data = yaml.safe_load(data) if data else {}
     data[unit_name] = {"url": url}
-    harness.update_relation_data(relation.id, "remote",
-                                 {"ingress": yaml.safe_dump(data)})
+    harness.update_relation_data(relation.id, "remote", {"ingress": yaml.safe_dump(data)})
 
 
-IPUEvents = IngressPerUnitReadyEvent, IngressPerUnitRevokedEvent, IngressPerUnitReadyForUnitEvent, IngressPerUnitRevokedForUnitEvent
+IPUEvents = (
+    IngressPerUnitReadyEvent,
+    IngressPerUnitRevokedEvent,
+    IngressPerUnitReadyForUnitEvent,
+    IngressPerUnitRevokedForUnitEvent,
+)
 
 
 def test_ready_single_unit(harness, charm, listen_to, url):
     with capture_events(charm, *IPUEvents) as captured:
         _requirer_provide_ingress(harness, charm.unit.name, url, relate(harness))
 
-    if listen_to == 'only-this-unit':
+    if listen_to == "only-this-unit":
         assert len(captured) == 1
         event = captured[0]
         assert isinstance(event, IngressPerUnitReadyForUnitEvent)
-    elif listen_to == 'all-units':
+    elif listen_to == "all-units":
         assert len(captured) == 1
         event = captured[0]
         assert isinstance(event, IngressPerUnitReadyEvent)
@@ -102,15 +109,15 @@ def test_ready_other_unit(harness, charm, listen_to, url):
     relation = relate(harness)
     _requirer_provide_ingress(harness, charm.unit.name, url, relation)
 
-    new_unit_name = charm.unit.name + '1'
-    new_unit_url = url + '/new_unit'
+    new_unit_name = charm.unit.name + "1"
+    new_unit_url = url + "/new_unit"
     harness.add_relation_unit(relation.id, new_unit_name)
 
     # we provide ingress to the new unit
     with capture_events(charm, *IPUEvents) as captured:
         _requirer_provide_ingress(harness, new_unit_name, new_unit_url, relation)
 
-    if listen_to == 'only-this-unit':
+    if listen_to == "only-this-unit":
         # no event captured, because we're only listening to events
         # pertaining THIS unit.
         assert len(captured) == 0
@@ -121,5 +128,4 @@ def test_ready_other_unit(harness, charm, listen_to, url):
         assert isinstance(event, IngressPerUnitReadyEvent)
 
     assert charm.ipu.url == url
-    assert charm.ipu.urls == {charm.unit.name: url,
-                              new_unit_name: new_unit_url}
+    assert charm.ipu.urls == {charm.unit.name: url, new_unit_name: new_unit_url}

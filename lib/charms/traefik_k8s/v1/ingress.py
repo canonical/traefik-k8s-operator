@@ -57,7 +57,7 @@ from typing import Any, Dict, Optional, Tuple
 import yaml
 from ops.charm import CharmBase, RelationEvent
 from ops.framework import EventSource, Object, ObjectEvents, StoredState
-from ops.model import Application, Model, Relation, Unit
+from ops.model import Relation
 
 # The unique Charmhub library identifier, never change it
 LIBID = "e6de2a5cd5b34422a204668f3b8f90d2"
@@ -214,9 +214,11 @@ class _IPAEvent(RelationEvent):
         for attr in self.__attrs__():
             obj = getattr(self, attr)
             if not isinstance(obj, str):
-                raise TypeError('cannot automagically serialize {}: '
-                                'override this method and do it '
-                                'manually.'.format(obj))
+                raise TypeError(
+                    "cannot automagically serialize {}: "
+                    "override this method and do it "
+                    "manually.".format(obj)
+                )
             dct[attr] = obj
         return dct
 
