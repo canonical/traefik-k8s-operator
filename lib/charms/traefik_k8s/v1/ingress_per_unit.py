@@ -54,7 +54,7 @@ from typing import Any, Dict, Optional, Tuple, Union
 import yaml
 from ops.charm import CharmBase, RelationEvent
 from ops.framework import EventSource, Object, ObjectEvents, StoredState
-from ops.model import Application, Relation, Unit
+from ops.model import Application, Model, Relation, Unit
 
 # The unique Charmhub library identifier, never change it
 LIBID = "7ef06111da2945ed84f4f5d4eb5b353a"
@@ -120,18 +120,13 @@ INGRESS_PROVIDES_APP_SCHEMA = {
 
 # TYPES
 try:
-    from typing import Literal, TypedDict
+    from typing import Literal, TypedDict  # type: ignore
 except ImportError:
     from typing_extensions import Literal, TypedDict  # py35 compat
 
 
-class RequirerData(TypedDict):
-    """Model of the data a unit implementing the requirer will need to provide."""
-
-    model: str
-    name: str
-    host: str
-    port: int
+# Model of the data a unit implementing the requirer will need to provide.
+RequirerData = TypedDict("RequirerData", {"model": str, "name": str, "host": str, "port": int})
 
 
 RequirerUnitData = Dict[Unit, "RequirerData"]
@@ -204,7 +199,7 @@ class _IngressPerUnitBase(Object):
                 (defaults to "ingress-per-unit").
         """
         super().__init__(charm, relation_name)
-        self.charm: CharmBase = charm
+        self.charm = charm  # type: CharmBase
 
         self.relation_name = relation_name
         self.app = self.charm.app
@@ -216,8 +211,8 @@ class _IngressPerUnitBase(Object):
         observe(rel_events.relation_joined, self._handle_relation)
         observe(rel_events.relation_changed, self._handle_relation)
         observe(rel_events.relation_broken, self._handle_relation_broken)
-        observe(charm.on.leader_elected, self._handle_upgrade_or_leader)
-        observe(charm.on.upgrade_charm, self._handle_upgrade_or_leader)
+        observe(charm.on.leader_elected, self._handle_upgrade_or_leader)  # type: ignore
+        observe(charm.on.upgrade_charm, self._handle_upgrade_or_leader)  # type: ignore
 
     @property
     def relations(self):
@@ -236,7 +231,7 @@ class _IngressPerUnitBase(Object):
         """Subclasses should implement this method to handle upgrades or leadership change."""
         pass
 
-    def is_ready(self, relation: Relation = None) -> bool:
+    def is_ready(self, relation: Optional[Relation] = None) -> bool:
         """Checks whether the given relation is ready.
 
         A relation is ready if the remote side has sent valid data.
@@ -288,22 +283,22 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
         try:
             self.validate(relation)
         except RelationDataMismatchError as e:
-            self.on.data_removed.emit(relation)
+            self.on.data_removed.emit(relation, model=self.model)  # type: ignore
             log.warning(
                 "relation data mismatch: {} " "data_removed ingress for {}.".format(e, relation)
             )
             return
 
         if self.is_ready(relation):
-            self.on.data_provided.emit(relation)
+            self.on.data_provided.emit(relation, model=self.model)  # type: ignore
         else:
-            self.on.data_removed.emit(relation)
+            self.on.data_removed.emit(relation, model=self.model)  # type: ignore
 
     def _handle_relation_broken(self, event):
         # relation broken -> we revoke in any case
-        self.on.data_removed.emit(event.relation)
+        self.on.data_removed.emit(event.relation, model=self.model)  # type: ignore
 
-    def is_ready(self, relation: Relation = None) -> bool:
+    def is_ready(self, relation: Optional[Relation] = None) -> bool:
         """Checks whether the given relation is ready.
 
         Or any relation if not specified.
@@ -323,7 +318,7 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
 
         return any(requirer_units_data.values())
 
-    def validate(self, relation: Relation = None) -> bool:
+    def validate(self, relation: Relation):
         """Checks whether the given relation is failed.
 
         Or any relation if not specified.
@@ -426,7 +421,7 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
             requirer_units_data[remote_unit] = remote_data
         return requirer_units_data
 
-    def _get_requirer_unit_data(self, relation: Relation, remote_unit: Unit) -> RequirerData:
+    def _get_requirer_unit_data(self, relation: Relation, remote_unit: Unit) -> RequirerData:  # type: ignore
         """Attempts to fetch the requirer unit data for this unit.
 
         May raise KeyError if the remote unit didn't send (some of) the required
@@ -492,8 +487,10 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
 
 
 class _IPUEvent(RelationEvent):
-    __args__ = ()  # type: Tuple[str]
+    __args__ = ()  # type: Tuple[str, ...]
     __optional_kwargs__ = {}  # type: Dict[str, Any]
+    if typing.TYPE_CHECKING:
+        model = typing.cast(Model, None)  # at runtime it will be.
 
     @classmethod
     def __attrs__(cls):
@@ -506,6 +503,9 @@ class _IPUEvent(RelationEvent):
 
     def __init__(self, handle, relation, *args, **kwargs):
         super().__init__(handle, relation)
+        model = kwargs.pop("model")
+        self.model = model
+
         if not len(self.__args__) == len(args):
             raise TypeError("expected {} args, got {}".format(len(self.__args__), len(args)))
 
@@ -519,7 +519,7 @@ class _IPUEvent(RelationEvent):
         for typ_, marker, meth_name in self.__converters__:
             if attr.startswith(marker):
                 attr = attr.strip(marker)
-                method = getattr(self.framework.model, meth_name)
+                method = getattr(self.app, meth_name)
                 return method(obj), attr
         raise TypeError("cannot deserialize {}: no converter".format(type(obj).__name__))
 
@@ -554,8 +554,8 @@ class IngressPerUnitReadyEvent(_IPUEvent):
 
     __args__ = ("unit", "url")
     if typing.TYPE_CHECKING:
-        unit = None  # type: Unit
-        url = None  # type: str
+        unit = typing.cast(Unit, None)  # at runtime it will be.
+        url = ""
 
 
 class IngressPerUnitReadyForUnitEvent(_IPUEvent):
@@ -566,7 +566,7 @@ class IngressPerUnitReadyForUnitEvent(_IPUEvent):
 
     __args__ = ("url",)
     if typing.TYPE_CHECKING:
-        url = None  # type: str
+        url = ""
 
 
 class IngressPerUnitRevokedEvent(RelationEvent):
@@ -592,7 +592,7 @@ class IngressPerUnitRequirerEvents(ObjectEvents):
 class IngressPerUnitRequirer(_IngressPerUnitBase):
     """Implementation of the requirer of ingress_per_unit."""
 
-    on = IngressPerUnitRequirerEvents()
+    on = IngressPerUnitRequirerEvents()  # type: IngressPerUnitRequirerEvents
     # used to prevent spurious urls to be sent out if the event we're currently
     # handling is a relation-broken one.
     _stored = StoredState()
@@ -602,8 +602,8 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
         charm: CharmBase,
         relation_name: str = DEFAULT_RELATION_NAME,
         *,
-        host: str = None,
-        port: int = None,
+        host: Optional[str] = None,
+        port: Optional[int] = None,
         listen_to: Literal["only-this-unit", "all-units", "both"] = "only-this-unit",
     ):
         """Constructor for IngressRequirer.
@@ -633,11 +633,13 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
                   will be notified *twice* of changes to this unit's ingress!)
         """  # noqa: D417
         super().__init__(charm, relation_name)
-        self._stored.set_default(current_urls=None)
+        self._stored.set_default(current_urls=None)  # type: ignore
 
         # if instantiated with a port, and we are related, then
         # we immediately publish our ingress data  to speed up the process.
-        self._auto_data = host, port if port else None
+        self._host = host
+        self._port = port
+
         self.listen_to = listen_to
 
         self.framework.observe(
@@ -647,32 +649,36 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
             self.charm.on[self.relation_name].relation_broken, self._handle_relation
         )
 
-    def _handle_relation(self, event):
+    def _handle_relation(self, event: RelationEvent):
         # we calculate the diff between the urls we were aware of
         # before and those we know now
-        previous_urls = self._stored.current_urls or {}
+        previous_urls = self._stored.current_urls or {}  # type: ignore
         current_urls = self.urls or {}
 
-        removed = previous_urls.keys() - current_urls.keys()
-        changed = {a for a in current_urls if current_urls[a] != previous_urls.get(a)}
+        removed = previous_urls.keys() - current_urls.keys()  # type: ignore
+        changed = {a for a in current_urls if current_urls[a] != previous_urls.get(a)}  # type: ignore
 
         this_unit_name = self.unit.name
         if self.listen_to in {"only-this-unit", "both"}:
             if this_unit_name in changed:
-                self.on.ready_for_unit.emit(self.relation, current_urls[this_unit_name])
+                self.on.ready_for_unit.emit(  # type: ignore
+                    self.relation, current_urls[this_unit_name], model=self.model
+                )
 
             if this_unit_name in removed:
-                self.on.revoked_for_unit.emit(self.relation)
+                self.on.revoked_for_unit.emit(self.relation, model=self.model)  # type: ignore
 
         if self.listen_to in {"all-units", "both"}:
             for unit_name in changed:
                 unit = self.model.get_unit(unit_name)
-                self.on.ready.emit(self.relation, unit, current_urls[unit_name])
+                self.on.ready.emit(  # type: ignore
+                    self.relation, unit, current_urls[unit_name], model=self.model
+                )
 
             for unit_name in removed:
-                self.on.revoked.emit(self.relation)
+                self.on.revoked.emit(self.relation, model=self.model)  # type: ignore
 
-        self._stored.current_urls = current_urls
+        self._stored.current_urls = current_urls  # type: ignore
         self._publish_auto_data(event.relation)
 
     def _handle_upgrade_or_leader(self, event):
@@ -680,9 +686,8 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
             self._publish_auto_data(relation)
 
     def _publish_auto_data(self, relation: Relation):
-        if self._auto_data:
-            host, port = self._auto_data
-            self.provide_ingress_requirements(host=host, port=port)
+        if self._port:
+            self.provide_ingress_requirements(host=self._host, port=self._port)
 
     @property
     def relation(self) -> Optional[Relation]:
@@ -701,7 +706,7 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
             return False
         return bool(self.url)
 
-    def provide_ingress_requirements(self, *, host: str = None, port: int):
+    def provide_ingress_requirements(self, *, host: Optional[str] = None, port: int):
         """Publishes the data that Traefik needs to provide ingress.
 
         Args:
@@ -709,6 +714,8 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
              requirer unit; if unspecified, FQDN will be used instead
             port: the port of the service (required)
         """
+        assert self.relation, "no relation"
+
         if not host:
             host = socket.getfqdn()
 
@@ -722,7 +729,7 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
         self.relation.data[self.unit].update(data)
 
     @property
-    def urls(self) -> dict:
+    def urls(self) -> Dict[str, str]:
         """The full ingress URLs to reach every unit.
 
         May return an empty dict if the URLs aren't available yet.
