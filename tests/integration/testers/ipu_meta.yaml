@@ -1,0 +1,5 @@
+name: ipu-requirer-mock
+requires:
+  ingress-per-unit:
+    interface: ingress-per-unit
+    limit: 1

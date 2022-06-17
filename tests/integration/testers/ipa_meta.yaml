@@ -1,0 +1,5 @@
+name: ipa-requirer-mock
+requires:
+  ingress:
+    interface: ingress
+    limit: 1
