@@ -522,7 +522,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
         action_event.set_results.assert_called_once_with(
             {
                 "proxied-endpoints": json.dumps(
-                    {"remote-0": {
+                    {"remote/0": {
                         "url": "http://testhostname:80/test-model-remote-0"}}
                 )
             }
