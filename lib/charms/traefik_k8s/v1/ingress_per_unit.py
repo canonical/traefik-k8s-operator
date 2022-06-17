@@ -49,21 +49,12 @@ class SomeCharm(CharmBase):
 import logging
 import socket
 import typing
-from typing import Dict, Optional, TypeVar, Union, Tuple
+from typing import Any, Dict, Optional, Tuple, Union
 
-import ops.model
 import yaml
-from ops.charm import CharmBase, RelationBrokenEvent, RelationEvent
+from ops.charm import CharmBase, RelationEvent
 from ops.framework import EventSource, Object, ObjectEvents, StoredState
-from ops.model import (
-    ActiveStatus,
-    Application,
-    BlockedStatus,
-    Relation,
-    StatusBase,
-    Unit,
-    WaitingStatus,
-)
+from ops.model import Application, Relation, Unit
 
 # The unique Charmhub library identifier, never change it
 LIBID = "7ef06111da2945ed84f4f5d4eb5b353a"
@@ -129,9 +120,9 @@ INGRESS_PROVIDES_APP_SCHEMA = {
 
 # TYPES
 try:
-    from typing import TypedDict, Literal
+    from typing import Literal, TypedDict
 except ImportError:
-    from typing_extensions import TypedDict, Literal  # py35 compat
+    from typing_extensions import Literal, TypedDict  # py35 compat
 
 
 class RequirerData(TypedDict):
@@ -192,8 +183,7 @@ class RelationDataMismatchError(RelationException):
 class RelationPermissionError(RelationException):
     """Ingress is requested to do something for which it lacks permissions."""
 
-    def __init__(self, relation: Relation, entity: Union[Application, Unit],
-                 message: str):
+    def __init__(self, relation: Relation, entity: Union[Application, Unit], message: str):
         super(RelationPermissionError, self).__init__(relation, entity)
         self.args = (
             "Unable to write data to relation '{}:{}' with {}: {}".format(
@@ -205,8 +195,7 @@ class RelationPermissionError(RelationException):
 class _IngressPerUnitBase(Object):
     """Base class for IngressPerUnit interface classes."""
 
-    def __init__(self, charm: CharmBase,
-                 relation_name: str = DEFAULT_RELATION_NAME):
+    def __init__(self, charm: CharmBase, relation_name: str = DEFAULT_RELATION_NAME):
         """Constructor for _IngressPerUnitBase.
 
         Args:
@@ -301,8 +290,7 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
         except RelationDataMismatchError as e:
             self.on.data_removed.emit(relation)
             log.warning(
-                "relation data mismatch: {} "
-                "data_removed ingress for {}.".format(e, relation)
+                "relation data mismatch: {} " "data_removed ingress for {}.".format(e, relation)
             )
             return
 
@@ -330,9 +318,7 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
         try:
             requirer_units_data = self._requirer_units_data(relation)
         except Exception:
-            log.exception(
-                "Cannot fetch ingress data for the '{}' relation".format(
-                    relation))
+            log.exception("Cannot fetch ingress data for the '{}' relation".format(relation))
             return False
 
         return any(requirer_units_data.values())
@@ -342,7 +328,7 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
 
         Or any relation if not specified.
         """
-         # verify that all remote units (requirer's side) publish the same model.
+        # verify that all remote units (requirer's side) publish the same model.
         # We do not validate the port because, in case of changes to the configuration
         # of the charm or a new version of the charmed workload, e.g. over an upgrade,
         # the remote port may be different among units.
@@ -361,9 +347,9 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
         """Report whether the given unit has shared data in its unit data bag."""
         # sanity check: this should not occur in production, but it may happen
         # during testing: cfr https://github.com/canonical/traefik-k8s-operator/issues/39
-        assert (
-                unit in relation.units
-        ), "attempting to get ready state for unit that does not belong to relation"
+        assert unit in relation.units, (
+            "attempting to get ready state " "for unit that does not belong to relation"
+        )
         try:
             self._get_requirer_unit_data(relation, unit)
         except (KeyError, DataValidationError):
@@ -379,7 +365,7 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
 
         Assumes that this unit is leader.
         """
-        assert self.unit.is_leader(), 'only leaders can do this'
+        assert self.unit.is_leader(), "only leaders can do this"
 
         raw_data = relation.data[self.app].get("ingress", None)
         data = yaml.safe_load(raw_data) if raw_data else {}
@@ -410,7 +396,7 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
 
         Assumes that this unit is leader.
         """
-        assert self.unit.is_leader(), 'only leaders can do this'
+        assert self.unit.is_leader(), "only leaders can do this"
         del relation.data[self.app]["ingress"]
 
     def _requirer_units_data(self, relation: Relation) -> RequirerUnitData:
@@ -421,8 +407,7 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
             # FIXME https://github.com/canonical/traefik-k8s-operator/issues/34
             return {}
 
-        remote_units = [unit for unit in relation.units if
-                        unit.app is not self.app]
+        remote_units = [unit for unit in relation.units if unit.app is not self.app]
 
         requirer_units_data = {}
         for remote_unit in remote_units:
@@ -430,14 +415,14 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
                 remote_data = self._get_requirer_unit_data(relation, remote_unit)
             except KeyError:
                 # this remote unit didn't share data yet
-                log.warning('Remote unit {} not ready.'.format(remote_unit.name))
+                log.warning("Remote unit {} not ready.".format(remote_unit.name))
                 continue
             except DataValidationError:
                 # this remote unit sent invalid data.
-                log.error('Remote unit {} sent invalid data.'.format(remote_unit.name))
+                log.error("Remote unit {} sent invalid data.".format(remote_unit.name))
                 continue
 
-            remote_data['port'] = int(remote_data['port'])
+            remote_data["port"] = int(remote_data["port"])
             requirer_units_data[remote_unit] = remote_data
         return requirer_units_data
 
@@ -449,11 +434,11 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
         is invalid.
         """
         databag = relation.data[remote_unit]
-        remote_data = {k: databag[k] for k in ('port', 'host', 'model', 'name')}
+        remote_data = {k: databag[k] for k in ("port", "host", "model", "name")}
         _validate_data(remote_data, INGRESS_REQUIRES_UNIT_SCHEMA)
 
         # do some convenience casting
-        remote_data['port'] = int(remote_data['port'])
+        remote_data["port"] = int(remote_data["port"])
         return remote_data
 
     def _provider_app_data(self, relation: Relation) -> ProviderApplicationData:
@@ -472,8 +457,7 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
                 return {}
 
             deserialized = yaml.safe_load(data)
-            _validate_data({'ingress': deserialized},
-                           INGRESS_PROVIDES_APP_SCHEMA)
+            _validate_data({"ingress": deserialized}, INGRESS_PROVIDES_APP_SCHEMA)
             return deserialized
 
         return {}
@@ -560,14 +544,15 @@ class _IPUEvent(RelationEvent):
             obj = snapshot[attr]
             try:
                 obj, attr = self._deserialize(obj, attr)
-            except TypeError as e:  # mostly safe
+            except TypeError:  # mostly safe
                 pass
             setattr(self, attr, obj)
 
 
 class IngressPerUnitReadyEvent(_IPUEvent):
     """Ingress is ready (or has changed) for some unit."""
-    __args__ = ('unit', 'url')
+
+    __args__ = ("unit", "url")
     if typing.TYPE_CHECKING:
         unit = None  # type: Unit
         url = None  # type: str
@@ -578,7 +563,8 @@ class IngressPerUnitReadyForUnitEvent(_IPUEvent):
 
     Is only fired on the unit(s) for which ingress has changed.
     """
-    __args__ = ('url', )
+
+    __args__ = ("url",)
     if typing.TYPE_CHECKING:
         url = None  # type: str
 
@@ -596,6 +582,7 @@ class IngressPerUnitRevokedForUnitEvent(RelationEvent):
 
 class IngressPerUnitRequirerEvents(ObjectEvents):
     """Container for IUP events."""
+
     ready = EventSource(IngressPerUnitReadyEvent)
     revoked = EventSource(IngressPerUnitRevokedEvent)
     ready_for_unit = EventSource(IngressPerUnitReadyForUnitEvent)
@@ -611,13 +598,13 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
     _stored = StoredState()
 
     def __init__(
-            self,
-            charm: CharmBase,
-            relation_name: str = DEFAULT_RELATION_NAME,
-            *,
-            host: str = None,
-            port: int = None,
-            listen_to: Literal['only-this-unit', 'all-units', 'both'] = 'only-this-unit'
+        self,
+        charm: CharmBase,
+        relation_name: str = DEFAULT_RELATION_NAME,
+        *,
+        host: str = None,
+        port: int = None,
+        listen_to: Literal["only-this-unit", "all-units", "both"] = "only-this-unit",
     ):
         """Constructor for IngressRequirer.
 
@@ -627,22 +614,24 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
         All request args must be given as keyword args.
 
         Args:
-            charm: the charm that is instantiating the library.
-            relation_name: the name of the relation name to bind to
+            `charm`: the charm that is instantiating the library.
+            `relation_name`: the name of the relation name to bind to
                 (defaults to "ingress-per-unit"; relation must be of interface
                 type "ingress_per_unit" and have "limit: 1")
-            host: Hostname to be used by the ingress provider to address the
-            requirer unit; if unspecified, the pod ip of the unit will be used
-                instead
-            listen_to: Choose which events should be fired on this unit:
-                - only-this-unit: this unit will only be notified when ingress
+            `host`: Hostname to be used by the ingress provider to address the
+                requirer unit; if unspecified, the FQDN of the unit will be
+                used instead
+            `port`: port to be used by the ingress provider to address the
+                    requirer unit.
+            `listen_to`: Choose which events should be fired on this unit:
+                "only-this-unit": this unit will only be notified when ingress
                   is ready/revoked for this unit.
-                - all-units: this unit will be notified when ingress is
+                "all-units": this unit will be notified when ingress is
                   ready/revoked for any unit of this application, including
                   itself.
-                - all: this unit will receive both event types (which means it
+                "all": this unit will receive both event types (which means it
                   will be notified *twice* of changes to this unit's ingress!)
-        """
+        """  # noqa: D417
         super().__init__(charm, relation_name)
         self._stored.set_default(current_urls=None)
 
@@ -652,12 +641,10 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
         self.listen_to = listen_to
 
         self.framework.observe(
-            self.charm.on[self.relation_name].relation_changed,
-            self._handle_relation
+            self.charm.on[self.relation_name].relation_changed, self._handle_relation
         )
         self.framework.observe(
-            self.charm.on[self.relation_name].relation_broken,
-            self._handle_relation
+            self.charm.on[self.relation_name].relation_broken, self._handle_relation
         )
 
     def _handle_relation(self, event):
@@ -670,15 +657,14 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
         changed = {a for a in current_urls if current_urls[a] != previous_urls.get(a)}
 
         this_unit_name = self.unit.name
-        if self.listen_to in {'only-this-unit', 'both'}:
+        if self.listen_to in {"only-this-unit", "both"}:
             if this_unit_name in changed:
-                self.on.ready_for_unit.emit(self.relation,
-                                            current_urls[this_unit_name])
+                self.on.ready_for_unit.emit(self.relation, current_urls[this_unit_name])
 
             if this_unit_name in removed:
                 self.on.revoked_for_unit.emit(self.relation)
 
-        if self.listen_to in {'all-units', 'both'}:
+        if self.listen_to in {"all-units", "both"}:
             for unit_name in changed:
                 unit = self.model.get_unit(unit_name)
                 self.on.ready.emit(self.relation, unit, current_urls[unit_name])
@@ -758,8 +744,7 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
         data = yaml.safe_load(raw)
         _validate_data({"ingress": data}, INGRESS_PROVIDES_APP_SCHEMA)
 
-        return {unit_name: unit_data["url"] for unit_name, unit_data in
-                data.items()}
+        return {unit_name: unit_data["url"] for unit_name, unit_data in data.items()}
 
     @property
     def url(self) -> Optional[str]:

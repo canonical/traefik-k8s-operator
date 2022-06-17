@@ -119,9 +119,7 @@ class TraefikIngressCharm(CharmBase):
         observe(self.traefik_route.on.ready, self._handle_traefik_route_ready)
 
         # Action handlers
-        observe(
-            self.on.show_proxied_endpoints_action, self._on_show_proxied_endpoints
-        )
+        observe(self.on.show_proxied_endpoints_action, self._on_show_proxied_endpoints)
 
     def _on_show_proxied_endpoints(self, event: ActionEvent):
         try:

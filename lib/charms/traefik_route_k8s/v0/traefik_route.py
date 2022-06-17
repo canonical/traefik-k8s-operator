@@ -75,7 +75,7 @@ import logging
 from typing import Optional
 
 import yaml
-from ops.charm import CharmBase, RelationEvent, CharmEvents
+from ops.charm import CharmBase, CharmEvents, RelationEvent
 from ops.framework import EventSource, Object
 from ops.model import Relation
 

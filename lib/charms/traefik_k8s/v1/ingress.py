@@ -52,12 +52,12 @@ class SomeCharm(CharmBase):
 import logging
 import socket
 import typing
-from typing import Optional, Tuple, Dict, Any
+from typing import Any, Dict, Optional, Tuple
 
 import yaml
 from ops.charm import CharmBase, RelationEvent
 from ops.framework import EventSource, Object, ObjectEvents, StoredState
-from ops.model import Relation, Unit, Application
+from ops.model import Application, Relation, Unit
 
 # The unique Charmhub library identifier, never change it
 LIBID = "e6de2a5cd5b34422a204668f3b8f90d2"
@@ -242,13 +242,14 @@ class _IPAEvent(RelationEvent):
             obj = snapshot[attr]
             try:
                 obj, attr = self._deserialize(obj, attr)
-            except TypeError as e:  # mostly safe
+            except TypeError:  # mostly safe
                 pass
             setattr(self, attr, obj)
 
 
 class IngressPerAppDataProvidedEvent(_IPAEvent):
     """Event representing that ingress data has been provided for an app."""
+
     __args__ = ("name", "model", "port", "host")
     if typing.TYPE_CHECKING:
         name = None  # type: str
@@ -289,8 +290,8 @@ class IngressPerAppProvider(_IngressPerAppBase):
         if self.is_ready(event.relation):
             data = self._get_requirer_data(event.relation)
             self.on.data_provided.emit(
-                event.relation, data["name"], data["model"],
-                data["port"], data["host"])
+                event.relation, data["name"], data["model"], data["port"], data["host"]
+            )
 
     def _handle_relation_broken(self, event):
         self.on.data_removed.emit(event.relation)
@@ -318,12 +319,10 @@ class IngressPerAppProvider(_IngressPerAppBase):
             log.debug("error {}; ignoring...".format(e))
             return {}
         except TypeError as e:
-            raise DataValidationError(
-                "Error casting remote data: {}".format(e)
-            )
+            raise DataValidationError("Error casting remote data: {}".format(e))
         _validate_data(remote_data, INGRESS_REQUIRES_APP_SCHEMA)
 
-        remote_data['port'] = int(remote_data['port'])
+        remote_data["port"] = int(remote_data["port"])
         return remote_data
 
     def get_data(self, relation: Relation) -> RequirerData:
@@ -352,7 +351,7 @@ class IngressPerAppProvider(_IngressPerAppBase):
         # fetch the provider's app databag
         raw_data = relation.data[self.app].get("ingress")
         if not raw_data:
-            raise RuntimeError('This application did not `publish_url` yet.')
+            raise RuntimeError("This application did not `publish_url` yet.")
 
         ingress: ProviderIngressData = yaml.safe_load(raw_data)
         _validate_data({"ingress": ingress}, INGRESS_PROVIDES_APP_SCHEMA)
@@ -391,7 +390,8 @@ class IngressPerAppProvider(_IngressPerAppBase):
 
 class IngressPerAppReadyEvent(_IPAEvent):
     """Event representing that ingress for an app is ready."""
-    __args__ = ("url", )
+
+    __args__ = ("url",)
     if typing.TYPE_CHECKING:
         url = None  # type: str
 
@@ -535,4 +535,3 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         ingress: ProviderIngressData = yaml.safe_load(raw_data)
         _validate_data({"ingress": ingress}, INGRESS_PROVIDES_APP_SCHEMA)
         return ingress["url"]
-

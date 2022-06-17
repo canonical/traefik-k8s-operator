@@ -1,15 +1,18 @@
+# Copyright 2022 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 from contextlib import contextmanager
-from typing import TypeVar, Generic, Optional, Type
+from typing import Generic, Optional, Type, TypeVar
 
 from ops.charm import CharmBase
 from ops.framework import EventBase
 
-_T = TypeVar('_T')
+_T = TypeVar("_T")
 
 
 @contextmanager
 def capture_events(charm: CharmBase, *types: Type[EventBase]):
-    allowed_types = types or (EventBase, )
+    allowed_types = types or (EventBase,)
 
     captured = []
     _real_emit = charm.framework._emit
@@ -45,8 +48,8 @@ def capture(charm: CharmBase, typ_: Type[_T] = EventBase) -> Captured[_T]:
         if not captured:
             yield result
 
-    assert len(captured) <= 1, f'too many events captured: {captured}'
-    assert len(captured) >= 1, f'no event of type {typ_} emitted.'
+    assert len(captured) <= 1, f"too many events captured: {captured}"
+    assert len(captured) >= 1, f"no event of type {typ_} emitted."
     event = captured[0]
     assert isinstance(event, typ_), f"expected {typ_}, not {type(event)}"
     result.event = event

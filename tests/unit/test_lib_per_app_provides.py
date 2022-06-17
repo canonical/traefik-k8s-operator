@@ -5,7 +5,6 @@ from textwrap import dedent
 
 import pytest
 import yaml
-
 from charms.traefik_k8s.v1.ingress import IngressPerAppProvider
 from ops.charm import CharmBase
 from ops.testing import Harness
@@ -41,30 +40,26 @@ def provider(harness):
     return provider
 
 
-def test_ingress_app_provider_uninitialized(
-    provider: IngressPerAppProvider
-):
+def test_ingress_app_provider_uninitialized(provider: IngressPerAppProvider):
     assert not provider.relations
     assert not provider.is_ready()
 
 
 def test_ingress_app_provider_related(harness, provider: IngressPerAppProvider):
-    relation = harness.add_relation('ingress', 'remote')
+    relation = harness.add_relation("ingress", "remote")
     assert not provider.is_ready(relation)
 
 
-def test_ingress_app_provider_relate_provide(
-    provider: IngressPerAppProvider, harness
-):
+def test_ingress_app_provider_relate_provide(provider: IngressPerAppProvider, harness):
     harness.set_leader(True)
-    relation_id = harness.add_relation('ingress', 'remote')
+    relation_id = harness.add_relation("ingress", "remote")
     remote_data = dict(host="host", port="42", name="foo", model="bar")
-    harness.update_relation_data(relation_id, 'remote', remote_data)
+    harness.update_relation_data(relation_id, "remote", remote_data)
 
-    relation = harness.model.get_relation('ingress', relation_id)
+    relation = harness.model.get_relation("ingress", relation_id)
     assert provider.is_ready(relation)
 
     provider.publish_url(relation, "foo.com")
 
-    ingress = harness.get_relation_data(relation_id, 'test-provider')["ingress"]
-    assert yaml.safe_load(ingress) == {'url': 'foo.com'}
+    ingress = harness.get_relation_data(relation_id, "test-provider")["ingress"]
+    assert yaml.safe_load(ingress) == {"url": "foo.com"}
