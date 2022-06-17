@@ -13,8 +13,8 @@ from typing import Tuple, Union
 import yaml
 from charms.observability_libs.v0.kubernetes_service_patch import KubernetesServicePatch
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
-from charms.traefik_k8s.v0.ingress import IngressPerAppProvider
-from charms.traefik_k8s.v0.ingress_per_unit import (
+from charms.traefik_k8s.v1.ingress import IngressPerAppProvider
+from charms.traefik_k8s.v1.ingress_per_unit import (
     DataValidationError,
     IngressPerUnitProvider,
 )
@@ -47,8 +47,8 @@ from ops.model import (
 from ops.pebble import APIError, PathError
 
 if typing.TYPE_CHECKING:
-    from charms.traefik_k8s.v0.ingress import RequirerData as RequirerData_IPA
-    from charms.traefik_k8s.v0.ingress_per_unit import RequirerData as RequirerData_IPU
+    from charms.traefik_k8s.v1.ingress import RequirerData as RequirerData_IPA
+    from charms.traefik_k8s.v1.ingress_per_unit import RequirerData as RequirerData_IPU
 
 logger = logging.getLogger(__name__)
 
@@ -102,26 +102,24 @@ class TraefikIngressCharm(CharmBase):
         self.ingress_per_unit = IngressPerUnitProvider(charm=self)
         self.traefik_route = TraefikRouteProvider(charm=self)
 
-        self.framework.observe(self.on.traefik_pebble_ready, self._on_traefik_pebble_ready)
-        self.framework.observe(self.on.start, self._on_start)
-        self.framework.observe(self.on.update_status, self._on_update_status)
-        self.framework.observe(self.on.config_changed, self._on_config_changed)
+        observe = self.framework.observe
+        observe(self.on.traefik_pebble_ready, self._on_traefik_pebble_ready)
+        observe(self.on.start, self._on_start)
+        observe(self.on.update_status, self._on_update_status)
+        observe(self.on.config_changed, self._on_config_changed)
 
-        self.framework.observe(
-            self.ingress_per_app.on.data_provided, self._handle_ingress_data_provided
-        )
-        self.framework.observe(
-            self.ingress_per_app.on.data_removed, self._handle_ingress_data_removed
-        )
+        ipa_events = self.ingress_per_app.on
+        observe(ipa_events.data_provided, self._handle_ingress_data_provided)
+        observe(ipa_events.data_removed, self._handle_ingress_data_removed)
 
-        self.framework.observe(self.ingress_per_unit.on.ready, self._handle_ingress_request)
-        self.framework.observe(self.ingress_per_unit.on.failed, self._handle_ingress_failure)
-        self.framework.observe(self.ingress_per_unit.on.broken, self._handle_ingress_broken)
+        ipu_events = self.ingress_per_unit.on
+        observe(ipu_events.data_provided, self._handle_ingress_data_provided)
+        observe(ipu_events.data_removed, self._handle_ingress_data_removed)
 
-        self.framework.observe(self.traefik_route.on.ready, self._handle_traefik_route_ready)
+        observe(self.traefik_route.on.ready, self._handle_traefik_route_ready)
 
         # Action handlers
-        self.framework.observe(
+        observe(
             self.on.show_proxied_endpoints_action, self._on_show_proxied_endpoints
         )
 
@@ -271,16 +269,6 @@ class TraefikIngressCharm(CharmBase):
     def _handle_ingress_data_removed(self, event: RelationEvent):
         """A unit has removed the data we need to provide ipu."""
         self._wipe_ingress_for_relation(event.relation)
-
-    def _handle_ingress_request(self, event: RelationEvent):
-        if not self.ready:
-            event.defer()
-            return
-
-        self._process_ingress_relation(event.relation)
-
-        if isinstance(self.unit.status, MaintenanceStatus):
-            self.unit.status = ActiveStatus()
 
     def _handle_traefik_route_ready(self, event: TraefikRouteRequirerReadyEvent):
         """A traefik_route charm has published some ingress data."""
@@ -458,20 +446,6 @@ class TraefikIngressCharm(CharmBase):
         }
 
         return config, app_url
-
-    def _handle_ingress_failure(self, event: RelationEvent):
-        provider = self._provider_from_relation(event.relation)
-        self.unit.status = provider.get_status(event.relation)
-
-    def _handle_ingress_broken(self, event: RelationEvent):
-        if not self._is_traefik_service_running():
-            self.unit.status = WaitingStatus(f"service '{_TRAEFIK_CONTAINER_NAME}' not ready yet")
-            event.defer()
-            return
-
-        self.unit.status = MaintenanceStatus("updating ingress configurations")
-        self._wipe_ingress_for_relation(event.relation)
-        self.unit.status = ActiveStatus()
 
     def _wipe_ingress_for_all_relations(self):
         for relation in self.model.relations["ingress"] + self.model.relations["ingress-per-unit"]:

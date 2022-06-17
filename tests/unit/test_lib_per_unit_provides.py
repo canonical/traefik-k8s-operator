@@ -51,6 +51,16 @@ def relate(harness: Harness[MockProviderCharm]):
     return harness.model.get_relation('ingress-per-unit', relation_id)
 
 
+def _requirer_provide_ingress_requirements(
+        harness: Harness[MockProviderCharm],
+        port: int, relation: Relation,
+        host=socket.getfqdn()):
+    # same as requirer.provide_ingress_requirements(port=port, host=host)s
+    harness.update_relation_data(relation.id, 'remote/0',
+                                 {'port': str(port), 'host': host,
+                                  'model': 'test-model', 'name': 'remote/0'})
+
+
 def test_ingress_unit_provider_uninitialized(provider):
     assert not provider.is_ready()
 
@@ -61,16 +71,6 @@ def test_ingress_unit_provider_related(provider, harness, leader):
     relation = relate(harness)
 
     assert not provider.is_ready(relation)
-
-
-def _requirer_provide_ingress_requirements(
-        harness: Harness[MockProviderCharm],
-        port: int, relation: Relation,
-        host=socket.getfqdn()):
-    # same as requirer.provide_ingress_requirements(port=port, host=host)s
-    harness.update_relation_data(relation.id, 'remote/0',
-                                 {'port': str(port), 'host': host,
-                                  'model': 'test-model', 'name': 'remote/0'})
 
 
 def test_ingress_unit_provider_request(provider, harness):

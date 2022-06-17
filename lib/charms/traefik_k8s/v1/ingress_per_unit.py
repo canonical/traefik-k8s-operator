@@ -202,34 +202,8 @@ class RelationPermissionError(RelationException):
         )
 
 
-# EVENTS
-class RelationAvailableEvent(RelationEvent):
-    """Event triggered when a relation is ready to provide ingress."""
-
-
-class RelationFailedEvent(RelationEvent):
-    """Event triggered when something went wrong with a relation."""
-
-
-class RelationReadyEvent(RelationEvent):
-    """Event triggered when a remote relation has the expected data."""
-
-
-class IngressPerUnitEvents(ObjectEvents):
-    """Container for events for IngressPerUnit."""
-
-    available = EventSource(RelationAvailableEvent)
-    ready = EventSource(RelationReadyEvent)
-    failed = EventSource(RelationFailedEvent)
-    broken = EventSource(RelationBrokenEvent)
-
-
 class _IngressPerUnitBase(Object):
     """Base class for IngressPerUnit interface classes."""
-
-    _IngressPerUnitEventType = TypeVar("_IngressPerUnitEventType",
-                                       bound=IngressPerUnitEvents)
-    on: _IngressPerUnitEventType
 
     def __init__(self, charm: CharmBase,
                  relation_name: str = DEFAULT_RELATION_NAME):
@@ -290,10 +264,56 @@ class _IngressPerUnitBase(Object):
         return True
 
 
+class IngressDataReadyEvent(RelationEvent):
+    """Event triggered when the requirer has provided valid ingress data.
+
+    Also emitted when the data has changed.
+    If you receive this, you should handle it as if the data being
+    provided was new.
+    """
+
+
+class IngressDataRemovedEvent(RelationEvent):
+    """Event triggered when a requirer has wiped its ingress data.
+
+    Also emitted when the requirer data has become incomplete or invalid.
+    If you receive this, you should handle it as if the remote unit no longer
+    wishes to receive ingress.
+    """
+
+
+class IngressPerUnitProviderEvents(ObjectEvents):
+    """Container for events for IngressPerUnit."""
+
+    data_provided = EventSource(IngressDataReadyEvent)
+    data_removed = EventSource(IngressDataRemovedEvent)
+
+
 class IngressPerUnitProvider(_IngressPerUnitBase):
     """Implementation of the provider of ingress_per_unit."""
 
-    on = IngressPerUnitEvents()
+    on = IngressPerUnitProviderEvents()
+
+    def _handle_relation(self, event):
+        relation = event.relation
+        try:
+            self.validate(relation)
+        except RelationDataMismatchError as e:
+            self.on.data_removed.emit(relation)
+            log.warning(
+                "relation data mismatch: {} "
+                "data_removed ingress for {}.".format(e, relation)
+            )
+            return
+
+        if self.is_ready(relation):
+            self.on.data_provided.emit(relation)
+        else:
+            self.on.data_removed.emit(relation)
+
+    def _handle_relation_broken(self, event):
+        # relation broken -> we revoke in any case
+        self.on.data_removed.emit(event.relation)
 
     def is_ready(self, relation: Relation = None) -> bool:
         """Checks whether the given relation is ready.
@@ -336,7 +356,6 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
                     expected_model = remote_model
                 elif expected_model != remote_model:
                     raise RelationDataMismatchError(relation, remote_unit)
-        return False
 
     def is_unit_ready(self, relation: Relation, unit: Unit) -> bool:
         """Report whether the given unit has shared data in its unit data bag."""
@@ -445,18 +464,19 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
             # FIXME https://github.com/canonical/traefik-k8s-operator/issues/34
             return {}
 
-        provider_app_data = {}
         # we start by looking at the provider's app databag
         if self.unit.is_leader():
             # only leaders can read their app's data
-            data = relation.data[self.app].get("data")
-            deserialized = {}
-            if data:
-                deserialized = yaml.safe_load(data)
-                _validate_data(deserialized, INGRESS_PROVIDES_APP_SCHEMA)
-            provider_app_data = deserialized.get("ingress", {})
+            data = relation.data[self.app].get("ingress")
+            if not data:
+                return {}
 
-        return provider_app_data
+            deserialized = yaml.safe_load(data)
+            _validate_data({'ingress': deserialized},
+                           INGRESS_PROVIDES_APP_SCHEMA)
+            return deserialized
+
+        return {}
 
     @property
     def proxied_endpoints(self) -> dict:
@@ -574,7 +594,7 @@ class IngressPerUnitRevokedForUnitEvent(RelationEvent):
     """
 
 
-class IngressPerUnitRequirerEvents(IngressPerUnitEvents):
+class IngressPerUnitRequirerEvents(ObjectEvents):
     """Container for IUP events."""
     ready = EventSource(IngressPerUnitReadyEvent)
     revoked = EventSource(IngressPerUnitRevokedEvent)
