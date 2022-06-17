@@ -57,7 +57,7 @@ from typing import Any, Dict, Optional, Tuple
 import yaml
 from ops.charm import CharmBase, RelationEvent
 from ops.framework import EventSource, Object, ObjectEvents, StoredState
-from ops.model import Application, Relation, Unit
+from ops.model import Application, Model, Relation, Unit
 
 # The unique Charmhub library identifier, never change it
 LIBID = "e6de2a5cd5b34422a204668f3b8f90d2"
@@ -190,7 +190,7 @@ class _IngressPerAppBase(Object):
 
 
 class _IPAEvent(RelationEvent):
-    __args__ = ()  # type: Tuple[str]
+    __args__ = ()  # type: Tuple[str, ...]
     __optional_kwargs__ = {}  # type: Dict[str, Any]
 
     @classmethod
@@ -202,8 +202,11 @@ class _IPAEvent(RelationEvent):
         (Application, "<__app__>", "get_app"),
     )
 
-    def __init__(self, handle, relation, *args, **kwargs):
+    def __init__(self, handle, relation, *args, model: Model, **kwargs):
         super().__init__(handle, relation)
+        assert isinstance(model, Model)  # type: ignore
+        self.model = model
+
         if not len(self.__args__) == len(args):
             raise TypeError("expected {} args, got {}".format(len(self.__args__), len(args)))
 
@@ -217,7 +220,7 @@ class _IPAEvent(RelationEvent):
         for typ_, marker, meth_name in self.__converters__:
             if attr.startswith(marker):
                 attr = attr.strip(marker)
-                method = getattr(self.framework.model, meth_name)
+                method = getattr(self.model, meth_name)
                 return method(obj), attr
         raise TypeError("cannot deserialize {}: no converter".format(type(obj).__name__))
 
@@ -290,7 +293,12 @@ class IngressPerAppProvider(_IngressPerAppBase):
         if self.is_ready(event.relation):
             data = self._get_requirer_data(event.relation)
             self.on.data_provided.emit(
-                event.relation, data["name"], data["model"], data["port"], data["host"]
+                event.relation,
+                data["name"],
+                data["model"],
+                data["port"],
+                data["host"],
+                model=self.model,
             )
 
     def _handle_relation_broken(self, event):
@@ -462,7 +470,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
             new_url = self.url
             if self._stored.current_url != new_url:
                 self._stored.current_url = new_url
-                self.on.ready.emit(event.relation, new_url)
+                self.on.ready.emit(event.relation, new_url, model=self.model)
 
     def _handle_relation_broken(self, event):
         self.on.revoked.emit(event.relation)

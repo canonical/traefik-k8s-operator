@@ -283,20 +283,20 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
         try:
             self.validate(relation)
         except RelationDataMismatchError as e:
-            self.on.data_removed.emit(relation, model=self.model)  # type: ignore
+            self.on.data_removed.emit(relation)  # type: ignore
             log.warning(
                 "relation data mismatch: {} " "data_removed ingress for {}.".format(e, relation)
             )
             return
 
         if self.is_ready(relation):
-            self.on.data_provided.emit(relation, model=self.model)  # type: ignore
+            self.on.data_provided.emit(relation)  # type: ignore
         else:
-            self.on.data_removed.emit(relation, model=self.model)  # type: ignore
+            self.on.data_removed.emit(relation)  # type: ignore
 
     def _handle_relation_broken(self, event):
         # relation broken -> we revoke in any case
-        self.on.data_removed.emit(event.relation, model=self.model)  # type: ignore
+        self.on.data_removed.emit(event.relation)  # type: ignore
 
     def is_ready(self, relation: Optional[Relation] = None) -> bool:
         """Checks whether the given relation is ready.
@@ -489,8 +489,6 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
 class _IPUEvent(RelationEvent):
     __args__ = ()  # type: Tuple[str, ...]
     __optional_kwargs__ = {}  # type: Dict[str, Any]
-    if typing.TYPE_CHECKING:
-        model = typing.cast(Model, None)  # at runtime it will be.
 
     @classmethod
     def __attrs__(cls):
@@ -501,9 +499,9 @@ class _IPUEvent(RelationEvent):
         (Application, "<__app__>", "get_app"),
     )
 
-    def __init__(self, handle, relation, *args, **kwargs):
+    def __init__(self, handle, relation, *args, model: Model, **kwargs):
         super().__init__(handle, relation)
-        model = kwargs.pop("model")
+        assert isinstance(model, Model)  # type: ignore
         self.model = model
 
         if not len(self.__args__) == len(args):
@@ -519,7 +517,7 @@ class _IPUEvent(RelationEvent):
         for typ_, marker, meth_name in self.__converters__:
             if attr.startswith(marker):
                 attr = attr.strip(marker)
-                method = getattr(self.app, meth_name)
+                method = getattr(self.model, meth_name)
                 return method(obj), attr
         raise TypeError("cannot deserialize {}: no converter".format(type(obj).__name__))
 
@@ -666,7 +664,7 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
                 )
 
             if this_unit_name in removed:
-                self.on.revoked_for_unit.emit(self.relation, model=self.model)  # type: ignore
+                self.on.revoked_for_unit.emit(self.relation)  # type: ignore
 
         if self.listen_to in {"all-units", "both"}:
             for unit_name in changed:
@@ -676,7 +674,7 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
                 )
 
             for unit_name in removed:
-                self.on.revoked.emit(self.relation, model=self.model)  # type: ignore
+                self.on.revoked.emit(self.relation)  # type: ignore
 
         self._stored.current_urls = current_urls  # type: ignore
         self._publish_auto_data(event.relation)
