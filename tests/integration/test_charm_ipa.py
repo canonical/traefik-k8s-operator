@@ -39,26 +39,23 @@ async def test_relation_data_shape(ops_test: OpsTest):
         requirer_endpoint="spring-music/0:ingress", provider_endpoint="traefik-k8s/0:ingress"
     )
 
-    requirer_app_data = yaml.safe_load(data.requirer.application_data["data"])
+    requirer_app_data = data.requirer.application_data
     # example:
     # host: spring-music.foo.svc.cluster.local
     # model: foo
     # name: spring-music/0
     # port: 8080
     model = requirer_app_data["model"]
-    assert requirer_app_data == {
-        "host": f"spring-music.{model}.svc.cluster.local",
-        "model": model,
-        "name": "spring-music/0",
-        "port": 8080,
-    }
+    assert requirer_app_data["host"] == f"spring-music.{model}.svc.cluster.local"
+    assert requirer_app_data["name"] == "spring-music/0"
+    assert requirer_app_data["host"] == "8080"
 
-    provider_app_data = yaml.safe_load(data.provider.application_data["data"])
+    provider_app_data = yaml.safe_load(data.provider.application_data["ingress"])
     # example:
     #  ingress:
     #    url: http://foo.bar:80/foo-spring-music/0
 
-    assert provider_app_data == {"ingress": {"url": f"http://foo.bar:80/{model}-spring-music/0"}}
+    assert provider_app_data == {"url": f"http://foo.bar:80/{model}-spring-music/0"}
 
 
 async def test_remove_relation(ops_test: OpsTest):

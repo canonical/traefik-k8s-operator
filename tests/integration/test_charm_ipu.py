@@ -49,23 +49,18 @@ async def test_relation_data_shape():
     # model: foo
     # name: prometheus-k8s/0
     # port: 9090
+    assert requirer_unit_data["name"] == "prometheus-k8s/0"
+    assert requirer_unit_data["host"] == "9090"
     model = requirer_unit_data["model"]
-    host = requirer_unit_data["host"]
-    assert requirer_unit_data == {
-        "host": host,
-        "model": model,
-        "name": "prometheus-k8s/0",
-        "port": 9090,
-    }
 
-    provider_app_data = yaml.safe_load(data.provider.application_data["data"])
+    provider_app_data = yaml.safe_load(data.provider.application_data["ingress"])
     # example:
     #  ingress:
     #   prometheus-k8s/0:
     #     url: http://foo.bar:80/foo-prometheus-k8s-0
 
     assert provider_app_data == {
-        "ingress": {"prometheus-k8s/0": {"url": f"http://foo.bar:80/{model}-prometheus-k8s-0"}}
+        "prometheus-k8s/0": {"url": f"http://foo.bar:80/{model}-prometheus-k8s-0"}
     }
 
 
