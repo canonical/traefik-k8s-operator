@@ -16,7 +16,7 @@ resources = {name: val["upstream-source"] for name, val in meta["resources"].ite
 
 @pytest.fixture
 def ipu_tester_charm():
-    return build_tester_charm('ipu')
+    return build_tester_charm("ipu")
 
 
 @pytest.fixture(autouse=True)

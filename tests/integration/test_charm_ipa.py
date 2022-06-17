@@ -16,7 +16,7 @@ resources = {name: val["upstream-source"] for name, val in meta["resources"].ite
 
 @pytest.fixture
 def ipa_tester_charm():
-    return build_tester_charm('ipa')
+    return build_tester_charm("ipa")
 
 
 @pytest.fixture(autouse=True)
