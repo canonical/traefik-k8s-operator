@@ -60,11 +60,11 @@ from ops.model import Application, Model, Relation, Unit
 LIBID = "7ef06111da2945ed84f4f5d4eb5b353a"
 
 # Increment this major API version when introducing breaking changes
-LIBAPI = 0
+LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 10
+LIBPATCH = 0
 
 log = logging.getLogger(__name__)
 
