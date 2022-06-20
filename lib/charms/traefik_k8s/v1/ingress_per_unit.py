@@ -562,7 +562,7 @@ class IngressPerUnitRevokedEvent(_IPUEvent):
             this could be "THIS" unit, or a peer.
     """
 
-    __args__ = "unit_name"
+    __args__ = ("unit_name",)
 
     if typing.TYPE_CHECKING:
         unit_name = ""

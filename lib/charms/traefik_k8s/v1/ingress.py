@@ -112,26 +112,12 @@ try:
 except ImportError:
     from typing_extensions import TypedDict  # py35 compat
 
-
-class RequirerData(TypedDict):
-    """Model of the data a unit implementing the requirer will need to provide."""
-
-    model: str
-    name: str
-    host: str
-    port: int
-
-
-class ProviderIngressData(TypedDict):
-    """Provider ingress data model."""
-
-    url: str
-
-
-class ProviderApplicationData(TypedDict):
-    """Provider application databag model."""
-
-    ingress: ProviderIngressData
+# Model of the data a unit implementing the requirer will need to provide.
+RequirerData = TypedDict("RequirerData", {"model": str, "name": str, "host": str, "port": int})
+# Provider ingress data model.
+ProviderIngressData = TypedDict("ProviderIngressData", {"url": str})
+# Provider application databag model.
+ProviderApplicationData = TypedDict("ProviderApplicationData", {"ingress": ProviderIngressData})
 
 
 def _validate_data(data, schema):
