@@ -32,9 +32,9 @@ def build_tester_charm(source: str) -> str:
 
         # add required fields to metadata file:
         data = yaml.safe_load(meta_clone.read_text())
-        for field in {'description', 'summary', 'display-name'}:
+        for field in {"description", "summary", "display-name"}:
             if field not in data:
-                data[field] = 'tester'
+                data[field] = "tester"
         meta_clone.write_text(yaml.safe_dump(data))
 
         copy(charmcraft_file, tempdir / "charmcraft.yaml")
