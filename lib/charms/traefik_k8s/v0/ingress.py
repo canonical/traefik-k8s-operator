@@ -247,7 +247,7 @@ class IngressPerAppProvider(_IngressPerAppBase):
     def publish_url(self, relation: Relation, url: str):
         """Publish to the app databag the ingress url."""
         ingress = ProviderIngressData(url=url)
-        relation.data[self.app]["data"] = ProviderData(ingress=ingress)
+        relation.data[self.app]["data"] = ProviderData(ingress=ingress).json()
 
     @property
     def proxied_endpoints(self):
