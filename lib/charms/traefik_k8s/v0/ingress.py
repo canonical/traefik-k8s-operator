@@ -51,7 +51,7 @@ class SomeCharm(CharmBase):
 
 import logging
 import socket
-from typing import Optional
+from typing import Optional, Any
 
 import yaml
 from ops.charm import CharmBase, RelationEvent
@@ -74,84 +74,32 @@ RELATION_INTERFACE = "ingress"
 log = logging.getLogger(__name__)
 
 try:
-    import jsonschema
-
-    DO_VALIDATION = True
-except ModuleNotFoundError:
-    log.warning(
-        "The `ingress` library needs the `jsonschema` package to be able "
-        "to do runtime data validation; without it, it will still work but validation "
-        "will be disabled. \n"
-        "It is recommended to add `jsonschema` to the 'requirements.txt' of your charm, "
-        "which will enable this feature."
-    )
-    DO_VALIDATION = False
-
-INGRESS_REQUIRES_APP_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "model": {"type": "string"},
-        "name": {"type": "string"},
-        "host": {"type": "string"},
-        "port": {"type": "integer"},
-    },
-    "required": ["model", "name", "host", "port"],
-}
-
-INGRESS_PROVIDES_APP_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "ingress": {"type": "object", "properties": {"url": {"type": "string"}}},
-        # Optional key for backwards compatibility
-        # with legacy requirers based on SDI
-        "_supported_versions": {"type": "string"},
-    },
-    "required": ["ingress"],
-}
-
-try:
-    from typing import TypedDict
-except ImportError:
-    from typing_extensions import TypedDict  # py35 compat
+    import pydantic
+except ModuleNotFoundError as e:
+    log.error('you need to `pip install pydantic` and add '
+              'pydantic to the requirements.txt for this charm.')
+    raise e
 
 
-class RequirerData(TypedDict):
-    """Model of the data a unit implementing the requirer will need to provide."""
-
-    model: str
-    name: str
-    host: str
-    port: int
+class ProviderIngressData(pydantic.BaseModel):
+    url = pydantic.Field()  # type: str
 
 
-class ProviderIngressData(TypedDict):
-    """Provider ingress data model."""
-
-    url: str
+class ProviderData(pydantic.BaseModel):
+    ingress = pydantic.Field()  # type: pydantic.Json[ProviderIngressData]
 
 
-class ProviderApplicationData(TypedDict):
-    """Provider application databag model."""
+class RequirerData(pydantic.BaseModel):
+    model = pydantic.Field()  # type: str
+    name = pydantic.Field()  # type: str
+    host = pydantic.Field()  # type: str
+    port = pydantic.Field()  # type: int
 
-    ingress: ProviderIngressData
-    # don't include _supported_versions as that is deprecated anyway
-
-
-def _validate_data(data, schema):
-    """Checks whether `data` matches `schema`.
-
-    Will raise DataValidationError if the data is not valid, else return None.
-    """
-    if not DO_VALIDATION:
-        return
-    try:
-        jsonschema.validate(instance=data, schema=schema)
-    except jsonschema.ValidationError as e:
-        raise DataValidationError(data, schema) from e
-
-
-class DataValidationError(RuntimeError):
-    """Raised when data validation fails on IPU relation data."""
+    # you can do cool things:
+    @pydantic.validator('model', 'name', 'host')
+    def name_cannot_contain_spaces(cls, v):
+        if ' ' in v:
+            raise ValueError('cannot contain spaces')
 
 
 class _IngressPerAppBase(Object):
@@ -263,8 +211,7 @@ class IngressPerAppProvider(_IngressPerAppBase):
         if not remote_data:
             return {}
 
-        remote_deserialized = yaml.safe_load(remote_data)
-        _validate_data(remote_deserialized, INGRESS_REQUIRES_APP_SCHEMA)
+        remote_deserialized = RequirerData.parse_obj(remote_data)
         return remote_deserialized
 
     def get_data(self, relation: Relation) -> RequirerData:
@@ -278,11 +225,11 @@ class IngressPerAppProvider(_IngressPerAppBase):
 
         try:
             return bool(self._get_requirer_data(relation))
-        except DataValidationError as e:
+        except pydantic.ValidationError as e:
             log.warning("Requirer not ready; validation error encountered: %s" % str(e))
             return False
 
-    def _provider_app_data(self, relation: Relation) -> ProviderApplicationData:
+    def _provider_app_data(self, relation: Relation) -> Optional[ProviderIngressData]:
         """Fetch and validate this provider's app databag."""
         if not relation.app or not relation.app.name:
             # Handle edge case where remote app name can be missing, e.g.,
@@ -290,24 +237,17 @@ class IngressPerAppProvider(_IngressPerAppBase):
             # FIXME https://github.com/canonical/traefik-k8s-operator/issues/34
             return {}  # noqa
 
-        provider_app_data = {}
         # we start by looking at the provider's app databag
         if self.unit.is_leader():
             # only leaders can read their app's data
-            data = relation.data[self.app].get("data")
-            deserialized = {}
-            if data:
-                deserialized = yaml.safe_load(data)
-                _validate_data(deserialized, INGRESS_PROVIDES_APP_SCHEMA)
-            provider_app_data = deserialized.get("ingress", {})
-
-        return provider_app_data
+            data = ProviderData.parse_obj(relation.data[self.app]['data'])
+            return data.ingress
+        return None
 
     def publish_url(self, relation: Relation, url: str):
         """Publish to the app databag the ingress url."""
-        ingress_data = {"ingress": {"url": url}}
-        _validate_data(ingress_data, INGRESS_PROVIDES_APP_SCHEMA)
-        relation.data[self.app]["data"] = yaml.safe_dump(ingress_data)
+        ingress = ProviderIngressData(url=url)
+        relation.data[self.app]["data"] = ProviderData(ingress=ingress)
 
     @property
     def proxied_endpoints(self):
@@ -414,7 +354,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         """The Requirer is ready if the Provider has sent valid data."""
         try:
             return bool(self.url)
-        except DataValidationError as e:
+        except pydantic.ValidationError as e:
             log.warning("Requirer not ready; validation error encountered: %s" % str(e))
             return False
 
@@ -449,14 +389,9 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         if not host:
             host = socket.getfqdn()
 
-        data = {
-            "model": self.model.name,
-            "name": self.app.name,
-            "host": host,
-            "port": port,
-        }
-        _validate_data(data, INGRESS_REQUIRES_APP_SCHEMA)
-        self.relation.data[self.app]["data"] = yaml.safe_dump(data)
+        data = RequirerData(model=self.model.name, name=self.app.name,
+                            host=host, port=port)
+        self.relation.data[self.app]["data"] = data.json()
 
     @property
     def relation(self):
@@ -478,8 +413,6 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         provider_app_data = remote_data.get("data")
         if not provider_app_data:
             return None
-        ingress_data = yaml.safe_load(provider_app_data)
-        _validate_data(ingress_data, INGRESS_PROVIDES_APP_SCHEMA)
 
-        ingress_url = ingress_data.get("ingress", {}).get("url")
-        return ingress_url
+        ingress_data = ProviderData(ingress=provider_app_data)
+        return ingress_data.ingress.url
