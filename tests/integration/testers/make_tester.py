@@ -1,5 +1,7 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
+import os
+import stat
 import tempfile
 from os import mkdir
 from pathlib import Path
@@ -16,18 +18,24 @@ def build_tester_charm(source: str) -> str:
     with tempfile.TemporaryDirectory() as tempdir:
         tempdir = Path(tempdir).absolute()
         mkdir(tempdir / "src")
-        copy(source_file, tempdir / "src" / "charm.py")
+
+        charm_py = tempdir / "src" / "charm.py"
+        copy(source_file, charm_py)
+        # chmod +x
+        st = os.stat(charm_py)
+        os.chmod(charm_py, st.st_mode | stat.S_IEXEC)
+
         copy(meta_file, tempdir / "metadata.yaml")
         copy(charmcraft_file, tempdir / "charmcraft.yaml")
 
         proc = Popen("charmcraft pack".split(" "), cwd=tempdir)
         proc.wait()
         charm_path = next(tempdir.glob("*.charm"))
-        charm = testers_folder / charm_path.name
-        copy(charm_path, charm)
+        charm_out = testers_folder / charm_path.name
+        copy(charm_path, charm_out)
 
-    return str(charm.absolute())
+    return str(charm_out.absolute())
 
 
 if __name__ == "__main__":
-    build_tester_charm("ipa")
+    print(build_tester_charm("ipa"))
