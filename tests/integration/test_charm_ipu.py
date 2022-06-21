@@ -9,19 +9,19 @@ from pytest_operator.plugin import OpsTest
 
 from tests.integration.conftest import get_relation_data
 
-ipu_charm_root = (Path(__file__).parent / 'testers' / 'ipu').absolute()
+ipu_charm_root = (Path(__file__).parent / "testers" / "ipu").absolute()
 meta = yaml.safe_load((Path() / "metadata.yaml").read_text())
 resources = {name: val["upstream-source"] for name, val in meta["resources"].items()}
 
 
 @pytest.fixture
 async def ipu_tester_charm(ops_test: OpsTest):
-    lib_source = Path()/'lib'/'charms'/'traefik_k8s'/'v1'/'ingress_per_unit.py'
-    libs_folder = ipu_charm_root/'lib'/'charms'/'traefik_k8s'/'v1'
+    lib_source = Path() / "lib" / "charms" / "traefik_k8s" / "v1" / "ingress_per_unit.py"
+    libs_folder = ipu_charm_root / "lib" / "charms" / "traefik_k8s" / "v1"
     libs_folder.mkdir(parents=True)
     shutil.copy(lib_source, libs_folder)
     yield await ops_test.build_charm(ipu_charm_root)
-    shutil.rmtree(ipu_charm_root/'lib')
+    shutil.rmtree(ipu_charm_root / "lib")
 
 
 @pytest.fixture(autouse=True)
