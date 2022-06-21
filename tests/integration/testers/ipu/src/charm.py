@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 from charms.traefik_k8s.v1.ingress_per_unit import IngressPerUnitRequirer
