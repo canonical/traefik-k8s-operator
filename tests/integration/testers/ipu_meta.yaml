@@ -1,7 +1,0 @@
-# Copyright 2022 Canonical Ltd.
-# See LICENSE file for licensing details.
-name: ipu-requirer-mock
-requires:
-  ingress-per-unit:
-    interface: ingress-per-unit
-    limit: 1
