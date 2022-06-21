@@ -6,5 +6,5 @@ description: ipu tester
 summary: ipu tester
 requires:
   ingress-per-unit:
-    interface: ingress-per-unit
+    interface: ingress_per_unit
     limit: 1
