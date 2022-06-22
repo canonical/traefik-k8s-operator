@@ -109,11 +109,8 @@ INGRESS_PROVIDES_APP_SCHEMA = {
                     },
                     "required": ["url"],
                 }
-            },
-        },
-        # Optional key for backwards compatibility
-        # with legacy requirers based on SDI
-        "_supported_versions": {"type": "string"},
+            }
+        }
     },
     "required": ["ingress"],
 }
@@ -510,13 +507,14 @@ class _IPUEvent(RelationEvent):
         dct = super().snapshot()
         for attr in self.__attrs__():
             obj = getattr(self, attr)
-            if not isinstance(obj, str):
-                raise TypeError(
-                    "cannot automagically serialize {}: ({}) "
+            try:
+                dct[attr] = obj
+            except ValueError as e:
+                raise ValueError(
+                    "cannot automagically serialize {}: "
                     "override this method and do it "
-                    "manually.".format(obj, attr)
+                    "manually.".format(obj)
                 )
-            dct[attr] = obj
         return dct
 
     def restore(self, snapshot: dict) -> None:

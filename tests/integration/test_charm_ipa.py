@@ -18,7 +18,7 @@ resources = {name: val["upstream-source"] for name, val in meta["resources"].ite
 async def ipa_tester_charm(ops_test: OpsTest):
     lib_source = Path() / "lib" / "charms" / "traefik_k8s" / "v1" / "ingress.py"
     libs_folder = ipa_charm_root / "lib" / "charms" / "traefik_k8s" / "v1"
-    libs_folder.mkdir(parents=True)
+    libs_folder.mkdir(parents=True, exist_ok=True)
     shutil.copy(lib_source, libs_folder)
     yield await ops_test.build_charm(ipa_charm_root)
     shutil.rmtree(ipa_charm_root / "lib")
