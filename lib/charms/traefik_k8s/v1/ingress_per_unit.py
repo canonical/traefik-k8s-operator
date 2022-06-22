@@ -109,7 +109,7 @@ INGRESS_PROVIDES_APP_SCHEMA = {
                     },
                     "required": ["url"],
                 }
-            }
+            },
         }
     },
     "required": ["ingress"],

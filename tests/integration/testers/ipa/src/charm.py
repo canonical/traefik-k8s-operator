@@ -11,7 +11,7 @@ class IPARequirerMock(CharmBase):
     def __init__(self, framework):
         super().__init__(framework, None)
         self.ipa = IngressPerAppRequirer(self, host="foo.bar", port=80)
-        self.unit.status = ActiveStatus('ready')
+        self.unit.status = ActiveStatus("ready")
 
 
 if __name__ == "__main__":

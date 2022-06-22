@@ -11,7 +11,7 @@ class IPURequirerMock(CharmBase):
     def __init__(self, framework):
         super().__init__(framework, None)
         self.ipu = IngressPerUnitRequirer(self, host="foo.bar", port=80)
-        self.unit.status = ActiveStatus('ready')
+        self.unit.status = ActiveStatus("ready")
 
 
 if __name__ == "__main__":

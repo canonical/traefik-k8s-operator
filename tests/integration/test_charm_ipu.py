@@ -40,7 +40,7 @@ async def deployment(ops_test: OpsTest, traefik_charm, ipu_tester_charm):
 
 @pytest.mark.abort_on_fail
 async def test_relate(ops_test: OpsTest):
-    await ops_test.juju("relate", "ipu-tester:ingress", "traefik-k8s:ingress-per-unit")
+    await ops_test.model.add_relation("ipu-tester:ingress", "traefik-k8s:ingress-per-unit")
     async with ops_test.fast_forward():
         await ops_test.model.wait_for_idle(["traefik-k8s", "ipu-tester"])
 
