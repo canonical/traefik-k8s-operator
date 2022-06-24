@@ -12,7 +12,7 @@ from ops.charm import CharmBase
 from ops.model import Relation
 from ops.testing import Harness
 
-from tests.unit.capture import capture, capture_events
+from charms.harness_extensions.v0.capture_events import capture_events, capture
 
 
 class MockRequirerCharm(CharmBase):

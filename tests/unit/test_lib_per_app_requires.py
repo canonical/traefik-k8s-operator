@@ -8,7 +8,7 @@ from charms.traefik_k8s.v1.ingress import IngressPerAppReadyEvent, IngressPerApp
 from ops.charm import CharmBase
 from ops.testing import Harness
 
-from tests.unit.capture import capture
+from charms.harness_extensions.v0.capture_events import capture
 
 
 class MockRequirerCharm(CharmBase):

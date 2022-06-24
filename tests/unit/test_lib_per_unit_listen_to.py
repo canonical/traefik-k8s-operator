@@ -13,7 +13,7 @@ from charms.traefik_k8s.v1.ingress_per_unit import (
 from ops.charm import CharmBase
 from ops.testing import Harness
 
-from tests.unit.capture import capture_events
+from charms.harness_extensions.v0.capture_events import capture_events
 
 
 @pytest.fixture(params=("only-this-unit", "all-units", "both"))

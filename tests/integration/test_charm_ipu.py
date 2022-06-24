@@ -40,7 +40,9 @@ async def deployment(ops_test: OpsTest, traefik_charm, ipu_tester_charm):
 
 @pytest.mark.abort_on_fail
 async def test_relate(ops_test: OpsTest):
-    await ops_test.model.add_relation("ipu-tester:ingress", "traefik-k8s:ingress-per-unit")
+    await ops_test.model.add_relation(
+        "ipu-tester:ingress-per-unit", "traefik-k8s:ingress-per-unit"
+    )
     async with ops_test.fast_forward():
         await ops_test.model.wait_for_idle(["traefik-k8s", "ipu-tester"])
 
@@ -48,7 +50,7 @@ async def test_relate(ops_test: OpsTest):
 @pytest.mark.abort_on_fail
 async def test_relation_data_shape():
     data = get_relation_data(
-        requirer_endpoint="ipu-tester/0:ingress",
+        requirer_endpoint="ipu-tester/0:ingress-per-unit",
         provider_endpoint="traefik-k8s/0:ingress-per-unit",
     )
 
@@ -74,6 +76,6 @@ async def test_relation_data_shape():
 
 
 async def test_remove_relation(ops_test: OpsTest):
-    await ops_test.juju("relate", "ipu-tester:ingress", "traefik-k8s:ingress-per-unit")
+    await ops_test.juju("relate", "ipu-tester:ingress-per-unit", "traefik-k8s:ingress-per-unit")
     async with ops_test.fast_forward():
-        await ops_test.model.wait_for_idle(["traefik-k8s", "spring-music"], status="active")
+        await ops_test.model.wait_for_idle(["traefik-k8s", "ipu-tester"], status="active")
