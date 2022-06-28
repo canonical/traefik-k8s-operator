@@ -48,10 +48,11 @@ async def test_relate(ops_test: OpsTest):
 
 
 @pytest.mark.abort_on_fail
-async def test_relation_data_shape():
+async def test_relation_data_shape(ops_test: OpsTest):
     data = get_relation_data(
         requirer_endpoint="ipu-tester/0:ingress-per-unit",
         provider_endpoint="traefik-k8s/0:ingress-per-unit",
+        model=ops_test.model_full_name,
     )
 
     requirer_unit_data = data.requirer.unit_data
@@ -61,7 +62,8 @@ async def test_relation_data_shape():
     # name: ipu-tester/0
     # port: 9090
     assert requirer_unit_data["name"] == "ipu-tester/0"
-    assert requirer_unit_data["host"] == "9090"
+    assert requirer_unit_data["port"] == "80"
+    assert requirer_unit_data["host"] == "foo.bar"
     model = requirer_unit_data["model"]
 
     provider_app_data = yaml.safe_load(data.provider.application_data["ingress"])

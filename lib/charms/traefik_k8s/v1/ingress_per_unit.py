@@ -514,7 +514,7 @@ class _IPUEvent(RelationEvent):
                     "cannot automagically serialize {}: "
                     "override this method and do it "
                     "manually.".format(obj)
-                )
+                ) from e
         return dct
 
     def restore(self, snapshot: dict) -> None:

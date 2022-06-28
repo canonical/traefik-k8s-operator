@@ -4,11 +4,10 @@ from textwrap import dedent
 
 import pytest
 import yaml
+from charms.harness_extensions.v0.capture_events import capture
 from charms.traefik_k8s.v1.ingress import IngressPerAppReadyEvent, IngressPerAppRequirer
 from ops.charm import CharmBase
 from ops.testing import Harness
-
-from charms.harness_extensions.v0.capture_events import capture
 
 
 class MockRequirerCharm(CharmBase):

@@ -206,7 +206,7 @@ class _IPAEvent(RelationEvent):
                     "cannot automagically serialize {}: "
                     "override this method and do it "
                     "manually.".format(obj)
-                )
+                ) from e
 
         return dct
 
@@ -315,9 +315,10 @@ class IngressPerAppProvider(_IngressPerAppBase):
 
     def _provided_url(self, relation: Relation) -> ProviderIngressData:
         """Fetch and validate this app databag; return the ingress url."""
-        if not relation.app or not relation.app.name or not not self.unit.is_leader():
+        if not all((relation.app, relation.app.name, self.unit.is_leader())):
             # Handle edge case where remote app name can be missing, e.g.,
             # relation_broken events.
+            # Also, only leader units can read own app databags.
             # FIXME https://github.com/canonical/traefik-k8s-operator/issues/34
             return {}  # noqa
 

@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.j de
-from ops.model import ActiveStatus
-
 from charms.traefik_k8s.v1.ingress import IngressPerAppRequirer
 from ops.charm import CharmBase
+from ops.model import ActiveStatus
 
 
 class IPARequirerMock(CharmBase):
