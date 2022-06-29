@@ -75,5 +75,8 @@ jobs:
     name: Static code analysis
     runs-on: ubuntu-latest
     steps:
+      - name: Install dependencies
+        run: python -m pip install tox
+
       - name: IPU
         run: tox -e static-ipu
