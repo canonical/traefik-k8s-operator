@@ -426,7 +426,9 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
         is invalid.
         """
         databag = relation.data[remote_unit]
-        remote_data = {k: databag[k] for k in ("port", "host", "model", "name")}
+        remote_data = {
+            k: databag[k] for k in ("port", "host", "model", "name")
+        }  # type: Dict[str, Union[int, str]]
         _validate_data(remote_data, INGRESS_REQUIRES_UNIT_SCHEMA)
 
         # do some convenience casting
@@ -671,7 +673,9 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
                 self.on.revoked.emit(self.relation, unit_name)  # type: ignore
 
         self._stored.current_urls = current_urls  # type: ignore
-        self._publish_auto_data(event.relation)
+
+        # todo remove cast when ops.charm is typed
+        self._publish_auto_data(typing.cast(Relation, event.relation))
 
     def _handle_upgrade_or_leader(self, event):
         for relation in self.relations:
@@ -730,10 +734,11 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
         if not relation:
             return {}
 
-        if not relation.app.name:  # type: ignore
+        if not all((relation.app, relation.app.name)):  # type: ignore
             # FIXME Workaround for https://github.com/canonical/operator/issues/693
             # We must be in a relation_broken hook
             return {}
+        assert isinstance(relation.app, Application)  # type guard
 
         raw = relation.data.get(relation.app, {}).get("ingress")
         if not raw:

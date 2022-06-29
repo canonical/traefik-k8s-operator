@@ -71,5 +71,9 @@ jobs:
         with:
           app: traefik-k8s
 
-      - name: Static IPU checks
+  static-checks:
+    name: Static code analysis
+    runs-on: ubuntu-latest
+    steps:
+      - name: IPU
         run: tox -e static-ipu
