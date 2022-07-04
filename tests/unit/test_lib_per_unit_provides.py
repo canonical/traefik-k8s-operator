@@ -1,16 +1,14 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
-
+import socket
 from textwrap import dedent
 
 import pytest
-from charms.traefik_k8s.v0.ingress_per_unit import (
-    IngressPerUnitProvider,
-    RelationPermissionError,
-)
+import yaml
+from charms.traefik_k8s.v1.ingress_per_unit import IngressPerUnitProvider
 from ops.charm import CharmBase
+from ops.model import Relation
 from ops.testing import Harness
-from test_lib_helpers import MockIPURequirer
 
 
 class MockProviderCharm(CharmBase):
@@ -32,14 +30,9 @@ class MockProviderCharm(CharmBase):
 @pytest.fixture(scope="function")
 def harness():
     harness = Harness(MockProviderCharm, meta=MockProviderCharm.META)
-    harness._backend.model_name = "test-model"
+    harness.set_model_name("test-model")
     harness.begin_with_initial_hooks()
     return harness
-
-
-@pytest.fixture(scope="function")
-def requirer(harness):
-    return MockIPURequirer(harness)
 
 
 @pytest.fixture(scope="function")
@@ -48,73 +41,64 @@ def provider(harness):
     return provider
 
 
-def test_ingress_unit_provider_uninitialized(provider, requirer):
-    assert not provider.is_available()
+def relate(harness: Harness[MockProviderCharm]):
+    relation_id = harness.add_relation("ingress-per-unit", "remote")
+    harness.add_relation_unit(relation_id, "remote/0")
+    return harness.model.get_relation("ingress-per-unit", relation_id)
+
+
+def _requirer_provide_ingress_requirements(
+    harness: Harness[MockProviderCharm], port: int, relation: Relation, host=socket.getfqdn()
+):
+    # same as requirer.provide_ingress_requirements(port=port, host=host)s
+    harness.update_relation_data(
+        relation.id,
+        "remote/0",
+        {"port": str(port), "host": host, "model": "test-model", "name": "remote/0"},
+    )
+
+
+def test_ingress_unit_provider_uninitialized(provider):
     assert not provider.is_ready()
-    assert not provider.is_failed()
-    assert not requirer.is_available()
-    assert not requirer.is_ready()
-    assert not requirer.is_failed()
 
 
 @pytest.mark.parametrize("leader", (True, False))
-def test_ingress_unit_provider_related(provider, requirer, harness, leader):
+def test_ingress_unit_provider_related(provider, harness, leader):
     harness.set_leader(leader)
-    relation = requirer.relate()
+    relation = relate(harness)
 
-    assert provider.is_available(relation)
     assert not provider.is_ready(relation)
-    assert not provider.is_failed(relation)
-    assert requirer.is_available(relation)
-    assert not requirer.is_ready(relation)
-    assert not requirer.is_failed(relation)
 
 
-@pytest.mark.parametrize("leader", (True, False))
-def test_ingress_unit_provider_supported_versions_shim(provider, requirer, harness, leader):
-    harness.set_leader(leader)
-    relation = requirer.relate()
-    if leader:
-        assert relation.data[provider.charm.app]["_supported_versions"] == "- v1"
-
-
-def test_ingress_unit_provider_request(provider, requirer, harness):
-    relation = requirer.relate()
-    requirer.provide_ingress_requirements(port=80)
-    assert provider.is_available(relation)
+def test_ingress_unit_provider_request(provider, harness):
+    relation = relate(harness)
+    _requirer_provide_ingress_requirements(harness, 80, relation)
     assert provider.is_ready(relation)
-    assert not provider.is_failed(relation)
-    assert requirer.is_available(relation)
-    assert not requirer.is_ready(relation)
-    assert not requirer.is_failed(relation)
 
 
 @pytest.mark.parametrize("port, host", ((80, "1.1.1.1"), (81, "10.1.10.1")))
-def test_ingress_unit_provider_request_response_nonleader(provider, requirer, harness, port, host):
+def test_ingress_unit_provider_request_response_nonleader(provider, harness, port, host):
     provider: IngressPerUnitProvider
-    relation = requirer.relate()
-    requirer.provide_ingress_requirements(port=port, host=host)
+    relation = relate(harness)
+    _requirer_provide_ingress_requirements(harness, port, relation, host=host)
 
-    unit_data = provider.get_data(relation, requirer.charm.unit)
-    assert unit_data["model"] == requirer.charm.model.name
-    assert unit_data["name"] == requirer.charm.unit.name
+    unit_data = provider.get_data(relation, relation.units.pop())
+    assert unit_data["model"] == "test-model"
+    assert unit_data["name"] == "remote/0"
     assert unit_data["host"] == host
     assert unit_data["port"] == port
 
     # fail because unit isn't leader
-    with pytest.raises(RelationPermissionError):
+    with pytest.raises(AssertionError):
         provider.publish_url(relation, unit_data["name"], "http://url/")
 
 
 @pytest.mark.parametrize("url", ("http://url/", "http://url2/"))
-def test_ingress_unit_provider_request_response(provider, requirer, harness, url):
-    relation = requirer.relate()
+def test_ingress_unit_provider_request_response(provider, harness, url):
+    relation = relate(harness)
     harness.set_leader(True)
-    requirer.provide_ingress_requirements(port=80)
+    _requirer_provide_ingress_requirements(harness, 80, relation)
+    provider.publish_url(relation, "remote/0", url)
 
-    provider.publish_url(relation, requirer.unit.name, url)
-    assert requirer.is_available(relation)
-    assert requirer.is_ready(relation)
-    assert not requirer.is_failed(relation)
-    assert requirer.urls == {"ingress-per-unit-remote/0": url}
-    assert requirer.url == url
+    ingress = relation.data[harness.charm.app]["ingress"]
+    assert yaml.safe_load(ingress) == {"remote/0": {"url": url}}

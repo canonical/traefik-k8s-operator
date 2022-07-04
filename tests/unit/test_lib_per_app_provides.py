@@ -4,10 +4,10 @@
 from textwrap import dedent
 
 import pytest
-from charms.traefik_k8s.v0.ingress import IngressPerAppProvider
+import yaml
+from charms.traefik_k8s.v1.ingress import IngressPerAppProvider
 from ops.charm import CharmBase
 from ops.testing import Harness
-from test_lib_helpers import MockIPARequirer
 
 
 class MockProviderCharm(CharmBase):
@@ -35,45 +35,31 @@ def harness():
 
 
 @pytest.fixture(scope="function")
-def requirer(harness):
-    return MockIPARequirer(harness)
-
-
-@pytest.fixture(scope="function")
 def provider(harness):
     provider = harness.charm.ipa
     return provider
 
 
-def test_ingress_app_provider_uninitialized(
-    provider: IngressPerAppProvider, requirer: MockIPARequirer
-):
+def test_ingress_app_provider_uninitialized(provider: IngressPerAppProvider):
     assert not provider.relations
     assert not provider.is_ready()
-    assert not requirer.relations
-    assert not requirer.is_ready()
 
 
-def test_ingress_app_provider_related(provider: IngressPerAppProvider, requirer: MockIPARequirer):
-    relation = requirer.relate()
+def test_ingress_app_provider_related(harness, provider: IngressPerAppProvider):
+    relation = harness.add_relation("ingress", "remote")
     assert not provider.is_ready(relation)
-    assert not requirer.is_ready(relation)
 
 
-def test_ingress_app_provider_relate_provide(
-    provider: IngressPerAppProvider, requirer: MockIPARequirer, harness
-):
+def test_ingress_app_provider_relate_provide(provider: IngressPerAppProvider, harness):
     harness.set_leader(True)
-    relation = requirer.relate()
-    requirer.provide_ingress_requirements(host="host", port=42)
+    relation_id = harness.add_relation("ingress", "remote")
+    remote_data = dict(host="host", port="42", name="foo", model="bar")
+    harness.update_relation_data(relation_id, "remote", remote_data)
+
+    relation = harness.model.get_relation("ingress", relation_id)
     assert provider.is_ready(relation)
-    assert not requirer.is_ready(relation)
 
     provider.publish_url(relation, "foo.com")
-    assert requirer.is_ready(relation)
 
-
-def test_ingress_app_provider_supported_versions_shim(provider, requirer, harness):
-    harness.set_leader(True)
-    relation = requirer.relate()
-    assert relation.data[provider.charm.app]["_supported_versions"] == "- v1"
+    ingress = harness.get_relation_data(relation_id, "test-provider")["ingress"]
+    assert yaml.safe_load(ingress) == {"url": "foo.com"}
