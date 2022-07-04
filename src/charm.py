@@ -227,7 +227,7 @@ class TraefikIngressCharm(CharmBase):
             self.unit.status = WaitingStatus("gateway address unavailable")
             return
 
-        if not self._is_traefik_service_running():
+        if not self._traefik_service_running:
             self.unit.status = WaitingStatus(f"waiting for service: '{_TRAEFIK_SERVICE_NAME}'")
             return
 
@@ -249,7 +249,7 @@ class TraefikIngressCharm(CharmBase):
             self._wipe_ingress_for_all_relations()  # fixme: no side-effects in prop
             self.unit.status = WaitingStatus("gateway address unavailable")
             return False
-        if not self._is_traefik_service_running():
+        if not self._traefik_service_running:
             self.unit.status = WaitingStatus(f"waiting for service: '{_TRAEFIK_SERVICE_NAME}'")
             return False
         return True
@@ -265,7 +265,7 @@ class TraefikIngressCharm(CharmBase):
             self.unit.status = ActiveStatus()
 
     def _handle_ingress_data_removed(self, event: RelationEvent):
-        """A unit has removed the data we need to provide ipu."""
+        """A unit has removed the data we need to provide ingress."""
         self._wipe_ingress_for_relation(event.relation)
 
     def _handle_traefik_route_ready(self, event: TraefikRouteRequirerReadyEvent):
@@ -284,33 +284,26 @@ class TraefikIngressCharm(CharmBase):
         gateway_address = self._external_host
         assert gateway_address, "No gateway address available"
 
-        relation_provider = self._provider_from_relation(relation)
-        if not (provider := relation_provider).is_ready(relation):
+        provider = self._provider_from_relation(relation)
+        if not provider.is_ready(relation):
             # TODO Cleanup: the provider for ingress_per_unit will NOT be ready if there are no
-            # units on the other side, which is the case for the RelationDeparted for the last unit
-            # (i.e., the proxied application scales to zero).
+            #  units on the other side, which is the case for the RelationDeparted for the last unit
+            #  (i.e., the proxied application scales to zero).
 
-            if relation_provider == self.ingress_per_unit and not relation.units:
+            if provider == self.ingress_per_unit and not relation.units:
                 logger.debug(
                     "No units found in the ingress-per-unit relation; resetting ingress configurations"
                 )
-
-                self._push_configurations(relation, {})
-
-            return
+                self._wipe_ingress_for_relation(relation)
 
         rel = f"{relation.name}:{relation.id}"
         self.unit.status = MaintenanceStatus(f"updating ingress configuration for '{rel}'")
         logger.debug("Updating ingress for relation '%s'", rel)
 
-        # TODO: once IngressPerApp is also SDI-free,
-        #  abstract the common logic here and remove this branch
-        if provider is self.ingress_per_app:
-            self._provide_ingress_per_app(relation)
-        elif provider is self.traefik_route:
+        if provider is self.traefik_route:
             self._provide_routed_ingress(relation)
         else:
-            self._provide_ingress_per_unit(relation)
+            self._provide_ingress(relation, provider)
 
     def _provide_routed_ingress(self, relation: Relation):
         """Provide ingress to a unit related through TraefikRoute."""
@@ -320,11 +313,20 @@ class TraefikIngressCharm(CharmBase):
         config = self.traefik_route.get_config(relation)
         self._push_configurations(relation, config)
 
-    def _provide_ingress_per_app(self, relation: Relation):
+    def _provide_ingress(self, relation: Relation,
+                         provider: Union[IngressPerAppProvider, IngressPerAppProvider]):
         # to avoid long-gone units from lingering in the ingress, we wipe it
-        provider = self.ingress_per_app
         if self.unit.is_leader():
             provider.wipe_ingress_data(relation)
+
+        # generate configs based on ingress type
+        # this will also populate our databags with the urls
+        configs = self._process_per_unit_relation(relation)
+        # push to traefik
+        self._push_configurations(relation, configs)
+
+    def _process_per_app_relation(self, relation: Relation):
+        provider = self.ingress_per_app
 
         try:
             data: "RequirerData_IPA" = provider.get_data(relation)
@@ -336,19 +338,16 @@ class TraefikIngressCharm(CharmBase):
         if self.unit.is_leader():
             provider.publish_url(relation, app_url)
 
-        self._push_configurations(relation, config)
+        return config
 
-    def _provide_ingress_per_unit(self, relation: Relation):
-        # to avoid long-gone units from lingering in the ingress, we wipe it
-        provider = self.ingress_per_unit
-        if self.unit.is_leader():
-            provider.wipe_ingress_data(relation)
-
+    def _process_per_unit_relation(self, relation: Relation):
         # FIXME Ideally, follower units could instead watch for the data in the
         # ingress app data bag, but Juju does not allow non-leader units to read
         # the application data bag on their side of the relation, so we may start
         # routing for a remote unit before the leader unit of ingress has
         # communicated the url.
+        provider = self.ingress_per_unit
+
         config = {}
         for unit in relation.units:
             if not provider.is_unit_ready(relation, unit):
@@ -371,7 +370,7 @@ class TraefikIngressCharm(CharmBase):
         # Note: We might be pushing an empty configuration if, for example,
         # none of the units has yet written their part of the data into the
         # relation. Traefik is fine with it :-)
-        self._push_configurations(relation, config)
+        return config
 
     def _push_configurations(self, relation: Relation, config: Union[dict, str]):
         if config:
@@ -481,17 +480,11 @@ class TraefikIngressCharm(CharmBase):
         # troubleshooting via `juju run 'relation_ids'...` and the like.`
         return f"juju_ingress_{relation.name}_{relation.id}_{relation.app.name}.yaml"
 
-    def _is_traefik_service_running(self):
+    @property
+    def _traefik_service_running(self):
         if not self.container.can_connect():
             return False
-
-        try:
-            # FIXME We cannot check by looking got the _TRAEFIK_SERVICE_NAME in
-            # `self.traefik_container.get_services()` because it would wrongly fail
-            # in the test Harness, see https://github.com/canonical/operator/issues/694
-            return self.container.get_service(_TRAEFIK_SERVICE_NAME).is_running()
-        except ModelError:
-            return False
+        return bool(self.container.get_services(_TRAEFIK_SERVICE_NAME))
 
     def _restart_traefik(self):
         updated_pebble_layer = {
