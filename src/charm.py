@@ -8,7 +8,7 @@ import enum
 import json
 import logging
 import typing
-from typing import Tuple, Union
+from typing import Tuple, Union, Callable, Dict
 
 import yaml
 from charms.observability_libs.v0.kubernetes_service_patch import KubernetesServicePatch
@@ -301,9 +301,9 @@ class TraefikIngressCharm(CharmBase):
         logger.debug("Updating ingress for relation '%s'", rel)
 
         if provider is self.traefik_route:
-            self._provide_routed_ingress(relation)
-        else:
-            self._provide_ingress(relation, provider)
+            return self._provide_routed_ingress(relation)
+
+        self._provide_ingress(relation, provider)
 
     def _provide_routed_ingress(self, relation: Relation):
         """Provide ingress to a unit related through TraefikRoute."""
@@ -314,19 +314,25 @@ class TraefikIngressCharm(CharmBase):
         self._push_configurations(relation, config)
 
     def _provide_ingress(
-        self, relation: Relation, provider: Union[IngressPerAppProvider, IngressPerAppProvider]
+        self, relation: Relation,
+            provider: Union[IngressPerAppProvider, IngressPerAppProvider]
     ):
-        # to avoid long-gone units from lingering in the ingress, we wipe it
+        # to avoid long-gone units from lingering in the databag, we wipe it
         if self.unit.is_leader():
             provider.wipe_ingress_data(relation)
 
         # generate configs based on ingress type
         # this will also populate our databags with the urls
-        configs = self._process_per_unit_relation(relation)
-        # push to traefik
+        # fixme no side-effects in _get_ method.
+        if provider is self.ingress_per_unit:
+            config_getter = self._get_configs_per_unit
+        else:  # self.ingress_per_app
+            config_getter = self._get_configs_per_app
+
+        configs = config_getter(relation)
         self._push_configurations(relation, configs)
 
-    def _process_per_app_relation(self, relation: Relation):
+    def _get_configs_per_app(self, relation: Relation):
         provider = self.ingress_per_app
 
         try:
@@ -341,7 +347,7 @@ class TraefikIngressCharm(CharmBase):
 
         return config
 
-    def _process_per_unit_relation(self, relation: Relation):
+    def _get_configs_per_unit(self, relation: Relation):
         # FIXME Ideally, follower units could instead watch for the data in the
         # ingress app data bag, but Juju does not allow non-leader units to read
         # the application data bag on their side of the relation, so we may start
@@ -360,7 +366,8 @@ class TraefikIngressCharm(CharmBase):
             except DataValidationError as e:
                 # is_unit_ready should guard against no data being there yet,
                 # but if the data is invalid...
-                logger.error(f"invalid data shared through {relation} by {unit}... Error: {e}.")
+                logger.error(f"invalid data shared through {relation} by "
+                             f"{unit}... Error: {e}.")
                 continue
 
             unit_config, unit_url = self._generate_per_unit_config(data)
@@ -468,10 +475,8 @@ class TraefikIngressCharm(CharmBase):
         # Wipe URLs sent to the requesting apps and units, as they are based on a gateway
         # address that is no longer valid.
         if self.unit.is_leader():
-            if self.ingress_per_app.is_ready():
-                self.ingress_per_app.wipe_ingress_data(relation)
-            if self.ingress_per_unit.is_ready():
-                self.ingress_per_unit.wipe_ingress_data(relation)
+            provider = self._provider_from_relation(relation)
+            provider.wipe_ingress_data(relation)
 
     def _relation_config_file(self, relation: Relation):
         # Using both the relation id and the app name in the file to facilitate
