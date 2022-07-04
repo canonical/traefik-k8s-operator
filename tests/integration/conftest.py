@@ -72,9 +72,6 @@ def get_unit_info(unit_name: str, model: str = None) -> dict:
       provider-id: traefik-k8s-0
       address: 10.1.232.144
     """
-    # if cached_data := _JUJU_DATA_CACHE.get(unit_name):
-    #     return cached_data
-
     cmd = f"juju show-unit {unit_name}".split(" ")
     if model:
         cmd.insert(2, "-m")

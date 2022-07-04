@@ -36,14 +36,15 @@ class SomeCharm(CharmBase):
     self.ingress_per_unit = IngressPerUnitRequirer(self, port=80)
     # The following event is triggered when the ingress URL to be used
     # by this unit of `SomeCharm` changes or there is no longer an ingress
-    # URL available, that is, `self.ingress_per_unit` would return `None`.
+    # URL available, that is, `self.ingress_per_unit.url` would return `None`.
     self.framework.observe(
-        self.ingress_per_unit.on.ingress_changed, self._handle_ingress_per_unit
+        self.ingress_per_unit.on.ready_for_unit, self._handle_ingress_per_unit
     )
     # ...
 
     def _handle_ingress_per_unit(self, event):
-        logger.info("This unit's ingress URL: %s", self.ingress_per_unit.url)
+        # event.url is the same as self.ingress_per_unit.url
+        logger.info("This unit's ingress URL: %s", event.url)
 ```
 """
 import logging
@@ -601,7 +602,7 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
         port: Optional[int] = None,
         listen_to: Literal["only-this-unit", "all-units", "both"] = "only-this-unit",
     ):
-        """Constructor for IngressRequirer.
+        """Constructor for IngressPerUnitRequirer.
 
         The request args can be used to specify the ingress properties when the
         instance is created. If any are set, at least `port` is required, and

@@ -6,7 +6,8 @@ options:
     description: |
       The DNS name to be used by Traefik ingress.
       If unspecified, the gateway ingress ip address will be used, e.g,
-      as provided by MetalLB.
+      as provided by MetalLB. This needs to be a `bare` hostname: i.e. 
+      no schema prefix and no port.
     type: string
   routing_mode:
     description: |
