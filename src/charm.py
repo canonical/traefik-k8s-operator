@@ -40,7 +40,6 @@ from ops.model import (
     ActiveStatus,
     BlockedStatus,
     MaintenanceStatus,
-    ModelError,
     Relation,
     WaitingStatus,
 )
@@ -286,9 +285,10 @@ class TraefikIngressCharm(CharmBase):
 
         provider = self._provider_from_relation(relation)
         if not provider.is_ready(relation):
-            # TODO Cleanup: the provider for ingress_per_unit will NOT be ready if there are no
-            #  units on the other side, which is the case for the RelationDeparted for the last unit
-            #  (i.e., the proxied application scales to zero).
+            # TODO Cleanup: the provider for ingress_per_unit will NOT be ready
+            #  if there are no units on the other side, which is the case for
+            #  the RelationDeparted for the last unit (i.e., the proxied
+            #  application scales to zero).
 
             if provider == self.ingress_per_unit and not relation.units:
                 logger.debug(
@@ -313,8 +313,9 @@ class TraefikIngressCharm(CharmBase):
         config = self.traefik_route.get_config(relation)
         self._push_configurations(relation, config)
 
-    def _provide_ingress(self, relation: Relation,
-                         provider: Union[IngressPerAppProvider, IngressPerAppProvider]):
+    def _provide_ingress(
+        self, relation: Relation, provider: Union[IngressPerAppProvider, IngressPerAppProvider]
+    ):
         # to avoid long-gone units from lingering in the ingress, we wipe it
         if self.unit.is_leader():
             provider.wipe_ingress_data(relation)
