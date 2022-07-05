@@ -73,6 +73,7 @@ class TraefikIngressCharm(CharmBase):
 
     _stored = StoredState()
     _port = 80
+    _tcp_port = 80080
     _diagnostics_port = 8082  # Prometheus metrics, healthcheck/ping
 
     def __init__(self, *args):
@@ -85,7 +86,8 @@ class TraefikIngressCharm(CharmBase):
         self.service_patch = KubernetesServicePatch(
             charm=self,
             service_type="LoadBalancer",
-            ports=[(f"{self.app.name}", self._port)],
+            ports=[(f"{self.app.name}", self._port),
+                   (f"{self.app.name}-tcp", self._tcp_port)],
         )
 
         self.metrics_endpoint = MetricsEndpointProvider(
@@ -158,6 +160,7 @@ class TraefikIngressCharm(CharmBase):
                 "entryPoints": {
                     "diagnostics": {"address": f":{self._diagnostics_port}"},
                     "web": {"address": f":{self._port}"},
+                    "tcp": {"address": f":{self._tcp_port}"},
                 },
                 # We always start the Prometheus endpoint for simplicity
                 # TODO: Generate this file in the dynamic configuration folder when the
@@ -396,12 +399,34 @@ class TraefikIngressCharm(CharmBase):
         prefix = f"{data['model']}-{name}"
 
         host = self._external_host
-        if self._routing_mode is _RoutingMode.path:
-            route_rule = f"PathPrefix(`/{prefix}`)"
-            unit_url = f"http://{host}:{self._port}/{prefix}"
-        else:  # _RoutingMode.subdomain
-            route_rule = f"Host(`{prefix}.{host}`)"
-            unit_url = f"http://{prefix}.{host}:{self._port}/"
+
+        if tcp_port := data['tcp-port']:
+            unit_url = f"{host}:{tcp_port}"
+            config = {"tcp": {
+                "routers": {
+                    f"juju-{prefix}-tcp-router": {
+                        "rule": f"HostSNI(`*`)",
+                        "service": f"juju-{prefix}-tcp-service",
+                    }
+                },
+                "services": {
+                    f"juju-{prefix}-tcp-service": {
+                        "loadBalancer": {
+                            "servers": [
+                                {"address": f"{data['tcp-ip']}:{tcp_port}"}
+                            ]
+                        }
+                    }
+                }}}
+            return config, unit_url
+
+        else:
+            if self._routing_mode is _RoutingMode.path:
+                route_rule = f"PathPrefix(`/{prefix}`)"
+                unit_url = f"http://{host}:{self._port}/{prefix}"
+            else:  # _RoutingMode.subdomain
+                route_rule = f"Host(`{prefix}.{host}`)"
+                unit_url = f"http://{prefix}.{host}:{self._port}/"
 
         traefik_router_name = f"juju-{prefix}-router"
         traefik_service_name = f"juju-{prefix}-service"
@@ -516,9 +541,9 @@ class TraefikIngressCharm(CharmBase):
 
     def _provider_from_relation(self, relation: Relation):
         """Returns the correct IngressProvider based on a relation."""
-        if _get_relation_type(relation) == _IngressRelationType.per_app:
+        if _get_relation_type(relation) is _IngressRelationType.per_app:
             return self.ingress_per_app
-        elif _get_relation_type(relation) == _IngressRelationType.per_unit:
+        elif _get_relation_type(relation) is _IngressRelationType.per_unit:
             return self.ingress_per_unit
         else:
             return self.traefik_route
