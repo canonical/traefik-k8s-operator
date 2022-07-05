@@ -8,7 +8,7 @@ import enum
 import json
 import logging
 import typing
-from typing import Tuple, Union, Callable, Dict
+from typing import Tuple, Union
 
 import yaml
 from charms.observability_libs.v0.kubernetes_service_patch import KubernetesServicePatch
@@ -314,8 +314,7 @@ class TraefikIngressCharm(CharmBase):
         self._push_configurations(relation, config)
 
     def _provide_ingress(
-        self, relation: Relation,
-            provider: Union[IngressPerAppProvider, IngressPerAppProvider]
+        self, relation: Relation, provider: Union[IngressPerAppProvider, IngressPerAppProvider]
     ):
         # to avoid long-gone units from lingering in the databag, we wipe it
         if self.unit.is_leader():
@@ -366,8 +365,9 @@ class TraefikIngressCharm(CharmBase):
             except DataValidationError as e:
                 # is_unit_ready should guard against no data being there yet,
                 # but if the data is invalid...
-                logger.error(f"invalid data shared through {relation} by "
-                             f"{unit}... Error: {e}.")
+                logger.error(
+                    f"invalid data shared through {relation} by " f"{unit}... Error: {e}."
+                )
                 continue
 
             unit_config, unit_url = self._generate_per_unit_config(data)
