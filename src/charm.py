@@ -73,6 +73,7 @@ class TraefikIngressCharm(CharmBase):
 
     _stored = StoredState()
     _port = 80
+    _tcp_port = 80080
     _diagnostics_port = 8082  # Prometheus metrics, healthcheck/ping
 
     def __init__(self, *args):
@@ -85,7 +86,8 @@ class TraefikIngressCharm(CharmBase):
         self.service_patch = KubernetesServicePatch(
             charm=self,
             service_type="LoadBalancer",
-            ports=[(f"{self.app.name}", self._port)],
+            ports=[(f"{self.app.name}", self._port),
+                   (f"{self.app.name}-tcp", self._tcp_port)],
         )
 
         self.metrics_endpoint = MetricsEndpointProvider(
@@ -158,6 +160,7 @@ class TraefikIngressCharm(CharmBase):
                 "entryPoints": {
                     "diagnostics": {"address": f":{self._diagnostics_port}"},
                     "web": {"address": f":{self._port}"},
+                    "tcp": {"address": f":{self._tcp_port}"},
                 },
                 # We always start the Prometheus endpoint for simplicity
                 # TODO: Generate this file in the dynamic configuration folder when the
