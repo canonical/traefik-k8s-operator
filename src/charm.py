@@ -399,12 +399,34 @@ class TraefikIngressCharm(CharmBase):
         prefix = f"{data['model']}-{name}"
 
         host = self._external_host
-        if self._routing_mode is _RoutingMode.path:
-            route_rule = f"PathPrefix(`/{prefix}`)"
-            unit_url = f"http://{host}:{self._port}/{prefix}"
-        else:  # _RoutingMode.subdomain
-            route_rule = f"Host(`{prefix}.{host}`)"
-            unit_url = f"http://{prefix}.{host}:{self._port}/"
+
+        if tcp_port := data['tcp-port']:
+            unit_url = f"{host}:{tcp_port}"
+            config = {"tcp": {
+                "routers": {
+                    f"juju-{prefix}-tcp-router": {
+                        "rule": f"HostSNI(`*`)",
+                        "service": f"juju-{prefix}-tcp-service",
+                    }
+                },
+                "services": {
+                    f"juju-{prefix}-tcp-service": {
+                        "loadBalancer": {
+                            "servers": [
+                                {"address": f"{data['tcp-ip']}:{tcp_port}"}
+                            ]
+                        }
+                    }
+                }}}
+            return config, unit_url
+
+        else:
+            if self._routing_mode is _RoutingMode.path:
+                route_rule = f"PathPrefix(`/{prefix}`)"
+                unit_url = f"http://{host}:{self._port}/{prefix}"
+            else:  # _RoutingMode.subdomain
+                route_rule = f"Host(`{prefix}.{host}`)"
+                unit_url = f"http://{prefix}.{host}:{self._port}/"
 
         traefik_router_name = f"juju-{prefix}-router"
         traefik_service_name = f"juju-{prefix}-service"
@@ -519,9 +541,9 @@ class TraefikIngressCharm(CharmBase):
 
     def _provider_from_relation(self, relation: Relation):
         """Returns the correct IngressProvider based on a relation."""
-        if _get_relation_type(relation) == _IngressRelationType.per_app:
+        if _get_relation_type(relation) is _IngressRelationType.per_app:
             return self.ingress_per_app
-        elif _get_relation_type(relation) == _IngressRelationType.per_unit:
+        elif _get_relation_type(relation) is _IngressRelationType.per_unit:
             return self.ingress_per_unit
         else:
             return self.traefik_route
