@@ -71,9 +71,18 @@ requirer = _RequirerMock()
 
 class TestTraefikIngressCharm(unittest.TestCase):
     def setUp(self):
-        self.harness = Harness(TraefikIngressCharm)
+        self.harness: Harness[TraefikIngressCharm] = Harness(TraefikIngressCharm)
         self.harness.set_model_name("test-model")
         self.addCleanup(self.harness.cleanup)
+
+    @patch("charm.KubernetesServicePatch", lambda **unused: None)
+    def test_service_get(self):
+        self.harness.update_config({"external_hostname": "testhostname"})
+        self.harness.set_leader(True)
+        self.harness.begin_with_initial_hooks()
+        self.harness.container_pebble_ready("traefik")
+
+        self.assertTrue(self.harness.charm._traefik_service_running)
 
     @patch("charm.KubernetesServicePatch", lambda **unused: None)
     def test_pebble_ready_with_gateway_address_from_config_and_path_routing_mode(self):

@@ -23,7 +23,7 @@ juju deploy ./traefik-k8s_ubuntu-20.04-amd64.charm traefik-ingress --trust --res
 
 ## Configurations
 
-* `external_hostname` allows you to specify a host for the URL that Traefik will assume is its externally-visible URL, and that will be used to generate the URLs passed to the proxied applications.
+* `external_hostname` allows you to specify a host for the URL that Traefik will assume is its externally-visible URL, and that will be used to generate the URLs passed to the proxied applications. Note that this has to be a 'bare' hostname, i.e. no `http` prefix and no `:port` suffix. Neither are configurable at the moment. (see )
   If `external_hostname` is unspecified, Traefik will use the ingress ip of its Kubernetes service, and the charm will go into `WaitingStatus` if it does not discover an ingress IP on its Kubernetes service.
   The [Setup](#setup) section shows how to optionally set up `metallb` with MicroK8s, so that Traefik's Kubernetes service will receive an ingress IP.
 
