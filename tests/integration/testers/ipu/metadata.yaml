@@ -1,0 +1,10 @@
+# Copyright 2022 Canonical Ltd.
+# See LICENSE file for licensing details.
+name: ipu-requirer-mock
+display-name: ipu-requirer-mock
+description: ipu tester
+summary: ipu tester
+requires:
+  ingress-per-unit:
+    interface: ingress_per_unit
+    limit: 1

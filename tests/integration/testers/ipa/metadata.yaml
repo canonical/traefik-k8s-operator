@@ -1,0 +1,10 @@
+# Copyright 2022 Canonical Ltd.
+# See LICENSE file for licensing details.
+name: ipa-requirer-mock
+display-name: ipa-requirer-mock
+description: ipa tester
+summary: ipa tester
+requires:
+  ingress:
+    interface: ingress
+    limit: 1

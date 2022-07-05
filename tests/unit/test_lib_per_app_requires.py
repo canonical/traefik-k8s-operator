@@ -1,14 +1,13 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
-
 from textwrap import dedent
 
 import pytest
-from charms.traefik_k8s.v0.ingress import IngressPerAppRequirer
+import yaml
+from charms.harness_extensions.v0.capture_events import capture
+from charms.traefik_k8s.v1.ingress import IngressPerAppReadyEvent, IngressPerAppRequirer
 from ops.charm import CharmBase
-from ops.framework import StoredState
 from ops.testing import Harness
-from test_lib_helpers import MockIPAProvider
 
 
 class MockRequirerCharm(CharmBase):
@@ -22,17 +21,9 @@ class MockRequirerCharm(CharmBase):
         """
     )
 
-    _stored = StoredState()
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args)
-        self._stored.set_default(num_events=0)
         self.ipa = IngressPerAppRequirer(self, port=80)
-        self.framework.observe(self.ipa.on.ready, self.record_events)
-        self.framework.observe(self.ipa.on.revoked, self.record_events)
-
-    def record_events(self, _):
-        self._stored.num_events += 1
 
 
 @pytest.fixture(scope="function")
@@ -44,53 +35,33 @@ def harness():
 
 
 @pytest.fixture(scope="function")
-def provider(harness):
-    return MockIPAProvider(harness)
-
-
-@pytest.fixture(scope="function")
 def requirer(harness):
     requirer = harness.charm.ipa
     return requirer
 
 
-def test_ingress_app_requirer_uninitialized(
-    requirer: IngressPerAppRequirer, provider: MockIPAProvider, harness
-):
+def test_ingress_app_requirer_uninitialized(requirer: IngressPerAppRequirer, harness):
     assert not requirer.is_ready()
-    assert not provider.is_ready()
-
-    assert harness.charm._stored.num_events == 0
 
 
-def test_ingress_app_requirer_related(
-    requirer: IngressPerAppRequirer, provider: MockIPAProvider, harness
-):
+# @pytest.mark.parametrize('url', ('foo.bar', 'foo.bar.baz'))
+def test_ingress_app_requirer_related(requirer: IngressPerAppRequirer, harness):
     harness.set_leader(True)
-    relation = provider.relate()
+    url = "foo.bar"
 
     assert not requirer.is_ready()
     # provider goes to ready immediately because we inited ipa with port=80.
     # auto-data feature...
-    assert provider.is_ready(relation)
 
+    relation_id = harness.add_relation("ingress", "remote")
     requirer.provide_ingress_requirements(host="foo", port=42)
-    assert provider.is_ready(relation)
     assert not requirer.is_ready()
 
-    assert harness.charm._stored.num_events == 0
-    provider.publish_url(relation, "url")
-    assert harness.charm._stored.num_events == 1
-
-    assert provider.is_ready(relation)
+    with capture(harness.charm, IngressPerAppReadyEvent) as captured:
+        harness.update_relation_data(
+            relation_id, "remote", {"ingress": yaml.safe_dump({"url": url})}
+        )
+    event = captured.event
+    assert event.url == url
+    assert requirer.url == url
     assert requirer.is_ready()
-
-    assert requirer.url == "url"
-
-    assert harness.charm._stored.num_events == 1
-    provider.publish_url(relation, "url2")
-    assert harness.charm._stored.num_events == 2
-
-    assert provider.is_ready(relation)
-    assert requirer.is_ready()
-    assert requirer.url == "url2"
