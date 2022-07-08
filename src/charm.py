@@ -32,7 +32,7 @@ from ops.charm import (
     PebbleReadyEvent,
     RelationEvent,
     StartEvent,
-    UpdateStatusEvent,
+    UpdateStatusEvent, RelationBrokenEvent,
 )
 from ops.framework import StoredState
 from ops.main import main
@@ -73,7 +73,7 @@ class TraefikIngressCharm(CharmBase):
 
     _stored = StoredState()
     _port = 80
-    _tcp_port = 80080
+    _tcp_port = 8080
     _diagnostics_port = 8082  # Prometheus metrics, healthcheck/ping
 
     def __init__(self, *args):
@@ -268,6 +268,9 @@ class TraefikIngressCharm(CharmBase):
 
     def _handle_ingress_data_removed(self, event: RelationEvent):
         """A unit has removed the data we need to provide ingress."""
+        # if this is because the relation is gone, we don't need to do anything
+        if isinstance(event, RelationBrokenEvent):
+            return
         self._wipe_ingress_for_relation(event.relation)
 
     def _handle_traefik_route_ready(self, event: TraefikRouteRequirerReadyEvent):

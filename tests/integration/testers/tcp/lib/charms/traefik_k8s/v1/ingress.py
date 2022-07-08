@@ -271,7 +271,6 @@ class IngressPerAppProvider(_IngressPerAppBase):
 
     def wipe_ingress_data(self, relation: Relation):
         """Clear ingress data from relation."""
-        assert self.unit.is_leader(), "only leaders can do this"
         del relation.data[self.app]["ingress"]
 
     def _get_requirer_data(self, relation: Relation) -> RequirerData:

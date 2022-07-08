@@ -14,11 +14,12 @@ from ops.model import ActiveStatus, Container, WaitingStatus
 class TCPRequirerMock(CharmBase):
     def __init__(self, framework):
         super().__init__(framework, None)
-        self.ipa = IngressPerUnitRequirer(self, host="foo.bar", port=80)
         self.unit.status = ActiveStatus("ready")
 
-        self.framework.observe(self.ipa.on.ready_for_unit, self._ipu_ready)
-        self.framework.observe(self.on.tcp_server_pebble_ready, self._pebble_ready)
+        self.framework.observe(self.on.ingress_per_unit_relation_created,
+                               self._ipu_ready)
+        self.framework.observe(self.on.tcp_server_pebble_ready,
+                               self._pebble_ready)
 
     def _pebble_ready(self, event: PebbleReadyEvent):
         container: Container = event.workload
@@ -58,8 +59,15 @@ class TCPRequirerMock(CharmBase):
 
     def _ipu_ready(self, event):
         # patch databag by adding some extra data
-        event.relation.data[self.unit]['tcp-port'] = '42'
-        event.relation.data[self.unit]['tcp-ip'] = getfqdn()
+        ipu = {'host': "foo.bar",
+               'port': '80',
+               'model': self.model.name,
+               'name': self.unit.name,
+               'tcp-port': '42',
+               'tcp-ip': getfqdn()}
+
+        for k, v in ipu.items():
+            event.relation.data[self.unit][k] = v
 
 
 if __name__ == "__main__":

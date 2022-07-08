@@ -434,8 +434,6 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
 
         # do some convenience casting
         remote_data["port"] = int(remote_data["port"])
-        remote_data['tcp-port'] = databag['tcp-port']
-        remote_data['tcp-ip'] = databag['tcp-ip']
         return remote_data
 
     def _provider_app_data(self, relation: Relation) -> ProviderApplicationData:
