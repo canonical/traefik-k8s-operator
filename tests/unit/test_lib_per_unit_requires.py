@@ -6,6 +6,7 @@ import pytest
 import yaml
 from charms.harness_extensions.v0.capture_events import capture, capture_events
 from charms.traefik_k8s.v1.ingress_per_unit import (
+    DataValidationError,
     IngressPerUnitReadyForUnitEvent,
     IngressPerUnitRequirer,
 )
@@ -108,3 +109,24 @@ def test_unit_joining_does_not_trigger_ingress_changed(requirer, harness, url):
         _requirer_provide_ingress(
             harness, harness.charm.unit.name, "a_different_url.com", relation
         )
+
+
+@pytest.mark.parametrize(
+    "auto_data, ok",
+    (
+        ((True, 42), False),
+        ((10, False), False),
+        ((10, None), False),
+        (("foo", 12), True),
+    ),
+)
+def test_validator(requirer: IngressPerUnitRequirer, harness, auto_data, ok):
+    harness.set_leader(True)
+    harness.add_relation("ingress-per-unit", "remote")
+    if not ok:
+        with pytest.raises(DataValidationError):
+            host, port = auto_data
+            requirer.provide_ingress_requirements(host=host, port=port)
+    else:
+        host, port = auto_data
+        requirer.provide_ingress_requirements(host=host, port=port)
