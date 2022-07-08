@@ -25,7 +25,8 @@ class TCPRequirerMock(CharmBase):
         container: Container = event.workload
         if container.can_connect():
             # ensure the container is set up
-            container.exec('pip install fastapi uvicorn'.split())
+            # FIXME: this doesn't work for some reason
+            container.exec('/usr/local/bin/pip install fastapi uvicorn'.split())
             workload_file = Path(__file__).parent / 'workload.py'
             with open(workload_file, 'r') as workload_source:
                 print('pushing webserver source...')
