@@ -5,7 +5,11 @@ from textwrap import dedent
 import pytest
 import yaml
 from charms.harness_extensions.v0.capture_events import capture
-from charms.traefik_k8s.v1.ingress import IngressPerAppReadyEvent, IngressPerAppRequirer
+from charms.traefik_k8s.v1.ingress import (
+    DataValidationError,
+    IngressPerAppReadyEvent,
+    IngressPerAppRequirer,
+)
 from ops.charm import CharmBase
 from ops.testing import Harness
 
@@ -44,7 +48,6 @@ def test_ingress_app_requirer_uninitialized(requirer: IngressPerAppRequirer, har
     assert not requirer.is_ready()
 
 
-# @pytest.mark.parametrize('url', ('foo.bar', 'foo.bar.baz'))
 def test_ingress_app_requirer_related(requirer: IngressPerAppRequirer, harness):
     harness.set_leader(True)
     url = "foo.bar"
@@ -65,3 +68,24 @@ def test_ingress_app_requirer_related(requirer: IngressPerAppRequirer, harness):
     assert event.url == url
     assert requirer.url == url
     assert requirer.is_ready()
+
+
+@pytest.mark.parametrize(
+    "auto_data, ok",
+    (
+        ((True, 42), False),
+        ((10, False), False),
+        ((10, None), False),
+        (("foo", 12), True),
+    ),
+)
+def test_validator(requirer: IngressPerAppRequirer, harness, auto_data, ok):
+    harness.set_leader(True)
+    harness.add_relation("ingress", "remote")
+    if not ok:
+        with pytest.raises(DataValidationError):
+            host, port = auto_data
+            requirer.provide_ingress_requirements(host=host, port=port)
+    else:
+        host, port = auto_data
+        requirer.provide_ingress_requirements(host=host, port=port)

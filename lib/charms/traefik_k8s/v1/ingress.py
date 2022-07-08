@@ -473,6 +473,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         # require one unit to publish it -- it will not differ between units,
         # unlike in ingress-per-unit.
         assert self.unit.is_leader(), "only leaders should do this."
+        assert self.relation, "no relation"
 
         if not host:
             host = socket.getfqdn()
