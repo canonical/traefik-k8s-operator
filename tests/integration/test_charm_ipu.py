@@ -39,7 +39,7 @@ async def deployment(ops_test: OpsTest, traefik_charm, ipu_tester_charm):
 
 
 @pytest.mark.abort_on_fail
-async def test_relate(ops_test: OpsTest):
+async def test_relate(ops_test: OpsTest, deployment):
     await ops_test.model.add_relation(
         "ipu-tester:ingress-per-unit", "traefik-k8s:ingress-per-unit"
     )

@@ -37,7 +37,7 @@ async def deployment(ops_test: OpsTest, traefik_charm, ipa_tester_charm):
 
 
 @pytest.mark.abort_on_fail
-async def test_relate(ops_test: OpsTest):
+async def test_relate(ops_test: OpsTest, deployment):
     await ops_test.model.add_relation("ipa-tester:ingress", "traefik-k8s:ingress")
     async with ops_test.fast_forward():
         await ops_test.model.wait_for_idle(["traefik-k8s", "ipa-tester"])
