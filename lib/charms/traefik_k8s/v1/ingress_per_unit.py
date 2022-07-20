@@ -760,8 +760,8 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
             raw = relation.data.get(relation.app, {}).get("ingress")
         except ModelError as e:
             log.debug(
-                f"Error {e} attempting to read remote app data; "
-                f"probably we are in a relation_departed hook"
+                "Error {} attempting to read remote app data; "
+                "probably we are in a relation_departed hook".format(e)
             )
             return {}
 
