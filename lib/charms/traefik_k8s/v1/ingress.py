@@ -57,7 +57,7 @@ from typing import Any, Dict, Optional, Tuple
 import yaml
 from ops.charm import CharmBase, RelationEvent
 from ops.framework import EventSource, Object, ObjectEvents, StoredState
-from ops.model import Relation
+from ops.model import Relation, ModelError
 
 # The unique Charmhub library identifier, never change it
 LIBID = "e6de2a5cd5b34422a204668f3b8f90d2"
@@ -502,10 +502,16 @@ class IngressPerAppRequirer(_IngressPerAppBase):
             return None
 
         # fetch the provider's app databag
-        raw_data = relation.data[relation.app].get("ingress")
-        if not raw_data:
+        try:
+            raw = relation.data.get(relation.app, {}).get("ingress")
+        except ModelError as e:
+            log.debug(f"Error {e} attempting to read remote app data; "
+                      f"probably we are in a relation_departed hook")
             return None
 
-        ingress: ProviderIngressData = yaml.safe_load(raw_data)
+        if not raw:
+            return None
+
+        ingress: ProviderIngressData = yaml.safe_load(raw)
         _validate_data({"ingress": ingress}, INGRESS_PROVIDES_APP_SCHEMA)
         return ingress["url"]
