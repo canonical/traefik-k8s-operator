@@ -4,11 +4,11 @@
 from pathlib import Path
 from socket import getfqdn
 
-from ops.pebble import Layer
+from ops.pebble import Layer, ProtocolError
 
 from charms.traefik_k8s.v1.ingress_per_unit import IngressPerUnitRequirer
 from ops.charm import CharmBase, PebbleReadyEvent
-from ops.model import ActiveStatus, Container, WaitingStatus
+from ops.model import ActiveStatus, Container, WaitingStatus, Relation
 
 
 class TCPRequirerMock(CharmBase):
@@ -26,7 +26,7 @@ class TCPRequirerMock(CharmBase):
         if container.can_connect():
             # ensure the container is set up
             # FIXME: this doesn't work for some reason
-            container.exec('/usr/local/bin/pip install fastapi uvicorn'.split())
+            container.exec("/usr/local/bin/pip install fastapi 'uvicorn[standard]'".split())
             workload_file = Path(__file__).parent / 'workload.py'
             with open(workload_file, 'r') as workload_source:
                 print('pushing webserver source...')
@@ -52,23 +52,45 @@ class TCPRequirerMock(CharmBase):
                 container.replan()
                 print("restarted webserver service")
 
+            # if we're related when pebble starts, go ahead
+            for relation in self.model.relations['ingress-per-unit']:
+                self._push_data(relation)
+
             self.unit.status = ActiveStatus()
         else:
             self.unit.status = WaitingStatus(
                 'Pending webserver restart; waiting for workload container'
             )
 
+    @property
+    def tcp_port(self):
+        container = self.unit.get_container('tcp-server')
+        if not container.can_connect():
+            print('unable to fetch port; container not ready')
+            return None
+        try:
+            return container.pull('/port.txt').read()
+        except ProtocolError as e:
+            print('port file not found in container.')
+            raise
+
     def _ipu_ready(self, event):
-        # patch databag by adding some extra data
+        self._push_data(event.relation)
+
+    def _push_data(self, relation: Relation):
+        tcp_port = self.tcp_port
+        if not tcp_port:
+            return
+
+        # todo replace with IPURequirer when tcp mode supported
         ipu = {'host': "foo.bar",
-               'port': '80',
+               'port': str(tcp_port),
                'model': self.model.name,
                'name': self.unit.name,
-               'tcp-port': '42',
-               'tcp-ip': getfqdn()}
+               'mode': 'tcp'}
 
         for k, v in ipu.items():
-            event.relation.data[self.unit][k] = v
+            relation.data[self.unit][k] = v
 
 
 if __name__ == "__main__":
