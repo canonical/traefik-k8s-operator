@@ -55,7 +55,7 @@ from typing import Any, Dict, Optional, Tuple, Union
 import yaml
 from ops.charm import CharmBase, RelationEvent
 from ops.framework import EventSource, Object, ObjectEvents, StoredState
-from ops.model import Application, Relation, Unit, ModelError
+from ops.model import Application, ModelError, Relation, Unit
 
 # The unique Charmhub library identifier, never change it
 LIBID = "7ef06111da2945ed84f4f5d4eb5b353a"
@@ -125,11 +125,17 @@ except ImportError:
 
 
 # Model of the data a unit implementing the requirer will need to provide.
-RequirerData = TypedDict("RequirerData",
-                         {"model": str, "name": str,
-                          "host": str, "port": int,
-                          "mode": Optional[Literal['tcp', 'http']]},
-                         total=False)
+RequirerData = TypedDict(
+    "RequirerData",
+    {
+        "model": str,
+        "name": str,
+        "host": str,
+        "port": int,
+        "mode": Optional[Literal["tcp", "http"]],
+    },
+    total=False,
+)
 
 
 RequirerUnitData = Dict[Unit, "RequirerData"]
@@ -606,7 +612,7 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
         *,
         host: Optional[str] = None,
         port: Optional[int] = None,
-        mode: Literal['tcp', 'http'] = 'http',
+        mode: Literal["tcp", "http"] = "http",
         listen_to: Literal["only-this-unit", "all-units", "both"] = "only-this-unit",
     ):
         """Constructor for IngressPerUnitRequirer.
@@ -753,8 +759,10 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
         try:
             raw = relation.data.get(relation.app, {}).get("ingress")
         except ModelError as e:
-            log.debug(f"Error {e} attempting to read remote app data; "
-                      f"probably we are in a relation_departed hook")
+            log.debug(
+                f"Error {e} attempting to read remote app data; "
+                f"probably we are in a relation_departed hook"
+            )
             return {}
 
         if not raw:
