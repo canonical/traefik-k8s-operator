@@ -4,6 +4,7 @@ import shutil
 from pathlib import Path
 
 import pytest
+import pytest_asyncio
 import yaml
 from pytest_operator.plugin import OpsTest
 
@@ -14,24 +15,22 @@ meta = yaml.safe_load((Path() / "metadata.yaml").read_text())
 resources = {name: val["upstream-source"] for name, val in meta["resources"].items()}
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def ipa_tester_charm(ops_test: OpsTest):
     lib_source = Path() / "lib" / "charms" / "traefik_k8s" / "v1" / "ingress.py"
     libs_folder = ipa_charm_root / "lib" / "charms" / "traefik_k8s" / "v1"
     libs_folder.mkdir(parents=True, exist_ok=True)
     shutil.copy(lib_source, libs_folder)
-    yield await ops_test.build_charm(ipa_charm_root)
-    shutil.rmtree(ipa_charm_root / "lib")
+    return await ops_test.build_charm(ipa_charm_root)
 
 
-@pytest.fixture(autouse=True)
 @pytest.mark.abort_on_fail
-async def deployment(ops_test: OpsTest, traefik_charm, ipa_tester_charm):
+async def test_deployment(ops_test: OpsTest, traefik_charm, ipa_tester_charm):
     if not ops_test.model.applications.get("traefik-k8s"):
         await ops_test.model.deploy(traefik_charm, resources=resources)
     await ops_test.model.applications["traefik-k8s"].set_config({"external_hostname": "foo.bar"})
 
-    await ops_test.juju("deploy", ipa_tester_charm, "ipa-tester")
+    await ops_test.model.deploy(ipa_tester_charm, "ipa-tester")
     async with ops_test.fast_forward():
         await ops_test.model.wait_for_idle(["traefik-k8s", "ipa-tester"], status="active")
 
