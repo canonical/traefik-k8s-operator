@@ -30,6 +30,7 @@ from ops.charm import (
     CharmBase,
     ConfigChangedEvent,
     PebbleReadyEvent,
+    RelationBrokenEvent,
     RelationEvent,
     StartEvent,
     UpdateStatusEvent,
@@ -55,6 +56,7 @@ _TRAEFIK_CONTAINER_NAME = _TRAEFIK_LAYER_NAME = _TRAEFIK_SERVICE_NAME = "traefik
 # We watch the parent folder of where we store the configuration files,
 # as that is usually safer for Traefik
 _CONFIG_DIRECTORY = "/opt/traefik/juju"
+_STATIC_CONFIG_PATH = "/etc/traefik/traefik.yaml"
 
 
 class _RoutingMode(enum.Enum):
@@ -78,7 +80,9 @@ class TraefikIngressCharm(CharmBase):
     def __init__(self, *args):
         super().__init__(*args)
 
-        self._stored.set_default(current_external_host=None, current_routing_mode=None)
+        self._stored.set_default(
+            current_external_host=None, current_routing_mode=None, tcp_entrypoints=None
+        )
 
         self.container = self.unit.get_container(_TRAEFIK_CONTAINER_NAME)
 
@@ -131,17 +135,28 @@ class TraefikIngressCharm(CharmBase):
             logger.exception("Action 'show-proxied-endpoints' failed")
             event.fail(str(e))
 
-    def _on_traefik_pebble_ready(self, _: PebbleReadyEvent):
-        # The the Traefik container comes up, e.g., after a pod churn, we
-        # ignore the unit status and start fresh.
+    def _tcp_entrypoints(self):
+        # for each unit related via IPU in tcp mode, we need to generate the tcp
+        # entry points for traefik's static config.
+        entrypoints = {}
+        ipu = self.ingress_per_unit
+        for relation in ipu.relations:
+            for unit in relation.units:
+                if unit._is_our_unit:
+                    # is this necessary?
+                    continue
+                if not ipu.is_unit_ready(relation, unit):
+                    logger.error(f"{relation} not ready: skipping...")
+                    continue
 
-        # Ensure the required basic configurations and folders exist
-        # TODO Use the Traefik user and group?
+                data = ipu.get_data(relation, unit)
+                if data.get("mode", "http") == "tcp":
+                    entrypoint_name = self._get_prefix(data)
+                    entrypoints[entrypoint_name] = {"address": f":{data['port']}"}
 
-        # Since pebble ready will also occur after a pod churn, but we store the
-        # configuration files on a storage volume that survives the pod churn, before
-        # we start traefik we clean up all Juju-generated config files to avoid spurious
-        # routes.
+        return entrypoints
+
+    def _clear_dynamic_configs(self):
         try:
             for file in self.container.list_files(path=_CONFIG_DIRECTORY, pattern="juju_*.yaml"):
                 self.container.remove_path(file.path)
@@ -149,8 +164,22 @@ class TraefikIngressCharm(CharmBase):
         except (FileNotFoundError, APIError):
             pass
 
+    def _push_static_config(self):
+        # Ensure the required basic configurations and folders exist
+        # TODO Use the Traefik user and group?
+
         # TODO Disable static config with telemetry and check new version
-        basic_configurations = yaml.dump(
+
+        # We always start the Prometheus endpoint for simplicity
+        # TODO: Generate this file in the dynamic configuration folder when the
+        #  metrics-endpoint relation is established?
+
+        # we cache the tcp entrypoints, so we can detect changes and decide
+        # whether we need a restart
+        tcp_entrypoints = self._tcp_entrypoints()
+        logger.debug(f"Statically configuring traefik with tcp entrypoints: {tcp_entrypoints}.")
+
+        traefik_static_config = yaml.dump(
             {
                 "log": {
                     "level": "DEBUG",
@@ -158,10 +187,8 @@ class TraefikIngressCharm(CharmBase):
                 "entryPoints": {
                     "diagnostics": {"address": f":{self._diagnostics_port}"},
                     "web": {"address": f":{self._port}"},
+                    **tcp_entrypoints,
                 },
-                # We always start the Prometheus endpoint for simplicity
-                # TODO: Generate this file in the dynamic configuration folder when the
-                # metrics-endpoint relation is established?
                 "metrics": {
                     "prometheus": {
                         "addRoutersLabels": True,
@@ -178,11 +205,26 @@ class TraefikIngressCharm(CharmBase):
                 },
             }
         )
-
-        self.container.push("/etc/traefik/traefik.yaml", basic_configurations, make_dirs=True)
+        self.container.push(_STATIC_CONFIG_PATH, traefik_static_config, make_dirs=True)
         self.container.make_dir(_CONFIG_DIRECTORY, make_parents=True)
-        self._restart_traefik()
+
+    def _on_traefik_pebble_ready(self, _: PebbleReadyEvent):
+        # If the Traefik container comes up, e.g., after a pod churn, we
+        # ignore the unit status and start fresh.
+        self._clear_all_configs_and_restart_traefik()
+        # push the (fresh new) configs.
         self._process_status_and_configurations()
+
+    def _clear_all_configs_and_restart_traefik(self):
+        # Since pebble ready will also occur after a pod churn, but we store the
+        # configuration files on a storage volume that survives the pod churn, before
+        # we start traefik we clean up all Juju-generated config files to avoid spurious
+        # routes.
+        self._clear_dynamic_configs()
+        # we push the static config
+        self._push_static_config()
+        # now we restart traefik
+        self._restart_traefik()
 
     def _on_start(self, _: StartEvent):
         self._process_status_and_configurations()
@@ -232,14 +274,43 @@ class TraefikIngressCharm(CharmBase):
 
         self.unit.status = MaintenanceStatus("updating ingress configurations")
 
+        # if there are changes in the tcp configs, we'll need to restart
+        # traefik as the tcp entrypoints are consumed as static configuration
+        # and those can only be passed on init.
+        if self._tcp_entrypoints_changed():
+            logger.debug("change in tcp entrypoints detected. Rebooting traefik.")
+            # fixme: this is kind of brutal;
+            #  will kill in-flight requests and disrupt traffic.
+            self._clear_all_configs_and_restart_traefik()
+            # we do this BEFORE processing the relations.
+
         for ingress_relation in self.ingress_per_app.relations + self.ingress_per_unit.relations:
             self._process_ingress_relation(ingress_relation)
 
         if isinstance(self.unit.status, MaintenanceStatus):
             self.unit.status = ActiveStatus()
         else:
+            logger.debug(
+                "unit in {!r}: {}".format(self.unit.status.name, self.unit.status.message)
+            )
             self.unit.status = BlockedStatus("setup of some ingress relation failed")
             logger.error("The setup of some ingress relation failed, see previous logs")
+
+    def _pull_tcp_entrypoints_from_container(self):
+        try:
+            static_config_raw = self.container.pull(_STATIC_CONFIG_PATH).read()
+        except PathError as e:
+            logger.error(f"Could not fetch static config from container; {e}")
+            return {}
+
+        static_config = yaml.safe_load(static_config_raw)
+        eps = static_config["entryPoints"]
+        return {k: v for k, v in eps.items() if k not in {"diagnostics", "web"}}
+
+    def _tcp_entrypoints_changed(self):
+        current = self._tcp_entrypoints()
+        traefik_entrypoints = self._pull_tcp_entrypoints_from_container()
+        return current != traefik_entrypoints
 
     @property
     def ready(self) -> bool:
@@ -265,6 +336,9 @@ class TraefikIngressCharm(CharmBase):
 
     def _handle_ingress_data_removed(self, event: RelationEvent):
         """A unit has removed the data we need to provide ingress."""
+        # if this is because the relation is gone, we don't need to do anything
+        if isinstance(event, RelationBrokenEvent):
+            return
         self._wipe_ingress_for_relation(event.relation)
 
     def _handle_traefik_route_ready(self, event: TraefikRouteRequirerReadyEvent):
@@ -292,7 +366,8 @@ class TraefikIngressCharm(CharmBase):
 
             if provider == self.ingress_per_unit and not relation.units:
                 logger.debug(
-                    "No units found in the ingress-per-unit relation; resetting ingress configurations"
+                    "No units found in the ingress-per-unit relation; "
+                    "resetting ingress configurations"
                 )
                 self._wipe_ingress_for_relation(relation)
 
@@ -389,19 +464,45 @@ class TraefikIngressCharm(CharmBase):
         else:
             self._wipe_ingress_for_relation(relation)
 
+    @staticmethod
+    def _get_prefix(data: Union["RequirerData_IPU", "RequirerData_IPA"]):
+        name = data["name"].replace("/", "-")
+        return f"{data['model']}-{name}"
+
     def _generate_per_unit_config(self, data: "RequirerData_IPU") -> Tuple[dict, str]:
         """Generate a config dict for a given unit for IngressPerUnit."""
         config = {"http": {"routers": {}, "services": {}}}
-        name = data["name"].replace("/", "-")
-        prefix = f"{data['model']}-{name}"
-
+        prefix = self._get_prefix(data)
         host = self._external_host
-        if self._routing_mode is _RoutingMode.path:
-            route_rule = f"PathPrefix(`/{prefix}`)"
-            unit_url = f"http://{host}:{self._port}/{prefix}"
-        else:  # _RoutingMode.subdomain
-            route_rule = f"Host(`{prefix}.{host}`)"
-            unit_url = f"http://{prefix}.{host}:{self._port}/"
+        if data["mode"] == "tcp":
+            port = data["port"]
+            unit_url = f"{host}:{port}"
+            config = {
+                "tcp": {
+                    "routers": {
+                        f"juju-{prefix}-tcp-router": {
+                            "rule": "HostSNI(`*`)",
+                            "service": f"juju-{prefix}-tcp-service",
+                            # or whatever entrypoint I defined in static config
+                            "entryPoints": [prefix],
+                        },
+                    },
+                    "services": {
+                        f"juju-{prefix}-tcp-service": {
+                            "loadBalancer": {"servers": [{"address": f"{data['host']}:{port}"}]}
+                        }
+                    },
+                }
+            }
+            return config, unit_url
+
+        else:
+            if self._routing_mode is _RoutingMode.path:
+                route_rule = f"PathPrefix(`/{prefix}`)"
+                unit_url = f"http://{host}:{self._port}/{prefix}"
+            else:  # _RoutingMode.subdomain
+                route_rule = f"Host(`{prefix}.{host}`)"
+                unit_url = f"http://{prefix}.{host}:{self._port}/"
 
         traefik_router_name = f"juju-{prefix}-router"
         traefik_service_name = f"juju-{prefix}-service"
@@ -419,7 +520,7 @@ class TraefikIngressCharm(CharmBase):
     def _generate_per_app_config(self, data: "RequirerData_IPA") -> Tuple[dict, str]:
         host = self._external_host
         port = self._port
-        prefix = f"{data['model']}-{data['name']}"
+        prefix = self._get_prefix(data)
 
         if self._routing_mode == _RoutingMode.path:
             route_rule = f"PathPrefix(`/{prefix}`)"
@@ -493,7 +594,7 @@ class TraefikIngressCharm(CharmBase):
         return bool(self.container.get_services(_TRAEFIK_SERVICE_NAME))
 
     def _restart_traefik(self):
-        updated_pebble_layer = {
+        layer = {
             "summary": "Traefik layer",
             "description": "Pebble config layer for Traefik",
             "services": {
@@ -506,19 +607,22 @@ class TraefikIngressCharm(CharmBase):
             },
         }
 
-        current_pebble_layer = self.container.get_plan().to_dict()
+        current_services = self.container.get_plan().to_dict().get("services", {})
 
-        if _TRAEFIK_SERVICE_NAME not in current_pebble_layer.get("services", {}):
-            self.unit.status = MaintenanceStatus(f"creating the '{_TRAEFIK_SERVICE_NAME}' service")
-            self.container.add_layer(_TRAEFIK_LAYER_NAME, updated_pebble_layer, combine=True)
-
-        self.container.replan()
+        if _TRAEFIK_SERVICE_NAME not in current_services:
+            self.unit.status = MaintenanceStatus(f"creating the {_TRAEFIK_SERVICE_NAME!r} service")
+            self.container.add_layer(_TRAEFIK_LAYER_NAME, layer, combine=True)
+            logger.debug(f"replanning {_TRAEFIK_SERVICE_NAME!r} after a service update")
+            self.container.replan()
+        else:
+            logger.debug(f"restarting {_TRAEFIK_SERVICE_NAME!r}")
+            self.container.restart(_TRAEFIK_SERVICE_NAME)
 
     def _provider_from_relation(self, relation: Relation):
         """Returns the correct IngressProvider based on a relation."""
-        if _get_relation_type(relation) == _IngressRelationType.per_app:
+        if _get_relation_type(relation) is _IngressRelationType.per_app:
             return self.ingress_per_app
-        elif _get_relation_type(relation) == _IngressRelationType.per_unit:
+        elif _get_relation_type(relation) is _IngressRelationType.per_unit:
             return self.ingress_per_unit
         else:
             return self.traefik_route

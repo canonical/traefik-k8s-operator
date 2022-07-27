@@ -55,7 +55,7 @@ from typing import Any, Dict, Optional, Tuple, Union
 import yaml
 from ops.charm import CharmBase, RelationEvent
 from ops.framework import EventSource, Object, ObjectEvents, StoredState
-from ops.model import Application, Relation, Unit
+from ops.model import Application, ModelError, Relation, Unit
 
 # The unique Charmhub library identifier, never change it
 LIBID = "7ef06111da2945ed84f4f5d4eb5b353a"
@@ -65,7 +65,7 @@ LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 0
+LIBPATCH = 1
 
 log = logging.getLogger(__name__)
 
@@ -94,6 +94,7 @@ INGRESS_REQUIRES_UNIT_SCHEMA = {
         "name": {"type": "string"},
         "host": {"type": "string"},
         "port": {"type": "string"},
+        "mode": {"type": "string"},
     },
     "required": ["model", "name", "host", "port"],
 }
@@ -124,7 +125,17 @@ except ImportError:
 
 
 # Model of the data a unit implementing the requirer will need to provide.
-RequirerData = TypedDict("RequirerData", {"model": str, "name": str, "host": str, "port": int})
+RequirerData = TypedDict(
+    "RequirerData",
+    {
+        "model": str,
+        "name": str,
+        "host": str,
+        "port": int,
+        "mode": Optional[Literal["tcp", "http"]],
+    },
+    total=False,
+)
 
 
 RequirerUnitData = Dict[Unit, "RequirerData"]
@@ -390,6 +401,15 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
         Assumes that this unit is leader.
         """
         assert self.unit.is_leader(), "only leaders can do this"
+        try:
+            relation.data
+        except ModelError as e:
+            log.warning(
+                "error {} accessing relation data for {!r}. "
+                "Probably a ghost of a dead relation is still "
+                "lingering around.".format(e, relation.name)
+            )
+            return
         del relation.data[self.app]["ingress"]
 
     def _requirer_units_data(self, relation: Relation) -> RequirerUnitData:
@@ -410,9 +430,9 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
                 # this remote unit didn't share data yet
                 log.warning("Remote unit {} not ready.".format(remote_unit.name))
                 continue
-            except DataValidationError:
+            except DataValidationError as e:
                 # this remote unit sent invalid data.
-                log.error("Remote unit {} sent invalid data.".format(remote_unit.name))
+                log.error("Remote unit {} sent invalid data ({}).".format(remote_unit.name, e))
                 continue
 
             remote_data["port"] = int(remote_data["port"])
@@ -427,11 +447,12 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
         is invalid.
         """
         databag = relation.data[remote_unit]
-        remote_data = {
-            k: databag[k] for k in ("port", "host", "model", "name")
-        }  # type: Dict[str, Union[int, str]]
+        remote_data = {}  # type: Dict[str, Union[int, str]]
+        for k in ("port", "host", "model", "name", "mode"):
+            v = databag.get(k)
+            if v is not None:
+                remote_data[k] = v
         _validate_data(remote_data, INGRESS_REQUIRES_UNIT_SCHEMA)
-
         # do some convenience casting
         remote_data["port"] = int(remote_data["port"])
         return remote_data
@@ -600,6 +621,7 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
         *,
         host: Optional[str] = None,
         port: Optional[int] = None,
+        mode: Literal["tcp", "http"] = "http",
         listen_to: Literal["only-this-unit", "all-units", "both"] = "only-this-unit",
     ):
         """Constructor for IngressPerUnitRequirer.
@@ -635,6 +657,7 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
         # we immediately publish our ingress data  to speed up the process.
         self._host = host
         self._port = port
+        self._mode = mode
 
         self.listen_to = listen_to
 
@@ -721,6 +744,7 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
             "name": self.unit.name,
             "host": host,
             "port": str(port),
+            "mode": self._mode,
         }
         _validate_data(data, INGRESS_REQUIRES_UNIT_SCHEMA)
         self.relation.data[self.unit].update(data)
@@ -741,7 +765,15 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
             return {}
         assert isinstance(relation.app, Application)  # type guard
 
-        raw = relation.data.get(relation.app, {}).get("ingress")
+        try:
+            raw = relation.data.get(relation.app, {}).get("ingress")
+        except ModelError as e:
+            log.debug(
+                "Error {} attempting to read remote app data; "
+                "probably we are in a relation_departed hook".format(e)
+            )
+            return {}
+
         if not raw:
             # remote side didn't send yet
             return {}

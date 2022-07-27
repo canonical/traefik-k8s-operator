@@ -8,6 +8,7 @@ from time import sleep
 import pytest
 import yaml
 
+charm_root = Path(__file__).parent.parent.parent
 _JUJU_DATA_CACHE = {}
 _JUJU_KEYS = ("egress-subnets", "ingress-address", "private-address")
 
@@ -15,7 +16,7 @@ _JUJU_KEYS = ("egress-subnets", "ingress-address", "private-address")
 @pytest.fixture(autouse=True, scope="session")
 @pytest.mark.abort_on_fail
 def traefik_charm():
-    proc = Popen(["charmcraft", "pack"], stdout=PIPE, stderr=PIPE)
+    proc = Popen(["charmcraft", "pack"], stdout=PIPE, stderr=PIPE, cwd=charm_root)
     proc.wait()
     while proc.returncode is None:  # wait() does not quite wait
         print(proc.stdout.read().decode("utf-8"))
@@ -27,7 +28,7 @@ def traefik_charm():
             proc.stderr.read().decode("utf-8"),
         )
 
-    charms = tuple(map(str, Path().glob("*.charm")))
+    charms = tuple(map(str, charm_root.glob("*.charm")))
     assert len(charms) == 1, (
         f"too many charms {charms}" if charms else f"no charm found at {Path().absolute()}"
     )
@@ -39,7 +40,7 @@ def traefik_charm():
 
     yield charm_path
 
-    Popen(["rm", str(charm_path)]).wait()
+    Popen(["rm", str(charm_path)], cwd=charm_root).wait()
 
 
 def purge(data: dict):
@@ -191,3 +192,21 @@ def get_relation_data(
         requirer_endpoint, provider_endpoint, include_default_juju_keys, model
     )
     return RelationData(provider=provider_data, requirer=requirer_data)
+
+
+if __name__ == "__main__":
+    # model = "test-charm-ipa-ai18"
+    model = "test-charm-ipu-rt7m"
+
+    print(
+        get_relation_data(
+            requirer_endpoint="ipu-tester/0:ingress-per-unit",
+            provider_endpoint="traefik-k8s/0:ingress-per-unit",
+            model=model,
+        )
+        # get_relation_data(
+        #         requirer_endpoint="ipa-tester/0:ingress",
+        #         provider_endpoint="traefik-k8s/0:ingress",
+        #         model=_juju
+        #     )
+    )
