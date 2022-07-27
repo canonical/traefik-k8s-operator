@@ -558,7 +558,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
         self.harness.container_pebble_ready("traefik")
         charm = self.harness.charm
         prefix = charm._get_prefix(data)
-        expected_entrypoint = {"address": ':3000'}
+        expected_entrypoint = {"address": ":3000"}
         assert charm._tcp_entrypoints() == {prefix: expected_entrypoint}
 
         static_config = charm.unit.get_container("traefik").pull(_STATIC_CONFIG_PATH).read()
