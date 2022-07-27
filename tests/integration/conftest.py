@@ -192,21 +192,3 @@ def get_relation_data(
         requirer_endpoint, provider_endpoint, include_default_juju_keys, model
     )
     return RelationData(provider=provider_data, requirer=requirer_data)
-
-
-if __name__ == "__main__":
-    # model = "test-charm-ipa-ai18"
-    model = "test-charm-ipu-rt7m"
-
-    print(
-        get_relation_data(
-            requirer_endpoint="ipu-tester/0:ingress-per-unit",
-            provider_endpoint="traefik-k8s/0:ingress-per-unit",
-            model=model,
-        )
-        # get_relation_data(
-        #         requirer_endpoint="ipa-tester/0:ingress",
-        #         provider_endpoint="traefik-k8s/0:ingress",
-        #         model=_juju
-        #     )
-    )
