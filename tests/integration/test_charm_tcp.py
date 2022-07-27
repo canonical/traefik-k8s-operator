@@ -60,7 +60,9 @@ async def test_deployment(ops_test: OpsTest, traefik_charm, tcp_charm):
 
     await ops_test.model.deploy(tcp_charm, "tcp-tester", resources=tcp_charm_resources)
     async with ops_test.fast_forward():
-        await ops_test.model.wait_for_idle(["traefik-k8s", "tcp-tester"], status="active")
+        await ops_test.model.wait_for_idle(
+            ["traefik-k8s", "tcp-tester"], status="active", timeout=1000
+        )
 
 
 @pytest.mark.abort_on_fail
