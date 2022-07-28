@@ -50,7 +50,7 @@ async def test_deployment(ops_test: OpsTest, traefik_charm, tcp_charm):
 
     # block until traefik goes to waiting status
     async with ops_test.fast_forward():
-        await ops_test.model.wait_for_idle(["traefik-k8s"], status="waiting")
+        await ops_test.model.wait_for_idle(["traefik-k8s"], status="waiting", timeout=1000)
 
     # we set the external hostname to traefik's own ip
     traefik_unit_ip = get_unit_ip(ops_test)
