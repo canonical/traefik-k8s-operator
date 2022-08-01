@@ -13,7 +13,7 @@ To get started using the library, you just need to fetch the library using `char
 
 ```shell
 cd some-charm
-charmcraft fetch-lib charms.traefik_k8s.v0.ingress
+charmcraft fetch-lib charms.traefik_k8s.v1.ingress
 ```
 
 In the `metadata.yaml` of the charm, add the following:
@@ -28,25 +28,27 @@ requires:
 Then, to initialise the library:
 
 ```python
-# ...
-from charms.traefik_k8s.v0.ingress import IngressPerAppRequirer
+from charms.traefik_k8s.v1.ingress import (IngressPerAppRequirer,
+  IngressPerAppReadyEvent, IngressPerAppRevokedEvent)
 
 class SomeCharm(CharmBase):
   def __init__(self, *args):
     # ...
     self.ingress = IngressPerAppRequirer(self, port=80)
     # The following event is triggered when the ingress URL to be used
-    # by this deployment of the `SomeCharm` changes or there is no longer
-    # an ingress URL available, that is, `self.ingress` would
-    # return `None`.
+    # by this deployment of the `SomeCharm` is ready (or changes).
     self.framework.observe(
-        self.ingress.on.ready, self._handle_ingress
+        self.ingress.on.ready, self._on_ingress_ready
     )
-    # ...
+    self.framework.observe(
+        self.ingress.on.revoked, self._on_ingress_revoked
+    )
 
-    def _handle_ingress(self, event):
-        logger.info("This app's ingress URL: %s", self.ingress.url)
-```
+    def _on_ingress_ready(self, event: IngressPerAppReadyEvent):
+        logger.info("This app's ingress URL: %s", event.url)
+
+    def _on_ingress_revoked(self, event: IngressPerAppRevokedEvent):
+        logger.info("This app no longer has ingress")
 """
 
 import logging
@@ -67,7 +69,7 @@ LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 1
+LIBPATCH = 2
 
 DEFAULT_RELATION_NAME = "ingress"
 RELATION_INTERFACE = "ingress"

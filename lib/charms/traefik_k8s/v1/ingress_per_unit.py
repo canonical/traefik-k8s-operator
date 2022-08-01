@@ -12,7 +12,7 @@ ingress.
 To get started using the library, you just need to fetch the library using `charmcraft`.
 
 ```shell
-charmcraft fetch-lib charms.traefik_k8s.v0.ingress_per_unit
+charmcraft fetch-lib charms.traefik_k8s.v1.ingress_per_unit
 ```
 
 Add the `jsonschema` dependency to the `requirements.txt` of your charm.
@@ -27,26 +27,36 @@ requires:
 Then, to initialise the library:
 
 ```python
-# ...
-from charms.traefik_k8s.v0.ingress_per_unit import IngressPerUnitRequirer
+from charms.traefik_k8s.v1.ingress_per_unit import (IngressPerUnitRequirer,
+  IngressPerUnitReadyForUnitEvent, IngressPerUnitRevokedForUnitEvent)
 
 class SomeCharm(CharmBase):
   def __init__(self, *args):
     # ...
     self.ingress_per_unit = IngressPerUnitRequirer(self, port=80)
     # The following event is triggered when the ingress URL to be used
-    # by this unit of `SomeCharm` changes or there is no longer an ingress
-    # URL available, that is, `self.ingress_per_unit.url` would return `None`.
+    # by this unit of `SomeCharm` is ready (or changes).
     self.framework.observe(
-        self.ingress_per_unit.on.ready_for_unit, self._handle_ingress_per_unit
+        self.ingress_per_unit.on.ready_for_unit, self._on_ingress_ready
     )
-    # ...
+    self.framework.observe(
+        self.ingress_per_unit.on.revoked_for_unit, self._on_ingress_revoked
+    )
 
-    def _handle_ingress_per_unit(self, event):
+    def _on_ingress_ready(self, event: IngressPerUnitReadyForUnitEvent):
         # event.url is the same as self.ingress_per_unit.url
         logger.info("This unit's ingress URL: %s", event.url)
+
+    def _on_ingress_revoked(self, event: IngressPerUnitRevokedForUnitEvent):
+        logger.info("This unit no longer has ingress")
 ```
+
+If you wish to be notified also (or instead) when another unit's ingress changes
+(e.g. if you're the leader and you're doing things with your peers' ingress),
+you can pass `listen_to = "all-units" | "both"` to `IngressPerUnitRequirer`
+and observe `self.ingress_per_unit.on.ready` and `self.ingress_per_unit.on.revoked`.
 """
+
 import logging
 import socket
 import typing
@@ -65,7 +75,7 @@ LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 1
+LIBPATCH = 2
 
 log = logging.getLogger(__name__)
 
