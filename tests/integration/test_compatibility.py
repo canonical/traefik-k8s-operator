@@ -1,6 +1,6 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
-
+import juju.errors
 import pytest_asyncio
 from pytest_operator.plugin import OpsTest
 
@@ -23,6 +23,17 @@ from tests.integration.test_charm_tcp import (  # noqa
 )
 
 
+async def safe_relate(ops_test: OpsTest, ep1, ep2):
+    # in pytest-operator CI, we deploy all tests in the same model.
+    # Therefore, it might be that by the time we run this module, the two endpoints
+    # are already related.
+    try:
+        await ops_test.model.add_relation(ep1, ep2)
+    except juju.errors.JujuAPIError:
+        # relation already exists? skip
+        pass
+
+
 @pytest_asyncio.fixture
 async def tcp_ipa_deployment(
     ops_test: OpsTest, traefik_charm, tcp_tester_charm, ipa_tester_charm  # noqa
@@ -32,8 +43,8 @@ async def tcp_ipa_deployment(
         ops_test, tcp_tester_charm, "tcp-tester", resources=tcp_charm_resources
     )
     await deploy_charm_if_not_deployed(ops_test, ipa_tester_charm, "ipa-tester")
-    await ops_test.model.add_relation("tcp-tester", "traefik-k8s")
-    await ops_test.model.add_relation("ipa-tester", "traefik-k8s")
+    await safe_relate(ops_test, "tcp-tester", "traefik-k8s")
+    await safe_relate(ops_test, "ipa-tester", "traefik-k8s")
     async with ops_test.fast_forward():
         await ops_test.model.wait_for_idle(
             ["traefik-k8s", "tcp-tester", "ipa-tester"], status="active", timeout=1000
@@ -53,8 +64,8 @@ async def tcp_ipu_deployment(
         ops_test, tcp_tester_charm, "tcp-tester", resources=tcp_charm_resources
     )
     await deploy_charm_if_not_deployed(ops_test, ipu_tester_charm, "ipu-tester")
-    await ops_test.model.add_relation("tcp-tester", "traefik-k8s")
-    await ops_test.model.add_relation("ipu-tester", "traefik-k8s")
+    await safe_relate(ops_test, "tcp-tester", "traefik-k8s")
+    await safe_relate(ops_test, "ipu-tester", "traefik-k8s")
     async with ops_test.fast_forward():
         await ops_test.model.wait_for_idle(
             ["traefik-k8s", "tcp-tester", "ipu-tester"], status="active", timeout=1000
