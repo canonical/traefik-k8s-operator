@@ -1,5 +1,6 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from subprocess import PIPE, Popen
@@ -7,8 +8,12 @@ from time import sleep
 
 import pytest
 import yaml
+from pytest_operator.plugin import OpsTest
 
 charm_root = Path(__file__).parent.parent.parent
+trfk_meta = yaml.safe_load((charm_root / "metadata.yaml").read_text())
+trfk_resources = {name: val["upstream-source"] for name, val in trfk_meta["resources"].items()}
+
 _JUJU_DATA_CACHE = {}
 _JUJU_KEYS = ("egress-subnets", "ingress-address", "private-address")
 
@@ -192,3 +197,52 @@ def get_relation_data(
         requirer_endpoint, provider_endpoint, include_default_juju_keys, model
     )
     return RelationData(provider=provider_data, requirer=requirer_data)
+
+
+def assert_can_ping(ip, port):
+    response = os.system(f"ping -c 1 {ip} -p {port}")
+    assert response == 0, f"{ip}:{port} is down/unreachable"
+
+
+async def get_address(ops_test: OpsTest, app_name: str, unit=0):
+    status = await ops_test.model.get_status()  # noqa: F821
+    addr = list(status.applications[app_name].units.values())[unit].address
+    return addr
+
+
+async def deploy_traefik_if_not_deployed(ops_test: OpsTest, traefik_charm):
+    if not ops_test.model.applications.get("traefik-k8s"):
+        await ops_test.model.deploy(
+            traefik_charm, application_name="traefik-k8s", resources=trfk_resources
+        )
+        # if we're running this locally, we need to wait for "waiting"
+        # CI however deploys all in a single model, so traefik is active already
+        # if a previous test has already set it up.
+        wait_for = "waiting"
+    else:
+        wait_for = "active"
+
+    # block until traefik goes to...
+    async with ops_test.fast_forward():
+        await ops_test.model.wait_for_idle(["traefik-k8s"], status=wait_for, timeout=1000)
+
+    # we set the external hostname to traefik-k8s's own ip
+    traefik_address = await get_address(ops_test, "traefik-k8s")
+    await ops_test.model.applications["traefik-k8s"].set_config(
+        {"external_hostname": traefik_address}
+    )
+
+    # now we're most definitely active.
+    async with ops_test.fast_forward():
+        await ops_test.model.wait_for_idle(["traefik-k8s"], status="active", timeout=1000)
+
+
+async def deploy_charm_if_not_deployed(ops_test: OpsTest, charm, app_name: str, resources=None):
+    if not ops_test.model.applications.get(app_name):
+        await ops_test.model.deploy(charm, resources=resources, application_name=app_name)
+
+    # block until app goes to active/idle
+    async with ops_test.fast_forward():
+        # if we're running this locally, we need to wait for "waiting"
+        # CI however deploys all in a single model, so traefik is active already.
+        await ops_test.model.wait_for_idle([app_name], status="active", timeout=1000)

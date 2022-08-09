@@ -11,7 +11,11 @@ import pytest_asyncio
 import yaml
 from pytest_operator.plugin import OpsTest
 
-from tests.integration.conftest import charm_root, get_relation_data
+from tests.integration.conftest import (
+    charm_root,
+    deploy_traefik_if_not_deployed,
+    get_relation_data,
+)
 
 tcp_charm_root = (Path(__file__).parent / "testers" / "tcp").absolute()
 tcp_charm_meta = yaml.safe_load((tcp_charm_root / "metadata.yaml").read_text())
@@ -19,12 +23,9 @@ tcp_charm_resources = {
     name: val["upstream-source"] for name, val in tcp_charm_meta["resources"].items()
 }
 
-trfk_meta = yaml.safe_load((Path(__file__).parent.parent.parent / "metadata.yaml").read_text())
-trfk_resources = {name: val["upstream-source"] for name, val in trfk_meta["resources"].items()}
-
 
 @pytest_asyncio.fixture
-async def tcp_charm(ops_test: OpsTest):
+async def tcp_tester_charm(ops_test: OpsTest):
     lib_source = charm_root / "lib" / "charms" / "traefik_k8s" / "v1" / "ingress_per_unit.py"
     libs_folder = tcp_charm_root / "lib" / "charms" / "traefik_k8s" / "v1"
     libs_folder.mkdir(parents=True, exist_ok=True)
@@ -44,23 +45,9 @@ def get_unit_ip(ops_test: OpsTest):
 
 
 @pytest.mark.abort_on_fail
-async def test_deployment(ops_test: OpsTest, traefik_charm, tcp_charm):
-    if not ops_test.model.applications.get("traefik-k8s"):
-        await ops_test.model.deploy(traefik_charm, resources=trfk_resources)
-
-    # block until traefik goes to waiting status
-    async with ops_test.fast_forward():
-        # if we're running this locally, we need to wait for "waiting"
-        # CI however deploys all in a single model, so traefik is active already.
-        await ops_test.model.wait_for_idle(["traefik-k8s"], status="active", timeout=1000)
-
-    # we set the external hostname to traefik's own ip
-    traefik_unit_ip = get_unit_ip(ops_test)
-    await ops_test.model.applications["traefik-k8s"].set_config(
-        {"external_hostname": traefik_unit_ip}
-    )
-
-    await ops_test.model.deploy(tcp_charm, "tcp-tester", resources=tcp_charm_resources)
+async def test_deployment(ops_test: OpsTest, traefik_charm, tcp_tester_charm):
+    await deploy_traefik_if_not_deployed(ops_test, traefik_charm)
+    await ops_test.model.deploy(tcp_tester_charm, "tcp-tester", resources=tcp_charm_resources)
     async with ops_test.fast_forward():
         await ops_test.model.wait_for_idle(
             ["traefik-k8s", "tcp-tester"], status="active", timeout=1000
@@ -106,7 +93,7 @@ async def test_relation_data_shape(ops_test: OpsTest):
     assert provider_app_data == {"tcp-tester/0": {"url": f"{traefik_unit_ip}:{port}"}}
 
 
-async def test_tcp_connection(ops_test: OpsTest):
+async def assert_tcp_charm_has_ingress(ops_test: OpsTest):
     traefik_unit_ip = get_unit_ip(ops_test)
     data = get_relation_data(
         requirer_endpoint="tcp-tester/0:ingress-per-unit",
@@ -121,6 +108,10 @@ async def test_tcp_connection(ops_test: OpsTest):
         data = s.recv(1024)
 
     assert data == b"Hello, world"
+
+
+async def test_tcp_connection(ops_test: OpsTest):
+    await assert_tcp_charm_has_ingress(ops_test)
 
 
 async def test_remove_relation(ops_test: OpsTest):
