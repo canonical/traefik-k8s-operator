@@ -411,6 +411,15 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
         Assumes that this unit is leader.
         """
         assert self.unit.is_leader(), "only leaders can do this"
+        try:
+            relation.data
+        except ModelError as e:
+            log.warning(
+                "error {} accessing relation data for {!r}. "
+                "Probably a ghost of a dead relation is still "
+                "lingering around.".format(e, relation.name)
+            )
+            return
         del relation.data[self.app]["ingress"]
 
     def _requirer_units_data(self, relation: Relation) -> RequirerUnitData:
@@ -431,9 +440,9 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
                 # this remote unit didn't share data yet
                 log.warning("Remote unit {} not ready.".format(remote_unit.name))
                 continue
-            except DataValidationError:
+            except DataValidationError as e:
                 # this remote unit sent invalid data.
-                log.error("Remote unit {} sent invalid data.".format(remote_unit.name))
+                log.error("Remote unit {} sent invalid data ({}).".format(remote_unit.name, e))
                 continue
 
             remote_data["port"] = int(remote_data["port"])

@@ -1,0 +1,22 @@
+# Copyright 2022 Canonical Ltd.
+# See LICENSE file for licensing details.
+name: tcp-tester
+display-name: tcp-tester
+description: tcp tester
+summary: tcp tester
+
+requires:
+  ingress-per-unit:
+    interface: ingress_per_unit
+    limit: 1
+
+containers:
+  tcp-server:
+    resource: tcp-server-image
+
+resources:
+  tcp-server-image:
+    type: oci-image
+    description: OCI image for tcp-server
+    upstream-source: python:slim-buster
+

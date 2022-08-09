@@ -8,11 +8,18 @@ import pytest_asyncio
 import yaml
 from pytest_operator.plugin import OpsTest
 
-from tests.integration.conftest import get_relation_data
+from tests.integration.conftest import (
+    assert_can_ping,
+    deploy_traefik_if_not_deployed,
+    get_address,
+    get_relation_data,
+)
 
 ipu_charm_root = (Path(__file__).parent / "testers" / "ipu").absolute()
-meta = yaml.safe_load((Path() / "metadata.yaml").read_text())
-resources = {name: val["upstream-source"] for name, val in meta["resources"].items()}
+meta = yaml.safe_load((ipu_charm_root / "metadata.yaml").read_text())
+ipu_tester_resources = {
+    name: val["upstream-source"] for name, val in meta.get("resources", {}).items()
+}
 
 
 @pytest_asyncio.fixture
@@ -26,10 +33,7 @@ async def ipu_tester_charm(ops_test: OpsTest):
 
 @pytest.mark.abort_on_fail
 async def test_deployment(ops_test: OpsTest, traefik_charm, ipu_tester_charm):
-    if not ops_test.model.applications.get("traefik-k8s"):
-        await ops_test.model.deploy(traefik_charm, resources=resources)
-    await ops_test.model.applications["traefik-k8s"].set_config({"external_hostname": "foo.bar"})
-
+    await deploy_traefik_if_not_deployed(ops_test, traefik_charm)
     await ops_test.model.deploy(ipu_tester_charm, "ipu-tester")
     async with ops_test.fast_forward():
         await ops_test.model.wait_for_idle(
@@ -44,6 +48,22 @@ async def test_relate(ops_test: OpsTest):
     )
     async with ops_test.fast_forward():
         await ops_test.model.wait_for_idle(["traefik-k8s", "ipu-tester"])
+
+
+async def assert_ipu_charm_has_ingress(ops_test: OpsTest):
+    data = get_relation_data(
+        requirer_endpoint="ipu-tester/0:ingress-per-unit",
+        provider_endpoint="traefik-k8s/0:ingress-per-unit",
+        model=ops_test.model_full_name,
+    )
+    provider_app_data = yaml.safe_load(data.provider.application_data["ingress"])
+    url = provider_app_data["ipu-tester/0"]["url"]
+    ip, port = url.split("//")[1].split("/")[0].split(":")
+    assert_can_ping(ip, port)
+
+
+async def test_ipu_charm_has_ingress(ops_test: OpsTest):
+    await assert_ipu_charm_has_ingress(ops_test)
 
 
 @pytest.mark.abort_on_fail
@@ -70,9 +90,9 @@ async def test_relation_data_shape(ops_test: OpsTest):
     #  ingress:
     #   ipu-tester/0:
     #     url: http://foo.bar:80/foo-ipu-tester-0
-
+    traefik_address = await get_address(ops_test, "traefik-k8s")
     assert provider_app_data == {
-        "ipu-tester/0": {"url": f"http://foo.bar:80/{model}-ipu-tester-0"}
+        "ipu-tester/0": {"url": f"http://{traefik_address}:80/{model}-ipu-tester-0"}
     }
 
 

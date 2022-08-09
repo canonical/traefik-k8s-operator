@@ -12,7 +12,7 @@ from ops.charm import ActionEvent
 from ops.model import ActiveStatus, Application, BlockedStatus, Relation, WaitingStatus
 from ops.testing import Harness
 
-from charm import TraefikIngressCharm
+from charm import _STATIC_CONFIG_PATH, TraefikIngressCharm
 
 ops.testing.SIMULATE_CAN_CONNECT = True
 
@@ -27,14 +27,22 @@ def relate(harness: Harness):
 
 
 def _requirer_provide_ingress_requirements(
-    harness: Harness, port: int, relation: Relation, host=socket.getfqdn()
+    harness: Harness, port: int, relation: Relation, host=socket.getfqdn(), mode="http"
 ):
     # same as requirer.provide_ingress_requirements(port=port, host=host)s
+    data = {
+        "port": str(port),
+        "host": host,
+        "model": "test-model",
+        "name": "remote/0",
+        "mode": mode,
+    }
     harness.update_relation_data(
         relation.id,
         "remote/0",
-        {"port": str(port), "host": host, "model": "test-model", "name": "remote/0"},
+        data,
     )
+    return data
 
 
 class _RequirerMock:
@@ -534,3 +542,24 @@ class TestTraefikIngressCharm(unittest.TestCase):
                 )
             }
         )
+
+    @patch("charm._get_loadbalancer_status", lambda **unused: None)
+    @patch("charm.KubernetesServicePatch", lambda **unused: None)
+    def test_tcp_config(self):
+        self.harness.set_leader(True)
+        self.harness.update_config({"external_hostname": "testhostname"})
+        self.harness.begin_with_initial_hooks()
+
+        relation = relate(self.harness)
+        data = _requirer_provide_ingress_requirements(
+            harness=self.harness, relation=relation, host="10.0.0.1", port=3000, mode="tcp"
+        )
+
+        self.harness.container_pebble_ready("traefik")
+        charm = self.harness.charm
+        prefix = charm._get_prefix(data)
+        expected_entrypoint = {"address": ":3000"}
+        assert charm._tcp_entrypoints() == {prefix: expected_entrypoint}
+
+        static_config = charm.unit.get_container("traefik").pull(_STATIC_CONFIG_PATH).read()
+        assert yaml.safe_load(static_config)["entryPoints"][prefix] == expected_entrypoint

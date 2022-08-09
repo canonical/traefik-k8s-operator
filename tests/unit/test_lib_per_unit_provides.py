@@ -48,13 +48,17 @@ def relate(harness: Harness[MockProviderCharm]):
 
 
 def _requirer_provide_ingress_requirements(
-    harness: Harness[MockProviderCharm], port: int, relation: Relation, host=socket.getfqdn()
+    harness: Harness[MockProviderCharm],
+    port: int,
+    relation: Relation,
+    host=socket.getfqdn(),
+    mode: str = "http",
 ):
     # same as requirer.provide_ingress_requirements(port=port, host=host)s
     harness.update_relation_data(
         relation.id,
         "remote/0",
-        {"port": str(port), "host": host, "model": "test-model", "name": "remote/0"},
+        {"port": str(port), "host": host, "model": "test-model", "name": "remote/0", "mode": mode},
     )
 
 
