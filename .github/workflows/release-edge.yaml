@@ -49,13 +49,7 @@ jobs:
           provider: microk8s
       
       - name: Run integration tests
-        run: tox -e integration -- --model testing
-
-      - name: Dump logs
-        uses: canonical/charm-logdump-action@main
-        if: failure()
-        with:
-          app: traefik-k8s
+        run: tox -vve integration
 
   release-to-charmhub:
     name: Release to CharmHub
