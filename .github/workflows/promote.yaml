@@ -33,7 +33,7 @@ jobs:
             echo "promote-to=stable" >> ${GITHUB_ENV}
           fi
       - name: Promote Charm
-        uses: canonical/charming-actions/release-charm@1.0.3
+        uses: canonical/charming-actions/release-charm@2.0.0-rc
         with:
           credentials: ${{ secrets.CHARMHUB_TOKEN }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
