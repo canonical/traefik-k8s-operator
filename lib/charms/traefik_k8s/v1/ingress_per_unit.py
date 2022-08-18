@@ -686,6 +686,13 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
 
         removed = previous_urls.keys() - current_urls.keys()  # type: ignore
         changed = {a for a in current_urls if current_urls[a] != previous_urls.get(a)}  # type: ignore
+        logging.info(
+            "unit: %s, event: %s. removed: %s; changed: %s",
+            self.unit.name,
+            event.__class__.__name__,
+            removed,
+            changed,
+        )
 
         this_unit_name = self.unit.name
         if self.listen_to in {"only-this-unit", "both"}:
