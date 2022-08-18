@@ -63,7 +63,7 @@ import typing
 from typing import Any, Dict, Optional, Tuple, Union
 
 import yaml
-from ops.charm import CharmBase, RelationEvent
+from ops.charm import CharmBase, RelationBrokenEvent, RelationEvent
 from ops.framework import EventSource, Object, ObjectEvents, StoredState
 from ops.model import Application, ModelError, Relation, Unit
 
@@ -682,17 +682,10 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
         # we calculate the diff between the urls we were aware of
         # before and those we know now
         previous_urls = self._stored.current_urls or {}  # type: ignore
-        current_urls = self.urls or {}
+        current_urls = {} if isinstance(event, RelationBrokenEvent) else self.urls
 
         removed = previous_urls.keys() - current_urls.keys()  # type: ignore
         changed = {a for a in current_urls if current_urls[a] != previous_urls.get(a)}  # type: ignore
-        logging.info(
-            "unit: %s, event: %s. removed: %s; changed: %s",
-            self.unit.name,
-            event.__class__.__name__,
-            removed,
-            changed,
-        )
 
         this_unit_name = self.unit.name
         if self.listen_to in {"only-this-unit", "both"}:

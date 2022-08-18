@@ -133,7 +133,7 @@ def test_validator(requirer: IngressPerUnitRequirer, harness, auto_data, ok):
         requirer.provide_ingress_requirements(host=host, port=port)
 
 
-class TestRevokedEvent(unittest.TestCase):
+class TestIPUEventsEmission(unittest.TestCase):
     class _RequirerCharm(CharmBase):
         META = dedent(
             """\
@@ -145,12 +145,17 @@ class TestRevokedEvent(unittest.TestCase):
             """
         )
 
+        ready_event_count: int = 0
         revoked_event_count: int = 0
 
         def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
             self.ipu = IngressPerUnitRequirer(self, relation_name="ingress", port=80)
+            self.framework.observe(self.ipu.on.ready_for_unit, self._on_ready)
             self.framework.observe(self.ipu.on.revoked_for_unit, self._on_revoked)
+
+        def _on_ready(self, _event):
+            self.ready_event_count += 1
 
         def _on_revoked(self, _event):
             self.revoked_event_count += 1
@@ -162,22 +167,29 @@ class TestRevokedEvent(unittest.TestCase):
         self.harness.set_model_name(self.__class__.__name__)
         self.harness.begin_with_initial_hooks()
 
+    def test_ipu_events(self):
+        # WHEN an ingress relation is formed
+        before = self.harness.charm.ready_event_count
         self.rel_id = self.harness.add_relation("ingress", "traefik-app")
         self.harness.add_relation_unit(self.rel_id, "traefik-app/0")
 
-        # GIVEN an ingress is in effect
+        # AND an ingress is in effect
         data = {self.harness.charm.unit.name: {"url": "http://a.b/c"}}
         self.harness.update_relation_data(
             self.rel_id, "traefik-app", {"ingress": yaml.safe_dump(data)}
         )
         self.assertEqual(self.harness.charm.ipu.url, "http://a.b/c")
 
-    def test_relation_removed(self):
-        before = self.harness.charm.revoked_event_count
+        # THEN the ready event is emitted
+        after = self.harness.charm.ready_event_count
+        self.assertGreater(after, before)
 
         # WHEN a relation with traefik is removed
+        before = self.harness.charm.revoked_event_count
         self.harness.remove_relation_unit(self.rel_id, "traefik-app/0")
         self.harness.remove_relation(self.rel_id)
+
+        # NOTE intentionally not emptying out relation data manually
 
         # THEN ingress.url returns a false-y value
         self.assertFalse(self.harness.charm.ipu.url)
