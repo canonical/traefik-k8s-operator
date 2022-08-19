@@ -682,7 +682,10 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
         # we calculate the diff between the urls we were aware of
         # before and those we know now
         previous_urls = self._stored.current_urls or {}  # type: ignore
-        current_urls = {} if isinstance(event, RelationBrokenEvent) else self.urls
+        current_urls = (
+            {} if isinstance(event, RelationBrokenEvent) else self._get_urls_from_relation_data
+        )
+        self._stored.current_urls = current_urls  # type: ignore
 
         removed = previous_urls.keys() - current_urls.keys()  # type: ignore
         changed = {a for a in current_urls if current_urls[a] != previous_urls.get(a)}  # type: ignore
@@ -705,8 +708,6 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
 
             for unit_name in removed:
                 self.on.revoked.emit(self.relation, unit_name)  # type: ignore
-
-        self._stored.current_urls = current_urls  # type: ignore
 
         # todo remove cast when ops.charm is typed
         self._publish_auto_data(typing.cast(Relation, event.relation))
@@ -760,7 +761,7 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
         self.relation.data[self.unit].update(data)
 
     @property
-    def urls(self) -> Dict[str, str]:
+    def _get_urls_from_relation_data(self) -> Dict[str, str]:
         """The full ingress URLs to reach every unit.
 
         May return an empty dict if the URLs aren't available yet.
@@ -792,6 +793,14 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
         _validate_data({"ingress": data}, INGRESS_PROVIDES_APP_SCHEMA)
 
         return {unit_name: unit_data["url"] for unit_name, unit_data in data.items()}
+
+    @property
+    def urls(self) -> Dict[str, str]:
+        """The full ingress URLs to reach every unit.
+
+        May return an empty dict if the URLs aren't available yet.
+        """
+        return self._stored.current_urls or {}
 
     @property
     def url(self) -> Optional[str]:
