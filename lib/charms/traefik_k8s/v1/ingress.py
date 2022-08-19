@@ -59,7 +59,7 @@ from typing import Any, Dict, Optional, Tuple
 import yaml
 from ops.charm import CharmBase, RelationEvent
 from ops.framework import EventSource, Object, ObjectEvents, StoredState
-from ops.model import ModelError, Relation
+from ops.model import ModelError, Relation, Unit
 
 # The unique Charmhub library identifier, never change it
 LIBID = "e6de2a5cd5b34422a204668f3b8f90d2"
@@ -69,7 +69,7 @@ LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 2
+LIBPATCH = 3
 
 DEFAULT_RELATION_NAME = "ingress"
 RELATION_INTERFACE = "ingress"
@@ -135,12 +135,35 @@ def _validate_data(data, schema):
         raise DataValidationError(data, schema) from e
 
 
+def _relation_data_exists(relation: Relation):
+    """Helper to verify that relation data exists.
+
+    In some cases when we receive a relation event, the relation data
+    is not ready (yet).
+    """
+    try:
+        _ = relation.data
+        return True
+    except ModelError as e:
+        log.debug("relation data access failed with {!r}".format(e))
+        return False
+
+
 class DataValidationError(RuntimeError):
     """Raised when data validation fails on IPU relation data."""
 
 
+class LeadershipError(RuntimeError):
+    """Raised when a follower unit attempts an operation that requires leadership."""
+
+
+def _leader_check(unit: Unit):
+    if not unit.is_leader():
+        raise LeadershipError(unit)
+
+
 class _IngressPerAppBase(Object):
-    """Base class for IngressPerUnit interface classes."""
+    """Base class for IngressPerApp interface classes."""
 
     def __init__(self, charm: CharmBase, relation_name: str = DEFAULT_RELATION_NAME):
         super().__init__(charm, relation_name)
@@ -162,7 +185,10 @@ class _IngressPerAppBase(Object):
     @property
     def relations(self):
         """The list of Relation instances associated with this endpoint."""
-        return list(self.charm.model.relations[self.relation_name])
+        all_relations = self.charm.model.relations[self.relation_name]
+        # we filter out relations whose data is unaccessible, these are
+        # probably ghost relations (TODO: reference juju bug?)
+        return list(filter(_relation_data_exists, all_relations))
 
     def _handle_relation(self, event):
         """Subclasses should implement this method to handle a relation update."""
@@ -273,7 +299,7 @@ class IngressPerAppProvider(_IngressPerAppBase):
 
     def wipe_ingress_data(self, relation: Relation):
         """Clear ingress data from relation."""
-        assert self.unit.is_leader(), "only leaders can do this"
+        _leader_check(self.unit)
         try:
             relation.data
         except ModelError as e:
@@ -440,6 +466,9 @@ class IngressPerAppRequirer(_IngressPerAppBase):
             self._auto_data = None
 
     def _handle_relation(self, event):
+        if not _relation_data_exists(event.relation):
+            return event.defer()
+
         # created, joined or changed: if we have auto data: publish it
         self._publish_auto_data(event.relation)
 
@@ -469,9 +498,11 @@ class IngressPerAppRequirer(_IngressPerAppBase):
     def _publish_auto_data(self, relation: Relation):
         if self._auto_data and self.unit.is_leader():
             host, port = self._auto_data
-            self.provide_ingress_requirements(host=host, port=port)
+            self.provide_ingress_requirements(host=host, port=port, relation=relation)
 
-    def provide_ingress_requirements(self, *, host: str = None, port: int):
+    def provide_ingress_requirements(
+        self, *, host: str = None, port: int, relation: Optional[Relation] = None
+    ):
         """Publishes the data that Traefik needs to provide ingress.
 
         NB only the leader unit is supposed to do this.
@@ -480,12 +511,17 @@ class IngressPerAppRequirer(_IngressPerAppBase):
             host: Hostname to be used by the ingress provider to address the
              requirer unit; if unspecified, FQDN will be used instead
             port: the port of the service (required)
+            relation: the relation via which ingress should be provided.
+            If unspecified, will default to the (unique) established
+            'ingress' relation.
         """
         # get only the leader to publish the data since we only
         # require one unit to publish it -- it will not differ between units,
         # unlike in ingress-per-unit.
-        assert self.unit.is_leader(), "only leaders should do this."
-        assert self.relation, "no relation"
+        _leader_check(self.unit)
+        rel = relation or self.relation
+        if not rel:
+            raise RuntimeError("no relation; cannot provide ingress requirements")
 
         if not host:
             host = socket.getfqdn()
@@ -502,7 +538,12 @@ class IngressPerAppRequirer(_IngressPerAppBase):
     @property
     def relation(self):
         """The established Relation instance, or None."""
-        return self.relations[0] if self.relations else None
+        relations = self.relations
+        if not relations:
+            return None
+        if len(relations) > 2:
+            raise RuntimeError("Too many ingress relations: {}".format(relations))
+        return relations[0]
 
     @property
     def url(self) -> Optional[str]:
