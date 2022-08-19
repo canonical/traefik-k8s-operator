@@ -64,7 +64,14 @@ from typing import Any, Dict, Optional, Tuple, Union
 
 import yaml
 from ops.charm import CharmBase, RelationBrokenEvent, RelationEvent
-from ops.framework import EventSource, Object, ObjectEvents, StoredState
+from ops.framework import (
+    EventSource,
+    Object,
+    ObjectEvents,
+    StoredDict,
+    StoredList,
+    StoredState,
+)
 from ops.model import Application, ModelError, Relation, Unit
 
 # The unique Charmhub library identifier, never change it
@@ -151,6 +158,19 @@ RequirerData = TypedDict(
 RequirerUnitData = Dict[Unit, "RequirerData"]
 KeyValueMapping = Dict[str, str]
 ProviderApplicationData = Dict[str, KeyValueMapping]
+
+
+def _type_convert_stored(obj):
+    """Convert Stored* to their appropriate types, recursively."""
+    if isinstance(obj, StoredList):
+        return list(map(_type_convert_stored, obj))
+    elif isinstance(obj, StoredDict):
+        rdict = {}  # type: Dict[Any, Any]
+        for k in obj.keys():
+            rdict[k] = _type_convert_stored(obj[k])
+        return rdict
+    else:
+        return obj
 
 
 def _validate_data(data, schema):
@@ -800,7 +820,9 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
 
         May return an empty dict if the URLs aren't available yet.
         """
-        return self._stored.current_urls or {}
+        data = _type_convert_stored(self._stored.current_urls or {})  # type: ignore
+        assert isinstance(data, dict)  # for static checker
+        return data
 
     @property
     def url(self) -> Optional[str]:
