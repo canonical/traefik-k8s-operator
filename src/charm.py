@@ -9,6 +9,7 @@ import json
 import logging
 import typing
 from typing import Tuple, Union
+from urllib.parse import urlparse
 
 import yaml
 from charms.observability_libs.v0.kubernetes_service_patch import KubernetesServicePatch
@@ -262,10 +263,24 @@ class TraefikIngressCharm(CharmBase):
             )
             return
 
-        if not self._external_host:
+        hostname = self._external_host
+
+        if not hostname:
             self.unit.status = MaintenanceStatus("resetting ingress relations")
             self._wipe_ingress_for_all_relations()
             self.unit.status = WaitingStatus("gateway address unavailable")
+            return
+
+        if hostname != urlparse(f"scheme://{hostname}").hostname:
+            self.unit.status = MaintenanceStatus("resetting ingress relations")
+            self._wipe_ingress_for_all_relations()
+            self.unit.status = BlockedStatus(f"invalid hostname: {hostname}; see logs.")
+
+            logger.error(
+                "'%s' is not a valid hostname value; "
+                "hostname must not include port or any other netloc components",
+                hostname,
+            )
             return
 
         if not self._traefik_service_running:

@@ -563,3 +563,45 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
         static_config = charm.unit.get_container("traefik").pull(_STATIC_CONFIG_PATH).read()
         assert yaml.safe_load(static_config)["entryPoints"][prefix] == expected_entrypoint
+
+
+class TestConfigOptionsValidation(unittest.TestCase):
+    @patch("charm._get_loadbalancer_status", lambda **_: "10.0.0.1")
+    @patch("charm.KubernetesServicePatch", lambda **_: None)
+    def setUp(self):
+        self.harness: Harness[TraefikIngressCharm] = Harness(TraefikIngressCharm)
+        self.harness.set_model_name("test-model")
+        self.addCleanup(self.harness.cleanup)
+
+        self.harness.set_leader(True)
+        self.harness.begin_with_initial_hooks()
+        self.harness.container_pebble_ready("traefik")
+
+        self.relation = relate(self.harness)
+        _requirer_provide_ingress_requirements(
+            harness=self.harness, relation=self.relation, host="10.1.10.1", port=9000
+        )
+
+    @patch("charm._get_loadbalancer_status", lambda **_: "10.0.0.1")
+    @patch("charm.KubernetesServicePatch", lambda **_: None)
+    def test_when_external_hostname_not_set_use_ip_with_port_80(self):
+        self.assertEqual(requirer.urls, {"remote/0": "http://10.0.0.1:80/test-model-remote-0"})
+
+    @patch("charm._get_loadbalancer_status", lambda **_: "10.0.0.1")
+    @patch("charm.KubernetesServicePatch", lambda **_: None)
+    def test_when_external_hostname_is_set_use_it_with_port_80(self):
+        self.harness.update_config({"external_hostname": "testhostname"})
+        self.assertEqual(requirer.urls, {"remote/0": "http://testhostname:80/test-model-remote-0"})
+
+    @patch("charm._get_loadbalancer_status", lambda **_: "10.0.0.1")
+    @patch("charm.KubernetesServicePatch", lambda **_: None)
+    def test_when_external_hostname_is_invalid_go_into_blocked_status(self):
+        for invalid_hostname in [
+            "testhostname:8080",
+            "user:pass@testhostname",
+            "testhostname/prefix",
+        ]:
+            with self.subTest(invalid_hostname=invalid_hostname):
+                self.harness.update_config({"external_hostname": invalid_hostname})
+                self.assertIsInstance(self.harness.charm.unit.status, BlockedStatus)
+                self.assertEqual(requirer.urls, {})
