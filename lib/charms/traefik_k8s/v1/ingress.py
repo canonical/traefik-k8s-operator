@@ -54,7 +54,7 @@ class SomeCharm(CharmBase):
 import logging
 import socket
 import typing
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 import yaml
 from ops.charm import CharmBase, RelationBrokenEvent, RelationEvent
@@ -446,7 +446,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         if self.is_ready():
             # Avoid spurious events, emit only when there is a NEW URL available
             new_url = (
-                ""
+                None
                 if isinstance(event, RelationBrokenEvent)
                 else self._get_url_from_relation_data()
             )
@@ -455,7 +455,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
                 self.on.ready.emit(event.relation, new_url)
 
     def _handle_relation_broken(self, event):
-        self._stored.current_url = ""
+        self._stored.current_url = None
         self.on.revoked.emit(event.relation)
 
     def _handle_upgrade_or_leader(self, event):
@@ -509,14 +509,14 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         """The established Relation instance, or None."""
         return self.relations[0] if self.relations else None
 
-    def _get_url_from_relation_data(self) -> str:
+    def _get_url_from_relation_data(self) -> Optional[str]:
         """The full ingress URL to reach the current unit.
 
-        Returns an empty string if the URL isn't available yet.
+        Returns None if the URL isn't available yet.
         """
         relation = self.relation
         if not relation:
-            return ""
+            return None
 
         # fetch the provider's app databag
         try:
@@ -526,21 +526,21 @@ class IngressPerAppRequirer(_IngressPerAppBase):
                 f"Error {e} attempting to read remote app data; "
                 f"probably we are in a relation_departed hook"
             )
-            return ""
+            return None
 
         if not raw:
-            return ""
+            return None
 
         ingress: ProviderIngressData = yaml.safe_load(raw)
         _validate_data({"ingress": ingress}, INGRESS_PROVIDES_APP_SCHEMA)
         return ingress["url"]
 
     @property
-    def url(self) -> str:
+    def url(self) -> Optional[str]:
         """The full ingress URL to reach the current unit.
 
-        May return None if the URL isn't available yet.
+        Returns None if the URL isn't available yet.
         """
-        data = self._stored.current_url or ""  # type: ignore
-        assert isinstance(data, str)  # for static checker
+        data = self._stored.current_url or None  # type: ignore
+        assert isinstance(data, (str, type(None)))  # for static checker
         return data
