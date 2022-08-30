@@ -10,6 +10,7 @@ from charms.traefik_k8s.v1.ingress import (
     DataValidationError,
     IngressPerAppReadyEvent,
     IngressPerAppRequirer,
+    IngressPerAppRevokedEvent,
 )
 from ops.charm import CharmBase
 from ops.testing import Harness
@@ -104,20 +105,9 @@ class TestIPAEventsEmission(unittest.TestCase):
             """
         )
 
-        ready_event_count: int = 0
-        revoked_event_count: int = 0
-
         def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
             self.ipa = IngressPerAppRequirer(self, relation_name="ingress", port=80)
-            self.framework.observe(self.ipa.on.ready, self._on_ready)
-            self.framework.observe(self.ipa.on.revoked, self._on_revoked)
-
-        def _on_ready(self, _event):
-            self.ready_event_count += 1
-
-        def _on_revoked(self, _event):
-            self.revoked_event_count += 1
 
     def setUp(self):
         self.harness = Harness(self._RequirerCharm, meta=self._RequirerCharm.META)
@@ -128,31 +118,24 @@ class TestIPAEventsEmission(unittest.TestCase):
 
     def test_ipa_events(self):
         # WHEN an ingress relation is formed
-        before = self.harness.charm.ready_event_count
-        self.rel_id = self.harness.add_relation("ingress", "traefik-app")
-        self.harness.add_relation_unit(self.rel_id, "traefik-app/0")
-
-        # AND an ingress is in effect
-        data = {"url": "http://a.b/c"}
-        self.harness.update_relation_data(
-            self.rel_id, "traefik-app", {"ingress": yaml.safe_dump(data)}
-        )
-        self.assertEqual(self.harness.charm.ipa.url, "http://a.b/c")
-
         # THEN the ready event is emitted
-        after = self.harness.charm.ready_event_count
-        self.assertGreater(after, before)
+        with capture(self.harness.charm, IngressPerAppReadyEvent):
+            self.rel_id = self.harness.add_relation("ingress", "traefik-app")
+            self.harness.add_relation_unit(self.rel_id, "traefik-app/0")
+
+            # AND an ingress is in effect
+            data = {"url": "http://a.b/c"}
+            self.harness.update_relation_data(
+                self.rel_id, "traefik-app", {"ingress": yaml.safe_dump(data)}
+            )
+            self.assertEqual(self.harness.charm.ipa.url, "http://a.b/c")
 
         # WHEN a relation with traefik is removed
-        before = self.harness.charm.revoked_event_count
-        self.harness.remove_relation_unit(self.rel_id, "traefik-app/0")
-        self.harness.remove_relation(self.rel_id)
+        # THEN a revoked event fires
+        with capture(self.harness.charm, IngressPerAppRevokedEvent):
+            self.harness.remove_relation_unit(self.rel_id, "traefik-app/0")
+            self.harness.remove_relation(self.rel_id)
+            # NOTE intentionally not emptying out relation data manually
 
-        # NOTE intentionally not emptying out relation data manually
-
-        # THEN ingress.url returns a false-y value
+        # AND ingress.url returns a false-y value
         self.assertFalse(self.harness.charm.ipa.url)
-
-        # AND a revoked event fires
-        after = self.harness.charm.revoked_event_count
-        self.assertGreater(after, before)
