@@ -57,7 +57,7 @@ import typing
 from typing import Any, Dict, Optional, Tuple
 
 import yaml
-from ops.charm import CharmBase, RelationEvent
+from ops.charm import CharmBase, RelationBrokenEvent, RelationEvent
 from ops.framework import EventSource, Object, ObjectEvents, StoredState
 from ops.model import ModelError, Relation
 
@@ -69,7 +69,7 @@ LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 2
+LIBPATCH = 3
 
 DEFAULT_RELATION_NAME = "ingress"
 RELATION_INTERFACE = "ingress"
@@ -445,12 +445,17 @@ class IngressPerAppRequirer(_IngressPerAppBase):
 
         if self.is_ready():
             # Avoid spurious events, emit only when there is a NEW URL available
-            new_url = self.url
+            new_url = (
+                None
+                if isinstance(event, RelationBrokenEvent)
+                else self._get_url_from_relation_data()
+            )
             if self._stored.current_url != new_url:
                 self._stored.current_url = new_url
                 self.on.ready.emit(event.relation, new_url)
 
     def _handle_relation_broken(self, event):
+        self._stored.current_url = None
         self.on.revoked.emit(event.relation)
 
     def _handle_upgrade_or_leader(self, event):
@@ -461,7 +466,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
     def is_ready(self):
         """The Requirer is ready if the Provider has sent valid data."""
         try:
-            return bool(self.url)
+            return bool(self._get_url_from_relation_data())
         except DataValidationError as e:
             log.warning("Requirer not ready; validation error encountered: %s" % str(e))
             return False
@@ -504,11 +509,10 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         """The established Relation instance, or None."""
         return self.relations[0] if self.relations else None
 
-    @property
-    def url(self) -> Optional[str]:
+    def _get_url_from_relation_data(self) -> Optional[str]:
         """The full ingress URL to reach the current unit.
 
-        May return None if the URL isn't available yet.
+        Returns None if the URL isn't available yet.
         """
         relation = self.relation
         if not relation:
@@ -530,3 +534,13 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         ingress: ProviderIngressData = yaml.safe_load(raw)
         _validate_data({"ingress": ingress}, INGRESS_PROVIDES_APP_SCHEMA)
         return ingress["url"]
+
+    @property
+    def url(self) -> Optional[str]:
+        """The full ingress URL to reach the current unit.
+
+        Returns None if the URL isn't available yet.
+        """
+        data = self._stored.current_url or None  # type: ignore
+        assert isinstance(data, (str, type(None)))  # for static checker
+        return data

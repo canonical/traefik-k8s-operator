@@ -1,5 +1,6 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
+import unittest
 from textwrap import dedent
 
 import pytest
@@ -9,6 +10,7 @@ from charms.traefik_k8s.v1.ingress import (
     DataValidationError,
     IngressPerAppReadyEvent,
     IngressPerAppRequirer,
+    IngressPerAppRevokedEvent,
 )
 from ops.charm import CharmBase
 from ops.testing import Harness
@@ -89,3 +91,51 @@ def test_validator(requirer: IngressPerAppRequirer, harness, auto_data, ok):
     else:
         host, port = auto_data
         requirer.provide_ingress_requirements(host=host, port=port)
+
+
+class TestIPAEventsEmission(unittest.TestCase):
+    class _RequirerCharm(CharmBase):
+        META = dedent(
+            """\
+            name: ipa-requirer
+            requires:
+              ingress:
+                interface: ingress
+                limit: 1
+            """
+        )
+
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.ipa = IngressPerAppRequirer(self, relation_name="ingress", port=80)
+
+    def setUp(self):
+        self.harness = Harness(self._RequirerCharm, meta=self._RequirerCharm.META)
+        self.addCleanup(self.harness.cleanup)
+
+        self.harness.set_model_name(self.__class__.__name__)
+        self.harness.begin_with_initial_hooks()
+
+    def test_ipa_events(self):
+        # WHEN an ingress relation is formed
+        # THEN the ready event is emitted
+        with capture(self.harness.charm, IngressPerAppReadyEvent):
+            self.rel_id = self.harness.add_relation("ingress", "traefik-app")
+            self.harness.add_relation_unit(self.rel_id, "traefik-app/0")
+
+            # AND an ingress is in effect
+            data = {"url": "http://a.b/c"}
+            self.harness.update_relation_data(
+                self.rel_id, "traefik-app", {"ingress": yaml.safe_dump(data)}
+            )
+            self.assertEqual(self.harness.charm.ipa.url, "http://a.b/c")
+
+        # WHEN a relation with traefik is removed
+        # THEN a revoked event fires
+        with capture(self.harness.charm, IngressPerAppRevokedEvent):
+            self.harness.remove_relation_unit(self.rel_id, "traefik-app/0")
+            self.harness.remove_relation(self.rel_id)
+            # NOTE intentionally not emptying out relation data manually
+
+        # AND ingress.url returns a false-y value
+        self.assertFalse(self.harness.charm.ipa.url)
