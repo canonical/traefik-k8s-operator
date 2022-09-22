@@ -1,16 +1,14 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
-import socket
-from textwrap import dedent
 
 import pytest
 import yaml
-from charms.traefik_k8s.v1.ingress_per_unit import IngressPerUnitProvider
 from ops.charm import CharmBase
-from ops.model import Relation
 from ops.testing import Harness
-from evt_sequences import Scenario, Playbook, Scene, RelationMeta, InjectRelation, \
-    RelationSpec, Model, Context, Emitter, Event, CharmSpec
+
+from charms.traefik_k8s.v1.ingress_per_unit import IngressPerUnitProvider
+from evt_sequences import Scenario, RelationMeta, RelationSpec, Model, Context, Emitter, Event, \
+    CharmSpec
 
 
 class MockProviderCharm(CharmBase):
@@ -82,12 +80,13 @@ def assert_local_published_url(_, __, emitter: Emitter, url: str, value: bool):
     if not value:
         assert h.charm.ipu.proxied_endpoints == {}
         assert not relation.data[h.model.app], 'non-leader IPU providers should not have app data'
-        assert not relation.data[h.model.unit], 'non-leader IPU providers should not have unit data'
+        assert not relation.data[
+            h.model.unit], 'non-leader IPU providers should not have unit data'
         return
 
     for unit_dct in h.charm.ipu.proxied_endpoints.values():
         assert unit_dct['url'] == url
-    assert relation.data[h.model.app]['ingress'] == yaml.safe_dump({'remote/0': {'url': url})}
+    assert relation.data[h.model.app]['ingress'] == yaml.safe_dump({'remote/0': {'url': url}})
     assert not relation.data[h.model.unit], 'leader IPU providers should not have unit data'
 
 
@@ -161,5 +160,3 @@ def test_ingress_unit_provider_request_response(port, host, leader, url):
     # fail because unit isn't leader
     with pytest.raises(AssertionError):
         provider.publish_url(relation, unit_data["name"], "http://url/")
-
-
