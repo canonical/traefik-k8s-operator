@@ -26,9 +26,9 @@ charm_spec = CharmSpec(
             {
                 'ingress-per-unit':
                     {
-                        'interface': 'ingress_per_unit'
-                    },
-                'limit': 1
+                        'interface': 'ingress_per_unit',
+                        'limit': 1
+                    }
             }
     }
 )
