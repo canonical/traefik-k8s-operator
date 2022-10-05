@@ -50,10 +50,13 @@ def test_ingress_app_provider_related(harness, provider: IngressPerAppProvider):
     assert not provider.is_ready(relation)
 
 
-def test_ingress_app_provider_relate_provide(provider: IngressPerAppProvider, harness):
+@pytest.mark.parametrize("strip_prefix", (True, False))
+def test_ingress_app_provider_relate_provide(
+    provider: IngressPerAppProvider, harness, strip_prefix
+):
     harness.set_leader(True)
     relation_id = harness.add_relation("ingress", "remote")
-    remote_data = dict(host="host", port="42", name="foo", model="bar")
+    remote_data = dict(host="host", port="42", name="foo", model="bar", strip_prefix=strip_prefix)
     harness.update_relation_data(relation_id, "remote", remote_data)
 
     relation = harness.model.get_relation("ingress", relation_id)

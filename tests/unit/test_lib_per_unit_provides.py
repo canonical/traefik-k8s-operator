@@ -53,12 +53,24 @@ def _requirer_provide_ingress_requirements(
     relation: Relation,
     host=socket.getfqdn(),
     mode: str = "http",
+    strip_prefix: bool = False,
 ):
     # same as requirer.provide_ingress_requirements(port=port, host=host)s
+    data = {
+        "port": str(port),
+        "host": host,
+        "model": "test-model",
+        "name": "remote/0",
+        "mode": mode,
+    }
+
+    if strip_prefix:
+        data["strip-prefix"] = "true"
+
     harness.update_relation_data(
         relation.id,
         "remote/0",
-        {"port": str(port), "host": host, "model": "test-model", "name": "remote/0", "mode": mode},
+        data,
     )
 
 
@@ -74,17 +86,23 @@ def test_ingress_unit_provider_related(provider, harness, leader):
     assert not provider.is_ready(relation)
 
 
-def test_ingress_unit_provider_request(provider, harness):
+@pytest.mark.parametrize("strip_prefix", (True, False))
+def test_ingress_unit_provider_request(provider, harness, strip_prefix):
     relation = relate(harness)
-    _requirer_provide_ingress_requirements(harness, 80, relation)
+    _requirer_provide_ingress_requirements(harness, 80, relation, strip_prefix=strip_prefix)
     assert provider.is_ready(relation)
 
 
 @pytest.mark.parametrize("port, host", ((80, "1.1.1.1"), (81, "10.1.10.1")))
-def test_ingress_unit_provider_request_response_nonleader(provider, harness, port, host):
+@pytest.mark.parametrize("strip_prefix", (True, False))
+def test_ingress_unit_provider_request_response_nonleader(
+    provider, harness, port, host, strip_prefix
+):
     provider: IngressPerUnitProvider
     relation = relate(harness)
-    _requirer_provide_ingress_requirements(harness, port, relation, host=host)
+    _requirer_provide_ingress_requirements(
+        harness, port, relation, host=host, strip_prefix=strip_prefix
+    )
 
     unit_data = provider.get_data(relation, relation.units.pop())
     assert unit_data["model"] == "test-model"
@@ -98,10 +116,11 @@ def test_ingress_unit_provider_request_response_nonleader(provider, harness, por
 
 
 @pytest.mark.parametrize("url", ("http://url/", "http://url2/"))
-def test_ingress_unit_provider_request_response(provider, harness, url):
+@pytest.mark.parametrize("strip_prefix", (True, False))
+def test_ingress_unit_provider_request_response(provider, harness, url, strip_prefix):
     relation = relate(harness)
     harness.set_leader(True)
-    _requirer_provide_ingress_requirements(harness, 80, relation)
+    _requirer_provide_ingress_requirements(harness, 80, relation, strip_prefix=strip_prefix)
     provider.publish_url(relation, "remote/0", url)
 
     ingress = relation.data[harness.charm.app]["ingress"]
