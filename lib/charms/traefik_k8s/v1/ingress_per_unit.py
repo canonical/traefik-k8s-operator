@@ -476,7 +476,7 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
 
         For convenience, we convert 'port' to integer.
         """
-        if not all((relation.app, relation.app.name)):
+        if not relation.app or not relation.app.name:
             # Handle edge case where remote app name can be missing, e.g.,
             # relation_broken events.
             # FIXME https://github.com/canonical/traefik-k8s-operator/issues/34
