@@ -484,6 +484,16 @@ class TraefikIngressCharm(CharmBase):
         name = data["name"].replace("/", "-")
         return f"{data['model']}-{name}"
 
+    def _generate_middleware_config(self, prefix: str) -> dict:
+        """Generate a stripPrefix middleware for path based routing."""
+        return {
+            "middlewares": {
+                "juju-sidecar-noprefix": {
+                    "stripPrefix": {"prefixes": [f"/{prefix}"], "forceSlash": False}
+                }
+            }
+        }
+
     def _generate_per_unit_config(self, data: "RequirerData_IPU") -> Tuple[dict, str]:
         """Generate a config dict for a given unit for IngressPerUnit."""
         config = {"http": {"routers": {}, "services": {}}}
@@ -527,6 +537,12 @@ class TraefikIngressCharm(CharmBase):
             "service": traefik_service_name,
             "entryPoints": ["web"],
         }
+
+        if self._routing_mode == _RoutingMode.path:
+            config["http"]["routers"][traefik_router_name].update(
+                self._generate_middleware_config(prefix)
+            )
+
         config["http"]["services"][traefik_service_name] = {
             "loadBalancer": {"servers": [{"url": f"http://{data['host']}:{data['port']}"}]}
         }
@@ -565,6 +581,11 @@ class TraefikIngressCharm(CharmBase):
                 },
             }
         }
+
+        if self._routing_mode == _RoutingMode.path:
+            config["http"]["routers"][traefik_router_name].update(
+                self._generate_middleware_config(prefix)
+            )
 
         return config, app_url
 

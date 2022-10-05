@@ -120,6 +120,15 @@ class TestTraefikIngressCharm(unittest.TestCase):
         file = f"/opt/traefik/juju/juju_ingress_{relation.name}_{relation.id}_{relation.app.name}.yaml"
         conf = yaml.safe_load(traefik_container.pull(file).read())
 
+        middlewares = { "middlewares": {
+                            "juju-sidecar-noprefix": {
+                                "stripPrefix": {
+                                    "prefixes": ["/test-model-ingress-per-unit-remote-0"],
+                                    "forceSlash": False,
+                                }
+                            }
+                        }}
+
         expected = {
             "http": {
                 "routers": {
@@ -163,6 +172,15 @@ class TestTraefikIngressCharm(unittest.TestCase):
         traefik_container = self.harness.charm.unit.get_container("traefik")
         file = f"/opt/traefik/juju/juju_ingress_{relation.name}_{relation.id}_{relation.app.name}.yaml"
         conf = yaml.safe_load(traefik_container.pull(file).read())
+        middlewares = {"middlewares": {
+                            "juju-sidecar-noprefix": {
+                                "stripPrefix": {
+                                    "prefixes": ["/test-model-ingress-remote"],
+                                    "forceSlash": False,
+                                }
+                            }
+                        }
+        }
 
         expected = {
             "http": {
@@ -278,7 +296,6 @@ class TestTraefikIngressCharm(unittest.TestCase):
                 },
             }
         }
-
         self.assertEqual(conf, expected)
 
         self.assertEqual(
