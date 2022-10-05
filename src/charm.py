@@ -126,6 +126,9 @@ class TraefikIngressCharm(CharmBase):
         observe(self.on.show_proxied_endpoints_action, self._on_show_proxied_endpoints)
 
     def _on_show_proxied_endpoints(self, event: ActionEvent):
+        if not self.ready:
+            return
+
         try:
             result = {}
             result.update(self.ingress_per_unit.proxied_endpoints)
@@ -369,8 +372,8 @@ class TraefikIngressCharm(CharmBase):
         # before continuing. However, the provider will NOT be ready if there are no units on the
         # other side, which is the case for the RelationDeparted for the last unit (i.e., the
         # proxied application scales to zero).
-        gateway_address = self._external_host
-        assert gateway_address, "No gateway address available"
+        if not self.ready:
+            return
 
         provider = self._provider_from_relation(relation)
         if not provider.is_ready(relation):
