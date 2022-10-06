@@ -655,9 +655,8 @@ class TraefikIngressCharm(CharmBase):
         If the gateway isn't available or doesn't have a load balancer address yet,
         returns None.
         """
-        if "external_hostname" in self.model.config:
-            if external_hostname := self.model.config["external_hostname"]:
-                return external_hostname
+        if external_hostname := self.model.config.get("external_hostname"):
+            return external_hostname
 
         return _get_loadbalancer_status(namespace=self.model.name, service_name=self.app.name)
 
