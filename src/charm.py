@@ -377,17 +377,9 @@ class TraefikIngressCharm(CharmBase):
 
         provider = self._provider_from_relation(relation)
         if not provider.is_ready(relation):
-            # TODO Cleanup: the provider for ingress_per_unit will NOT be ready
-            #  if there are no units on the other side, which is the case for
-            #  the RelationDeparted for the last unit (i.e., the proxied
-            #  application scales to zero).
-
-            if provider == self.ingress_per_unit and not relation.units:
-                logger.debug(
-                    "No units found in the ingress-per-unit relation; "
-                    "resetting ingress configurations"
-                )
-                self._wipe_ingress_for_relation(relation)
+            logger.debug(f"Provider {provider} not ready; resetting ingress configurations.")
+            self._wipe_ingress_for_relation(relation)
+            return
 
         rel = f"{relation.name}:{relation.id}"
         self.unit.status = MaintenanceStatus(f"updating ingress configuration for '{rel}'")
@@ -400,9 +392,6 @@ class TraefikIngressCharm(CharmBase):
 
     def _provide_routed_ingress(self, relation: Relation):
         """Provide ingress to a unit related through TraefikRoute."""
-        if not self.traefik_route.is_ready(relation):
-            logger.info("traefik-route not ready on %s", relation)
-            return
         config = self.traefik_route.get_config(relation)
         self._push_configurations(relation, config)
 
