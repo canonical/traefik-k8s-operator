@@ -8,7 +8,6 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from subprocess import PIPE, Popen
-from time import sleep
 
 import pytest
 import yaml
@@ -61,35 +60,11 @@ def timed_memoizer(func):
     return wrapper
 
 
-@pytest.fixture(autouse=True, scope="session")
-@pytest.mark.abort_on_fail
+@pytest.fixture(scope="module")
 @timed_memoizer
-def traefik_charm():
-    proc = Popen(["charmcraft", "pack"], stdout=PIPE, stderr=PIPE, cwd=charm_root)
-    proc.wait()
-    while proc.returncode is None:  # wait() does not quite wait
-        print(proc.stdout.read().decode("utf-8"))
-        sleep(1)
-    if proc.returncode != 0:
-        raise ValueError(
-            "charmcraft pack failed with code: ",
-            proc.returncode,
-            proc.stderr.read().decode("utf-8"),
-        )
-
-    charms = tuple(map(str, charm_root.glob("*.charm")))
-    assert len(charms) == 1, (
-        f"too many charms {charms}" if charms else f"no charm found at {Path().absolute()}"
-    )
-
-    charm = charms[0]
-    charm_path = Path(charm).absolute()
-
-    assert charm_path.exists()
-
-    yield charm_path
-
-    Popen(["rm", str(charm_path)], cwd=charm_root).wait()
+async def traefik_charm(ops_test: OpsTest):
+    charm = await ops_test.build_charm(".")
+    return charm
 
 
 def purge(data: dict):
