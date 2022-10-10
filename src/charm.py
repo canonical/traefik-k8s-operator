@@ -126,6 +126,9 @@ class TraefikIngressCharm(CharmBase):
         observe(self.on.show_proxied_endpoints_action, self._on_show_proxied_endpoints)
 
     def _on_show_proxied_endpoints(self, event: ActionEvent):
+        if not self.ready:
+            return
+
         try:
             result = {}
             result.update(self.ingress_per_unit.proxied_endpoints)
@@ -369,22 +372,14 @@ class TraefikIngressCharm(CharmBase):
         # before continuing. However, the provider will NOT be ready if there are no units on the
         # other side, which is the case for the RelationDeparted for the last unit (i.e., the
         # proxied application scales to zero).
-        gateway_address = self._external_host
-        assert gateway_address, "No gateway address available"
+        if not self.ready:
+            return
 
         provider = self._provider_from_relation(relation)
         if not provider.is_ready(relation):
-            # TODO Cleanup: the provider for ingress_per_unit will NOT be ready
-            #  if there are no units on the other side, which is the case for
-            #  the RelationDeparted for the last unit (i.e., the proxied
-            #  application scales to zero).
-
-            if provider == self.ingress_per_unit and not relation.units:
-                logger.debug(
-                    "No units found in the ingress-per-unit relation; "
-                    "resetting ingress configurations"
-                )
-                self._wipe_ingress_for_relation(relation)
+            logger.debug(f"Provider {provider} not ready; resetting ingress configurations.")
+            self._wipe_ingress_for_relation(relation)
+            return
 
         rel = f"{relation.name}:{relation.id}"
         self.unit.status = MaintenanceStatus(f"updating ingress configuration for '{rel}'")
@@ -397,9 +392,6 @@ class TraefikIngressCharm(CharmBase):
 
     def _provide_routed_ingress(self, relation: Relation):
         """Provide ingress to a unit related through TraefikRoute."""
-        if not self.traefik_route.is_ready(relation):
-            logger.info("traefik-route not ready on %s", relation)
-            return
         config = self.traefik_route.get_config(relation)
         self._push_configurations(relation, config)
 
@@ -652,9 +644,8 @@ class TraefikIngressCharm(CharmBase):
         If the gateway isn't available or doesn't have a load balancer address yet,
         returns None.
         """
-        if "external_hostname" in self.model.config:
-            if external_hostname := self.model.config["external_hostname"]:
-                return external_hostname
+        if external_hostname := self.model.config.get("external_hostname"):
+            return external_hostname
 
         return _get_loadbalancer_status(namespace=self.model.name, service_name=self.app.name)
 
