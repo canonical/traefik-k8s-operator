@@ -104,7 +104,7 @@ class TraefikIngressCharm(CharmBase):
 
         self.ingress_per_app = IngressPerAppProvider(charm=self)
         self.ingress_per_unit = IngressPerUnitProvider(charm=self)
-        self.traefik_route = TraefikRouteProvider(charm=self)
+        self.traefik_route = TraefikRouteProvider(charm=self, external_host=self.external_host)
 
         observe = self.framework.observe
         observe(self.on.traefik_pebble_ready, self._on_traefik_pebble_ready)

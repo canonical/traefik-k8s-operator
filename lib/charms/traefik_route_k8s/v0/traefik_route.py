@@ -135,7 +135,9 @@ class TraefikRouteProvider(Object):
     on = TraefikRouteProviderEvents()
     _stored = StoredState()
 
-    def __init__(self, charm: CharmBase, relation_name: str = "traefik-route"):
+    def __init__(
+        self, charm: CharmBase, relation_name: str = "traefik-route", external_host: str = ""
+    ):
         """Constructor for TraefikRouteProvider.
 
         Args:
@@ -149,8 +151,8 @@ class TraefikRouteProvider(Object):
         self.charm = charm
         self._relation_name = relation_name
 
-        if self._stored.external_host != charm.external_host:
-            self._stored.external_host = charm.external_host
+        if self._stored.external_host != external_host:
+            self._stored.external_host = external_host
             self._update_requirers_with_external_host()
 
         self.framework.observe(
