@@ -232,7 +232,7 @@ async def get_address(ops_test: OpsTest, app_name: str, unit=0):
 async def deploy_traefik_if_not_deployed(ops_test: OpsTest, traefik_charm):
     if not ops_test.model.applications.get("traefik-k8s"):
         await ops_test.model.deploy(
-            traefik_charm, application_name="traefik-k8s", resources=trfk_resources
+            traefik_charm, application_name="traefik-k8s", resources=trfk_resources, series="focal"
         )
         # if we're running this locally, we need to wait for "waiting"
         # CI however deploys all in a single model, so traefik is active already
@@ -258,7 +258,9 @@ async def deploy_traefik_if_not_deployed(ops_test: OpsTest, traefik_charm):
 
 async def deploy_charm_if_not_deployed(ops_test: OpsTest, charm, app_name: str, resources=None):
     if not ops_test.model.applications.get(app_name):
-        await ops_test.model.deploy(charm, resources=resources, application_name=app_name)
+        await ops_test.model.deploy(
+            charm, resources=resources, application_name=app_name, series="focal"
+        )
 
     # block until app goes to active/idle
     async with ops_test.fast_forward():
