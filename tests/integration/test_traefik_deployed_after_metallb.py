@@ -46,29 +46,32 @@ async def test_build_and_deploy(ops_test: OpsTest, traefik_charm):
 
     await asyncio.gather(
         ops_test.model.deploy(
-            traefik_charm,
-            resources=trfk.resources,
-            application_name=trfk.name,
+            traefik_charm, resources=trfk.resources, application_name=trfk.name, series="focal"
         ),
         ops_test.model.deploy(
             ipu.charm,
             application_name=ipu.name,
             channel="edge",  # TODO change to "stable" once available
             trust=True,
+            series="focal",
         ),
         ops_test.model.deploy(
             ipa.charm,
             application_name=ipa.name,
             channel="edge",  # TODO change to "stable" once available
             trust=True,
+            series="focal",
         ),
         ops_test.model.deploy(
             ipr.charm,
             application_name=ipr.name,
             channel="edge",  # TODO change to "stable" once available
             trust=True,
+            series="focal",
         ),
     )
+
+    await ops_test.model.wait_for_idle(status="active", timeout=600, idle_period=30)
 
     await asyncio.gather(
         ops_test.model.add_relation(f"{ipu.name}:ingress", trfk.name),
@@ -76,7 +79,7 @@ async def test_build_and_deploy(ops_test: OpsTest, traefik_charm):
         ops_test.model.add_relation(f"{ipr.name}:ingress", trfk.name),
     )
 
-    await ops_test.model.wait_for_idle(status="active", timeout=600, idle_period=idle_period)
+    await ops_test.model.wait_for_idle(status="active", timeout=600, idle_period=30)
 
     endpoints = [
         f"{ip}/{path}"

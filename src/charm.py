@@ -104,7 +104,7 @@ class TraefikIngressCharm(CharmBase):
 
         self.ingress_per_app = IngressPerAppProvider(charm=self)
         self.ingress_per_unit = IngressPerUnitProvider(charm=self)
-        self.traefik_route = TraefikRouteProvider(charm=self)
+        self.traefik_route = TraefikRouteProvider(charm=self, external_host=self.external_host)
 
         observe = self.framework.observe
         observe(self.on.traefik_pebble_ready, self._on_traefik_pebble_ready)
@@ -239,7 +239,7 @@ class TraefikIngressCharm(CharmBase):
     def _on_config_changed(self, _: ConfigChangedEvent):
         # If the external hostname is changed since we last processed it, we need to
         # to reconsider all data sent over the relations and all configs
-        new_external_host = self._external_host
+        new_external_host = self.external_host
         new_routing_mode = self.config["routing_mode"]
 
         if (
@@ -266,7 +266,7 @@ class TraefikIngressCharm(CharmBase):
             )
             return
 
-        hostname = self._external_host
+        hostname = self.external_host
 
         if not hostname:
             self.unit.status = MaintenanceStatus("resetting ingress relations")
@@ -333,7 +333,7 @@ class TraefikIngressCharm(CharmBase):
     @property
     def ready(self) -> bool:
         """Check whether we have an external host set, and traefik is running."""
-        if not self._external_host:
+        if not self.external_host:
             self._wipe_ingress_for_all_relations()  # fixme: no side-effects in prop
             self.unit.status = WaitingStatus("gateway address unavailable")
             return False
@@ -491,7 +491,7 @@ class TraefikIngressCharm(CharmBase):
         """Generate a config dict for a given unit for IngressPerUnit."""
         config = {"http": {"routers": {}, "services": {}}}
         prefix = self._get_prefix(data)
-        host = self._external_host
+        host = self.external_host
         if data["mode"] == "tcp":
             port = data["port"]
             unit_url = f"{host}:{port}"
@@ -543,7 +543,7 @@ class TraefikIngressCharm(CharmBase):
         return config, unit_url
 
     def _generate_per_app_config(self, data: "RequirerData_IPA") -> Tuple[dict, str]:
-        host = self._external_host
+        host = self.external_host
         port = self._port
         prefix = self._get_prefix(data)
 
@@ -659,7 +659,7 @@ class TraefikIngressCharm(CharmBase):
             return self.traefik_route
 
     @property
-    def _external_host(self):
+    def external_host(self):
         """Determine the external address for the ingress gateway.
 
         It will prefer the `external-hostname` config if that is set, otherwise
