@@ -70,6 +70,8 @@ async def test_build_and_deploy(ops_test: OpsTest, traefik_charm):
         ),
     )
 
+    await ops_test.model.wait_for_idle(timeout=600, idle_period=30)
+
     await asyncio.gather(
         ops_test.model.add_relation(f"{ipu.name}:ingress", trfk.name),
         ops_test.model.add_relation(f"{ipa.name}:ingress", trfk.name),
