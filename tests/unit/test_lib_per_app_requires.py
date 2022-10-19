@@ -50,7 +50,8 @@ def test_ingress_app_requirer_uninitialized(requirer: IngressPerAppRequirer, har
     assert not requirer.is_ready()
 
 
-def test_ingress_app_requirer_related(requirer: IngressPerAppRequirer, harness):
+@pytest.mark.parametrize("strip_prefix", (True, False))
+def test_ingress_app_requirer_related(requirer: IngressPerAppRequirer, harness, strip_prefix):
     harness.set_leader(True)
     url = "foo.bar"
 
@@ -59,6 +60,9 @@ def test_ingress_app_requirer_related(requirer: IngressPerAppRequirer, harness):
     # auto-data feature...
 
     relation_id = harness.add_relation("ingress", "remote")
+    # usually one would provide this via the initializer, but here...
+    requirer._strip_prefix = strip_prefix
+
     requirer.provide_ingress_requirements(host="foo", port=42)
     assert not requirer.is_ready()
 
@@ -81,9 +85,12 @@ def test_ingress_app_requirer_related(requirer: IngressPerAppRequirer, harness):
         (("foo", 12), True),
     ),
 )
-def test_validator(requirer: IngressPerAppRequirer, harness, auto_data, ok):
+@pytest.mark.parametrize("strip_prefix", (True, False))
+def test_validator(requirer: IngressPerAppRequirer, harness, auto_data, ok, strip_prefix):
     harness.set_leader(True)
     harness.add_relation("ingress", "remote")
+    requirer._strip_prefix = strip_prefix
+
     if not ok:
         with pytest.raises(DataValidationError):
             host, port = auto_data

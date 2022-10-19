@@ -476,6 +476,17 @@ class TraefikIngressCharm(CharmBase):
         name = data["name"].replace("/", "-")
         return f"{data['model']}-{name}"
 
+    def _generate_middleware_config(
+        self, data: Union["RequirerData_IPA", "RequirerData_IPU"], prefix: str
+    ) -> dict:
+        """Generate a stripPrefix middleware for path based routing."""
+        if self._routing_mode is _RoutingMode.path and data.get("strip-prefix", False):
+            return {
+                "juju-sidecar-noprefix": {
+                    "stripPrefix": {"prefixes": [f"/{prefix}"], "forceSlash": False}
+                }
+            }
+
     def _generate_per_unit_config(self, data: "RequirerData_IPU") -> Tuple[dict, str]:
         """Generate a config dict for a given unit for IngressPerUnit."""
         config = {"http": {"routers": {}, "services": {}}}
@@ -514,11 +525,18 @@ class TraefikIngressCharm(CharmBase):
         traefik_router_name = f"juju-{prefix}-router"
         traefik_service_name = f"juju-{prefix}-service"
 
-        config["http"]["routers"][traefik_router_name] = {
+        router_cfg = {
             "rule": route_rule,
             "service": traefik_service_name,
             "entryPoints": ["web"],
         }
+
+        middlewares = self._generate_middleware_config(data, prefix)
+        if middlewares:
+            router_cfg["middlewares"] = middlewares
+
+        config["http"]["routers"][traefik_router_name] = router_cfg
+
         config["http"]["services"][traefik_service_name] = {
             "loadBalancer": {"servers": [{"url": f"http://{data['host']}:{data['port']}"}]}
         }
@@ -539,15 +557,21 @@ class TraefikIngressCharm(CharmBase):
         traefik_router_name = f"juju-{prefix}-router"
         traefik_service_name = f"juju-{prefix}-service"
 
+        router_cfg = {
+            traefik_router_name: {
+                "rule": route_rule,
+                "service": traefik_service_name,
+                "entryPoints": ["web"],
+            }
+        }
+
+        middlewares = self._generate_middleware_config(data, prefix)
+        if middlewares:
+            router_cfg["middlewares"] = middlewares
+
         config = {
             "http": {
-                "routers": {
-                    traefik_router_name: {
-                        "rule": route_rule,
-                        "service": traefik_service_name,
-                        "entryPoints": ["web"],
-                    }
-                },
+                "routers": router_cfg,
                 "services": {
                     traefik_service_name: {
                         "loadBalancer": {
