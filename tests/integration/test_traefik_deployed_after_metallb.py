@@ -79,6 +79,8 @@ async def test_build_and_deploy(ops_test: OpsTest, traefik_charm):
         ops_test.model.add_relation(f"{ipr.name}:ingress", trfk.name),
     )
 
+    await ops_test.model.wait_for_idle(status="active", timeout=600, idle_period=30)
+
     endpoints = [
         f"{ip}/{path}"
         for path in [
