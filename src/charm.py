@@ -482,7 +482,7 @@ class TraefikIngressCharm(CharmBase):
         """Generate a stripPrefix middleware for path based routing."""
         if self._routing_mode is _RoutingMode.path and data.get("strip-prefix", False):
             return {
-                "juju-sidecar-noprefix": {
+                f"juju-sidecar-noprefix-{prefix}": {
                     "stripPrefix": {"prefixes": [f"/{prefix}"], "forceSlash": False}
                 }
             }
@@ -533,8 +533,9 @@ class TraefikIngressCharm(CharmBase):
 
         middlewares = self._generate_middleware_config(data, prefix)
         if middlewares:
-            router_cfg["middlewares"] = middlewares
+            router_cfg["middlewares"] = list(middlewares.keys())
 
+        config["http"]["middlewares"] = middlewares
         config["http"]["routers"][traefik_router_name] = router_cfg
 
         config["http"]["services"][traefik_service_name] = {
@@ -567,10 +568,11 @@ class TraefikIngressCharm(CharmBase):
 
         middlewares = self._generate_middleware_config(data, prefix)
         if middlewares:
-            router_cfg["middlewares"] = middlewares
+            router_cfg["middlewares"] = list(middlewares.keys())
 
         config = {
             "http": {
+                "middlewares": middlewares,
                 "routers": router_cfg,
                 "services": {
                     traefik_service_name: {

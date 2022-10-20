@@ -82,7 +82,7 @@ LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 4
+LIBPATCH = 5
 
 log = logging.getLogger(__name__)
 
@@ -787,7 +787,7 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
         }
 
         if self._strip_prefix:
-            data["strip_prefix"] = "true"
+            data["strip-prefix"] = "true"
 
         _validate_data(data, INGRESS_REQUIRES_UNIT_SCHEMA)
         self.relation.data[self.unit].update(data)

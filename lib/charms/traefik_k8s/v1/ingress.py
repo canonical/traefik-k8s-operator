@@ -69,7 +69,7 @@ LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 4
+LIBPATCH = 5
 
 DEFAULT_RELATION_NAME = "ingress"
 RELATION_INTERFACE = "ingress"
@@ -511,7 +511,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         }
 
         if self._strip_prefix:
-            data["strip_prefix"] = "true"
+            data["strip-prefix"] = "true"
 
         _validate_data(data, INGRESS_REQUIRES_APP_SCHEMA)
         self.relation.data[self.app].update(data)
