@@ -787,7 +787,7 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
         }
 
         if self._strip_prefix:
-            data["strip_prefix"] = "true"
+            data["strip-prefix"] = "true"
 
         _validate_data(data, INGRESS_REQUIRES_UNIT_SCHEMA)
         self.relation.data[self.unit].update(data)

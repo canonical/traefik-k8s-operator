@@ -511,7 +511,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         }
 
         if self._strip_prefix:
-            data["strip_prefix"] = "true"
+            data["strip-prefix"] = "true"
 
         _validate_data(data, INGRESS_REQUIRES_APP_SCHEMA)
         self.relation.data[self.app].update(data)
