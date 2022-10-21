@@ -218,7 +218,6 @@ class TraefikRouteRequirer(Object):
     def external_host(self) -> str:
         """Return the external host set by Traefik, if any."""
         self._update_stored_external_host()
-        log.warning("---- EXTERNAL_HOST IS: {}".format(self._stored.external_host))
         return self._stored.external_host or ""
 
     def _update_stored_external_host(self) -> None:
