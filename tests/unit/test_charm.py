@@ -137,7 +137,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
                 middlewares = {
                     "middlewares": {
-                        "juju-sidecar-noprefix": {
+                        "juju-sidecar-noprefix-test-model-remote-0": {
                             "stripPrefix": {
                                 "prefixes": ["/test-model-remote-0"],
                                 "forceSlash": False,
@@ -148,6 +148,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
                 expected = {
                     "http": {
+                        "middlewares": None,
                         "routers": {
                             "juju-test-model-remote-0-router": {
                                 "entryPoints": ["web"],
@@ -163,8 +164,9 @@ class TestTraefikIngressCharm(unittest.TestCase):
                     }
                 }
                 if strip_prefix:
+                    expected["http"].update(middlewares)
                     expected["http"]["routers"]["juju-test-model-remote-0-router"].update(
-                        middlewares
+                        {"middlewares": ["juju-sidecar-noprefix-test-model-remote-0"]},
                     )
 
                 self.assertEqual(conf, expected)
@@ -201,7 +203,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
                 conf = yaml.safe_load(traefik_container.pull(file).read())
                 middlewares = {
                     "middlewares": {
-                        "juju-sidecar-noprefix": {
+                        "juju-sidecar-noprefix-test-model-remote-0": {
                             "stripPrefix": {
                                 "prefixes": ["/test-model-remote-0"],
                                 "forceSlash": False,
@@ -212,6 +214,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
                 expected = {
                     "http": {
+                        "middlewares": None,
                         "routers": {
                             "juju-test-model-remote-0-router": {
                                 "entryPoints": ["web"],
@@ -227,8 +230,9 @@ class TestTraefikIngressCharm(unittest.TestCase):
                     }
                 }
                 if strip_prefix:
+                    expected["http"].update(middlewares)
                     expected["http"]["routers"]["juju-test-model-remote-0-router"].update(
-                        middlewares
+                        {"middlewares": ["juju-sidecar-noprefix-test-model-remote-0"]},
                     )
 
                 self.assertEqual(conf, expected)
@@ -271,6 +275,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
                 expected = {
                     "http": {
+                        "middlewares": None,
                         "routers": {
                             "juju-test-model-remote-0-router": {
                                 "entryPoints": ["web"],
@@ -329,6 +334,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
                 expected = {
                     "http": {
+                        "middlewares": None,
                         "routers": {
                             "juju-test-model-remote-0-router": {
                                 "entryPoints": ["web"],
@@ -391,6 +397,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
             expected = {
                 "http": {
+                    "middlewares": None,
                     "routers": {
                         "juju-test-model-remote-0-router": {
                             "entryPoints": ["web"],
