@@ -68,6 +68,8 @@ _TRAEFIK_CONTAINER_NAME = _TRAEFIK_LAYER_NAME = _TRAEFIK_SERVICE_NAME = "traefik
 # as that is usually safer for Traefik
 _CONFIG_DIRECTORY = "/opt/traefik/juju"
 _STATIC_CONFIG_PATH = "/etc/traefik/traefik.yaml"
+_CERTIFICATE_PATH = "/etc/traefik/certificate.cert"
+_CERTIFICATE_KEY_PATH = "/etc/traefik/certificate.key"
 
 
 class _RoutingMode(enum.Enum):
@@ -177,6 +179,8 @@ class TraefikIngressCharm(CharmBase):
         self._stored.ca = event.ca
         self._stored.chain = event.chain
         # TODO: Store files in container and modify config file
+        self.container.push(_CERTIFICATE_PATH, self._stored.certificate, make_parents=True)
+        self.container.push(_CERTIFICATE_KEY_PATH, self._stored.private_key, make_parents=True)
         self._process_status_and_configurations()
 
     def _on_certificate_expiring(self, event: CertificateExpiringEvent) -> None:
@@ -193,7 +197,6 @@ class TraefikIngressCharm(CharmBase):
             new_certificate_signing_request=new_csr,
         )
         self._stored.csr = new_csr.decode()
-        self._process_status_and_configurations()
 
     def _on_show_proxied_endpoints(self, event: ActionEvent):
         if not self.ready:
@@ -238,7 +241,7 @@ class TraefikIngressCharm(CharmBase):
         except (FileNotFoundError, APIError):
             pass
 
-    def _push_static_config(self):
+    def _push_config(self):
         # Ensure the required basic configurations and folders exist
         # TODO Use the Traefik user and group?
 
@@ -253,34 +256,50 @@ class TraefikIngressCharm(CharmBase):
         tcp_entrypoints = self._tcp_entrypoints()
         logger.debug(f"Statically configuring traefik with tcp entrypoints: {tcp_entrypoints}.")
 
-        traefik_static_config = yaml.dump(
-            {
-                "log": {
-                    "level": "DEBUG",
-                },
-                "entryPoints": {
-                    "diagnostics": {"address": f":{self._diagnostics_port}"},
-                    "web": {"address": f":{self._port}"},
-                    **tcp_entrypoints,
-                },
-                "metrics": {
-                    "prometheus": {
-                        "addRoutersLabels": True,
-                        "addServicesLabels": True,
-                        "entryPoint": "diagnostics",
-                    }
-                },
-                "ping": {"entryPoint": "diagnostics"},
-                "providers": {
-                    "file": {
-                        "directory": _CONFIG_DIRECTORY,
-                        "watch": True,
-                    }
-                },
-            }
-        )
-        self.container.push(_STATIC_CONFIG_PATH, traefik_static_config, make_dirs=True)
+        traefik_config = {
+            "log": {
+                "level": "DEBUG",
+            },
+            "entryPoints": {
+                "diagnostics": {"address": f":{self._diagnostics_port}"},
+                "web": {"address": f":{self._port}"},
+                **tcp_entrypoints,
+            },
+            "metrics": {
+                "prometheus": {
+                    "addRoutersLabels": True,
+                    "addServicesLabels": True,
+                    "entryPoint": "diagnostics",
+                }
+            },
+            "ping": {"entryPoint": "diagnostics"},
+            "providers": {
+                "file": {
+                    "directory": _CONFIG_DIRECTORY,
+                    "watch": True,
+                }
+            },
+        }
+
+        traefik_config.update(self._get_tls_config())
+
+        self.container.push(_STATIC_CONFIG_PATH, yaml.dump(traefik_config), make_dirs=True)
         self.container.make_dir(_CONFIG_DIRECTORY, make_parents=True)
+
+    def _get_tls_config(self):
+        """Return dictionary with TLS traefik configuration if it exists."""
+        if not self._stored.certificate:
+            return {}
+        return {
+            "tls": {
+                "certificates": [
+                    {
+                        "certFile": _CERTIFICATE_PATH,
+                        "keyFile": _CERTIFICATE_KEY_PATH,
+                    }
+                ]
+            }
+        }
 
     def _on_traefik_pebble_ready(self, _: PebbleReadyEvent):
         # If the Traefik container comes up, e.g., after a pod churn, we
@@ -296,7 +315,7 @@ class TraefikIngressCharm(CharmBase):
         # routes.
         self._clear_dynamic_configs()
         # we push the static config
-        self._push_static_config()
+        self._push_config()
         # now we restart traefik
         self._restart_traefik()
 
