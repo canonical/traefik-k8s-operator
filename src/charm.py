@@ -7,6 +7,8 @@
 import enum
 import json
 import logging
+import secrets
+import string
 import typing
 from typing import Any, Dict, List, Tuple, Union
 from urllib.parse import urlparse
@@ -90,7 +92,15 @@ class TraefikIngressCharm(CharmBase):
         super().__init__(*args)
 
         self._stored.set_default(  # pyright: reportGeneralTypeIssues=false
-            current_external_host=None, current_routing_mode=None, tcp_entrypoints=None
+            current_external_host=None,
+            current_routing_mode=None,
+            tcp_entrypoints=None,
+            private_key=None,
+            private_key_password=None,
+            csr=None,
+            certificate=None,
+            ca=None,
+            chain=None,
         )
 
         self.container = self.unit.get_container(_TRAEFIK_CONTAINER_NAME)
@@ -114,7 +124,6 @@ class TraefikIngressCharm(CharmBase):
         self.ingress_per_unit = IngressPerUnitProvider(charm=self)
         self.traefik_route = TraefikRouteProvider(charm=self, external_host=self.external_host)
 
-        self.cert_subject = "whatever"
         self.certificates = TLSCertificatesRequiresV1(self, "certificates")
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(
@@ -147,53 +156,33 @@ class TraefikIngressCharm(CharmBase):
         observe(self.on.show_proxied_endpoints_action, self._on_show_proxied_endpoints)
 
     def _on_install(self, event) -> None:
-        private_key_password = b"banana"
-        private_key = generate_private_key(password=private_key_password)
-        replicas_relation = self.model.get_relation("replicas")
-        if not replicas_relation:
-            self.unit.status = WaitingStatus("Waiting for peer relation to be created")
-            event.defer()
-            return
-        replicas_relation.data[self.app].update(
-            {"private_key_password": "banana", "private_key": private_key.decode()}
-        )
+        private_key_password = self._generate_password()
+        private_key = generate_private_key(password=private_key_password.encode("utf-8"))
+        self._stored.private_key_password = private_key_password
+        self._stored.private_key = private_key.decode()
 
     def _on_certificates_relation_joined(self, event: RelationJoinedEvent) -> None:
-        replicas_relation = self.model.get_relation("replicas")
-        if not replicas_relation:
-            self.unit.status = WaitingStatus("Waiting for peer relation to be created")
-            event.defer()
-            return
-        private_key_password = replicas_relation.data[self.app].get("private_key_password")
-        private_key = replicas_relation.data[self.app].get("private_key")
+        private_key_password = self._stored.get("private_key_password")
+        private_key = self._stored.get("private_key")
         csr = generate_csr(
-            private_key=private_key.encode(),
-            private_key_password=private_key_password.encode(),
+            private_key=private_key.encode("utf-8"),
+            private_key_password=private_key_password.encode("utf-8"),
             subject=self.cert_subject,
         )
-        replicas_relation.data[self.app].update({"csr": csr.decode()})
+        self._stored.csr = csr.decode()
         self.certificates.request_certificate_creation(certificate_signing_request=csr)
 
     def _on_certificate_available(self, event: CertificateAvailableEvent) -> None:
-        replicas_relation = self.model.get_relation("replicas")
-        if not replicas_relation:
-            self.unit.status = WaitingStatus("Waiting for peer relation to be created")
-            event.defer()
-            return
-        replicas_relation.data[self.app].update({"certificate": event.certificate})
-        replicas_relation.data[self.app].update({"ca": event.ca})
-        replicas_relation.data[self.app].update({"chain": event.chain})
-        self.unit.status = ActiveStatus()
+        self._stored.certificate = event.certificate
+        self._stored.ca = event.ca
+        self._stored.chain = event.chain
+        # TODO: Store files in container and modify config file
+        self._process_status_and_configurations()
 
     def _on_certificate_expiring(self, event: CertificateExpiringEvent) -> None:
-        replicas_relation = self.model.get_relation("replicas")
-        if not replicas_relation:
-            self.unit.status = WaitingStatus("Waiting for peer relation to be created")
-            event.defer()
-            return
-        old_csr = replicas_relation.data[self.app].get("csr")
-        private_key_password = replicas_relation.data[self.app].get("private_key_password")
-        private_key = replicas_relation.data[self.app].get("private_key")
+        old_csr = self._stored.get("csr")
+        private_key_password = self._stored.get("private_key_password")
+        private_key = self._stored.get("private_key")
         new_csr = generate_csr(
             private_key=private_key.encode(),
             private_key_password=private_key_password.encode(),
@@ -203,7 +192,8 @@ class TraefikIngressCharm(CharmBase):
             old_certificate_signing_request=old_csr,
             new_certificate_signing_request=new_csr,
         )
-        replicas_relation.data[self.app].update({"csr": new_csr.decode()})
+        self._stored.csr = new_csr.decode()
+        self._process_status_and_configurations()
 
     def _on_show_proxied_endpoints(self, event: ActionEvent):
         if not self.ready:
@@ -754,6 +744,18 @@ class TraefikIngressCharm(CharmBase):
         The two modes are 'subdomain' and 'path', where 'path' is the default.
         """
         return _RoutingMode(self.config["routing_mode"])
+
+    @property
+    def cert_subject(self) -> str:
+        """Provide certificate subject."""
+        return self.model.config.get("external_hostname")
+
+    def _generate_password(self) -> str:
+        """Generate a random 12 character password."""
+        # Really limited by what can be passed into shell commands, since this
+        # all goes through subprocess. So much for complex password
+        chars = string.ascii_letters + string.digits
+        return "".join(secrets.choice(chars) for _ in range(12))
 
 
 def _get_loadbalancer_status(namespace: str, service_name: str):
