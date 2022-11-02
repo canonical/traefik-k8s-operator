@@ -767,7 +767,8 @@ class TraefikIngressCharm(CharmBase):
     @property
     def cert_subject(self) -> str:
         """Provide certificate subject."""
-        return self.model.config.get("external_hostname")
+        # TODO: Use a good default for when the external_hostname is None
+        return self.model.config.get("external_hostname", "whatever")
 
     def _generate_password(self) -> str:
         """Generate a random 12 character password."""
