@@ -14,6 +14,13 @@ from urllib.parse import urlparse
 import yaml
 from charms.observability_libs.v0.kubernetes_service_patch import KubernetesServicePatch
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
+from charms.tls_certificates_interface.v1.tls_certificates import (
+    CertificateAvailableEvent,
+    CertificateExpiringEvent,
+    TLSCertificatesRequiresV1,
+    generate_csr,
+    generate_private_key,
+)
 from charms.traefik_k8s.v1.ingress import IngressPerAppProvider
 from charms.traefik_k8s.v1.ingress_per_unit import (
     DataValidationError,
@@ -33,6 +40,7 @@ from ops.charm import (
     PebbleReadyEvent,
     RelationBrokenEvent,
     RelationEvent,
+    RelationJoinedEvent,
     StartEvent,
     UpdateStatusEvent,
 )
@@ -106,6 +114,19 @@ class TraefikIngressCharm(CharmBase):
         self.ingress_per_unit = IngressPerUnitProvider(charm=self)
         self.traefik_route = TraefikRouteProvider(charm=self, external_host=self.external_host)
 
+        self.cert_subject = "whatever"
+        self.certificates = TLSCertificatesRequiresV1(self, "certificates")
+        self.framework.observe(self.on.install, self._on_install)
+        self.framework.observe(
+            self.on.certificates_relation_joined, self._on_certificates_relation_joined
+        )
+        self.framework.observe(
+            self.certificates.on.certificate_available, self._on_certificate_available
+        )
+        self.framework.observe(
+            self.certificates.on.certificate_expiring, self._on_certificate_expiring
+        )
+
         observe = self.framework.observe
         observe(self.on.traefik_pebble_ready, self._on_traefik_pebble_ready)
         observe(self.on.start, self._on_start)
@@ -124,6 +145,65 @@ class TraefikIngressCharm(CharmBase):
 
         # Action handlers
         observe(self.on.show_proxied_endpoints_action, self._on_show_proxied_endpoints)
+
+    def _on_install(self, event) -> None:
+        private_key_password = b"banana"
+        private_key = generate_private_key(password=private_key_password)
+        replicas_relation = self.model.get_relation("replicas")
+        if not replicas_relation:
+            self.unit.status = WaitingStatus("Waiting for peer relation to be created")
+            event.defer()
+            return
+        replicas_relation.data[self.app].update(
+            {"private_key_password": "banana", "private_key": private_key.decode()}
+        )
+
+    def _on_certificates_relation_joined(self, event: RelationJoinedEvent) -> None:
+        replicas_relation = self.model.get_relation("replicas")
+        if not replicas_relation:
+            self.unit.status = WaitingStatus("Waiting for peer relation to be created")
+            event.defer()
+            return
+        private_key_password = replicas_relation.data[self.app].get("private_key_password")
+        private_key = replicas_relation.data[self.app].get("private_key")
+        csr = generate_csr(
+            private_key=private_key.encode(),
+            private_key_password=private_key_password.encode(),
+            subject=self.cert_subject,
+        )
+        replicas_relation.data[self.app].update({"csr": csr.decode()})
+        self.certificates.request_certificate_creation(certificate_signing_request=csr)
+
+    def _on_certificate_available(self, event: CertificateAvailableEvent) -> None:
+        replicas_relation = self.model.get_relation("replicas")
+        if not replicas_relation:
+            self.unit.status = WaitingStatus("Waiting for peer relation to be created")
+            event.defer()
+            return
+        replicas_relation.data[self.app].update({"certificate": event.certificate})
+        replicas_relation.data[self.app].update({"ca": event.ca})
+        replicas_relation.data[self.app].update({"chain": event.chain})
+        self.unit.status = ActiveStatus()
+
+    def _on_certificate_expiring(self, event: CertificateExpiringEvent) -> None:
+        replicas_relation = self.model.get_relation("replicas")
+        if not replicas_relation:
+            self.unit.status = WaitingStatus("Waiting for peer relation to be created")
+            event.defer()
+            return
+        old_csr = replicas_relation.data[self.app].get("csr")
+        private_key_password = replicas_relation.data[self.app].get("private_key_password")
+        private_key = replicas_relation.data[self.app].get("private_key")
+        new_csr = generate_csr(
+            private_key=private_key.encode(),
+            private_key_password=private_key_password.encode(),
+            subject=self.cert_subject,
+        )
+        self.certificates.request_certificate_renewal(
+            old_certificate_signing_request=old_csr,
+            new_certificate_signing_request=new_csr,
+        )
+        replicas_relation.data[self.app].update({"csr": new_csr.decode()})
 
     def _on_show_proxied_endpoints(self, event: ActionEvent):
         if not self.ready:

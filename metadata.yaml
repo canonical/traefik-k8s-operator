@@ -54,3 +54,7 @@ provides:
     description: |
       Provides endpoint for a traefik-route charm to sit between Traefik and a
       charm in need of ingress, configuring the relation on a per-unit basis.
+
+peers:
+  replicas:
+    interface: traefik_replica
