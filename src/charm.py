@@ -164,8 +164,8 @@ class TraefikIngressCharm(CharmBase):
         self._stored.private_key = private_key.decode()
 
     def _on_certificates_relation_joined(self, event: RelationJoinedEvent) -> None:
-        private_key_password = self._stored.get("private_key_password")
-        private_key = self._stored.get("private_key")
+        private_key_password = self._stored.private_key_password
+        private_key = self._stored.private_key
         csr = generate_csr(
             private_key=private_key.encode("utf-8"),
             private_key_password=private_key_password.encode("utf-8"),
@@ -184,9 +184,9 @@ class TraefikIngressCharm(CharmBase):
         self._process_status_and_configurations()
 
     def _on_certificate_expiring(self, event: CertificateExpiringEvent) -> None:
-        old_csr = self._stored.get("csr")
-        private_key_password = self._stored.get("private_key_password")
-        private_key = self._stored.get("private_key")
+        old_csr = self._stored.csr
+        private_key_password = self._stored.private_key_password
+        private_key = self._stored.private_key
         new_csr = generate_csr(
             private_key=private_key.encode(),
             private_key_password=private_key_password.encode(),
