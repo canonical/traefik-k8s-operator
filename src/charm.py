@@ -181,6 +181,7 @@ class TraefikIngressCharm(CharmBase):
         # TODO: Store files in container and modify config file
         self.container.push(_CERTIFICATE_PATH, self._stored.certificate, make_dirs=True)
         self.container.push(_CERTIFICATE_KEY_PATH, self._stored.private_key, make_dirs=True)
+        self._push_config()
         self._process_status_and_configurations()
 
     def _on_certificate_expiring(self, event: CertificateExpiringEvent) -> None:
