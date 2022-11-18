@@ -12,6 +12,9 @@ from typing import Any, Dict, List, Tuple, Union
 from urllib.parse import urlparse
 
 import yaml
+
+from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
+from charms.loki_k8s.v0.loki_push_api import LogProxyConsumer
 from charms.observability_libs.v0.kubernetes_service_patch import KubernetesServicePatch
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 from charms.traefik_k8s.v1.ingress import IngressPerAppProvider
@@ -76,6 +79,7 @@ class TraefikIngressCharm(CharmBase):
 
     _stored = StoredState()
     _port = 80
+    _log_path = "/var/log/traefik.log"
     _diagnostics_port = 8082  # Prometheus metrics, healthcheck/ping
 
     def __init__(self, *args):
@@ -93,6 +97,18 @@ class TraefikIngressCharm(CharmBase):
             ports=[(f"{self.app.name}", self._port)],
         )
 
+        # observability endpoints
+        # Provide grafana dashboards over a relation interface
+        # dashboard to use: https://grafana.com/grafana/dashboards/4475-traefik/
+        # TODO wishlist: I would like for the p60, p70, p80, p90, p99, min, max, and avg for
+        #  http_request_duration to be plotted as a graph. You should have access to a
+        #  http_request_duration_bucket, which should make this fairly straight
+        #  forward to do using histogram_quantiles
+        self._grafana_dashboards = GrafanaDashboardProvider(
+            self, relation_name="grafana-dashboard"
+        )
+        # Enable log forwarding for Loki and other charms that implement loki_push_api
+        self._logging = LogProxyConsumer(self, relation_name="logging", log_files=[self._log_path])
         self.metrics_endpoint = MetricsEndpointProvider(
             self,
             jobs=[
@@ -626,7 +642,8 @@ class TraefikIngressCharm(CharmBase):
                 _TRAEFIK_SERVICE_NAME: {
                     "override": "replace",
                     "summary": "Traefik",
-                    "command": "/usr/bin/traefik",
+                    # trick to drop the logs to a file but also keep them available in the pod logs
+                    "command": '/bin/sh -c "/usr/bin/traefik | tee {}"'.format(self._log_path),
                     "startup": "enabled",
                 },
             },

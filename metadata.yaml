@@ -54,3 +54,14 @@ provides:
     description: |
       Provides endpoint for a traefik-route charm to sit between Traefik and a
       charm in need of ingress, configuring the relation on a per-unit basis.
+  grafana-dashboard:
+    description: |
+      Provides endpoint to instrument a grafana dashboard upon relating to a Grafana charm.
+    interface: grafana_dashboard
+
+requires:
+  logging:
+    interface: loki_push_api
+    description: |
+      Endpoint to push logs to Loki.
+    limit: 1
