@@ -607,7 +607,9 @@ def _replace_template_fields(  # noqa: C901
 
     If existing datasource variables are present, try to substitute them.
     """
-    replacements = {"loki": "${lokids}", "prometheus": "${prometheusds}"}
+    replacements = {"loki": "${lokids}",
+                    "prometheus": "${prometheusds}",
+                    "grafana": "grafana"}
     used_replacements = []
 
     # If any existing datasources match types we know, or we didn't find

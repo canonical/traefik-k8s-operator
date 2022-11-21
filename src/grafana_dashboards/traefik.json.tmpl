@@ -597,8 +597,224 @@
       ],
       "title": "Requests by protocol",
       "type": "piechart"
+    },
+    {
+      "datasource": "${lokids}",
+      "description": "Raw log stream from Traefik",
+      "gridPos": {
+        "h": 13,
+        "w": 12,
+        "x": 0,
+        "y": 30
+      },
+      "id": 13,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": false,
+        "sortOrder": "Descending",
+        "wrapLogMessage": false
+      },
+      "targets": [
+        {
+          "datasource": "${lokids}",
+          "editorMode": "code",
+          "expr": "{juju_application=\"traefik\", juju_model=\"$juju_model\", juju_model_uuid=\"$juju_model_uuid\", juju_unit=\"$juju_unit\"} |= \"\"",
+          "key": "Q-ec8ee0ce-b192-40d9-976e-bdfc279e9b32-0",
+          "legendFormat": "",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Raw logs",
+      "type": "logs"
+    },
+    {
+      "datasource": "${prometheusds}",
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "__systemRef": "hideSeriesFrom",
+            "matcher": {
+              "id": "byNames",
+              "options": {
+                "mode": "exclude",
+                "names": [
+                  "min(rate(traefik_entrypoint_request_duration_seconds_bucket{juju_application=\"traefik\",juju_model=\"bar\",juju_model_uuid=\"ec15b396-0c95-4d6c-85b8-f6f012eafd01\",juju_unit=\"traefik/0\"}[5m]))",
+                  "max(rate(traefik_entrypoint_request_duration_seconds_bucket{juju_application=\"traefik\",juju_model=\"bar\",juju_model_uuid=\"ec15b396-0c95-4d6c-85b8-f6f012eafd01\",juju_unit=\"traefik/0\"}[5m]))",
+                  "avg(rate(traefik_entrypoint_request_duration_seconds_bucket{juju_application=\"traefik\",juju_model=\"bar\",juju_model_uuid=\"ec15b396-0c95-4d6c-85b8-f6f012eafd01\",juju_unit=\"traefik/0\"}[5m]))"
+                ],
+                "prefix": "All except:",
+                "readOnly": true
+              }
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 13,
+        "w": 12,
+        "x": 12,
+        "y": 30
+      },
+      "id": 15,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": "${prometheusds}",
+          "editorMode": "code",
+          "expr": "",
+          "hide": false,
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "p100"
+        },
+        {
+          "datasource": "${prometheusds}",
+          "editorMode": "code",
+          "expr": "histogram_quantile(0.99, rate(sum(traefik_entrypoint_request_duration_seconds_bucket{juju_application=\"$juju_application\",juju_model=\"$juju_model\",juju_model_uuid=\"$juju_model_uuid\",juju_unit=\"$juju_unit\"})by(le)[2m:]))",
+          "hide": false,
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "p99"
+        },
+        {
+          "datasource": "${prometheusds}",
+          "editorMode": "code",
+          "expr": "histogram_quantile(0.9, rate(sum(traefik_entrypoint_request_duration_seconds_bucket{juju_application=\"$juju_application\",juju_model=\"$juju_model\",juju_model_uuid=\"$juju_model_uuid\",juju_unit=\"$juju_unit\"})by(le)[2m:]))",
+          "hide": false,
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "p90"
+        },
+        {
+          "datasource": "${prometheusds}",
+          "editorMode": "code",
+          "expr": "histogram_quantile(0.8, rate(sum(traefik_entrypoint_request_duration_seconds_bucket{juju_application=\"$juju_application\",juju_model=\"$juju_model\",juju_model_uuid=\"$juju_model_uuid\",juju_unit=\"$juju_unit\"})by(le)[2m:]))",
+          "hide": false,
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "p80"
+        },
+        {
+          "datasource": "${prometheusds}",
+          "editorMode": "code",
+          "expr": "histogram_quantile(0.7, rate(sum(traefik_entrypoint_request_duration_seconds_bucket{juju_application=\"$juju_application\",juju_model=\"$juju_model\",juju_model_uuid=\"$juju_model_uuid\",juju_unit=\"$juju_unit\"})by(le)[2m:]))",
+          "hide": false,
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "p70"
+        },
+        {
+          "datasource": "${prometheusds}",
+          "editorMode": "code",
+          "expr": "min(rate(traefik_entrypoint_request_duration_seconds_bucket{juju_application=\"$juju_application\",juju_model=\"$juju_model\",juju_model_uuid=\"$juju_model_uuid\",juju_unit=\"$juju_unit\"}[5m]))",
+          "hide": false,
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "min"
+        },
+        {
+          "datasource": "${prometheusds}",
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "max(rate(traefik_entrypoint_request_duration_seconds_bucket{juju_application=\"$juju_application\",juju_model=\"$juju_model\",juju_model_uuid=\"$juju_model_uuid\",juju_unit=\"$juju_unit\"}[5m]))",
+          "hide": false,
+          "instant": false,
+          "interval": "",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "max"
+        },
+        {
+          "datasource": "${prometheusds}",
+          "editorMode": "code",
+          "expr": "avg(rate(traefik_entrypoint_request_duration_seconds_bucket{juju_application=\"$juju_application\",juju_model=\"$juju_model\",juju_model_uuid=\"$juju_model_uuid\",juju_unit=\"$juju_unit\"}[5m]))",
+          "hide": false,
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "avg"
+        }
+      ],
+      "title": "Long tails",
+      "type": "timeseries"
     }
   ],
+  "refresh": false,
   "schemaVersion": 37,
   "style": "dark",
   "tags": [
@@ -610,8 +826,42 @@
       {
         "current": {
           "selected": false,
-          "text": "prometheus-k8s",
-          "value": "prometheus-k8s"
+          "text": "juju_bar_ec15b396-0c95-4d6c-85b8-f6f012eafd01_loki_0",
+          "value": "juju_bar_ec15b396-0c95-4d6c-85b8-f6f012eafd01_loki_0"
+        },
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "name": "lokids",
+        "options": [],
+        "query": "loki",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "type": "datasource"
+      },
+      {
+        "current": {
+          "selected": false,
+          "text": "juju_bar_ec15b396-0c95-4d6c-85b8-f6f012eafd01_prometheus_0",
+          "value": "juju_bar_ec15b396-0c95-4d6c-85b8-f6f012eafd01_prometheus_0"
+        },
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "name": "prometheusds",
+        "options": [],
+        "query": "prometheus",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "type": "datasource"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": "traefik/0",
+          "value": "traefik/0"
         },
         "datasource": "${prometheusds}",
         "definition": "label_values(up{juju_model=\"$juju_model\",juju_model_uuid=\"$juju_model_uuid\",juju_application=\"$juju_application\"},juju_unit)",
@@ -636,9 +886,9 @@
       },
       {
         "current": {
-          "selected": false,
-          "text": "prometheus",
-          "value": "prometheus"
+          "selected": true,
+          "text": "traefik",
+          "value": "traefik"
         },
         "datasource": "${prometheusds}",
         "definition": "label_values(up{juju_model=\"$juju_model\",juju_model_uuid=\"$juju_model_uuid\"},juju_application)",
@@ -664,8 +914,8 @@
       {
         "current": {
           "selected": false,
-          "text": "52787cbf-b4f2-4a80-8cdd-6545b8eeb2b3",
-          "value": "52787cbf-b4f2-4a80-8cdd-6545b8eeb2b3"
+          "text": "ec15b396-0c95-4d6c-85b8-f6f012eafd01",
+          "value": "ec15b396-0c95-4d6c-85b8-f6f012eafd01"
         },
         "datasource": "${prometheusds}",
         "definition": "label_values(up{juju_model=\"$juju_model\"},juju_model_uuid)",
@@ -690,9 +940,9 @@
       },
       {
         "current": {
-          "selected": false,
-          "text": "cos",
-          "value": "cos"
+          "selected": true,
+          "text": "bar",
+          "value": "bar"
         },
         "datasource": "${prometheusds}",
         "definition": "label_values(up,juju_model)",
@@ -716,7 +966,11 @@
         "useTags": false
       },
       {
-        "current": {},
+        "current": {
+          "selected": false,
+          "text": "juju-bar-alertmanager-service@file",
+          "value": "juju-bar-alertmanager-service@file"
+        },
         "datasource": "${prometheusds}",
         "definition": "label_values(service)",
         "hide": 0,
@@ -738,7 +992,11 @@
         "useTags": false
       },
       {
-        "current": {},
+        "current": {
+          "selected": false,
+          "text": "All",
+          "value": "$__all"
+        },
         "datasource": "${prometheusds}",
         "definition": "",
         "hide": 0,
@@ -762,8 +1020,8 @@
     ]
   },
   "time": {
-    "from": "now-1h",
-    "to": "now"
+    "from": "2022-11-21T09:22:02.186Z",
+    "to": "2022-11-21T09:25:39.620Z"
   },
   "timepicker": {
     "refresh_intervals": [
@@ -793,6 +1051,6 @@
   "timezone": "",
   "title": "Traefik",
   "uid": "qPdAviJmz",
-  "version": 2,
+  "version": 1,
   "weekStart": ""
 }
