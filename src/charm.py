@@ -12,7 +12,6 @@ from typing import Any, Dict, List, Tuple, Union
 from urllib.parse import urlparse
 
 import yaml
-
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from charms.loki_k8s.v0.loki_push_api import LogProxyConsumer
 from charms.observability_libs.v0.kubernetes_service_patch import KubernetesServicePatch
