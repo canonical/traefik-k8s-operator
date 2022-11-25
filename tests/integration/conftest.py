@@ -11,14 +11,14 @@ from subprocess import PIPE, Popen
 
 import pytest
 import yaml
+from juju.errors import JujuError
 from pytest_operator.plugin import OpsTest
 
 from tests.integration.spellbook.cache import spellbook_fetch
 
-charm_root = Path(__file__).parent.parent.parent
-trfk_meta = yaml.safe_load((charm_root / "metadata.yaml").read_text())
+trfk_root = Path(__file__).parent.parent.parent
+trfk_meta = yaml.safe_load((trfk_root / "metadata.yaml").read_text())
 trfk_resources = {name: val["upstream-source"] for name, val in trfk_meta["resources"].items()}
-
 
 _JUJU_DATA_CACHE = {}
 _JUJU_KEYS = ("egress-subnets", "ingress-address", "private-address")
@@ -66,15 +66,23 @@ def timed_memoizer(func):
 @pytest.fixture(scope="module")
 @timed_memoizer
 async def traefik_charm():
-    return spellbook_fetch("traefik", "./")
+    return spellbook_fetch(
+        trfk_root, charm_name='traefik',
+        hash_paths=[trfk_root / 'src',
+                    trfk_root / 'lib',
+                    trfk_root / 'metadata.yaml',
+                    trfk_root / 'config.yaml',
+                    trfk_root / 'charmcraft.yaml']
+    )
+
 
 
 @pytest.fixture(scope="module")
 async def ipa_tester_charm():
     ipa_charm_root = (Path(__file__).parent / "testers" / "ipa").absolute()
     return spellbook_fetch(
-        "ipa-tester",
         ipa_charm_root,
+        charm_name="ipa-tester",
         pull_libs=[Path() / "lib" / "charms" / "traefik_k8s" / "v1" / "ingress.py"],
     )
 
@@ -83,8 +91,8 @@ async def ipa_tester_charm():
 async def ipu_tester_charm():
     ipu_charm_root = (Path(__file__).parent / "testers" / "ipu").absolute()
     return spellbook_fetch(
-        "ipu-tester",
         ipu_charm_root,
+        charm_name="ipu-tester",
         pull_libs=[Path() / "lib" / "charms" / "traefik_k8s" / "v1" / "ingress_per_unit.py"],
     )
 
@@ -93,8 +101,8 @@ async def ipu_tester_charm():
 async def tcp_tester_charm():
     tcp_charm_root = (Path(__file__).parent / "testers" / "tcp").absolute()
     return spellbook_fetch(
-        "tcp-tester",
         tcp_charm_root,
+        charm_name="tcp-tester",
         pull_libs=[Path() / "lib" / "charms" / "traefik_k8s" / "v1" / "ingress_per_unit.py"],
     )
 
@@ -103,8 +111,8 @@ async def tcp_tester_charm():
 async def route_tester_charm():
     route_charm_root = (Path(__file__).parent / "testers" / "route").absolute()
     return spellbook_fetch(
-        "route-tester",
         route_charm_root,
+        charm_name="route-tester",
         pull_libs=[Path() / "lib" / "charms" / "traefik_route_k8s" / "v0" / "traefik_route.py"],
     )
 
@@ -169,10 +177,10 @@ def get_relation_by_endpoint(relations, local_endpoint, remote_endpoint, remote_
         r
         for r in relations
         if (
-            (r["endpoint"] == local_endpoint and r["related-endpoint"] == remote_endpoint)
-            or (r["endpoint"] == remote_endpoint and r["related-endpoint"] == local_endpoint)
-        )
-        and remote_obj in r["related-units"]
+                   (r["endpoint"] == local_endpoint and r["related-endpoint"] == remote_endpoint)
+                   or (r["endpoint"] == remote_endpoint and r["related-endpoint"] == local_endpoint)
+           )
+           and remote_obj in r["related-units"]
     ]
     if not matches:
         raise ValueError(
@@ -199,7 +207,7 @@ class UnitRelationData:
 
 
 def get_content(
-    obj: str, other_obj, include_default_juju_keys: bool = False, model: str = None
+        obj: str, other_obj, include_default_juju_keys: bool = False, model: str = None
 ) -> UnitRelationData:
     """Get the content of the databag of `obj`, as seen from `other_obj`."""
     unit_name, endpoint = obj.split(":")
@@ -241,11 +249,11 @@ class RelationData:
 
 
 def get_relation_data(
-    *,
-    provider_endpoint: str,
-    requirer_endpoint: str,
-    include_default_juju_keys: bool = False,
-    model: str = None,
+        *,
+        provider_endpoint: str,
+        requirer_endpoint: str,
+        include_default_juju_keys: bool = False,
+        model: str = None,
 ):
     """Get relation databags for a juju relation.
 
@@ -272,13 +280,13 @@ async def get_address(ops_test: OpsTest, app_name: str, unit=0):
 
 
 async def deploy_traefik_if_not_deployed(ops_test: OpsTest, traefik_charm):
-    if not ops_test.model.applications.get("traefik-k8s"):
+    try:
         await ops_test.model.deploy(
             traefik_charm, application_name="traefik-k8s", resources=trfk_resources, series="focal"
         )
-        # if we're running this locally, we need to wait for "waiting"
-        # CI however deploys all in a single model, so traefik is active already
-        # if a previous test has already set it up.
+    except JujuError as e:
+        if e.message != 'cannot add application "traefik-k8s": application already exists':
+            raise e
 
     # block until traefik goes to...
     async with ops_test.fast_forward():

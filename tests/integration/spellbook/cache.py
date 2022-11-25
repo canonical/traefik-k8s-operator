@@ -9,8 +9,12 @@ from pathlib import Path
 from subprocess import getoutput
 from typing import List, Union
 
-charm_cache = Path(__file__).parent
+import yaml
 
+charm_cache = Path(__file__).parent / 'cache'
+charm_shelf = Path(__file__).parent / 'shelf'
+
+COPY_TAG = 'unfrozen'  # tag for charm copies
 USE_CACHE = True  # you can flip this to true when testing locally. Do not commit!
 if USE_CACHE:
     logging.warning(
@@ -20,18 +24,50 @@ if USE_CACHE:
     )
 
 
+def _get_charm_name(metadata: Path):
+    if not metadata.exists() or not metadata.is_file():
+        raise RuntimeError(f'invalid charm metadata file: {metadata}')
+    meta = yaml.safe_load(metadata.read_text())
+    if 'name' not in meta:
+        raise RuntimeError('unable to fetch charm name from metadata')
+    return meta['name']
+
+
 def spellbook_fetch(
-    charm_name: str,
-    build_root: Union[str, Path],
+    charm_root: Union[str, Path] = './',
+    charm_name: str = None,
+    hash_paths: List[Path] = None,
     pull_libs: List[Path] = None,
     use_cache=USE_CACHE,
+    cache_dir=charm_cache,
+    shelf_dir=charm_shelf,
 ):
+    """Cache for charmcraft pack.
+
+    Params::
+        :param charm_root: Charm tree root.
+        :param charm_name: Name of the charm. If not given, will default to whatever
+            charm_root/metadata.yaml says.
+        :param hash_paths: Specific directories or files to base the hashing on.
+            Defaults to 'charm_root/'.
+        :param pull_libs: Path to local charm lib files to include in the package.
+        :param use_cache: Flag to disable caching entirely.
+        :param cache_dir: Directory in which to store the cached charm files. Defaults to ./cache
+        :param shelf_dir: Directory in which to store the copies of the cached charm files
+            whose paths are returned by this function. Defaults to ./shelf
+    """
+
     # caching or not, we need to ensure the libs the charm depends on are up to date.
+
+    if use_cache:
+        # ensure cache dirs exist
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        shelf_dir.mkdir(parents=True, exist_ok=True)
 
     if pull_libs:
         for lib in pull_libs:
             lib_source = Path(lib)
-            lib_path = build_root
+            lib_path = charm_root
 
             for part in lib_source.parent.parts[:-5:-1]:
                 lib_path /= part
@@ -43,27 +79,35 @@ def spellbook_fetch(
             logging.info(f"copying {lib_source} -> {lib_path}")
 
     def do_build():
-        pack_out = getoutput(f"charmcraft pack -p {build_root}")
+        pack_out = getoutput(f"charmcraft pack -p {charm_root}")
         return (Path(os.getcwd()) / pack_out.split("\n")[-1].strip()).absolute()
 
     if not use_cache:
         logging.info("not using cache")
         return do_build()
 
-    logging.info(f"hashing {build_root}")
-    root_md5 = getoutput(f'find {build_root} -type f -exec md5sum "{{}}" +')
+    logging.info(f"hashing {charm_root}")
+
+    # todo check that if a hash path does not exist we don't blow up
+    hash_path = charm_root if not hash_paths else ' '.join(map(str, hash_paths))
+    root_md5 = getoutput(f'find {hash_path} -type f -exec md5sum "{{}}" +')
     # builtins.hash() is unpredictable on str
     charm_tree_sum = md5(root_md5.encode("utf-8")).hexdigest()
 
     logging.info(f"hash: {charm_tree_sum}")
 
-    cached_charm_path = charm_cache / f"{charm_name}.{charm_tree_sum}.charm"
-    # in case someone deletes it after deploy, we make a copy.
-    charm_copy = (charm_cache / f"{charm_name}.unfrozen.charm").absolute()
+    charm_tag = charm_name or _get_charm_name(charm_root/'metadata.yaml')
+
+    cached_charm_path = cache_dir / f"{charm_tag}.{charm_tree_sum}.charm"
+
+    # in case someone deletes it after deploy, we make a copy and keep it in the shelf
+    shelved_charm_copy = (shelf_dir / f"{charm_tag}.{COPY_TAG}.charm").absolute()
 
     # clear any dirty cache
     dirty_cache_found = False
-    for fname in charm_cache.glob(f"{charm_name}.*"):
+    for fname in cache_dir.glob(f"{charm_tag}.*"):
+        if fname.name.startswith(f"{charm_tag}.{COPY_TAG}."):
+            continue
         if fname != cached_charm_path:
             dirty_cache_found = True
             logging.info(f"deleting dirty cache: {fname}")
@@ -71,16 +115,19 @@ def spellbook_fetch(
 
     if cached_charm_path.exists():
         tstamp = datetime.fromtimestamp(os.path.getmtime(cached_charm_path))
-        logging.info(f"Found cached charm {charm_name} timestamp={tstamp}.")
-        shutil.copyfile(cached_charm_path, charm_copy)
-        return charm_copy
+        logging.info(f"Found cached charm {charm_tag} timestamp={tstamp}.")
+        shutil.copyfile(cached_charm_path, shelved_charm_copy)
+        return shelved_charm_copy
 
     if dirty_cache_found:
-        logging.info(f"Cache for {charm_name} is dirty. Repacking...")
+        logging.info(f"Cache for {charm_tag} is dirty. Repacking...")
     else:
-        logging.info(f"Cache not found for charm {charm_name}. Packing...")
+        logging.info(f"Cache not found for charm {charm_tag}. Packing...")
 
     charm = do_build()
     shutil.copyfile(charm, cached_charm_path)
-    shutil.copyfile(charm, charm_copy)
-    return charm_copy
+    shutil.copyfile(charm, shelved_charm_copy)
+    charm.unlink()
+    return shelved_charm_copy
+
+

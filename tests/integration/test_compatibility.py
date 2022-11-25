@@ -61,10 +61,10 @@ async def tcp_ipu_deployment(
 ):
     await asyncio.gather(
         deploy_traefik_if_not_deployed(ops_test, traefik_charm),
-        await deploy_charm_if_not_deployed(
+        deploy_charm_if_not_deployed(
             ops_test, tcp_tester_charm, "tcp-tester", resources=tcp_charm_resources
         ),
-        await deploy_charm_if_not_deployed(ops_test, ipu_tester_charm, "ipu-tester"),
+        deploy_charm_if_not_deployed(ops_test, ipu_tester_charm, "ipu-tester"),
     )
     await asyncio.gather(
         safe_relate(ops_test, "tcp-tester", "traefik-k8s"),

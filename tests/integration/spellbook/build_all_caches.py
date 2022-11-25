@@ -4,14 +4,22 @@ from pathlib import Path
 
 from tests.integration.spellbook.cache import spellbook_fetch
 
+traefik_root = Path(__file__).parent.parent.parent.parent
 testers_root = Path(__file__).parent.parent / "testers"
 
 
 def main():
-    spellbook_fetch("route-tester", testers_root / "route"),
-    spellbook_fetch("ipa-tester", testers_root / "ipa"),
-    spellbook_fetch("ipu-tester", testers_root / "ipu"),
-    spellbook_fetch("tcp-tester", testers_root / "tcp"),
+    spellbook_fetch(charm_name="fockit", charm_root=traefik_root,
+                    hash_paths=[traefik_root / 'src',
+                                traefik_root / 'lib',
+                                traefik_root / 'metadata.yaml',
+                                traefik_root / 'config.yaml',
+                                traefik_root / 'charmcraft.yaml']
+                    ),
+    spellbook_fetch(charm_name="route-tester", charm_root=testers_root / "route"),
+    spellbook_fetch(charm_name="ipa-tester", charm_root=testers_root / "ipa"),
+    spellbook_fetch(charm_name="ipu-tester", charm_root=testers_root / "ipu"),
+    spellbook_fetch(charm_name="tcp-tester", charm_root=testers_root / "tcp"),
 
 
 if __name__ == "__main__":
