@@ -20,7 +20,7 @@ if USE_CACHE:
     )
 
 
-def build_charm_or_fetch_cached(
+def spellbook_fetch(
     charm_name: str,
     build_root: Union[str, Path],
     pull_libs: List[Path] = None,

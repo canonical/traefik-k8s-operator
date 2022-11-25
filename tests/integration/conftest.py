@@ -3,7 +3,6 @@
 import functools
 import logging
 import os
-import shutil
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
@@ -14,7 +13,7 @@ import pytest
 import yaml
 from pytest_operator.plugin import OpsTest
 
-from tests.integration.spellbook.cache import build_charm_or_fetch_cached
+from tests.integration.spellbook.cache import spellbook_fetch
 
 charm_root = Path(__file__).parent.parent.parent
 trfk_meta = yaml.safe_load((charm_root / "metadata.yaml").read_text())
@@ -67,13 +66,13 @@ def timed_memoizer(func):
 @pytest.fixture(scope="module")
 @timed_memoizer
 async def traefik_charm():
-    return build_charm_or_fetch_cached("traefik", "./")
+    return spellbook_fetch("traefik", "./")
 
 
 @pytest.fixture(scope="module")
 async def ipa_tester_charm():
     ipa_charm_root = (Path(__file__).parent / "testers" / "ipa").absolute()
-    return build_charm_or_fetch_cached(
+    return spellbook_fetch(
         "ipa-tester",
         ipa_charm_root,
         pull_libs=[Path() / "lib" / "charms" / "traefik_k8s" / "v1" / "ingress.py"],
@@ -83,7 +82,7 @@ async def ipa_tester_charm():
 @pytest.fixture(scope="module")
 async def ipu_tester_charm():
     ipu_charm_root = (Path(__file__).parent / "testers" / "ipu").absolute()
-    return build_charm_or_fetch_cached(
+    return spellbook_fetch(
         "ipu-tester",
         ipu_charm_root,
         pull_libs=[Path() / "lib" / "charms" / "traefik_k8s" / "v1" / "ingress_per_unit.py"],
@@ -91,9 +90,9 @@ async def ipu_tester_charm():
 
 
 @pytest.fixture(scope="module")
-async def ipu_tester_charm():
+async def tcp_tester_charm():
     tcp_charm_root = (Path(__file__).parent / "testers" / "tcp").absolute()
-    return build_charm_or_fetch_cached(
+    return spellbook_fetch(
         "tcp-tester",
         tcp_charm_root,
         pull_libs=[Path() / "lib" / "charms" / "traefik_k8s" / "v1" / "ingress_per_unit.py"],
@@ -103,7 +102,7 @@ async def ipu_tester_charm():
 @pytest.fixture(scope="module")
 async def route_tester_charm():
     route_charm_root = (Path(__file__).parent / "testers" / "route").absolute()
-    return build_charm_or_fetch_cached(
+    return spellbook_fetch(
         "route-tester",
         route_charm_root,
         pull_libs=[Path() / "lib" / "charms" / "traefik_route_k8s" / "v0" / "traefik_route.py"],

@@ -1,21 +1,15 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 import re
-import shutil
 import socket
 from pathlib import Path
 from subprocess import PIPE, Popen
 
 import pytest
-import pytest_asyncio
 import yaml
 from pytest_operator.plugin import OpsTest
 
-from tests.integration.conftest import (
-    charm_root,
-    deploy_traefik_if_not_deployed,
-    get_relation_data,
-)
+from tests.integration.conftest import deploy_traefik_if_not_deployed, get_relation_data
 
 tcp_charm_root = (Path(__file__).parent / "testers" / "tcp").absolute()
 tcp_charm_meta = yaml.safe_load((tcp_charm_root / "metadata.yaml").read_text())

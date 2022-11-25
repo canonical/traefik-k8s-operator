@@ -1,10 +1,6 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
-import shutil
-from pathlib import Path
-
 import pytest
-import pytest_asyncio
 import yaml
 from pytest_operator.plugin import OpsTest
 

@@ -1,5 +1,5 @@
 # About this folder
-In `conftest.py` there's a `build_charm_or_fetch_cached` function that:
+In `conftest.py` there's a `spellbook_fetch` function that:
 
 - checks if a `<charm-name>.charm` file is present in this folder
 - if so, returns that package
