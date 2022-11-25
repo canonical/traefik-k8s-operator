@@ -19,29 +19,29 @@ def main():
             traefik_root / "config.yaml",
             traefik_root / "charmcraft.yaml",
         ],
-    ),
+    )
     spellbook_fetch(
         charm_name="route-tester",
         charm_root=testers_root / "route",
         pull_libs=[
             traefik_root / "lib" / "charms" / "traefik_route_k8s" / "v0" / "traefik_route.py"
         ],
-    ),
-    spellbook_fetch(
-        charm_name="ipa-tester",
-        charm_root=testers_root / "ipa",
-        pull_libs=[traefik_root / "lib" / "charms" / "traefik_k8s" / "v1" / "ingress.py"],
-    ),
-    spellbook_fetch(
-        charm_name="ipu-tester",
-        charm_root=testers_root / "ipu",
-        pull_libs=[traefik_root / "lib" / "charms" / "traefik_k8s" / "v1" / "ingress_per_unit.py"],
-    ),
-    spellbook_fetch(
-        charm_name="tcp-tester",
-        charm_root=testers_root / "tcp",
-        pull_libs=[traefik_root / "lib" / "charms" / "traefik_k8s" / "v1" / "ingress_per_unit.py"],
-    ),
+    )
+    # spellbook_fetch(
+    #     charm_name="ipa-tester",
+    #     charm_root=testers_root / "ipa",
+    #     pull_libs=[traefik_root / "lib" / "charms" / "traefik_k8s" / "v1" / "ingress.py"],
+    # )
+    # spellbook_fetch(
+    #     charm_name="ipu-tester",
+    #     charm_root=testers_root / "ipu",
+    #     pull_libs=[traefik_root / "lib" / "charms" / "traefik_k8s" / "v1" / "ingress_per_unit.py"],
+    # )
+    # spellbook_fetch(
+    #     charm_name="tcp-tester",
+    #     charm_root=testers_root / "tcp",
+    #     pull_libs=[traefik_root / "lib" / "charms" / "traefik_k8s" / "v1" / "ingress_per_unit.py"],
+    # )
 
 
 if __name__ == "__main__":
