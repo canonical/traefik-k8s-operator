@@ -64,6 +64,25 @@ jobs:
       - name: IPU
         run: tox -e static-ipu
 
+  scenario-tests:
+    name: Scenario tests
+    runs-on: ubuntu-latest
+    needs:
+      - lint
+      - unit-test
+      - static-checks
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: Install charmcraft
+        run: snap install charmcraft
+      - name: Fetch dependencies
+        run: charmcraft fetch-lib charms.harness_extensions.v0.evt_sequences
+      - name: Run scenario tests
+        run: tox -vve scenario
+
   integration-test:
     name: Integration tests (microk8s)
     runs-on: ubuntu-latest
