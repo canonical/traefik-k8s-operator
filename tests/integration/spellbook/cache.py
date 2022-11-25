@@ -74,7 +74,7 @@ def spellbook_fetch(  # ignore: C901
             logging.info(f"copying {lib_source} -> {lib_path}")
 
     def do_build():
-        logging.info(f'building {charm_root}')
+        logging.info(f"building {charm_root}")
         pack_out = getoutput(f"charmcraft pack -p {charm_root}")
         return (Path(os.getcwd()) / pack_out.split("\n")[-1].strip()).absolute()
 
