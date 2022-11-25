@@ -9,22 +9,17 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from subprocess import PIPE, Popen
-from typing import Union
 
 import pytest
 import yaml
 from pytest_operator.plugin import OpsTest
 
+from tests.integration.spellbook.cache import build_charm_or_fetch_cached
+
 charm_root = Path(__file__).parent.parent.parent
 trfk_meta = yaml.safe_load((charm_root / "metadata.yaml").read_text())
 trfk_resources = {name: val["upstream-source"] for name, val in trfk_meta["resources"].items()}
-charm_cache = Path(__file__).parent / 'charms'
 
-USE_CACHE = False  # you can flip this to true when testing locally. Do not commit!
-if USE_CACHE:
-    logging.warning('USE_CACHE:: charms will be packed once and stored in '
-                    './tests/integration/charms. Clear them manually if you '
-                    'have made changes to the charm code.')
 
 _JUJU_DATA_CACHE = {}
 _JUJU_KEYS = ("egress-subnets", "ingress-address", "private-address")
@@ -69,61 +64,50 @@ def timed_memoizer(func):
     return wrapper
 
 
-async def build_charm_or_fetch_cached(
-        ops_test: OpsTest,
-        charm_name: str,
-        build_root: Union[str, Path]):
-    if USE_CACHE:
-        cached_charm_path = charm_cache / f'{charm_name}.charm'
-        if cached_charm_path.exists():
-            tstamp = datetime.fromtimestamp(os.path.getmtime(cached_charm_path))
-            logger.info(f'Found cached charm {charm_name} timestamp={tstamp}.')
-            charm_copy = Path(build_root) / f'{charm_name}.fromcache.charm'
-            shutil.copyfile(cached_charm_path, charm_copy)
-            return charm_copy.absolute()  # in case someone deletes it after deploy.
-
-        charm = await ops_test.build_charm(build_root)
-        if USE_CACHE:
-            shutil.copyfile(charm, cached_charm_path)
-        return charm
-    else:
-        return await ops_test.build_charm(build_root)
-
-
 @pytest.fixture(scope="module")
 @timed_memoizer
-async def traefik_charm(ops_test: OpsTest):
-    return await build_charm_or_fetch_cached(ops_test, 'traefik', './')
+async def traefik_charm():
+    return build_charm_or_fetch_cached("traefik", "./")
 
 
 @pytest.fixture(scope="module")
-async def ipa_tester_charm(ops_test: OpsTest):
+async def ipa_tester_charm():
     ipa_charm_root = (Path(__file__).parent / "testers" / "ipa").absolute()
-    lib_source = Path() / "lib" / "charms" / "traefik_k8s" / "v1" / "ingress.py"
-    libs_folder = ipa_charm_root / "lib" / "charms" / "traefik_k8s" / "v1"
-    libs_folder.mkdir(parents=True, exist_ok=True)
-    shutil.copy(lib_source, libs_folder)
-    return await build_charm_or_fetch_cached(ops_test, 'ipa-tester', ipa_charm_root)
+    return build_charm_or_fetch_cached(
+        "ipa-tester",
+        ipa_charm_root,
+        pull_libs=[Path() / "lib" / "charms" / "traefik_k8s" / "v1" / "ingress.py"],
+    )
 
 
 @pytest.fixture(scope="module")
-async def ipu_tester_charm(ops_test: OpsTest):
+async def ipu_tester_charm():
     ipu_charm_root = (Path(__file__).parent / "testers" / "ipu").absolute()
-    lib_source = Path() / "lib" / "charms" / "traefik_k8s" / "v1" / "ingress_per_unit.py"
-    libs_folder = ipu_charm_root / "lib" / "charms" / "traefik_k8s" / "v1"
-    libs_folder.mkdir(parents=True, exist_ok=True)
-    shutil.copy(lib_source, libs_folder)
-    return await build_charm_or_fetch_cached(ops_test, 'ipu-tester', ipu_charm_root)
+    return build_charm_or_fetch_cached(
+        "ipu-tester",
+        ipu_charm_root,
+        pull_libs=[Path() / "lib" / "charms" / "traefik_k8s" / "v1" / "ingress_per_unit.py"],
+    )
 
 
 @pytest.fixture(scope="module")
-async def route_tester_charm(ops_test: OpsTest):
+async def ipu_tester_charm():
+    tcp_charm_root = (Path(__file__).parent / "testers" / "tcp").absolute()
+    return build_charm_or_fetch_cached(
+        "tcp-tester",
+        tcp_charm_root,
+        pull_libs=[Path() / "lib" / "charms" / "traefik_k8s" / "v1" / "ingress_per_unit.py"],
+    )
+
+
+@pytest.fixture(scope="module")
+async def route_tester_charm():
     route_charm_root = (Path(__file__).parent / "testers" / "route").absolute()
-    lib_source = Path() / "lib" / "charms" / "traefik_route_k8s" / "v0" / "traefik_route.py"
-    libs_folder = route_charm_root / "lib" / "charms" / "traefik_route_k8s" / "v0"
-    libs_folder.mkdir(parents=True, exist_ok=True)
-    shutil.copy(lib_source, libs_folder)
-    return await build_charm_or_fetch_cached(ops_test, 'route-tester', route_charm_root)
+    return build_charm_or_fetch_cached(
+        "route-tester",
+        route_charm_root,
+        pull_libs=[Path() / "lib" / "charms" / "traefik_route_k8s" / "v0" / "traefik_route.py"],
+    )
 
 
 def purge(data: dict):
@@ -186,10 +170,10 @@ def get_relation_by_endpoint(relations, local_endpoint, remote_endpoint, remote_
         r
         for r in relations
         if (
-                   (r["endpoint"] == local_endpoint and r["related-endpoint"] == remote_endpoint)
-                   or (r["endpoint"] == remote_endpoint and r["related-endpoint"] == local_endpoint)
-           )
-           and remote_obj in r["related-units"]
+            (r["endpoint"] == local_endpoint and r["related-endpoint"] == remote_endpoint)
+            or (r["endpoint"] == remote_endpoint and r["related-endpoint"] == local_endpoint)
+        )
+        and remote_obj in r["related-units"]
     ]
     if not matches:
         raise ValueError(
@@ -216,7 +200,7 @@ class UnitRelationData:
 
 
 def get_content(
-        obj: str, other_obj, include_default_juju_keys: bool = False, model: str = None
+    obj: str, other_obj, include_default_juju_keys: bool = False, model: str = None
 ) -> UnitRelationData:
     """Get the content of the databag of `obj`, as seen from `other_obj`."""
     unit_name, endpoint = obj.split(":")
@@ -258,11 +242,11 @@ class RelationData:
 
 
 def get_relation_data(
-        *,
-        provider_endpoint: str,
-        requirer_endpoint: str,
-        include_default_juju_keys: bool = False,
-        model: str = None,
+    *,
+    provider_endpoint: str,
+    requirer_endpoint: str,
+    include_default_juju_keys: bool = False,
+    model: str = None,
 ):
     """Get relation databags for a juju relation.
 

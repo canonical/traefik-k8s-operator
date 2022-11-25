@@ -24,15 +24,6 @@ tcp_charm_resources = {
 }
 
 
-@pytest_asyncio.fixture
-async def tcp_tester_charm(ops_test: OpsTest):
-    lib_source = charm_root / "lib" / "charms" / "traefik_k8s" / "v1" / "ingress_per_unit.py"
-    libs_folder = tcp_charm_root / "lib" / "charms" / "traefik_k8s" / "v1"
-    libs_folder.mkdir(parents=True, exist_ok=True)
-    shutil.copy(lib_source, libs_folder)
-    return await ops_test.build_charm(tcp_charm_root)
-
-
 def get_unit_ip(ops_test: OpsTest):
     proc = Popen(f"juju status -m {ops_test.model_name}".split(), stdout=PIPE)
     raw_status = proc.stdout.read()

@@ -1,10 +1,7 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
-import shutil
-from pathlib import Path
 
 import pytest
-import pytest_asyncio
 import yaml
 from pytest_operator.plugin import OpsTest
 
@@ -12,7 +9,7 @@ from tests.integration.conftest import (
     assert_can_ping,
     deploy_traefik_if_not_deployed,
     get_address,
-    get_relation_data, build_charm_or_fetch_cached,
+    get_relation_data,
 )
 
 

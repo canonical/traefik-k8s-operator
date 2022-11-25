@@ -20,8 +20,9 @@ from pathlib import Path
 
 import pytest
 import yaml
-from tests.integration.helpers import disable_metallb, enable_metallb
 from pytest_operator.plugin import OpsTest
+
+from tests.integration.helpers import disable_metallb, enable_metallb
 
 logger = logging.getLogger(__name__)
 
@@ -33,9 +34,9 @@ idle_period = 90
 
 
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy(ops_test: OpsTest, traefik_charm,
-                                ipa_tester_charm, ipu_tester_charm,
-                                route_tester_charm):
+async def test_build_and_deploy(
+    ops_test: OpsTest, traefik_charm, ipa_tester_charm, ipu_tester_charm, route_tester_charm
+):
     logger.info("First, disable metallb, in case it's enabled")
     await disable_metallb()
 
@@ -43,9 +44,9 @@ async def test_build_and_deploy(ops_test: OpsTest, traefik_charm,
         ops_test.model.deploy(
             traefik_charm, resources=resources, application_name="traefik", series="focal"
         ),
-        ops_test.model.deploy(ipu_tester_charm, application_name='ipu-tester', series="focal"),
-        ops_test.model.deploy(ipa_tester_charm, application_name='ipa-tester', series="focal"),
-        ops_test.model.deploy(route_tester_charm, application_name='route-tester', series="focal"),
+        ops_test.model.deploy(ipu_tester_charm, application_name="ipu-tester", series="focal"),
+        ops_test.model.deploy(ipa_tester_charm, application_name="ipa-tester", series="focal"),
+        ops_test.model.deploy(route_tester_charm, application_name="route-tester", series="focal"),
     )
 
     await ops_test.model.wait_for_idle(timeout=600, idle_period=30)
