@@ -1,6 +1,7 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 import unittest
+from copy import copy
 from textwrap import dedent
 
 import pytest
@@ -220,7 +221,7 @@ class TestInterlibDependency(unittest.TestCase):
         def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
             self.ipu = IngressPerUnitRequirer(self, relation_name="ingress", port=80)
-            self.dependee = {"value": self.ipu.url}  # Stand-in for interlib dependency
+            self.dependee = {"value": copy(self.ipu.url)}  # Stand-in for interlib dependency
 
     def setUp(self):
         self.harness = Harness(self.RequirerCharm, meta=self.RequirerCharm.META)
