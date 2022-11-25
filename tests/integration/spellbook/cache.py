@@ -11,10 +11,10 @@ from typing import List, Union
 
 import yaml
 
-charm_cache = Path(__file__).parent / 'cache'
-charm_shelf = Path(__file__).parent / 'shelf'
+charm_cache = Path(__file__).parent / "cache"
+charm_shelf = Path(__file__).parent / "shelf"
 
-COPY_TAG = 'unfrozen'  # tag for charm copies
+COPY_TAG = "unfrozen"  # tag for charm copies
 USE_CACHE = True  # you can flip this to true when testing locally. Do not commit!
 if USE_CACHE:
     logging.warning(
@@ -26,15 +26,22 @@ if USE_CACHE:
 
 def _get_charm_name(metadata: Path):
     if not metadata.exists() or not metadata.is_file():
-        raise RuntimeError(f'invalid charm metadata file: {metadata}')
+        raise RuntimeError(f"invalid charm metadata file: {metadata}")
     meta = yaml.safe_load(metadata.read_text())
-    if 'name' not in meta:
-        raise RuntimeError('unable to fetch charm name from metadata')
-    return meta['name']
+    if "name" not in meta:
+        raise RuntimeError("unable to fetch charm name from metadata")
+    return meta["name"]
 
 
-def spellbook_fetch(
-    charm_root: Union[str, Path] = './',
+def _get_libpath(base, source):
+    root = Path(base)
+    for part in source.parent.parts[:-6:-1]:
+        root /= part
+    return root.absolute()
+
+
+def spellbook_fetch(  # ignore: C901
+    charm_root: Union[str, Path] = "./",
     charm_name: str = None,
     hash_paths: List[Path] = None,
     pull_libs: List[Path] = None,
@@ -56,23 +63,11 @@ def spellbook_fetch(
         :param shelf_dir: Directory in which to store the copies of the cached charm files
             whose paths are returned by this function. Defaults to ./shelf
     """
-
-    # caching or not, we need to ensure the libs the charm depends on are up to date.
-
-    if use_cache:
-        # ensure cache dirs exist
-        cache_dir.mkdir(parents=True, exist_ok=True)
-        shelf_dir.mkdir(parents=True, exist_ok=True)
-
+    # caching or not, we need to ensure the libs the charm depends on are up-to-date.
     if pull_libs:
         for lib in pull_libs:
             lib_source = Path(lib)
-            lib_path = charm_root
-
-            for part in lib_source.parent.parts[:-5:-1]:
-                lib_path /= part
-
-            lib_path = lib_path.absolute()
+            lib_path = _get_libpath(charm_root, lib_source)
             # ensure it exists
             lib_path.mkdir(parents=True, exist_ok=True)
             shutil.copy(lib_source, lib_path)
@@ -86,17 +81,21 @@ def spellbook_fetch(
         logging.info("not using cache")
         return do_build()
 
+    # ensure cache dirs exist
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    shelf_dir.mkdir(parents=True, exist_ok=True)
+
     logging.info(f"hashing {charm_root}")
 
     # todo check that if a hash path does not exist we don't blow up
-    hash_path = charm_root if not hash_paths else ' '.join(map(str, hash_paths))
+    hash_path = charm_root if not hash_paths else " ".join(map(str, hash_paths))
     root_md5 = getoutput(f'find {hash_path} -type f -exec md5sum "{{}}" +')
     # builtins.hash() is unpredictable on str
     charm_tree_sum = md5(root_md5.encode("utf-8")).hexdigest()
 
     logging.info(f"hash: {charm_tree_sum}")
 
-    charm_tag = charm_name or _get_charm_name(charm_root/'metadata.yaml')
+    charm_tag = charm_name or _get_charm_name(charm_root / "metadata.yaml")
 
     cached_charm_path = cache_dir / f"{charm_tag}.{charm_tree_sum}.charm"
 
@@ -129,5 +128,3 @@ def spellbook_fetch(
     shutil.copyfile(charm, shelved_charm_copy)
     charm.unlink()
     return shelved_charm_copy
-
-

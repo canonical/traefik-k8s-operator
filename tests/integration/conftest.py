@@ -67,14 +67,16 @@ def timed_memoizer(func):
 @timed_memoizer
 async def traefik_charm():
     return spellbook_fetch(
-        trfk_root, charm_name='traefik',
-        hash_paths=[trfk_root / 'src',
-                    trfk_root / 'lib',
-                    trfk_root / 'metadata.yaml',
-                    trfk_root / 'config.yaml',
-                    trfk_root / 'charmcraft.yaml']
+        trfk_root,
+        charm_name="traefik",
+        hash_paths=[
+            trfk_root / "src",
+            trfk_root / "lib",
+            trfk_root / "metadata.yaml",
+            trfk_root / "config.yaml",
+            trfk_root / "charmcraft.yaml",
+        ],
     )
-
 
 
 @pytest.fixture(scope="module")
@@ -83,7 +85,7 @@ async def ipa_tester_charm():
     return spellbook_fetch(
         ipa_charm_root,
         charm_name="ipa-tester",
-        pull_libs=[Path() / "lib" / "charms" / "traefik_k8s" / "v1" / "ingress.py"],
+        pull_libs=[trfk_root / "lib" / "charms" / "traefik_k8s" / "v1" / "ingress.py"],
     )
 
 
@@ -93,7 +95,7 @@ async def ipu_tester_charm():
     return spellbook_fetch(
         ipu_charm_root,
         charm_name="ipu-tester",
-        pull_libs=[Path() / "lib" / "charms" / "traefik_k8s" / "v1" / "ingress_per_unit.py"],
+        pull_libs=[trfk_root / "lib" / "charms" / "traefik_k8s" / "v1" / "ingress_per_unit.py"],
     )
 
 
@@ -103,7 +105,7 @@ async def tcp_tester_charm():
     return spellbook_fetch(
         tcp_charm_root,
         charm_name="tcp-tester",
-        pull_libs=[Path() / "lib" / "charms" / "traefik_k8s" / "v1" / "ingress_per_unit.py"],
+        pull_libs=[trfk_root / "lib" / "charms" / "traefik_k8s" / "v1" / "ingress_per_unit.py"],
     )
 
 
@@ -113,7 +115,7 @@ async def route_tester_charm():
     return spellbook_fetch(
         route_charm_root,
         charm_name="route-tester",
-        pull_libs=[Path() / "lib" / "charms" / "traefik_route_k8s" / "v0" / "traefik_route.py"],
+        pull_libs=[trfk_root / "lib" / "charms" / "traefik_route_k8s" / "v0" / "traefik_route.py"],
     )
 
 
@@ -177,10 +179,10 @@ def get_relation_by_endpoint(relations, local_endpoint, remote_endpoint, remote_
         r
         for r in relations
         if (
-                   (r["endpoint"] == local_endpoint and r["related-endpoint"] == remote_endpoint)
-                   or (r["endpoint"] == remote_endpoint and r["related-endpoint"] == local_endpoint)
-           )
-           and remote_obj in r["related-units"]
+            (r["endpoint"] == local_endpoint and r["related-endpoint"] == remote_endpoint)
+            or (r["endpoint"] == remote_endpoint and r["related-endpoint"] == local_endpoint)
+        )
+        and remote_obj in r["related-units"]
     ]
     if not matches:
         raise ValueError(
@@ -207,7 +209,7 @@ class UnitRelationData:
 
 
 def get_content(
-        obj: str, other_obj, include_default_juju_keys: bool = False, model: str = None
+    obj: str, other_obj, include_default_juju_keys: bool = False, model: str = None
 ) -> UnitRelationData:
     """Get the content of the databag of `obj`, as seen from `other_obj`."""
     unit_name, endpoint = obj.split(":")
@@ -249,11 +251,11 @@ class RelationData:
 
 
 def get_relation_data(
-        *,
-        provider_endpoint: str,
-        requirer_endpoint: str,
-        include_default_juju_keys: bool = False,
-        model: str = None,
+    *,
+    provider_endpoint: str,
+    requirer_endpoint: str,
+    include_default_juju_keys: bool = False,
+    model: str = None,
 ):
     """Get relation databags for a juju relation.
 
