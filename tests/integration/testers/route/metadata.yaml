@@ -1,0 +1,10 @@
+# Copyright 2022 Canonical Ltd.
+# See LICENSE file for licensing details.
+name: route-requirer-mock
+display-name: route-requirer-mock
+description: route tester
+summary: route tester
+requires:
+  traefik-route:
+    interface: traefik_route
+    limit: 1

@@ -15,21 +15,6 @@ from tests.integration.conftest import (
     get_relation_data,
 )
 
-ipa_charm_root = (Path(__file__).parent / "testers" / "ipa").absolute()
-meta = yaml.safe_load((ipa_charm_root / "metadata.yaml").read_text())
-ipa_tester_resources = {
-    name: val["upstream-source"] for name, val in meta.get("resources", {}).items()
-}
-
-
-@pytest_asyncio.fixture
-async def ipa_tester_charm(ops_test: OpsTest):
-    lib_source = Path() / "lib" / "charms" / "traefik_k8s" / "v1" / "ingress.py"
-    libs_folder = ipa_charm_root / "lib" / "charms" / "traefik_k8s" / "v1"
-    libs_folder.mkdir(parents=True, exist_ok=True)
-    shutil.copy(lib_source, libs_folder)
-    return await ops_test.build_charm(ipa_charm_root)
-
 
 @pytest.mark.abort_on_fail
 async def test_deployment(ops_test: OpsTest, traefik_charm, ipa_tester_charm):
@@ -46,7 +31,7 @@ async def test_relate(ops_test: OpsTest):
         await ops_test.model.wait_for_idle(["traefik-k8s", "ipa-tester"])
 
 
-async def assert_ipa_charm_has_ingress(ops_test: OpsTest):
+def assert_ipa_charm_has_ingress(ops_test: OpsTest):
     data = get_relation_data(
         requirer_endpoint="ipa-tester/0:ingress",
         provider_endpoint="traefik-k8s/0:ingress",
@@ -59,7 +44,7 @@ async def assert_ipa_charm_has_ingress(ops_test: OpsTest):
 
 
 async def test_ipa_charm_has_ingress(ops_test: OpsTest):
-    await assert_ipa_charm_has_ingress(ops_test)
+    assert_ipa_charm_has_ingress(ops_test)
 
 
 @pytest.mark.abort_on_fail

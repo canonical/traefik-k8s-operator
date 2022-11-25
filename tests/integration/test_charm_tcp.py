@@ -95,7 +95,7 @@ async def test_relation_data_shape(ops_test: OpsTest):
     assert provider_app_data == {"tcp-tester/0": {"url": f"{traefik_unit_ip}:{port}"}}
 
 
-async def assert_tcp_charm_has_ingress(ops_test: OpsTest):
+def assert_tcp_charm_has_ingress(ops_test: OpsTest):
     traefik_unit_ip = get_unit_ip(ops_test)
     data = get_relation_data(
         requirer_endpoint="tcp-tester/0:ingress-per-unit",
@@ -113,7 +113,7 @@ async def assert_tcp_charm_has_ingress(ops_test: OpsTest):
 
 
 async def test_tcp_connection(ops_test: OpsTest):
-    await assert_tcp_charm_has_ingress(ops_test)
+    assert_tcp_charm_has_ingress(ops_test)
 
 
 async def test_remove_relation(ops_test: OpsTest):

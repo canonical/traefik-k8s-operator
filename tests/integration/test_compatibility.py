@@ -1,5 +1,7 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
+import asyncio
+
 import juju.errors
 import pytest_asyncio
 from pytest_operator.plugin import OpsTest
@@ -36,15 +38,20 @@ async def safe_relate(ops_test: OpsTest, ep1, ep2):
 
 @pytest_asyncio.fixture
 async def tcp_ipa_deployment(
-    ops_test: OpsTest, traefik_charm, tcp_tester_charm, ipa_tester_charm  # noqa
+        ops_test: OpsTest, traefik_charm, tcp_tester_charm, ipa_tester_charm  # noqa
 ):
-    await deploy_traefik_if_not_deployed(ops_test, traefik_charm)
-    await deploy_charm_if_not_deployed(
-        ops_test, tcp_tester_charm, "tcp-tester", resources=tcp_charm_resources
+    await asyncio.gather(
+         deploy_traefik_if_not_deployed(ops_test, traefik_charm),
+         deploy_charm_if_not_deployed(
+             ops_test, tcp_tester_charm, "tcp-tester", resources=tcp_charm_resources
+         ),
+         deploy_charm_if_not_deployed(ops_test, ipa_tester_charm, "ipa-tester")
     )
-    await deploy_charm_if_not_deployed(ops_test, ipa_tester_charm, "ipa-tester")
-    await safe_relate(ops_test, "tcp-tester", "traefik-k8s")
-    await safe_relate(ops_test, "ipa-tester", "traefik-k8s")
+    await asyncio.gather(
+        safe_relate(ops_test, "tcp-tester", "traefik-k8s"),
+        safe_relate(ops_test, "ipa-tester", "traefik-k8s")
+    )
+
     async with ops_test.fast_forward():
         await ops_test.model.wait_for_idle(
             ["traefik-k8s", "tcp-tester", "ipa-tester"], status="active", timeout=1000
@@ -57,15 +64,19 @@ async def tcp_ipa_deployment(
 
 @pytest_asyncio.fixture
 async def tcp_ipu_deployment(
-    ops_test: OpsTest, traefik_charm, tcp_tester_charm, ipu_tester_charm  # noqa
+        ops_test: OpsTest, traefik_charm, tcp_tester_charm, ipu_tester_charm  # noqa
 ):
-    await deploy_traefik_if_not_deployed(ops_test, traefik_charm)
-    await deploy_charm_if_not_deployed(
-        ops_test, tcp_tester_charm, "tcp-tester", resources=tcp_charm_resources
+    await asyncio.gather(
+        deploy_traefik_if_not_deployed(ops_test, traefik_charm),
+        await deploy_charm_if_not_deployed(
+            ops_test, tcp_tester_charm, "tcp-tester", resources=tcp_charm_resources
+        ),
+        await deploy_charm_if_not_deployed(ops_test, ipu_tester_charm, "ipu-tester")
     )
-    await deploy_charm_if_not_deployed(ops_test, ipu_tester_charm, "ipu-tester")
-    await safe_relate(ops_test, "tcp-tester", "traefik-k8s")
-    await safe_relate(ops_test, "ipu-tester", "traefik-k8s")
+    await asyncio.gather(
+        safe_relate(ops_test, "tcp-tester", "traefik-k8s"),
+        safe_relate(ops_test, "ipu-tester", "traefik-k8s")
+    )
     async with ops_test.fast_forward():
         await ops_test.model.wait_for_idle(
             ["traefik-k8s", "tcp-tester", "ipu-tester"], status="active", timeout=1000
@@ -76,10 +87,10 @@ async def tcp_ipu_deployment(
 
 
 async def test_tcp_ipu_compatibility(ops_test, tcp_ipu_deployment):
-    await assert_tcp_charm_has_ingress(ops_test)
-    await assert_ipu_charm_has_ingress(ops_test)
+    assert_tcp_charm_has_ingress(ops_test)
+    assert_ipu_charm_has_ingress(ops_test)
 
 
 async def test_tcp_ipa_compatibility(ops_test, tcp_ipa_deployment):
-    await assert_tcp_charm_has_ingress(ops_test)
-    await assert_ipa_charm_has_ingress(ops_test)
+    assert_tcp_charm_has_ingress(ops_test)
+    assert_ipa_charm_has_ingress(ops_test)
