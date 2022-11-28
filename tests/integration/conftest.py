@@ -287,7 +287,7 @@ async def deploy_traefik_if_not_deployed(ops_test: OpsTest, traefik_charm):
             traefik_charm, application_name="traefik-k8s", resources=trfk_resources, series="focal"
         )
     except JujuError as e:
-        if e.message != 'cannot add application "traefik-k8s": application already exists':
+        if 'cannot add application "traefik-k8s": application already exists' not in str(e):
             raise e
 
     # block until traefik goes to...
