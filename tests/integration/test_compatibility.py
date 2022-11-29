@@ -1,6 +1,7 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 import asyncio
+import logging
 
 import juju.errors
 import pytest_asyncio
@@ -24,8 +25,9 @@ async def safe_relate(ops_test: OpsTest, ep1, ep2):
     # are already related.
     try:
         await ops_test.model.add_relation(ep1, ep2)
-    except juju.errors.JujuAPIError:
+    except juju.errors.JujuAPIError as e:
         # relation already exists? skip
+        logging.error(e)
         pass
 
 
@@ -41,8 +43,8 @@ async def tcp_ipa_deployment(
         deploy_charm_if_not_deployed(ops_test, ipa_tester_charm, "ipa-tester"),
     )
     await asyncio.gather(
-        safe_relate(ops_test, "tcp-tester", "traefik-k8s"),
-        safe_relate(ops_test, "ipa-tester", "traefik-k8s"),
+        safe_relate(ops_test, "tcp-tester:ingress-per-unit", "traefik-k8s:ingress-per-unit"),
+        safe_relate(ops_test, "ipa-tester:ingress", "traefik-k8s:ingress"),
     )
 
     async with ops_test.fast_forward():
@@ -67,8 +69,8 @@ async def tcp_ipu_deployment(
         deploy_charm_if_not_deployed(ops_test, ipu_tester_charm, "ipu-tester"),
     )
     await asyncio.gather(
-        safe_relate(ops_test, "tcp-tester", "traefik-k8s"),
-        safe_relate(ops_test, "ipu-tester", "traefik-k8s"),
+        safe_relate(ops_test, "tcp-tester:ingress-per-unit", "traefik-k8s:ingress-per-unit"),
+        safe_relate(ops_test, "ipu-tester:ingress", "traefik-k8s:ingress"),
     )
     async with ops_test.fast_forward():
         await ops_test.model.wait_for_idle(
