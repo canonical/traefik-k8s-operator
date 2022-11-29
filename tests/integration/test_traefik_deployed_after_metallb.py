@@ -20,8 +20,9 @@ from types import SimpleNamespace
 
 import pytest
 import yaml
-from helpers import disable_metallb, enable_metallb
 from pytest_operator.plugin import OpsTest
+
+from tests.integration.helpers import disable_metallb, enable_metallb
 
 logger = logging.getLogger(__name__)
 

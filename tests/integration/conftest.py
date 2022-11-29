@@ -9,12 +9,16 @@ from datetime import datetime
 from pathlib import Path
 from subprocess import PIPE, Popen
 
+import juju
 import pytest
 import yaml
+from juju.errors import JujuError
 from pytest_operator.plugin import OpsTest
 
-charm_root = Path(__file__).parent.parent.parent
-trfk_meta = yaml.safe_load((charm_root / "metadata.yaml").read_text())
+from tests.integration.spellbook.cache import spellbook_fetch
+
+trfk_root = Path(__file__).parent.parent.parent
+trfk_meta = yaml.safe_load((trfk_root / "metadata.yaml").read_text())
 trfk_resources = {name: val["upstream-source"] for name, val in trfk_meta["resources"].items()}
 
 _JUJU_DATA_CACHE = {}
@@ -62,9 +66,58 @@ def timed_memoizer(func):
 
 @pytest.fixture(scope="module")
 @timed_memoizer
-async def traefik_charm(ops_test: OpsTest):
-    charm = await ops_test.build_charm(".")
-    return charm
+async def traefik_charm():
+    return spellbook_fetch(
+        trfk_root,
+        charm_name="traefik",
+        hash_paths=[
+            trfk_root / "src",
+            trfk_root / "lib",
+            trfk_root / "metadata.yaml",
+            trfk_root / "config.yaml",
+            trfk_root / "charmcraft.yaml",
+        ],
+    )
+
+
+@pytest.fixture(scope="module")
+async def ipa_tester_charm():
+    ipa_charm_root = (Path(__file__).parent / "testers" / "ipa").absolute()
+    return spellbook_fetch(
+        ipa_charm_root,
+        charm_name="ipa-tester",
+        pull_libs=[trfk_root / "lib" / "charms" / "traefik_k8s" / "v1" / "ingress.py"],
+    )
+
+
+@pytest.fixture(scope="module")
+async def ipu_tester_charm():
+    ipu_charm_root = (Path(__file__).parent / "testers" / "ipu").absolute()
+    return spellbook_fetch(
+        ipu_charm_root,
+        charm_name="ipu-tester",
+        pull_libs=[trfk_root / "lib" / "charms" / "traefik_k8s" / "v1" / "ingress_per_unit.py"],
+    )
+
+
+@pytest.fixture(scope="module")
+async def tcp_tester_charm():
+    tcp_charm_root = (Path(__file__).parent / "testers" / "tcp").absolute()
+    return spellbook_fetch(
+        tcp_charm_root,
+        charm_name="tcp-tester",
+        pull_libs=[trfk_root / "lib" / "charms" / "traefik_k8s" / "v1" / "ingress_per_unit.py"],
+    )
+
+
+@pytest.fixture(scope="module")
+async def route_tester_charm():
+    route_charm_root = (Path(__file__).parent / "testers" / "route").absolute()
+    return spellbook_fetch(
+        route_charm_root,
+        charm_name="route-tester",
+        pull_libs=[trfk_root / "lib" / "charms" / "traefik_route_k8s" / "v0" / "traefik_route.py"],
+    )
 
 
 def purge(data: dict):
@@ -230,20 +283,17 @@ async def get_address(ops_test: OpsTest, app_name: str, unit=0):
 
 
 async def deploy_traefik_if_not_deployed(ops_test: OpsTest, traefik_charm):
-    if not ops_test.model.applications.get("traefik-k8s"):
+    try:
         await ops_test.model.deploy(
             traefik_charm, application_name="traefik-k8s", resources=trfk_resources, series="focal"
         )
-        # if we're running this locally, we need to wait for "waiting"
-        # CI however deploys all in a single model, so traefik is active already
-        # if a previous test has already set it up.
-        wait_for = "waiting"
-    else:
-        wait_for = "active"
+    except JujuError as e:
+        if 'cannot add application "traefik-k8s": application already exists' not in str(e):
+            raise e
 
     # block until traefik goes to...
     async with ops_test.fast_forward():
-        await ops_test.model.wait_for_idle(["traefik-k8s"], status=wait_for, timeout=1000)
+        await ops_test.model.wait_for_idle(["traefik-k8s"], timeout=1000)
 
     # we set the external hostname to traefik-k8s's own ip
     traefik_address = await get_address(ops_test, "traefik-k8s")
@@ -267,3 +317,15 @@ async def deploy_charm_if_not_deployed(ops_test: OpsTest, charm, app_name: str, 
         # if we're running this locally, we need to wait for "waiting"
         # CI however deploys all in a single model, so traefik is active already.
         await ops_test.model.wait_for_idle([app_name], status="active", timeout=1000)
+
+
+async def safe_relate(ops_test: OpsTest, ep1, ep2):
+    # in pytest-operator CI, we deploy all tests in the same model.
+    # Therefore, it might be that by the time we run this module, the two endpoints
+    # are already related.
+    try:
+        await ops_test.model.add_relation(ep1, ep2)
+    except juju.errors.JujuAPIError as e:
+        # relation already exists? skip
+        logging.error(e)
+        pass

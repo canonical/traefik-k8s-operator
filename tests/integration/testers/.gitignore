@@ -1,3 +1,5 @@
 /ipa/lib/charms/traefik_k8s/v1/ingress.py
 /ipu/lib/charms/traefik_k8s/v1/ingress_per_unit.py
 /tcp/lib/charms/traefik_k8s/v1/ingress_per_unit.py
+/route/lib/charms/traefik_route_k8s/v0/traefik_route.py
+/charms/
