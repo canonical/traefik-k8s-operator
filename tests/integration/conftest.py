@@ -9,6 +9,7 @@ from datetime import datetime
 from pathlib import Path
 from subprocess import PIPE, Popen
 
+import juju
 import pytest
 import yaml
 from juju.errors import JujuError
@@ -316,3 +317,15 @@ async def deploy_charm_if_not_deployed(ops_test: OpsTest, charm, app_name: str, 
         # if we're running this locally, we need to wait for "waiting"
         # CI however deploys all in a single model, so traefik is active already.
         await ops_test.model.wait_for_idle([app_name], status="active", timeout=1000)
+
+
+async def safe_relate(ops_test: OpsTest, ep1, ep2):
+    # in pytest-operator CI, we deploy all tests in the same model.
+    # Therefore, it might be that by the time we run this module, the two endpoints
+    # are already related.
+    try:
+        await ops_test.model.add_relation(ep1, ep2)
+    except juju.errors.JujuAPIError as e:
+        # relation already exists? skip
+        logging.error(e)
+        pass
