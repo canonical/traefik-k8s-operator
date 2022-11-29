@@ -70,7 +70,7 @@ async def tcp_ipu_deployment(
     )
     await asyncio.gather(
         safe_relate(ops_test, "tcp-tester:ingress-per-unit", "traefik-k8s:ingress-per-unit"),
-        safe_relate(ops_test, "ipu-tester:ingress", "traefik-k8s:ingress"),
+        safe_relate(ops_test, "ipu-tester:ingress-per-unit", "traefik-k8s:ingress-per-unit"),
     )
     async with ops_test.fast_forward():
         await ops_test.model.wait_for_idle(
