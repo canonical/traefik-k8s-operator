@@ -221,7 +221,7 @@ class TestInterlibDependency(unittest.TestCase):
         def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
             self.ipu = IngressPerUnitRequirer(self, relation_name="ingress", port=80)
-            self.dependee = {"value": copy(self.ipu.url)}  # Stand-in for interlib dependency
+            self.dependee = copy(self.ipu.url)  # Stand-in for interlib dependency
 
     def setUp(self):
         self.harness = Harness(self.RequirerCharm, meta=self.RequirerCharm.META)
@@ -230,7 +230,7 @@ class TestInterlibDependency(unittest.TestCase):
         self.harness.set_model_name(self.__class__.__name__)
         self.harness.begin_with_initial_hooks()
 
-    def test_ipu_events(self):
+    def test_ipu_auto_prefetch_for_interlib_dep(self):
         # WHEN an ingress relation is formed
         self.rel_id = self.harness.add_relation("ingress", "traefik-app")
         self.harness.add_relation_unit(self.rel_id, "traefik-app/0")
@@ -241,7 +241,11 @@ class TestInterlibDependency(unittest.TestCase):
         self.harness.update_relation_data(
             self.rel_id, "traefik-app", {"ingress": yaml.safe_dump(data)}
         )
+
         self.assertEqual(self.harness.charm.ipu.url, "http://a.b/c")
+        # TODO remove the following workaround, which is currently needed because harness does not
+        #  re-init the charm on relation-changed: https://github.com/canonical/operator/issues/736
+        self.harness.charm.dependee = copy(self.harness.charm.ipu.url)  # Workaround. TODO: remove
 
         # THEN the dependee (defined in the charm's constructor before ingress-ready is emitted),
         # still has up-to-date value regardless of code ordering.
