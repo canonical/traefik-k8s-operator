@@ -711,7 +711,7 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
         # before and those we know now
         previous_urls = self._stored.current_urls or {}  # type: ignore
         current_urls = (
-            {} if isinstance(event, RelationBrokenEvent) else self._get_urls_from_relation_data
+            {} if isinstance(event, RelationBrokenEvent) else self._urls_from_relation_data
         )
         self._stored.current_urls = current_urls  # type: ignore
 
@@ -792,7 +792,7 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
         self.relation.data[self.unit].update(data)
 
     @property
-    def _get_urls_from_relation_data(self) -> Dict[str, str]:
+    def _urls_from_relation_data(self) -> Dict[str, str]:
         """The full ingress URLs to reach every unit.
 
         May return an empty dict if the URLs aren't available yet.
@@ -831,7 +831,7 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
 
         May return an empty dict if the URLs aren't available yet.
         """
-        current_urls = self._get_urls_from_relation_data
+        current_urls = self._urls_from_relation_data
         return current_urls
 
     @property
