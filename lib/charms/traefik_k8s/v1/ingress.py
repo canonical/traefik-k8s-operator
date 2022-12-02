@@ -376,7 +376,9 @@ class IngressPerAppProvider(_IngressPerAppBase):
         results = {}
 
         for ingress_relation in self.relations:
-            assert ingress_relation.app, "no app in relation (shouldn't happen)"  # for type checker
+            assert (
+                ingress_relation.app
+            ), "no app in relation (shouldn't happen)"  # for type checker
             results[ingress_relation.app.name] = self._provided_url(ingress_relation)
 
         return results
