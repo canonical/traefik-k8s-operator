@@ -54,7 +54,7 @@ class SomeCharm(CharmBase):
 import logging
 import socket
 import typing
-from typing import Any, Dict, Optional, Tuple, Type, Union
+from typing import Any, Dict, Optional, Tuple, Union
 
 import yaml
 from ops.charm import CharmBase, RelationBrokenEvent, RelationEvent
