@@ -24,7 +24,7 @@ from charms.traefik_route_k8s.v0.traefik_route import (
     TraefikRouteRequirerReadyEvent,
 )
 from deepmerge import always_merger
-from lightkube import Client
+from lightkube.core.client import Client
 from lightkube.resources.core_v1 import Service
 from ops.charm import (
     ActionEvent,
@@ -81,7 +81,7 @@ class TraefikIngressCharm(CharmBase):
     def __init__(self, *args):
         super().__init__(*args)
 
-        self._stored.set_default(
+        self._stored.set_default(  # pyright: reportGeneralTypeIssues=false
             current_external_host=None, current_routing_mode=None, tcp_entrypoints=None
         )
 
@@ -618,6 +618,7 @@ class TraefikIngressCharm(CharmBase):
         # Apps not in the same model as Traefik (i.e., if `relation` is a CRM) will have
         # some `remote_...` as app name. Relation name and id are handy when one is
         # troubleshooting via `juju run 'relation_ids'...` and the like.`
+        assert relation.app, "no app in relation (shouldn't happen)"  # for type checker
         return f"juju_ingress_{relation.name}_{relation.id}_{relation.app.name}.yaml"
 
     @property

@@ -69,7 +69,7 @@ LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 6
+LIBPATCH = 7
 
 DEFAULT_RELATION_NAME = "ingress"
 RELATION_INTERFACE = "ingress"
@@ -124,7 +124,7 @@ RequirerData = TypedDict(
 # Provider ingress data model.
 ProviderIngressData = TypedDict("ProviderIngressData", {"url": str})
 # Provider application databag model.
-ProviderApplicationData = TypedDict("ProviderApplicationData", {"ingress": ProviderIngressData})
+ProviderApplicationData = TypedDict("ProviderApplicationData", {"ingress": ProviderIngressData})  # type: ignore
 
 
 def _validate_data(data, schema):
@@ -161,8 +161,8 @@ class _IngressPerAppBase(Object):
         observe(rel_events.relation_joined, self._handle_relation)
         observe(rel_events.relation_changed, self._handle_relation)
         observe(rel_events.relation_broken, self._handle_relation_broken)
-        observe(charm.on.leader_elected, self._handle_upgrade_or_leader)
-        observe(charm.on.upgrade_charm, self._handle_upgrade_or_leader)
+        observe(charm.on.leader_elected, self._handle_upgrade_or_leader)  # type: ignore
+        observe(charm.on.upgrade_charm, self._handle_upgrade_or_leader)  # type: ignore
 
     @property
     def relations(self):
@@ -229,10 +229,10 @@ class IngressPerAppDataProvidedEvent(_IPAEvent):
     __args__ = ("name", "model", "port", "host", "strip_prefix")
 
     if typing.TYPE_CHECKING:
-        name = None  # type: str
-        model = None  # type: str
-        port = None  # type: int
-        host = None  # type: str
+        name = None  # type: Optional[str]
+        model = None  # type: Optional[str]
+        port = None  # type: Optional[str]
+        host = None  # type: Optional[str]
         strip_prefix = False  # type: bool
 
 
@@ -267,7 +267,7 @@ class IngressPerAppProvider(_IngressPerAppBase):
         # notify listeners.
         if self.is_ready(event.relation):
             data = self._get_requirer_data(event.relation)
-            self.on.data_provided.emit(
+            self.on.data_provided.emit(  # type: ignore
                 event.relation,
                 data["name"],
                 data["model"],
@@ -277,7 +277,7 @@ class IngressPerAppProvider(_IngressPerAppBase):
             )
 
     def _handle_relation_broken(self, event):
-        self.on.data_removed.emit(event.relation)
+        self.on.data_removed.emit(event.relation)  # type: ignore
 
     def wipe_ingress_data(self, relation: Relation):
         """Clear ingress data from relation."""
@@ -293,11 +293,12 @@ class IngressPerAppProvider(_IngressPerAppBase):
             return
         del relation.data[self.app]["ingress"]
 
-    def _get_requirer_data(self, relation: Relation) -> RequirerData:
+    def _get_requirer_data(self, relation: Relation) -> RequirerData:  # type: ignore
         """Fetch and validate the requirer's app databag.
 
         For convenience, we convert 'port' to integer.
         """
+        assert relation.app, "no app in relation (shouldn't happen)"  # for type checker
         if not all((relation.app, relation.app.name)):
             # Handle edge case where remote app name can be missing, e.g.,
             # relation_broken events.
@@ -315,7 +316,7 @@ class IngressPerAppProvider(_IngressPerAppBase):
         remote_data["strip-prefix"] = bool(remote_data.get("strip-prefix", False))
         return remote_data
 
-    def get_data(self, relation: Relation) -> RequirerData:
+    def get_data(self, relation: Relation) -> RequirerData:  # type: ignore
         """Fetch the remote app's databag, i.e. the requirer data."""
         return self._get_requirer_data(relation)
 
@@ -330,8 +331,9 @@ class IngressPerAppProvider(_IngressPerAppBase):
             log.warning("Requirer not ready; validation error encountered: %s" % str(e))
             return False
 
-    def _provided_url(self, relation: Relation) -> ProviderIngressData:
+    def _provided_url(self, relation: Relation) -> ProviderIngressData:  # type: ignore
         """Fetch and validate this app databag; return the ingress url."""
+        assert relation.app, "no app in relation (shouldn't happen)"  # for type checker
         if not all((relation.app, relation.app.name, self.unit.is_leader())):
             # Handle edge case where remote app name can be missing, e.g.,
             # relation_broken events.
@@ -374,6 +376,9 @@ class IngressPerAppProvider(_IngressPerAppBase):
         results = {}
 
         for ingress_relation in self.relations:
+            assert (
+                ingress_relation.app
+            ), "no app in relation (shouldn't happen)"  # for type checker
             results[ingress_relation.app.name] = self._provided_url(ingress_relation)
 
         return results
@@ -384,7 +389,7 @@ class IngressPerAppReadyEvent(_IPAEvent):
 
     __args__ = ("url",)
     if typing.TYPE_CHECKING:
-        url = None  # type: str
+        url = None  # type: Optional[str]
 
 
 class IngressPerAppRevokedEvent(RelationEvent):
@@ -438,7 +443,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         self.relation_name = relation_name
         self._strip_prefix = strip_prefix
 
-        self._stored.set_default(current_url=None)
+        self._stored.set_default(current_url=None)  # type: ignore
 
         # if instantiated with a port, and we are related, then
         # we immediately publish our ingress data  to speed up the process.
@@ -458,13 +463,13 @@ class IngressPerAppRequirer(_IngressPerAppBase):
                 if isinstance(event, RelationBrokenEvent)
                 else self._get_url_from_relation_data()
             )
-            if self._stored.current_url != new_url:
-                self._stored.current_url = new_url
-                self.on.ready.emit(event.relation, new_url)
+            if self._stored.current_url != new_url:  # type: ignore
+                self._stored.current_url = new_url  # type: ignore
+                self.on.ready.emit(event.relation, new_url)  # type: ignore
 
     def _handle_relation_broken(self, event):
-        self._stored.current_url = None
-        self.on.revoked.emit(event.relation)
+        self._stored.current_url = None  # type: ignore
+        self.on.revoked.emit(event.relation)  # type: ignore
 
     def _handle_upgrade_or_leader(self, event):
         """On upgrade/leadership change: ensure we publish the data we have."""
@@ -532,6 +537,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
 
         # fetch the provider's app databag
         try:
+            assert relation.app, "no app in relation (shouldn't happen)"  # for type checker
             raw = relation.data.get(relation.app, {}).get("ingress")
         except ModelError as e:
             log.debug(
