@@ -8,6 +8,7 @@ import enum
 import json
 import logging
 import secrets
+import socket
 import string
 import typing
 from typing import Any, Dict, List, Tuple, Union
@@ -287,7 +288,7 @@ class TraefikIngressCharm(CharmBase):
         self.container.push(_STATIC_CONFIG_PATH, yaml.dump(traefik_config), make_dirs=True)
         self.container.make_dir(_CONFIG_DIRECTORY, make_parents=True)
 
-    def _get_tls_config(self):
+    def _get_tls_config(self) -> dict:
         """Return dictionary with TLS traefik configuration if it exists."""
         if not self._stored.certificate:
             return {}
@@ -769,7 +770,7 @@ class TraefikIngressCharm(CharmBase):
     def cert_subject(self) -> str:
         """Provide certificate subject."""
         # TODO: Use a good default for when the external_hostname is None
-        return self.model.config.get("external_hostname", "whatever")
+        return self.model.config.get("external_hostname", socket.getfqdn())
 
     def _generate_password(self) -> str:
         """Generate a random 12 character password."""

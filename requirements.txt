@@ -1,7 +1,30 @@
-ops == 1.5.2
+# Cryptographic primitives and recipes
+# Code: https://github.com/pyca/cryptography
+# Docs: https://cryptography.io/
+# Deps: tls-certificates-interface
+cryptography
+
+# Handle merging of nested data structures in python.
+# Code: https://github.com/toumorokoshi/deepmerge
+# Docs: https://deepmerge.readthedocs.io/en/latest/
+# Deps: charm
 deepmerge
+
+# An implementation of the JSON Schema specification
+# Code: https://github.com/python-jsonschema/jsonschema
+# Docs: https://python-jsonschema.readthedocs.io/
+# Deps: traefik_k8s libs, tls-certificates-interface
+jsonschema
+
+# Lightweight k8s module
+# Code: https://github.com/gtsystem/lightkube
+# Docs: https://lightkube.readthedocs.io/
+# Deps: observability_libs
 lightkube >= 0.8.1
 lightkube-models >= 1.22.0.4
-# The following is needed by lib/charms/traefik_k8s/*
-jsonschema
-cryptography
+
+# Operator Framework
+# Code: https://github.com/canonical/operator/
+# Docs: https://ops.rtfd.io/
+# Deps: charm
+ops == 1.5.2
