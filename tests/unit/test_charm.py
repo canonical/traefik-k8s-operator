@@ -94,7 +94,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
         self.harness.set_model_name("test-model")
         self.addCleanup(self.harness.cleanup)
 
-    @patch("charm.KubernetesServicePatch", lambda **unused: None)
+    @patch("charm.KubernetesServicePatch", lambda *_, **unused: None)
     def test_service_get(self):
         self.harness.update_config({"external_hostname": "testhostname"})
         self.harness.set_leader(True)
@@ -103,7 +103,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
         self.assertTrue(self.harness.charm._traefik_service_running)
 
-    @patch("charm.KubernetesServicePatch", lambda **unused: None)
+    @patch("charm.KubernetesServicePatch", lambda *_, **unused: None)
     def test_pebble_ready_with_gateway_address_from_config_and_path_routing_mode(self):
         """Test round-trip bootstrap and relation with a consumer."""
         self.harness.update_config({"external_hostname": "testhostname"})
@@ -179,7 +179,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
                 )
                 self.assertEqual(self.harness.charm.unit.status, ActiveStatus())
 
-    @patch("charm.KubernetesServicePatch", lambda **unused: None)
+    @patch("charm.KubernetesServicePatch", lambda *_, **unused: None)
     def test_pebble_ready_with_gateway_address_from_config_and_path_routing_mode_per_app(self):
         """Test round-trip bootstrap and relation with a consumer."""
         self.harness.update_config({"external_hostname": "testhostname"})
@@ -246,7 +246,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
                 )
                 self.assertEqual(self.harness.charm.unit.status, ActiveStatus())
 
-    @patch("charm.KubernetesServicePatch", lambda **unused: None)
+    @patch("charm.KubernetesServicePatch", lambda *_, **unused: None)
     def test_pebble_ready_with_gateway_address_from_config_and_subdomain_routing_mode_per_app(
         self,
     ):
@@ -301,7 +301,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
                 )
                 self.assertEqual(self.harness.charm.unit.status, ActiveStatus())
 
-    @patch("charm.KubernetesServicePatch", lambda **unused: None)
+    @patch("charm.KubernetesServicePatch", lambda *_, **unused: None)
     def test_pebble_ready_with_gateway_address_from_config_and_subdomain_routing_mode(self):
         """Test round-trip bootstrap and relation with a consumer."""
         self.harness.update_config({"external_hostname": "testhostname"})
@@ -359,7 +359,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
                 )
                 self.assertEqual(self.harness.charm.unit.status, ActiveStatus())
 
-    @patch("charm.KubernetesServicePatch", lambda **unused: None)
+    @patch("charm.KubernetesServicePatch", lambda *_, **unused: None)
     def test_pebble_ready_no_leader_with_gateway_address_from_config_and_subdomain_routing_mode(
         self,
     ):
@@ -418,7 +418,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
             self.assertEqual(self.harness.charm.unit.status, ActiveStatus())
 
-    @patch("charm.KubernetesServicePatch", lambda **unused: None)
+    @patch("charm.KubernetesServicePatch", lambda *_, **unused: None)
     def test_bad_routing_mode_config_and_recovery(self):
         """Test round-trip bootstrap and relation with a consumer."""
         self.harness.update_config({"external_hostname": "testhostname"})
@@ -448,7 +448,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
         self.assertEqual(self.harness.charm.unit.status, ActiveStatus())
 
     @patch("charm._get_loadbalancer_status", lambda **unused: None)
-    @patch("charm.KubernetesServicePatch", lambda **unused: None)
+    @patch("charm.KubernetesServicePatch", lambda *_, **unused: None)
     def test_pebble_ready_without_gateway_address(self):
         """Test that requirers do not get addresses until the gateway address is available."""
         self.harness.set_leader(True)
@@ -472,7 +472,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
         )
 
     @patch("charm._get_loadbalancer_status", lambda **unused: "10.0.0.1")
-    @patch("charm.KubernetesServicePatch", lambda **unused: None)
+    @patch("charm.KubernetesServicePatch", lambda *_, **unused: None)
     def test_pebble_ready_with_joined_relations(self):
         self.harness.set_leader(True)
         self.harness.begin_with_initial_hooks()
@@ -493,7 +493,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
         self.assertEqual(self.harness.charm.unit.status, ActiveStatus())
 
     @patch("charm._get_loadbalancer_status", lambda **unused: "10.0.0.1")
-    @patch("charm.KubernetesServicePatch", lambda **unused: None)
+    @patch("charm.KubernetesServicePatch", lambda *_, **unused: None)
     def test_gateway_address_change_with_joined_relations(self):
         self.harness.set_leader(True)
         self.harness.begin_with_initial_hooks()
@@ -522,7 +522,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
         self.assertEqual(self.harness.charm.unit.status, ActiveStatus())
 
     @patch("charm._get_loadbalancer_status", lambda **unused: None)
-    @patch("charm.KubernetesServicePatch", lambda **unused: None)
+    @patch("charm.KubernetesServicePatch", lambda *_, **unused: None)
     def test_gateway_address_becomes_unavailable_after_relation_join(self):
         self.harness.update_config({"external_hostname": "testhostname"})
         self.harness.set_leader(True)
@@ -567,7 +567,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
     @patch("charm._get_loadbalancer_status", lambda **unused: None)
     @patch("charm.TraefikIngressCharm._traefik_service_running", lambda **unused: True)
-    @patch("charm.KubernetesServicePatch", lambda **unused: None)
+    @patch("charm.KubernetesServicePatch", lambda *_, **unused: None)
     def test_show_proxied_endpoints_action_no_relations(self):
         self.harness.begin_with_initial_hooks()
 
@@ -577,7 +577,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
         action_event.set_results.assert_called_once_with({"proxied-endpoints": "{}"})
 
     @patch("charm._get_loadbalancer_status", lambda **unused: None)
-    @patch("charm.KubernetesServicePatch", lambda **unused: None)
+    @patch("charm.KubernetesServicePatch", lambda *_, **unused: None)
     def test_show_proxied_endpoints_action_only_ingress_per_app_relations(self):
         self.harness.set_leader(True)
         self.harness.update_config({"external_hostname": "testhostname"})
@@ -605,7 +605,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
         )
 
     @patch("charm._get_loadbalancer_status", lambda **unused: None)
-    @patch("charm.KubernetesServicePatch", lambda **unused: None)
+    @patch("charm.KubernetesServicePatch", lambda *_, **unused: None)
     def test_show_proxied_endpoints_action_only_ingress_per_unit_relations(self):
         self.harness.set_leader(True)
         self.harness.update_config({"external_hostname": "testhostname"})
@@ -629,7 +629,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
         )
 
     @patch("charm._get_loadbalancer_status", lambda **unused: None)
-    @patch("charm.KubernetesServicePatch", lambda **unused: None)
+    @patch("charm.KubernetesServicePatch", lambda *_, **unused: None)
     def test_tcp_config(self):
         self.harness.set_leader(True)
         self.harness.update_config({"external_hostname": "testhostname"})
@@ -652,7 +652,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
 class TestConfigOptionsValidation(unittest.TestCase):
     @patch("charm._get_loadbalancer_status", lambda **_: "10.0.0.1")
-    @patch("charm.KubernetesServicePatch", lambda **_: None)
+    @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
     def setUp(self):
         self.harness: Harness[TraefikIngressCharm] = Harness(TraefikIngressCharm)
         self.harness.set_model_name("test-model")

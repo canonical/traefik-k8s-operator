@@ -16,6 +16,8 @@ from urllib.parse import urlparse
 
 import yaml
 from charms.observability_libs.v0.kubernetes_service_patch import KubernetesServicePatch
+
+# from charms.observability_libs.v1.kubernetes_service_patch import KubernetesServicePatch
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 from charms.tls_certificates_interface.v1.tls_certificates import (
     CertificateAvailableEvent,
@@ -35,6 +37,8 @@ from charms.traefik_route_k8s.v0.traefik_route import (
 )
 from deepmerge import always_merger
 from lightkube.core.client import Client
+
+# from lightkube.models.core_v1 import ServicePort
 from lightkube.resources.core_v1 import Service
 from ops.charm import (
     ActionEvent,
@@ -69,6 +73,7 @@ _TRAEFIK_CONTAINER_NAME = _TRAEFIK_LAYER_NAME = _TRAEFIK_SERVICE_NAME = "traefik
 # as that is usually safer for Traefik
 _CONFIG_DIRECTORY = "/opt/traefik/juju"
 _STATIC_CONFIG_PATH = "/etc/traefik/traefik.yaml"
+_DYNAMIC_CERTS_PATH = _CONFIG_DIRECTORY + "/certificates.yaml"
 _CERTIFICATE_PATH = "/etc/traefik/certificate.cert"
 _CERTIFICATE_KEY_PATH = "/etc/traefik/certificate.key"
 
@@ -89,6 +94,7 @@ class TraefikIngressCharm(CharmBase):
 
     _stored = StoredState()
     _port = 80
+    _tls_port = 443
     _diagnostics_port = 8082  # Prometheus metrics, healthcheck/ping
 
     def __init__(self, *args):
@@ -108,10 +114,15 @@ class TraefikIngressCharm(CharmBase):
 
         self.container = self.unit.get_container(_TRAEFIK_CONTAINER_NAME)
 
+        # ports = [
+        #     ServicePort(self._port, targetPort=self._port, name=f"{self.app.name}"),
+        #     ServicePort(self._tls_port, targetPort=self._tls_port, name=f"{self.app.name}-tls"),
+        # ]
+        # self.service_patcher = KubernetesServicePatch(self, ports, "LoadBalancer")
         self.service_patch = KubernetesServicePatch(
             charm=self,
             service_type="LoadBalancer",
-            ports=[(f"{self.app.name}", self._port)],
+            ports=[(f"{self.app.name}", self._port), (f"{self.app.name}-tls", 443)],
         )
 
         self.metrics_endpoint = MetricsEndpointProvider(
@@ -163,6 +174,10 @@ class TraefikIngressCharm(CharmBase):
         private_key = generate_private_key(password=private_key_password.encode("utf-8"))
         self._stored.private_key_password = private_key_password
         self._stored.private_key = private_key.decode()
+        # FIXME this (occasionally?!) doesn't survive a charm upgrade, and results in:
+        #   File "./src/charm.py", line 179, in _on_certificates_relation_joined
+        #     private_key=private_key.encode("utf-8"),
+        #  AttributeError: 'NoneType' object has no attribute 'encode'
 
     def _on_certificates_relation_joined(self, event: RelationJoinedEvent) -> None:
         private_key_password = self._stored.private_key_password
@@ -264,7 +279,9 @@ class TraefikIngressCharm(CharmBase):
             },
             "entryPoints": {
                 "diagnostics": {"address": f":{self._diagnostics_port}"},
+                # "web": {"address": f":{self._port}", 'http': {'redirections': {'entryPoint': {'to': 'websecure', 'scheme': 'https'}}}},
                 "web": {"address": f":{self._port}"},
+                "websecure": {"address": f":{self._tls_port}"},
                 **tcp_entrypoints,
             },
             "metrics": {
@@ -282,10 +299,9 @@ class TraefikIngressCharm(CharmBase):
                 }
             },
         }
-
-        traefik_config.update(self._get_tls_config())
-
         self.container.push(_STATIC_CONFIG_PATH, yaml.dump(traefik_config), make_dirs=True)
+        self.container.push(_DYNAMIC_CERTS_PATH, yaml.dump(self._get_tls_config()), make_dirs=True)
+
         self.container.make_dir(_CONFIG_DIRECTORY, make_parents=True)
 
     def _get_tls_config(self) -> dict:
@@ -299,7 +315,8 @@ class TraefikIngressCharm(CharmBase):
                         "certFile": _CERTIFICATE_PATH,
                         "keyFile": _CERTIFICATE_KEY_PATH,
                     }
-                ]
+                ],
+                "stores": {"default": {"defaultCertificate": {}}},
             }
         }
 
@@ -477,7 +494,8 @@ class TraefikIngressCharm(CharmBase):
         logger.debug("Updating ingress for relation '%s'", rel)
 
         if provider is self.traefik_route:
-            return self._provide_routed_ingress(relation)
+            self._provide_routed_ingress(relation)
+            return
 
         self._provide_ingress(relation, provider)
 
@@ -644,7 +662,14 @@ class TraefikIngressCharm(CharmBase):
                 "rule": route_rule,
                 "service": traefik_service_name,
                 "entryPoints": ["web"],
-            }
+            },
+            traefik_router_name
+            + "-tls": {
+                "rule": route_rule,
+                "service": traefik_service_name,
+                "entryPoints": ["websecure"],
+                "tls": {},
+            },
         }
 
         config = {
@@ -736,12 +761,15 @@ class TraefikIngressCharm(CharmBase):
 
     def _provider_from_relation(self, relation: Relation):
         """Returns the correct IngressProvider based on a relation."""
-        if _get_relation_type(relation) is _IngressRelationType.per_app:
+        relation_type = _get_relation_type(relation)
+        if relation_type is _IngressRelationType.per_app:
             return self.ingress_per_app
-        elif _get_relation_type(relation) is _IngressRelationType.per_unit:
+        elif relation_type is _IngressRelationType.per_unit:
             return self.ingress_per_unit
-        else:
+        elif relation_type is _IngressRelationType.routed:
             return self.traefik_route
+        else:
+            raise RuntimeError("Invalid relation type (shouldn't happen)")
 
     @property
     def external_host(self):
@@ -798,8 +826,9 @@ def _get_relation_type(relation: Relation) -> _IngressRelationType:
         return _IngressRelationType.per_app
     elif relation.name == "ingress-per-unit":
         return _IngressRelationType.per_unit
-    else:  # traefik-route
+    elif relation.name == "traefik-route":
         return _IngressRelationType.routed
+    raise RuntimeError("Invalid relation name (shouldn't happen)")
 
 
 if __name__ == "__main__":

@@ -19,7 +19,7 @@ jsonschema
 # Lightweight k8s module
 # Code: https://github.com/gtsystem/lightkube
 # Docs: https://lightkube.readthedocs.io/
-# Deps: observability_libs
+# Deps: charm, observability_libs
 lightkube >= 0.8.1
 lightkube-models >= 1.22.0.4
 
