@@ -17,10 +17,11 @@ from charm import _STATIC_CONFIG_PATH, TraefikIngressCharm
 ops.testing.SIMULATE_CAN_CONNECT = True
 
 
-def relate(harness: Harness):
-    relation_id = harness.add_relation("ingress-per-unit", "remote")
+def relate(harness: Harness, per_app_relation: bool = False) -> Relation:
+    interface_name = "ingress" if per_app_relation else "ingress-per-unit"
+    relation_id = harness.add_relation(interface_name, "remote")
     harness.add_relation_unit(relation_id, "remote/0")
-    relation = harness.model.get_relation("ingress-per-unit", relation_id)
+    relation = harness.model.get_relation(interface_name, relation_id)
     requirer.relation = relation
     requirer.local_app = harness.charm.app
     return relation
@@ -33,6 +34,7 @@ def _requirer_provide_ingress_requirements(
     host=socket.getfqdn(),
     mode="http",
     strip_prefix: bool = False,
+    per_app_relation: bool = False,
 ):
     # same as requirer.provide_ingress_requirements(port=port, host=host)s
     data = {
@@ -48,7 +50,7 @@ def _requirer_provide_ingress_requirements(
 
     harness.update_relation_data(
         relation.id,
-        "remote/0",
+        "remote" if per_app_relation else "remote/0",
         data,
     )
     return data
@@ -71,7 +73,7 @@ class _RequirerMock:
     @property
     def url(self):
         try:
-            return self.ingress["remote/0"]["url"]
+            return self.ingress.get("url", "") or self.ingress["remote/0"]["url"]
         except:  # noqa
             return None
 
@@ -187,7 +189,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
         self.assertEqual(self.harness.charm.unit.status, ActiveStatus())
 
-        relation = relate(self.harness)
+        relation = relate(self.harness, per_app_relation=True)
         for strip_prefix in (False, True):
             with self.subTest():
                 _requirer_provide_ingress_requirements(
@@ -196,11 +198,13 @@ class TestTraefikIngressCharm(unittest.TestCase):
                     host="foo.bar",
                     port=3000,
                     strip_prefix=strip_prefix,
+                    per_app_relation=True,
                 )
 
                 traefik_container = self.harness.charm.unit.get_container("traefik")
                 file = f"/opt/traefik/juju/juju_ingress_{relation.name}_{relation.id}_{relation.app.name}.yaml"
                 conf = yaml.safe_load(traefik_container.pull(file).read())
+
                 middlewares = {
                     "middlewares": {
                         "juju-sidecar-noprefix-test-model-remote-0": {
@@ -214,7 +218,6 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
                 expected = {
                     "http": {
-                        "middlewares": None,
                         "routers": {
                             "juju-test-model-remote-0-router": {
                                 "entryPoints": ["web"],
@@ -257,10 +260,9 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
         self.assertEqual(self.harness.charm.unit.status, ActiveStatus())
 
-        relation = relate(self.harness)
+        relation = relate(self.harness, per_app_relation=True)
         for strip_prefix in (False, True):
             # in subdomain routing mode this should not have any effect
-            # ^^^ there is NO REASON this should be true. They can be combined
             with self.subTest():
                 _requirer_provide_ingress_requirements(
                     harness=self.harness,
@@ -268,6 +270,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
                     host="foo.bar",
                     port=3000,
                     strip_prefix=strip_prefix,
+                    per_app_relation=True,
                 )
 
                 traefik_container = self.harness.charm.unit.get_container("traefik")
@@ -276,7 +279,6 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
                 expected = {
                     "http": {
-                        "middlewares": None,
                         "routers": {
                             "juju-test-model-remote-0-router": {
                                 "entryPoints": ["web"],
@@ -583,9 +585,13 @@ class TestTraefikIngressCharm(unittest.TestCase):
         self.harness.update_config({"external_hostname": "testhostname"})
         self.harness.begin_with_initial_hooks()
 
-        relation = relate(self.harness)
+        relation = relate(self.harness, per_app_relation=True)
         _requirer_provide_ingress_requirements(
-            harness=self.harness, relation=relation, host="10.0.0.1", port=3000
+            harness=self.harness,
+            relation=relation,
+            host="10.0.0.1",
+            port=3000,
+            per_app_relation=True,
         )
 
         self.harness.container_pebble_ready("traefik")
@@ -595,7 +601,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
         action_event.set_results.assert_called_once_with(
             {
                 "proxied-endpoints": json.dumps(
-                    {"remote/0": {"url": "http://testhostname:80/test-model-remote-0"}}
+                    {"remote": {"url": "http://testhostname:80/test-model-remote-0"}}
                 )
             }
         )

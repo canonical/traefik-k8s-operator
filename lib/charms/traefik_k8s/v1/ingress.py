@@ -69,7 +69,7 @@ LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 7
+LIBPATCH = 8
 
 DEFAULT_RELATION_NAME = "ingress"
 RELATION_INTERFACE = "ingress"
@@ -559,6 +559,6 @@ class IngressPerAppRequirer(_IngressPerAppBase):
 
         Returns None if the URL isn't available yet.
         """
-        data = self._stored.current_url or None  # type: ignore
+        data = self._stored.current_url or self._get_url_from_relation_data()  # type: ignore
         assert isinstance(data, (str, type(None)))  # for static checker
         return data
