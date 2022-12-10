@@ -8,7 +8,7 @@ import enum
 import json
 import logging
 import typing
-from typing import Tuple, Union
+from typing import Any, Dict, List, Tuple, Union
 from urllib.parse import urlparse
 
 import yaml
@@ -487,12 +487,21 @@ class TraefikIngressCharm(CharmBase):
                 }
             }
 
+        return {}
+
     def _generate_per_unit_config(self, data: "RequirerData_IPU") -> Tuple[dict, str]:
         """Generate a config dict for a given unit for IngressPerUnit."""
-        config = {"http": {"routers": {}, "services": {}}}
+        config = {"http": {"routers": {}, "services": {}}}  # type: Dict[str, Any]
         prefix = self._get_prefix(data)
         host = self.external_host
         if data["mode"] == "tcp":
+            # TODO: is there a reason why SNI-based routing (from TLS certs) is per-unit only?
+            # This is not a technical limitation in any way. It's meaningful/useful for
+            # authenticating to individual TLS-based servers where it may be desirable to reach
+            # one or more servers in a cluster (let's say Kafka), but limiting it to per-unit only
+            # actively impedes the architectural design of any distributed/ring-buffered TLS-based
+            # scale-out services which may only have frontends dedicated, but which do not "speak"
+            # HTTP(S). Such as any of the "cloud-native" SQL implementations (TiDB, Cockroach, etc)
             port = data["port"]
             unit_url = f"{host}:{port}"
             config = {
@@ -515,45 +524,26 @@ class TraefikIngressCharm(CharmBase):
             return config, unit_url
 
         else:
-            if self._routing_mode is _RoutingMode.path:
-                route_rule = f"PathPrefix(`/{prefix}`)"
-                unit_url = f"http://{host}:{self._port}/{prefix}"
-            else:  # _RoutingMode.subdomain
-                route_rule = f"Host(`{prefix}.{host}`)"
-                unit_url = f"http://{prefix}.{host}:{self._port}/"
+            lb_servers = [{"url": f"http://{data['host']}:{data['port']}"}]
+            return self._generate_config_block(prefix, lb_servers, data)
 
-        traefik_router_name = f"juju-{prefix}-router"
-        traefik_service_name = f"juju-{prefix}-service"
+    def _generate_config_block(
+        self, prefix: str, lb_servers: List[Dict[str, str]], data: Dict[str, Any]
+    ) -> Tuple[Dict[str, Any], str]:
+        """Generate a configuration segment.
 
-        router_cfg = {
-            "rule": route_rule,
-            "service": traefik_service_name,
-            "entryPoints": ["web"],
-        }
-
-        middlewares = self._generate_middleware_config(data, prefix)
-        if middlewares:
-            router_cfg["middlewares"] = list(middlewares.keys())
-
-        config["http"]["middlewares"] = middlewares
-        config["http"]["routers"][traefik_router_name] = router_cfg
-
-        config["http"]["services"][traefik_service_name] = {
-            "loadBalancer": {"servers": [{"url": f"http://{data['host']}:{data['port']}"}]}
-        }
-        return config, unit_url
-
-    def _generate_per_app_config(self, data: "RequirerData_IPA") -> Tuple[dict, str]:
+        Per-unit and per-app configuration blocks are mostly similar, with the principal
+        difference being the list of servers to load balance across (where IPU is one server per
+        unit and IPA may be more than one.
+        """
         host = self.external_host
-        port = self._port
-        prefix = self._get_prefix(data)
 
-        if self._routing_mode == _RoutingMode.path:
+        if self._routing_mode is _RoutingMode.path:
             route_rule = f"PathPrefix(`/{prefix}`)"
-            app_url = f"http://{host}:{port}/{prefix}"
+            url = f"http://{host}:{self._port}/{prefix}"
         else:  # _RoutingMode.subdomain
             route_rule = f"Host(`{prefix}.{host}`)"
-            app_url = f"http://{prefix}.{host}:{port}/"
+            url = f"http://{prefix}.{host}:{self._port}/"
 
         traefik_router_name = f"juju-{prefix}-router"
         traefik_service_name = f"juju-{prefix}-service"
@@ -569,13 +559,7 @@ class TraefikIngressCharm(CharmBase):
         config = {
             "http": {
                 "routers": router_cfg,
-                "services": {
-                    traefik_service_name: {
-                        "loadBalancer": {
-                            "servers": [{"url": f"http://{data['host']}:{data['port']}"}]
-                        }
-                    }
-                },
+                "services": {traefik_service_name: {"loadBalancer": {"servers": lb_servers}}},
             }
         }
 
@@ -585,7 +569,13 @@ class TraefikIngressCharm(CharmBase):
             config["http"]["middlewares"] = middlewares
             router_cfg[traefik_router_name]["middlewares"] = list(middlewares.keys())
 
-        return config, app_url
+        return config, url
+
+    def _generate_per_app_config(self, data: "RequirerData_IPA") -> Tuple[dict, str]:
+        prefix = self._get_prefix(data)
+
+        lb_servers = [{"url": f"http://{data['host']}:{data['port']}"}]
+        return self._generate_config_block(prefix, lb_servers, data)
 
     def _wipe_ingress_for_all_relations(self):
         for relation in self.model.relations["ingress"] + self.model.relations["ingress-per-unit"]:

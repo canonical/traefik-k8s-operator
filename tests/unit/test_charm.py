@@ -150,7 +150,6 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
                 expected = {
                     "http": {
-                        "middlewares": None,
                         "routers": {
                             "juju-test-model-remote-0-router": {
                                 "entryPoints": ["web"],
@@ -165,6 +164,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
                         },
                     }
                 }
+
                 if strip_prefix:
                     expected["http"].update(middlewares)
                     expected["http"]["routers"]["juju-test-model-remote-0-router"].update(
@@ -337,7 +337,6 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
                 expected = {
                     "http": {
-                        "middlewares": None,
                         "routers": {
                             "juju-test-model-remote-0-router": {
                                 "entryPoints": ["web"],
@@ -400,7 +399,6 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
             expected = {
                 "http": {
-                    "middlewares": None,
                     "routers": {
                         "juju-test-model-remote-0-router": {
                             "entryPoints": ["web"],
