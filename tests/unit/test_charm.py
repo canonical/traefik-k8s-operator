@@ -260,6 +260,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
         relation = relate(self.harness)
         for strip_prefix in (False, True):
             # in subdomain routing mode this should not have any effect
+            # ^^^ there is NO REASON this should be true. They can be combined
             with self.subTest():
                 _requirer_provide_ingress_requirements(
                     harness=self.harness,

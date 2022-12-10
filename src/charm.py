@@ -566,13 +566,8 @@ class TraefikIngressCharm(CharmBase):
             }
         }
 
-        middlewares = self._generate_middleware_config(data, prefix)
-        if middlewares:
-            router_cfg["middlewares"] = list(middlewares.keys())
-
         config = {
             "http": {
-                "middlewares": middlewares,
                 "routers": router_cfg,
                 "services": {
                     traefik_service_name: {
@@ -583,6 +578,12 @@ class TraefikIngressCharm(CharmBase):
                 },
             }
         }
+
+        middlewares = self._generate_middleware_config(data, prefix)
+
+        if middlewares:
+            config["http"]["middlewares"] = middlewares
+            router_cfg[traefik_router_name]["middlewares"] = list(middlewares.keys())
 
         return config, app_url
 
