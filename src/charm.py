@@ -74,8 +74,8 @@ _TRAEFIK_CONTAINER_NAME = _TRAEFIK_LAYER_NAME = _TRAEFIK_SERVICE_NAME = "traefik
 _CONFIG_DIRECTORY = "/opt/traefik/juju"
 _STATIC_CONFIG_PATH = "/etc/traefik/traefik.yaml"
 _DYNAMIC_CERTS_PATH = _CONFIG_DIRECTORY + "/certificates.yaml"
-_CERTIFICATE_PATH = "/etc/traefik/certificate.cert"
-_CERTIFICATE_KEY_PATH = "/etc/traefik/certificate.key"
+_CERTIFICATE_PATH = _CONFIG_DIRECTORY + "/certificate.cert"
+_CERTIFICATE_KEY_PATH = _CONFIG_DIRECTORY + "/certificate.key"
 
 
 class _RoutingMode(enum.Enum):
@@ -170,9 +170,10 @@ class TraefikIngressCharm(CharmBase):
         observe(self.on.show_proxied_endpoints_action, self._on_show_proxied_endpoints)
 
     def _on_install(self, event) -> None:
-        private_key_password = self._generate_password()
-        private_key = generate_private_key(password=private_key_password.encode("utf-8"))
-        self._stored.private_key_password = private_key_password
+        # private_key_password = self._generate_password()
+        # private_key = generate_private_key(password=private_key_password.encode("utf-8"))
+        private_key = generate_private_key()
+        # self._stored.private_key_password = private_key_password
         self._stored.private_key = private_key.decode()
         # FIXME this (occasionally?!) doesn't survive a charm upgrade, and results in:
         #   File "./src/charm.py", line 179, in _on_certificates_relation_joined
@@ -180,11 +181,11 @@ class TraefikIngressCharm(CharmBase):
         #  AttributeError: 'NoneType' object has no attribute 'encode'
 
     def _on_certificates_relation_joined(self, event: RelationJoinedEvent) -> None:
-        private_key_password = self._stored.private_key_password
+        # private_key_password = self._stored.private_key_password
         private_key = self._stored.private_key
         csr = generate_csr(
             private_key=private_key.encode("utf-8"),
-            private_key_password=private_key_password.encode("utf-8"),
+            # private_key_password=private_key_password.encode("utf-8"),
             subject=self.cert_subject,
         )
         self._stored.csr = csr.decode()
@@ -202,11 +203,11 @@ class TraefikIngressCharm(CharmBase):
 
     def _on_certificate_expiring(self, event: CertificateExpiringEvent) -> None:
         old_csr = self._stored.csr
-        private_key_password = self._stored.private_key_password
+        # private_key_password = self._stored.private_key_password
         private_key = self._stored.private_key
         new_csr = generate_csr(
             private_key=private_key.encode(),
-            private_key_password=private_key_password.encode(),
+            # private_key_password=private_key_password.encode(),
             subject=self.cert_subject,
         )
         self.certificates.request_certificate_renewal(
@@ -316,7 +317,14 @@ class TraefikIngressCharm(CharmBase):
                         "keyFile": _CERTIFICATE_KEY_PATH,
                     }
                 ],
-                "stores": {"default": {"defaultCertificate": {}}},
+                # "stores": {
+                #     "default": {
+                #         "defaultCertificate": {
+                #             "certFile": _CERTIFICATE_PATH,
+                #             "keyFile": _CERTIFICATE_KEY_PATH,
+                #         }
+                #     }
+                # },
             }
         }
 
