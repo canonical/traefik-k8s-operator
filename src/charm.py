@@ -317,6 +317,7 @@ class TraefikIngressCharm(CharmBase):
                         "keyFile": _CERTIFICATE_KEY_PATH,
                     }
                 ],
+                "stores": {"default": {"defaultCertificate": {}}},
                 # "stores": {
                 #     "default": {
                 #         "defaultCertificate": {
@@ -608,7 +609,7 @@ class TraefikIngressCharm(CharmBase):
 
     def _generate_per_unit_config(self, data: "RequirerData_IPU") -> Tuple[dict, str]:
         """Generate a config dict for a given unit for IngressPerUnit."""
-        config = {"http": {"routers": {}, "services": {}}}  # type: Dict[str, Any]
+        # config = {"http": {"routers": {}, "services": {}}}  # type: Dict[str, Any]
         prefix = self._get_prefix(data)
         host = self.external_host
         if data["mode"] == "tcp":
@@ -677,6 +678,14 @@ class TraefikIngressCharm(CharmBase):
                 "service": traefik_service_name,
                 "entryPoints": ["websecure"],
                 "tls": {},
+                # "tls": {
+                #     "domains": [
+                #         {
+                #             "main": "juju.local",
+                #             "sans": ["*.juju.local"],
+                #         },
+                #     ],
+                # },
             },
         }
 
