@@ -73,6 +73,10 @@ _DYNAMIC_CONFIG_DIR = "/opt/traefik/juju"
 _STATIC_CONFIG_DIR = "/etc/traefik"
 _STATIC_CONFIG_PATH = _STATIC_CONFIG_DIR + "/traefik.yaml"
 _DYNAMIC_CERTS_PATH = _DYNAMIC_CONFIG_DIR + "/certificates.yaml"
+
+# FIXME:
+#  1. Is it ok to store certs/keys in the dynamic config path?
+#  2. If overwritten (in /etc/...), would certs/keys be re-read without certificates.yaml changing?
 _CERTIFICATE_PATH = _STATIC_CONFIG_DIR + "/certificate.cert"
 _CERTIFICATE_KEY_PATH = _STATIC_CONFIG_DIR + "/certificate.key"
 
@@ -314,7 +318,7 @@ class TraefikIngressCharm(CharmBase):
                         "keyFile": _CERTIFICATE_KEY_PATH,
                     }
                 ],
-                "stores": {"default": {"defaultCertificate": {}}},
+                # "stores": {"default": {"defaultCertificate": {}}},
                 # "stores": {
                 #     "default": {
                 #         "defaultCertificate": {
@@ -674,15 +678,15 @@ class TraefikIngressCharm(CharmBase):
                 "rule": route_rule,
                 "service": traefik_service_name,
                 "entryPoints": ["websecure"],
-                "tls": {},
-                # "tls": {
-                #     "domains": [
-                #         {
-                #             "main": "juju.local",
-                #             "sans": ["*.juju.local"],
-                #         },
-                #     ],
-                # },
+                # "tls": {},
+                "tls": {
+                    "domains": [
+                        {
+                            "main": "juju.local",
+                            "sans": ["*.juju.local"],
+                        },
+                    ],
+                },
             },
         }
 
