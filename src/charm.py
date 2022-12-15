@@ -7,9 +7,7 @@
 import enum
 import json
 import logging
-import secrets
 import socket
-import string
 import typing
 from typing import Any, Dict, List, Tuple, Union
 from urllib.parse import urlparse
@@ -71,11 +69,12 @@ logger = logging.getLogger(__name__)
 _TRAEFIK_CONTAINER_NAME = _TRAEFIK_LAYER_NAME = _TRAEFIK_SERVICE_NAME = "traefik"
 # We watch the parent folder of where we store the configuration files,
 # as that is usually safer for Traefik
-_CONFIG_DIRECTORY = "/opt/traefik/juju"
-_STATIC_CONFIG_PATH = "/etc/traefik/traefik.yaml"
-_DYNAMIC_CERTS_PATH = _CONFIG_DIRECTORY + "/certificates.yaml"
-_CERTIFICATE_PATH = _CONFIG_DIRECTORY + "/certificate.cert"
-_CERTIFICATE_KEY_PATH = _CONFIG_DIRECTORY + "/certificate.key"
+_DYNAMIC_CONFIG_DIR = "/opt/traefik/juju"
+_STATIC_CONFIG_DIR = "/etc/traefik"
+_STATIC_CONFIG_PATH = _STATIC_CONFIG_DIR + "/traefik.yaml"
+_DYNAMIC_CERTS_PATH = _DYNAMIC_CONFIG_DIR + "/certificates.yaml"
+_CERTIFICATE_PATH = _STATIC_CONFIG_DIR + "/certificate.cert"
+_CERTIFICATE_KEY_PATH = _STATIC_CONFIG_DIR + "/certificate.key"
 
 
 class _RoutingMode(enum.Enum):
@@ -105,7 +104,6 @@ class TraefikIngressCharm(CharmBase):
             current_routing_mode=None,
             tcp_entrypoints=None,
             private_key=None,
-            private_key_password=None,
             csr=None,
             certificate=None,
             ca=None,
@@ -170,10 +168,9 @@ class TraefikIngressCharm(CharmBase):
         observe(self.on.show_proxied_endpoints_action, self._on_show_proxied_endpoints)
 
     def _on_install(self, event) -> None:
-        # private_key_password = self._generate_password()
-        # private_key = generate_private_key(password=private_key_password.encode("utf-8"))
+        # Generate key without a passphrase as traefik does not support it
+        # https://github.com/traefik/traefik/pull/6518
         private_key = generate_private_key()
-        # self._stored.private_key_password = private_key_password
         self._stored.private_key = private_key.decode()
         # FIXME this (occasionally?!) doesn't survive a charm upgrade, and results in:
         #   File "./src/charm.py", line 179, in _on_certificates_relation_joined
@@ -181,11 +178,9 @@ class TraefikIngressCharm(CharmBase):
         #  AttributeError: 'NoneType' object has no attribute 'encode'
 
     def _on_certificates_relation_joined(self, event: RelationJoinedEvent) -> None:
-        # private_key_password = self._stored.private_key_password
         private_key = self._stored.private_key
         csr = generate_csr(
             private_key=private_key.encode("utf-8"),
-            # private_key_password=private_key_password.encode("utf-8"),
             subject=self.cert_subject,
         )
         self._stored.csr = csr.decode()
@@ -203,11 +198,9 @@ class TraefikIngressCharm(CharmBase):
 
     def _on_certificate_expiring(self, event: CertificateExpiringEvent) -> None:
         old_csr = self._stored.csr
-        # private_key_password = self._stored.private_key_password
         private_key = self._stored.private_key
         new_csr = generate_csr(
             private_key=private_key.encode(),
-            # private_key_password=private_key_password.encode(),
             subject=self.cert_subject,
         )
         self.certificates.request_certificate_renewal(
@@ -253,7 +246,7 @@ class TraefikIngressCharm(CharmBase):
 
     def _clear_dynamic_configs(self):
         try:
-            for file in self.container.list_files(path=_CONFIG_DIRECTORY, pattern="juju_*.yaml"):
+            for file in self.container.list_files(path=_DYNAMIC_CONFIG_DIR, pattern="juju_*.yaml"):
                 self.container.remove_path(file.path)
                 logger.debug("Deleted orphaned ingress configuration file: %s", file.path)
         except (FileNotFoundError, APIError):
@@ -280,7 +273,11 @@ class TraefikIngressCharm(CharmBase):
             },
             "entryPoints": {
                 "diagnostics": {"address": f":{self._diagnostics_port}"},
-                # "web": {"address": f":{self._port}", 'http': {'redirections': {'entryPoint': {'to': 'websecure', 'scheme': 'https'}}}},
+                # "web": {
+                #     "address": f":{self._port}",
+                #     'http': {
+                #         'redirections': {'entryPoint': {'to': 'websecure', 'scheme': 'https'}}}
+                # },
                 "web": {"address": f":{self._port}"},
                 "websecure": {"address": f":{self._tls_port}"},
                 **tcp_entrypoints,
@@ -295,7 +292,7 @@ class TraefikIngressCharm(CharmBase):
             "ping": {"entryPoint": "diagnostics"},
             "providers": {
                 "file": {
-                    "directory": _CONFIG_DIRECTORY,
+                    "directory": _DYNAMIC_CONFIG_DIR,
                     "watch": True,
                 }
             },
@@ -303,7 +300,7 @@ class TraefikIngressCharm(CharmBase):
         self.container.push(_STATIC_CONFIG_PATH, yaml.dump(traefik_config), make_dirs=True)
         self.container.push(_DYNAMIC_CERTS_PATH, yaml.dump(self._get_tls_config()), make_dirs=True)
 
-        self.container.make_dir(_CONFIG_DIRECTORY, make_parents=True)
+        self.container.make_dir(_DYNAMIC_CONFIG_DIR, make_parents=True)
 
     def _get_tls_config(self) -> dict:
         """Return dictionary with TLS traefik configuration if it exists."""
@@ -583,7 +580,7 @@ class TraefikIngressCharm(CharmBase):
     def _push_configurations(self, relation: Relation, config: Union[dict, str]):
         if config:
             yaml_config = yaml.dump(config) if not isinstance(config, str) else config
-            config_filename = f"{_CONFIG_DIRECTORY}/{self._relation_config_file(relation)}"
+            config_filename = f"{_DYNAMIC_CONFIG_DIR}/{self._relation_config_file(relation)}"
             self.container.push(config_filename, yaml_config, make_dirs=True)
             logger.debug("Updated ingress configuration file: %s", config_filename)
         else:
@@ -724,7 +721,7 @@ class TraefikIngressCharm(CharmBase):
         # during _on_traefik_pebble_ready .
         if self.container.can_connect():
             try:
-                config_path = f"{_CONFIG_DIRECTORY}/{self._relation_config_file(relation)}"
+                config_path = f"{_DYNAMIC_CONFIG_DIR}/{self._relation_config_file(relation)}"
                 self.container.remove_path(config_path, recursive=True)
                 logger.debug(f"Deleted orphaned {config_path} ingress configuration file")
             except (PathError, FileNotFoundError):
@@ -816,13 +813,6 @@ class TraefikIngressCharm(CharmBase):
         """Provide certificate subject."""
         # TODO: Use a good default for when the external_hostname is None
         return self.model.config.get("external_hostname", socket.getfqdn())
-
-    def _generate_password(self) -> str:
-        """Generate a random 12 character password."""
-        # Really limited by what can be passed into shell commands, since this
-        # all goes through subprocess. So much for complex password
-        chars = string.ascii_letters + string.digits
-        return "".join(secrets.choice(chars) for _ in range(12))
 
 
 def _get_loadbalancer_status(namespace: str, service_name: str):
