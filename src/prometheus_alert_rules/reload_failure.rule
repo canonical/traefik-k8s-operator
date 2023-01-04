@@ -1,5 +1,5 @@
 alert: TraefikConfigReloadFailure
-expr: rate(traefik_config_reloads_failure_total[3m]) > bool 0
+expr: increase(traefik_config_reloads_failure_total[3m]) > 0
 for: 1m
 labels:
   severity: critical
