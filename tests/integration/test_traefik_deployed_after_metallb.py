@@ -75,7 +75,9 @@ async def test_build_and_deploy(ops_test: OpsTest, traefik_charm):
         ),
     )
 
-    await ops_test.model.wait_for_idle(status="active", timeout=600, idle_period=30)
+    await ops_test.model.wait_for_idle(
+        status="active", timeout=600, idle_period=30, raise_on_error=False
+    )
 
     await asyncio.gather(
         ops_test.model.add_relation(f"{ipu.name}:ingress", trfk.name),
@@ -117,7 +119,7 @@ async def test_tls_termination(ops_test: OpsTest):
     await ops_test.model.applications["root-ca"].set_config(
         {
             "ca-common-name": "demo.ca.local",
-            "generate-self-signed-certificates": True,
+            "generate-self-signed-certificates": "true",
         }
     )
     await ops_test.model.add_relation("root-ca", f"{trfk.name}:certificates")

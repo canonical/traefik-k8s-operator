@@ -53,5 +53,7 @@ async def get_address(ops_test: OpsTest, app_name: str, unit_num: Optional[int] 
     status = await ops_test.model.get_status()
     app = status["applications"][app_name]
     return (
-        app["address"] if unit_num is None else app["units"][f"{app_name}/{unit_num}"]["address"]
+        app.public_address
+        if unit_num is None
+        else app["units"][f"{app_name}/{unit_num}"]["address"]
     )
