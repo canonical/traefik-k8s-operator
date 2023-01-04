@@ -1,0 +1,8 @@
+alert: TraefikConfigReloadFailure
+expr: rate(traefik_config_reloads_failure_total[3m]) > bool 0
+for: 1m
+labels:
+  severity: critical
+annotations:
+  summary: Traefik config reload failure (instance {{ $labels.instance }})
+  description: "Traefik keeps failing to reload its config file"
