@@ -441,7 +441,7 @@ class TraefikIngressCharm(CharmBase):
 
         static_config = yaml.safe_load(static_config_raw)
         eps = static_config["entryPoints"]
-        return {k: v for k, v in eps.items() if k not in {"diagnostics", "web"}}
+        return {k: v for k, v in eps.items() if k not in {"diagnostics", "web", "websecure"}}
 
     def _tcp_entrypoints_changed(self):
         current = self._tcp_entrypoints()
