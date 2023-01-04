@@ -19,7 +19,6 @@ import logging
 import tempfile
 from pathlib import Path
 from types import SimpleNamespace
-from urllib.parse import quote
 from urllib.request import urlopen
 
 import pytest
@@ -89,9 +88,9 @@ async def test_build_and_deploy(ops_test: OpsTest, traefik_charm):
 
 @pytest.mark.abort_on_fail
 async def test_ingressed_endpoints_reachable_after_metallb_enabled(ops_test: OpsTest):
-    ip = get_address(ops_test, trfk.name)
+    ip = await get_address(ops_test, trfk.name)
     endpoints = [
-        quote(f"{ip}/{path}")
+        f"{ip}/{path}"
         for path in [
             f"{ops_test.model_name}-{ipr.name}",
             f"{ops_test.model_name}-{ipu.name}-0",
@@ -138,14 +137,14 @@ async def test_tls_termination(ops_test: OpsTest):
             f.writelines(cert)
 
         endpoints = [
-            quote(f"https://juju.local/{path}")
+            f"https://juju.local/{path}"
             for path in [
                 f"{ops_test.model_name}-{ipr.name}",
                 f"{ops_test.model_name}-{ipu.name}-0",
                 f"{ops_test.model_name}-{ipa.name}",
             ]
         ]
-        ip = get_address(ops_test, trfk.name)
+        ip = await get_address(ops_test, trfk.name)
         for endpoint in endpoints:
             rc, stdout, stderr = await ops_test.run(
                 "curl",
