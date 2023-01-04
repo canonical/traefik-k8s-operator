@@ -484,7 +484,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 12
+LIBPATCH = 13
 
 logger = logging.getLogger(__name__)
 
@@ -936,7 +936,7 @@ def _resolve_dir_against_charm_path(charm: CharmBase, *path_elements: str) -> st
 class NoRelationWithInterfaceFoundError(Exception):
     """No relations with the given interface are found in the charm meta."""
 
-    def __init__(self, charm: CharmBase, relation_interface: str = None):
+    def __init__(self, charm: CharmBase, relation_interface: Optional[str] = None):
         self.charm = charm
         self.relation_interface = relation_interface
         self.message = (
@@ -1097,7 +1097,6 @@ class LokiPushApiProvider(Object):
         self._relation_name = relation_name
         self._tool = CosTool(self)
         self.port = int(port)
-        self.container = self._charm._container
         self.scheme = scheme
         self.address = address
         self.path = path
@@ -1229,7 +1228,7 @@ class LokiPushApiProvider(Object):
 
         return {"promtail_binary_zip_url": json.dumps(promtail_binaries)}
 
-    def update_endpoint(self, url: str = None, relation: Relation = None) -> None:
+    def update_endpoint(self, url: str = "", relation: Optional[Relation] = None) -> None:
         """Triggers programmatically the update of endpoint in unit relation data.
 
         This method should be used when the charm relying on this library needs
@@ -1676,7 +1675,7 @@ class LogProxyConsumer(ConsumerBase):
     def __init__(
         self,
         charm,
-        log_files: list = None,
+        log_files: Optional[list] = None,
         relation_name: str = DEFAULT_LOG_PROXY_RELATION_NAME,
         enable_syslog: bool = False,
         syslog_port: int = 1514,
@@ -1807,7 +1806,7 @@ class LogProxyConsumer(ConsumerBase):
             logger.warning(msg)
             self.on.promtail_digest_error.emit(msg)
 
-    def _get_container_name(self, container_name: str = None) -> str:
+    def _get_container_name(self, container_name: str = "") -> str:
         """Helper function for getting/validating a container name.
 
         Args:

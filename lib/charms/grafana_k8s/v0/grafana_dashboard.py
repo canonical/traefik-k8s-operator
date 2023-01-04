@@ -218,7 +218,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 16
+LIBPATCH = 19
 
 logger = logging.getLogger(__name__)
 
@@ -607,9 +607,7 @@ def _replace_template_fields(  # noqa: C901
 
     If existing datasource variables are present, try to substitute them.
     """
-    replacements = {"loki": "${lokids}",
-                    "prometheus": "${prometheusds}",
-                    "grafana": "grafana"}
+    replacements = {"loki": "${lokids}", "prometheus": "${prometheusds}"}
     used_replacements = []
 
     # If any existing datasources match types we know, or we didn't find
@@ -617,30 +615,60 @@ def _replace_template_fields(  # noqa: C901
     if datasources or not existing_templates:
         panels = dict_content["panels"]
 
-        # Go through all of the panels. If they have a datasource set, AND it's one
+        # Go through all the panels. If they have a datasource set, AND it's one
         # that we can convert to ${lokids} or ${prometheusds}, by stripping off the
         # ${} templating and comparing the name to the list we built, replace it,
         # otherwise, leave it alone.
         #
         # COS only knows about Prometheus and Loki.
         for panel in panels:
-            if "datasource" not in panel or not panel.get("datasource", ""):
+            if "datasource" not in panel or not panel.get("datasource"):
                 continue
             if not existing_templates:
-                if "loki" in panel.get("datasource"):
-                    panel["datasource"] = "${lokids}"
+                datasource = panel.get("datasource")
+                if type(datasource) == str:
+                    if "loki" in datasource:
+                        panel["datasource"] = "${lokids}"
+                    else:
+                        panel["datasource"] = "${prometheusds}"
+                elif type(datasource) == dict:
+                    # In dashboards exported by Grafana 9, datasource type is dict
+                    dstype = datasource.get("type", "")
+                    if dstype == "loki":
+                        panel["datasource"]["uid"] = "${lokids}"
+                    elif dstype == "prometheus":
+                        panel["datasource"]["uid"] = "${prometheusds}"
+                    else:
+                        logger.debug("Unrecognized datasource type '%s'; skipping", dstype)
+                        continue
                 else:
-                    panel["datasource"] = "${prometheusds}"
-            else:
-                if panel["datasource"].lower() in replacements.values():
-                    # Already a known template variable
+                    logger.error("Unknown datasource format: skipping")
                     continue
-                # Strip out variable characters and maybe braces
-                ds = re.sub(r"(\$|\{|\})", "", panel["datasource"])
-                replacement = replacements.get(datasources[ds], "")
-                if replacement:
-                    used_replacements.append(ds)
-                panel["datasource"] = replacement or panel["datasource"]
+            else:
+                if type(panel["datasource"]) == str:
+                    if panel["datasource"].lower() in replacements.values():
+                        # Already a known template variable
+                        continue
+                    # Strip out variable characters and maybe braces
+                    ds = re.sub(r"(\$|\{|\})", "", panel["datasource"])
+                    replacement = replacements.get(datasources[ds], "")
+                    if replacement:
+                        used_replacements.append(ds)
+                    panel["datasource"] = replacement or panel["datasource"]
+                elif type(panel["datasource"]) == dict:
+                    dstype = panel["datasource"].get("type", "")
+                    if panel["datasource"].get("uid", "").lower() in replacements.values():
+                        # Already a known template variable
+                        continue
+                    # Strip out variable characters and maybe braces
+                    ds = re.sub(r"(\$|\{|\})", "", panel["datasource"].get("uid", ""))
+                    replacement = replacements.get(datasources[ds], "")
+                    if replacement:
+                        used_replacements.append(ds)
+                        panel["datasource"]["uid"] = replacement
+                else:
+                    logger.error("Unknown datasource format: skipping")
+                    continue
 
         # Put our substitutions back
         dict_content["panels"] = panels
@@ -712,7 +740,7 @@ def _inject_labels(content: str, topology: dict, transformer: "CosTool") -> str:
     if "panels" not in dict_content.keys():
         return json.dumps(dict_content)
 
-    # Go through all of the panels and inject topology labels
+    # Go through all the panels and inject topology labels
     # Panels may have more than one 'target' where the expressions live, so that must be
     # accounted for. Additionally, `promql-transform` does not necessarily gracefully handle
     # expressions with range queries including variables. Exclude these.
@@ -760,13 +788,22 @@ def _modify_panel(panel: dict, topology: dict, transformer: "CosTool") -> dict:
         # If there's no expression, we don't need to do anything
         if "expr" not in target.keys():
             continue
+        expr = target["expr"]
 
         if "datasource" not in panel.keys():
             continue
-        elif panel["datasource"] not in known_datasources:
-            continue
-        querytype = known_datasources[panel["datasource"]]
-        expr = target["expr"]
+        else:
+            if type(panel["datasource"]) == str:
+                if panel["datasource"] not in known_datasources:
+                    continue
+                querytype = known_datasources[panel["datasource"]]
+            elif type(panel["datasource"]) == dict:
+                if panel["datasource"]["uid"] not in known_datasources:
+                    continue
+                querytype = known_datasources[panel["datasource"]["uid"]]
+            else:
+                logger.error("Unknown datasource format: skipping")
+                continue
 
         # Capture all values inside `[]` into a list which we'll iterate over later to
         # put them back in-order. Then apply the regex again and replace everything with
@@ -926,7 +963,7 @@ class GrafanaDashboardProvider(Object):
         If you would like to use relation name other than `grafana-dashboard`,
         you will need to specify the relation name via the `relation_name`
         argument when instantiating the :class:`GrafanaDashboardProvider` object.
-        However, it is strongly advised to keep the the default relation name,
+        However, it is strongly advised to keep the default relation name,
         so that people deploying your charm will have a consistent experience
         with all other charms that provide Grafana dashboards.
 
@@ -1055,7 +1092,7 @@ class GrafanaDashboardProvider(Object):
             # Path.glob uses fnmatch on the backend, which is pretty limited, so use a
             # custom function for the filter
             def _is_dashboard(p: Path) -> bool:
-                return p.is_file and p.name.endswith((".json", ".json.tmpl", ".tmpl"))
+                return p.is_file() and p.name.endswith((".json", ".json.tmpl", ".tmpl"))
 
             for path in filter(_is_dashboard, Path(self._dashboards_path).glob("*")):
                 # path = Path(path)
@@ -1107,7 +1144,7 @@ class GrafanaDashboardProvider(Object):
                     del stored_dashboard_templates[dashboard_id]
             self._stored.dashboard_templates = stored_dashboard_templates
 
-            # With all of the file-based dashboards cleared out, force a refresh
+            # With all the file-based dashboards cleared out, force a refresh
             # of relation data
             if self._charm.unit.is_leader():
                 for dashboard_relation in self._charm.model.relations[self._relation_name]:
@@ -1157,7 +1194,7 @@ class GrafanaDashboardProvider(Object):
         return {
             "charm": self._charm.meta.name,
             "content": content,
-            "juju_topology": self._juju_topology,
+            "juju_topology": self._juju_topology if inject_dropdowns else {},
             "inject_dropdowns": inject_dropdowns,
         }
 
@@ -1754,7 +1791,7 @@ class GrafanaDashboardAggregator(Object):
         if dashboards_path:
 
             def _is_dashboard(p: Path) -> bool:
-                return p.is_file and p.name.endswith((".json", ".json.tmpl", ".tmpl"))
+                return p.is_file() and p.name.endswith((".json", ".json.tmpl", ".tmpl"))
 
             for path in filter(_is_dashboard, Path(dashboards_path).glob("*")):
                 # path = Path(path)
