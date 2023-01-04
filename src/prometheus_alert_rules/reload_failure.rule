@@ -5,4 +5,4 @@ labels:
   severity: critical
 annotations:
   summary: Traefik config reload failure (instance {{ $labels.instance }})
-  description: "Traefik config reload failure rate is above 0"
+  description: "Traefik keeps failing to reload its config file"
