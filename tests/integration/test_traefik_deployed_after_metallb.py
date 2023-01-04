@@ -133,6 +133,14 @@ async def test_tls_termination(ops_test: OpsTest):
     )
     cert = peer_data["application-data"]["self_signed_ca_certificate"]
 
+    # Temporary workaround for grafana giving 404 (TODO remove when fixed)
+    num_rels_before = len(ops_test.model.applications[trfk.name].relations)
+    await ops_test.model.applications[trfk.name].remove_relation(f"{ipr.name}:ingress", trfk.name)
+    await ops_test.model.block_until(  # https://github.com/juju/python-libjuju/pull/665
+        lambda: len(ops_test.model.applications[trfk.name].relations) < num_rels_before
+    )
+    await ops_test.model.applications[trfk.name].add_relation(f"{ipr.name}:ingress", trfk.name)
+
     with tempfile.TemporaryDirectory() as certs_dir:
         cert_path = f"{certs_dir}/local.cert"
         with open(cert_path, "wt") as f:
@@ -141,8 +149,8 @@ async def test_tls_termination(ops_test: OpsTest):
         endpoints = [
             f"https://juju.local/{path}"
             for path in [
-                f"{ops_test.model_name}-{ipr.name}",
                 f"{ops_test.model_name}-{ipu.name}-0",
+                f"{ops_test.model_name}-{ipr.name}",
                 f"{ops_test.model_name}-{ipa.name}",
             ]
         ]
@@ -150,6 +158,8 @@ async def test_tls_termination(ops_test: OpsTest):
         for endpoint in endpoints:
             rc, stdout, stderr = await ops_test.run(
                 "curl",
+                "-s",
+                "--fail-with-body",
                 "--resolve",
                 f"juju.local:443:{ip}",
                 "--capath",
@@ -159,3 +169,4 @@ async def test_tls_termination(ops_test: OpsTest):
                 endpoint,
             )
             logger.info("%s: %s", endpoint, (rc, stdout, stderr))
+            assert rc == 0
