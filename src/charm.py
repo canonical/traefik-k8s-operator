@@ -9,7 +9,7 @@ import json
 import logging
 import socket
 import typing
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 from urllib.parse import urlparse
 
 import yaml
@@ -512,6 +512,20 @@ class TraefikIngressCharm(CharmBase):
     def _provide_routed_ingress(self, relation: Relation):
         """Provide ingress to a unit related through TraefikRoute."""
         config = self.traefik_route.get_config(relation)
+        config = yaml.safe_load(config)
+
+        if "http" in config.keys():
+            route_config = config["http"].get("routers", {})
+            router_name = next(iter(route_config.keys()))
+            route_rule = route_config.get(router_name, {}).get("rule", "")
+            service_name = route_config.get(router_name, {}).get("service", "")
+        if not all([router_name, route_rule, service_name]):
+            logger.debug("Not enough information to generate a TLS config!")
+        else:
+            config["http"]["routers"].update(
+                self._generate_tls_block(router_name, route_rule, service_name)
+            )
+
         self._push_configurations(relation, config)
 
     def _provide_ingress(
@@ -673,22 +687,10 @@ class TraefikIngressCharm(CharmBase):
                 "service": traefik_service_name,
                 "entryPoints": ["web"],
             },
-            traefik_router_name
-            + "-tls": {
-                "rule": route_rule,
-                "service": traefik_service_name,
-                "entryPoints": ["websecure"],
-                # "tls": {},
-                "tls": {
-                    "domains": [
-                        {
-                            "main": "juju.local",
-                            "sans": ["*.juju.local"],
-                        },
-                    ],
-                },
-            },
         }
+        router_cfg.update(
+            self._generate_tls_block(traefik_router_name, route_rule, traefik_service_name)
+        )
 
         config = {
             "http": {
@@ -704,6 +706,30 @@ class TraefikIngressCharm(CharmBase):
             router_cfg[traefik_router_name]["middlewares"] = list(middlewares.keys())
 
         return config, url
+
+    def _generate_tls_block(
+        self,
+        router_name: str = "",
+        route_rule: str = "",
+        service_name: str = "",
+    ) -> Dict[str, Any]:
+        """Generate a TLS configuration segment."""
+        return {
+            f"{router_name}-tls": {
+                "rule": route_rule,
+                "service": service_name,
+                "entryPoints": ["websecure"],
+                # "tls": {},
+                "tls": {
+                    "domains": [
+                        {
+                            "main": "juju.local",
+                            "sans": ["*.juju.local"],
+                        },
+                    ],
+                },
+            }
+        }
 
     def _generate_per_app_config(self, data: "RequirerData_IPA") -> Tuple[dict, str]:
         prefix = self._get_prefix(data)

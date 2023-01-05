@@ -4,6 +4,7 @@
 from unittest.mock import Mock, patch
 
 import pytest
+import yaml
 from ops.testing import Harness
 
 from charm import TraefikIngressCharm
@@ -12,6 +13,53 @@ MODEL_NAME = "test-model"
 REMOTE_APP_NAME = "traefikRouteApp"
 REMOTE_UNIT_NAME = REMOTE_APP_NAME + "/0"
 TR_RELATION_NAME = "traefik-route"
+
+CONFIG = {
+    "http": {
+        "routers": {
+            "juju-foo-router": {
+                "entryPoints": ["web"],
+                "rule": "PathPrefix(`/path`)",
+                "service": "juju-foo-service",
+            }
+        },
+        "services": {
+            "juju-foo-service": {
+                "loadBalancer": {"servers": [{"url": "http://foo.testmodel-endpoints.local:8080"}]}
+            }
+        },
+    }
+}
+
+CONFIG_WITH_TLS = {
+    "http": {
+        "routers": {
+            "juju-foo-router": {
+                "entryPoints": ["web"],
+                "rule": "PathPrefix(`/path`)",
+                "service": "juju-foo-service",
+            },
+            "juju-foo-router-tls": {
+                "entryPoints": ["websecure"],
+                "rule": "PathPrefix(`/path`)",
+                "service": "juju-foo-service",
+                "tls": {
+                    "domains": [
+                        {
+                            "main": "juju.local",
+                            "sans": ["*.juju.local"],
+                        },
+                    ],
+                },
+            },
+        },
+        "services": {
+            "juju-foo-service": {
+                "loadBalancer": {"servers": [{"url": "http://foo.testmodel-endpoints.local:8080"}]}
+            }
+        },
+    }
+}
 
 
 @pytest.fixture
@@ -54,7 +102,7 @@ def test_relation_not_ready(harness: Harness[TraefikIngressCharm]):
 def test_relation_ready(harness: Harness[TraefikIngressCharm]):
     tr_relation_id, relation = initialize_and_setup_tr_relation(harness)
     charm = harness.charm
-    config = "FOO"
+    config = yaml.dump(CONFIG)
     harness.update_relation_data(tr_relation_id, REMOTE_APP_NAME, {"config": config})
 
     assert charm.traefik_route.is_ready(relation)
@@ -66,10 +114,23 @@ def test_tr_ready_handler_called(harness: Harness[TraefikIngressCharm]):
     charm = harness.charm
     charm._handle_traefik_route_ready = mocked_handle = Mock(return_value=None)
 
-    config = "FOO"
+    config = yaml.dump(CONFIG)
     harness.update_relation_data(tr_relation_id, REMOTE_APP_NAME, {"config": config})
 
     assert charm.traefik_route.is_ready(relation)
     assert charm.traefik_route.get_config(relation) == config
 
     assert mocked_handle.called
+
+
+def test_tls_is_added(harness: Harness[TraefikIngressCharm]):
+    tr_relation_id, relation = initialize_and_setup_tr_relation(harness)
+    charm = harness.charm
+    config = yaml.dump(CONFIG)
+    harness.update_relation_data(tr_relation_id, REMOTE_APP_NAME, {"config": config})
+
+    assert charm.traefik_route.is_ready(relation)
+    assert charm.traefik_route.get_config(relation) == config
+    file = f"/opt/traefik/juju/juju_ingress_{relation.name}_{relation.id}_{relation.app.name}.yaml"
+    conf = yaml.safe_load(charm.container.pull(file).read())
+    assert conf == CONFIG_WITH_TLS
