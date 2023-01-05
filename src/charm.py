@@ -96,7 +96,7 @@ class TraefikIngressCharm(CharmBase):
             ports=[(f"{self.app.name}", self._port)],
         )
 
-        # observability endpoints
+        # Observability integrations
         # Provide grafana dashboards over a relation interface
         # dashboard to use: https://grafana.com/grafana/dashboards/4475-traefik/
         # TODO wishlist: I would like for the p60, p70, p80, p90, p99, min, max, and avg for

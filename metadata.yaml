@@ -56,12 +56,12 @@ provides:
       charm in need of ingress, configuring the relation on a per-unit basis.
   grafana-dashboard:
     description: |
-      Provides endpoint to instrument a grafana dashboard upon relating to a Grafana charm.
+      Forwards the built-in grafana dashboard(s) for monitoring traefik.
     interface: grafana_dashboard
 
 requires:
   logging:
     interface: loki_push_api
     description: |
-      Endpoint to push logs to Loki.
+      Receives Loki's push api endpoint address to push logs to, and forwards charm's built-in alert rules to Loki.
     limit: 1
