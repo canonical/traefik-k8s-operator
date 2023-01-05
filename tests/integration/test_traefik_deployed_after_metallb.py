@@ -169,4 +169,7 @@ async def test_tls_termination(ops_test: OpsTest):
                 endpoint,
             )
             logger.info("%s: %s", endpoint, (rc, stdout, stderr))
-            assert rc == 0
+            assert rc == 0, (
+                f"curl exited with rc={rc} for {endpoint}; "
+                "non-zero return code means curl encountered a >= 400 HTTP code"
+            )
