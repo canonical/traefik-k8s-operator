@@ -725,8 +725,8 @@ class TraefikIngressCharm(CharmBase):
                 "tls": {
                     "domains": [
                         {
-                            "main": "juju.local",
-                            "sans": ["*.juju.local"],
+                            "main": self.external_host,
+                            "sans": [f"*.{self.external_host}"],
                         },
                     ],
                 },

@@ -46,8 +46,8 @@ CONFIG_WITH_TLS = {
                 "tls": {
                     "domains": [
                         {
-                            "main": "juju.local",
-                            "sans": ["*.juju.local"],
+                            "main": "testhostname",
+                            "sans": ["*.testhostname"],
                         },
                     ],
                 },
