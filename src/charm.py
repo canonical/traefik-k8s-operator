@@ -7,9 +7,10 @@
 import enum
 import json
 import logging
+import re
 import socket
 import typing
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 from urllib.parse import urlparse
 
 import yaml
@@ -99,6 +100,7 @@ class TraefikIngressCharm(CharmBase):
     _port = 80
     _tls_port = 443
     _diagnostics_port = 8082  # Prometheus metrics, healthcheck/ping
+    _bin_path = "/usr/bin/traefik"
 
     def __init__(self, *args):
         super().__init__(*args)
@@ -338,6 +340,7 @@ class TraefikIngressCharm(CharmBase):
         self._clear_all_configs_and_restart_traefik()
         # push the (fresh new) configs.
         self._process_status_and_configurations()
+        self._set_workload_version()
 
     def _clear_all_configs_and_restart_traefik(self):
         # Since pebble ready will also occur after a pod churn, but we store the
@@ -355,10 +358,11 @@ class TraefikIngressCharm(CharmBase):
 
     def _on_update_status(self, _: UpdateStatusEvent):
         self._process_status_and_configurations()
+        self._set_workload_version()
 
     def _on_config_changed(self, _: ConfigChangedEvent):
         # If the external hostname is changed since we last processed it, we need to
-        # to reconsider all data sent over the relations and all configs
+        # reconsider all data sent over the relations and all configs
         new_external_host = self.external_host
         new_routing_mode = self.config["routing_mode"]
 
@@ -789,7 +793,7 @@ class TraefikIngressCharm(CharmBase):
                 _TRAEFIK_SERVICE_NAME: {
                     "override": "replace",
                     "summary": "Traefik",
-                    "command": "/usr/bin/traefik",
+                    "command": self._bin_path,
                     "startup": "enabled",
                 },
             },
@@ -840,6 +844,32 @@ class TraefikIngressCharm(CharmBase):
         The two modes are 'subdomain' and 'path', where 'path' is the default.
         """
         return _RoutingMode(self.config["routing_mode"])
+
+    @property
+    def version(self) -> Optional[str]:
+        """Return the workload version."""
+        if not self.container.can_connect():
+            return None
+
+        version_output, _ = self.container.exec([self._bin_path, "version"]).wait_output()
+        # Output looks like this:
+        # Version:      2.9.6
+        # Codename:     banon
+        # Go version:   go1.18.9
+        # Built:        2022-12-07_04:28:37PM
+        # OS/Arch:      linux/amd64
+
+        if result := re.search(r"Version:\s*(\d*\.\d*\.\d*)", version_output):
+            return result.group(1)
+        return None
+
+    def _set_workload_version(self):
+        if version := self.version:
+            self.unit.set_workload_version(version)
+        else:
+            logger.debug(
+                "Cannot set workload version at this time: could not get Traefik version."
+            )
 
     @property
     def cert_subject(self) -> str:

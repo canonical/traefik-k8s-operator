@@ -94,6 +94,10 @@ class TestTraefikIngressCharm(unittest.TestCase):
         self.harness.set_model_name("test-model")
         self.addCleanup(self.harness.cleanup)
 
+        patcher = patch.object(TraefikIngressCharm, "version", property(lambda *_: "0.0.0"))
+        self.mock_version = patcher.start()
+        self.addCleanup(patcher.stop)
+
     @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
     def test_service_get(self):
         self.harness.update_config({"external_hostname": "testhostname"})
@@ -663,6 +667,10 @@ class TestConfigOptionsValidation(unittest.TestCase):
         self.harness: Harness[TraefikIngressCharm] = Harness(TraefikIngressCharm)
         self.harness.set_model_name("test-model")
         self.addCleanup(self.harness.cleanup)
+
+        patcher = patch.object(TraefikIngressCharm, "version", property(lambda *_: "0.0.0"))
+        self.mock_version = patcher.start()
+        self.addCleanup(patcher.stop)
 
         self.harness.set_leader(True)
         self.harness.begin_with_initial_hooks()
