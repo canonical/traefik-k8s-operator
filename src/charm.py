@@ -562,7 +562,7 @@ class TraefikIngressCharm(CharmBase):
 
         return config
 
-    def _get_configs_per_unit(self, relation: Relation):
+    def _get_configs_per_unit(self, relation: Relation) -> dict:
         # FIXME Ideally, follower units could instead watch for the data in the
         # ingress app data bag, but Juju does not allow non-leader units to read
         # the application data bag on their side of the relation, so we may start
@@ -668,7 +668,7 @@ class TraefikIngressCharm(CharmBase):
 
         Per-unit and per-app configuration blocks are mostly similar, with the principal
         difference being the list of servers to load balance across (where IPU is one server per
-        unit and IPA may be more than one.
+        unit and IPA may be more than one).
         """
         host = self.external_host
 
