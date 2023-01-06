@@ -55,10 +55,10 @@ def get_endpoints(ops_test: OpsTest, *, scheme: str, netloc: str) -> list:
 
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy(ops_test: OpsTest, traefik_charm):
-    # logger.info("First, disable metallb, in case it's enabled")
-    # await disable_metallb()
-    # logger.info("Now enable metallb")
-    # await enable_metallb()
+    logger.info("First, disable metallb, in case it's enabled")
+    await disable_metallb()
+    logger.info("Now enable metallb")
+    await enable_metallb()
 
     await asyncio.gather(
         ops_test.model.deploy(
@@ -137,14 +137,6 @@ async def test_tls_termination(ops_test: OpsTest):
         filter(lambda d: d["endpoint"] == "replicas", data["root-ca/0"]["relation-info"])
     )
     cert = peer_data["application-data"]["self_signed_ca_certificate"]
-
-    # # Temporary workaround for grafana giving 404 (TODO remove when fixed)
-    # num_rels_before = len(ops_test.model.applications[trfk.name].relations)
-    # await ops_test.model.applications[trfk.name].remove_relation(f"{ipr.name}:ingress", trfk.name)
-    # await ops_test.model.block_until(  # https://github.com/juju/python-libjuju/pull/665
-    #     lambda: len(ops_test.model.applications[trfk.name].relations) < num_rels_before
-    # )
-    # await ops_test.model.applications[trfk.name].add_relation(f"{ipr.name}:ingress", trfk.name)
 
     with tempfile.TemporaryDirectory() as certs_dir:
         cert_path = f"{certs_dir}/local.cert"
