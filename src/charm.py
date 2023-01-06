@@ -9,7 +9,7 @@ import json
 import logging
 import socket
 import typing
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Tuple, Union
 from urllib.parse import urlparse
 
 import yaml
@@ -519,12 +519,13 @@ class TraefikIngressCharm(CharmBase):
             router_name = next(iter(route_config.keys()))
             route_rule = route_config.get(router_name, {}).get("rule", "")
             service_name = route_config.get(router_name, {}).get("service", "")
-        if not all([router_name, route_rule, service_name]):
-            logger.debug("Not enough information to generate a TLS config!")
-        else:
-            config["http"]["routers"].update(
-                self._generate_tls_block(router_name, route_rule, service_name)
-            )
+
+            if not all([router_name, route_rule, service_name]):
+                logger.debug("Not enough information to generate a TLS config!")
+            else:
+                config["http"]["routers"].update(
+                    self._generate_tls_block(router_name, route_rule, service_name)
+                )
 
         self._push_configurations(relation, config)
 
@@ -709,9 +710,9 @@ class TraefikIngressCharm(CharmBase):
 
     def _generate_tls_block(
         self,
-        router_name: str = "",
-        route_rule: str = "",
-        service_name: str = "",
+        router_name: str,
+        route_rule: str,
+        service_name: str,
     ) -> Dict[str, Any]:
         """Generate a TLS configuration segment."""
         return {
