@@ -166,7 +166,9 @@ class TraefikIngressCharm(CharmBase):
         observe(ipu_events.data_provided, self._handle_ingress_data_provided)
         observe(ipu_events.data_removed, self._handle_ingress_data_removed)
 
-        observe(self.traefik_route.on.ready, self._handle_traefik_route_ready)
+        ipr_events = self.traefik_route.on
+        observe(ipr_events.ready, self._handle_traefik_route_ready)
+        observe(ipr_events.data_removed, self._handle_ingress_data_removed)
 
         # Action handlers
         observe(self.on.show_proxied_endpoints_action, self._on_show_proxied_endpoints)
@@ -472,10 +474,9 @@ class TraefikIngressCharm(CharmBase):
 
     def _handle_ingress_data_removed(self, event: RelationEvent):
         """A unit has removed the data we need to provide ingress."""
-        # if this is because the relation is gone, we don't need to do anything
-        if isinstance(event, RelationBrokenEvent):
-            return
-        self._wipe_ingress_for_relation(event.relation)
+        self._wipe_ingress_for_relation(
+            event.relation, wipe_rel_data=not isinstance(event, RelationBrokenEvent)
+        )
 
     def _handle_traefik_route_ready(self, event: TraefikRouteRequirerReadyEvent):
         """A traefik_route charm has published some ingress data."""
@@ -742,7 +743,7 @@ class TraefikIngressCharm(CharmBase):
         for relation in self.model.relations["ingress"] + self.model.relations["ingress-per-unit"]:
             self._wipe_ingress_for_relation(relation)
 
-    def _wipe_ingress_for_relation(self, relation: Relation):
+    def _wipe_ingress_for_relation(self, relation: Relation, *, wipe_rel_data=True):
         logger.debug(f"Wiping the ingress setup for the '{relation.name}:{relation.id}' relation")
 
         # Delete configuration files for the relation. In case of Traefik pod
@@ -760,8 +761,9 @@ class TraefikIngressCharm(CharmBase):
 
         # Wipe URLs sent to the requesting apps and units, as they are based on a gateway
         # address that is no longer valid.
-        if self.unit.is_leader():
-            provider = self._provider_from_relation(relation)
+        # Skip this for traefik-route because it doesn't have a `wipe_ingress_data` method.
+        provider = self._provider_from_relation(relation)
+        if wipe_rel_data and self.unit.is_leader() and provider != self.traefik_route:
             provider.wipe_ingress_data(relation)
 
     def _relation_config_file(self, relation: Relation):
