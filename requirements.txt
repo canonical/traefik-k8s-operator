@@ -27,4 +27,3 @@ lightkube-models >= 1.22.0.4
 # Code: https://github.com/canonical/operator/
 # Docs: https://ops.rtfd.io/
 # Deps: charm
-ops
