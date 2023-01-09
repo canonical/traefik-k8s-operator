@@ -120,6 +120,11 @@ async def route_tester_charm():
     )
 
 
+@pytest.fixture(scope="module")
+def temp_dir(tmp_path_factory):
+    return tmp_path_factory.mktemp("data")
+
+
 def purge(data: dict):
     for key in _JUJU_KEYS:
         if key in data:
@@ -285,7 +290,7 @@ async def get_address(ops_test: OpsTest, app_name: str, unit=0):
 async def deploy_traefik_if_not_deployed(ops_test: OpsTest, traefik_charm):
     try:
         await ops_test.model.deploy(
-            traefik_charm, application_name="traefik-k8s", resources=trfk_resources, series="focal"
+            traefik_charm, application_name="traefik-k8s", resources=trfk_resources
         )
     except JujuError as e:
         if 'cannot add application "traefik-k8s": application already exists' not in str(e):
@@ -308,9 +313,7 @@ async def deploy_traefik_if_not_deployed(ops_test: OpsTest, traefik_charm):
 
 async def deploy_charm_if_not_deployed(ops_test: OpsTest, charm, app_name: str, resources=None):
     if not ops_test.model.applications.get(app_name):
-        await ops_test.model.deploy(
-            charm, resources=resources, application_name=app_name, series="focal"
-        )
+        await ops_test.model.deploy(charm, resources=resources, application_name=app_name)
 
     # block until app goes to active/idle
     async with ops_test.fast_forward():

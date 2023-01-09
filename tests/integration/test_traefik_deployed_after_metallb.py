@@ -16,7 +16,6 @@ NOTE: This module implicitly relies on in-order execution (test running in the o
 import asyncio
 import json
 import logging
-import tempfile
 from pathlib import Path
 from types import SimpleNamespace
 from urllib.request import urlopen
@@ -54,6 +53,13 @@ def get_endpoints(ops_test: OpsTest, *, scheme: str, netloc: str) -> list:
 
 
 @pytest.mark.abort_on_fail
+async def test_setup_env(ops_test: OpsTest):
+    await ops_test.model.set_config(
+        {"update-status-hook-interval": "60m", "logging-config": "<root>=WARNING; unit=DEBUG"}
+    )
+
+
+@pytest.mark.abort_on_fail
 async def test_build_and_deploy(ops_test: OpsTest, traefik_charm):
     logger.info("First, disable metallb, in case it's enabled")
     await disable_metallb()
@@ -62,28 +68,25 @@ async def test_build_and_deploy(ops_test: OpsTest, traefik_charm):
 
     await asyncio.gather(
         ops_test.model.deploy(
-            traefik_charm, resources=trfk.resources, application_name=trfk.name, series="focal"
+            traefik_charm, resources=trfk.resources, application_name=trfk.name
         ),
         ops_test.model.deploy(
             ipu.charm,
             application_name=ipu.name,
             channel="edge",  # TODO change to "stable" once available
             trust=True,
-            series="focal",
         ),
         ops_test.model.deploy(
             ipa.charm,
             application_name=ipa.name,
             channel="edge",  # TODO change to "stable" once available
             trust=True,
-            series="focal",
         ),
         ops_test.model.deploy(
             ipr.charm,
             application_name=ipr.name,
             channel="edge",  # TODO change to "stable" once available
             trust=True,
-            series="focal",
         ),
     )
 
@@ -111,8 +114,33 @@ async def test_ingressed_endpoints_reachable_after_metallb_enabled(ops_test: Ops
         # so just `urlopen` on its own should suffice for the test.
 
 
+async def curl_endpoints(ops_test: OpsTest, certs_dir, cert_path, traefik_app_ip):
+    for endpoint in get_endpoints(ops_test, scheme="https", netloc=mock_hostname):
+        # Tell curl to resolve the mock_hostname as traefik's IP (to avoid using a custom DNS
+        # server). This is needed because the certificate issued by the CA would have that same
+        # hostname as the subject, and for TLS to succeed, the target url's hostname must match
+        # the one in the certificate.
+        rc, stdout, stderr = await ops_test.run(
+            "curl",
+            "-s",
+            "--fail-with-body",
+            "--resolve",
+            f"{mock_hostname}:443:{traefik_app_ip}",
+            "--capath",
+            certs_dir,
+            "--cacert",
+            cert_path,
+            endpoint,
+        )
+        logger.info("%s: %s", endpoint, (rc, stdout, stderr))
+        assert rc == 0, (
+            f"curl exited with rc={rc} for {endpoint}; "
+            "non-zero return code means curl encountered a >= 400 HTTP code"
+        )
+
+
 @pytest.mark.abort_on_fail
-async def test_tls_termination(ops_test: OpsTest):
+async def test_tls_termination(ops_test: OpsTest, temp_dir):
     # TODO move this to the bundle tests
     await ops_test.model.applications[trfk.name].set_config({"external_hostname": mock_hostname})
 
@@ -138,31 +166,28 @@ async def test_tls_termination(ops_test: OpsTest):
     )
     cert = peer_data["application-data"]["self_signed_ca_certificate"]
 
-    with tempfile.TemporaryDirectory() as certs_dir:
-        cert_path = f"{certs_dir}/local.cert"
-        with open(cert_path, "wt") as f:
-            f.writelines(cert)
+    cert_path = temp_dir / "local.cert"
+    with open(cert_path, "wt") as f:
+        f.writelines(cert)
 
-        ip = await get_address(ops_test, trfk.name)
-        for endpoint in get_endpoints(ops_test, scheme="https", netloc=mock_hostname):
-            # Tell curl to resolve the mock_hostname as traefik's IP (to avoid using a custom DNS
-            # server). This is needed because the certificate issued by the CA would have that same
-            # hostname as the subject, and for TLS to succeed, the target url's hostname must match
-            # the one in the certificate.
-            rc, stdout, stderr = await ops_test.run(
-                "curl",
-                "-s",
-                "--fail-with-body",
-                "--resolve",
-                f"{mock_hostname}:443:{ip}",
-                "--capath",
-                certs_dir,
-                "--cacert",
-                cert_path,
-                endpoint,
-            )
-            logger.info("%s: %s", endpoint, (rc, stdout, stderr))
-            assert rc == 0, (
-                f"curl exited with rc={rc} for {endpoint}; "
-                "non-zero return code means curl encountered a >= 400 HTTP code"
-            )
+    logger.info("Attempting to read %s", temp_dir / "local.cert")
+    logger.info((temp_dir / "local.cert").read_text())
+
+    ip = await get_address(ops_test, trfk.name)
+    await curl_endpoints(ops_test, temp_dir, cert_path, ip)
+
+
+@pytest.mark.abort_on_fail
+async def test_tls_termination_after_charm_upgrade(ops_test: OpsTest, traefik_charm, temp_dir):
+    logger.info(
+        "Refreshing charm to test TLS termination still works with the same certificate after"
+        " charm upgrade..."
+    )
+    await ops_test.model.applications[trfk.name].refresh(
+        path=traefik_charm, resources=trfk.resources
+    )
+    await ops_test.model.wait_for_idle(status="active", timeout=600, idle_period=30)
+    ip = await get_address(ops_test, trfk.name)
+    logger.info("Attempting to read %s", temp_dir / "local.cert")
+    logger.info((temp_dir / "local.cert").read_text())
+    await curl_endpoints(ops_test, temp_dir, temp_dir / "local.cert", ip)

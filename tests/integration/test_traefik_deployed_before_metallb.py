@@ -42,11 +42,11 @@ async def test_build_and_deploy(
 
     await asyncio.gather(
         ops_test.model.deploy(
-            traefik_charm, resources=resources, application_name="traefik", series="focal"
+            traefik_charm, resources=resources, application_name="traefik"
         ),
-        ops_test.model.deploy(ipu_tester_charm, application_name="ipu-tester", series="focal"),
-        ops_test.model.deploy(ipa_tester_charm, application_name="ipa-tester", series="focal"),
-        ops_test.model.deploy(route_tester_charm, application_name="route-tester", series="focal"),
+        ops_test.model.deploy(ipu_tester_charm, application_name="ipu-tester"),
+        ops_test.model.deploy(ipa_tester_charm, application_name="ipa-tester"),
+        ops_test.model.deploy(route_tester_charm, application_name="route-tester"),
     )
 
     await ops_test.model.wait_for_idle(timeout=600, idle_period=30)

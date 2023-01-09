@@ -33,7 +33,7 @@ def get_unit_ip(ops_test: OpsTest):
 async def test_deployment(ops_test: OpsTest, traefik_charm, tcp_tester_charm):
     await deploy_traefik_if_not_deployed(ops_test, traefik_charm)
     await ops_test.model.deploy(
-        tcp_tester_charm, "tcp-tester", resources=tcp_charm_resources, series="focal"
+        tcp_tester_charm, "tcp-tester", resources=tcp_charm_resources
     )
     async with ops_test.fast_forward():
         await ops_test.model.wait_for_idle(
