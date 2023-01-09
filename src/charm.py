@@ -76,6 +76,7 @@ _STATIC_CONFIG_PATH = _STATIC_CONFIG_DIR + "/traefik.yaml"
 _DYNAMIC_CERTS_PATH = _DYNAMIC_CONFIG_DIR + "/certificates.yaml"
 _CERTIFICATE_PATH = _DYNAMIC_CONFIG_DIR + "/certificate.cert"
 _CERTIFICATE_KEY_PATH = _DYNAMIC_CONFIG_DIR + "/certificate.key"
+BIN_PATH = "/usr/bin/traefik"
 
 
 class _RoutingMode(enum.Enum):
@@ -96,7 +97,6 @@ class TraefikIngressCharm(CharmBase):
     _port = 80
     _tls_port = 443
     _diagnostics_port = 8082  # Prometheus metrics, healthcheck/ping
-    _bin_path = "/usr/bin/traefik"
 
     def __init__(self, *args):
         super().__init__(*args)
@@ -801,7 +801,7 @@ class TraefikIngressCharm(CharmBase):
                 _TRAEFIK_SERVICE_NAME: {
                     "override": "replace",
                     "summary": "Traefik",
-                    "command": self._bin_path,
+                    "command": BIN_PATH,
                     "startup": "enabled",
                 },
             },
@@ -859,7 +859,7 @@ class TraefikIngressCharm(CharmBase):
         if not self.container.can_connect():
             return None
 
-        version_output, _ = self.container.exec([self._bin_path, "version"]).wait_output()
+        version_output, _ = self.container.exec([BIN_PATH, "version"]).wait_output()
         # Output looks like this:
         # Version:      2.9.6
         # Codename:     banon
@@ -867,7 +867,7 @@ class TraefikIngressCharm(CharmBase):
         # Built:        2022-12-07_04:28:37PM
         # OS/Arch:      linux/amd64
 
-        if result := re.search(r"Version:\s*((\d+.?)+)", version_output):
+        if result := re.search(r"Version:\s*(.+)", version_output):
             return result.group(1)
         return None
 
