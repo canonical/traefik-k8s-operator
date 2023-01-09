@@ -1,10 +1,13 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
+import functools
+import logging
 import os
+from collections import defaultdict
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from subprocess import PIPE, Popen
-from time import sleep
 
 import pytest
 import yaml
@@ -17,35 +20,51 @@ trfk_resources = {name: val["upstream-source"] for name, val in trfk_meta["resou
 _JUJU_DATA_CACHE = {}
 _JUJU_KEYS = ("egress-subnets", "ingress-address", "private-address")
 
+logger = logging.getLogger(__name__)
 
-@pytest.fixture(autouse=True, scope="session")
-@pytest.mark.abort_on_fail
-def traefik_charm():
-    proc = Popen(["charmcraft", "pack"], stdout=PIPE, stderr=PIPE, cwd=charm_root)
-    proc.wait()
-    while proc.returncode is None:  # wait() does not quite wait
-        print(proc.stdout.read().decode("utf-8"))
-        sleep(1)
-    if proc.returncode != 0:
-        raise ValueError(
-            "charmcraft pack failed with code: ",
-            proc.returncode,
-            proc.stderr.read().decode("utf-8"),
-        )
 
-    charms = tuple(map(str, charm_root.glob("*.charm")))
-    assert len(charms) == 1, (
-        f"too many charms {charms}" if charms else f"no charm found at {Path().absolute()}"
-    )
+class Store(defaultdict):
+    def __init__(self):
+        super(Store, self).__init__(Store)
 
-    charm = charms[0]
-    charm_path = Path(charm).absolute()
+    def __getattr__(self, key):
+        """Override __getattr__ so dot syntax works on keys."""
+        try:
+            return self[key]
+        except KeyError:
+            raise AttributeError(key)
 
-    assert charm_path.exists()
+    def __setattr__(self, key, value):
+        """Override __setattr__ so dot syntax works on keys."""
+        self[key] = value
 
-    yield charm_path
 
-    Popen(["rm", str(charm_path)], cwd=charm_root).wait()
+store = Store()
+
+
+def timed_memoizer(func):
+    @functools.wraps(func)
+    async def wrapper(*args, **kwargs):
+        fname = func.__qualname__
+        logger.info("Started: %s" % fname)
+        start_time = datetime.now()
+        if fname in store.keys():
+            ret = store[fname]
+        else:
+            logger.info("Return for {} not cached".format(fname))
+            ret = await func(*args, **kwargs)
+            store[fname] = ret
+        logger.info("Finished: {} in: {} seconds".format(fname, datetime.now() - start_time))
+        return ret
+
+    return wrapper
+
+
+@pytest.fixture(scope="module")
+@timed_memoizer
+async def traefik_charm(ops_test: OpsTest):
+    charm = await ops_test.build_charm(".")
+    return charm
 
 
 def purge(data: dict):
@@ -213,7 +232,7 @@ async def get_address(ops_test: OpsTest, app_name: str, unit=0):
 async def deploy_traefik_if_not_deployed(ops_test: OpsTest, traefik_charm):
     if not ops_test.model.applications.get("traefik-k8s"):
         await ops_test.model.deploy(
-            traefik_charm, application_name="traefik-k8s", resources=trfk_resources
+            traefik_charm, application_name="traefik-k8s", resources=trfk_resources, series="focal"
         )
         # if we're running this locally, we need to wait for "waiting"
         # CI however deploys all in a single model, so traefik is active already
@@ -239,7 +258,9 @@ async def deploy_traefik_if_not_deployed(ops_test: OpsTest, traefik_charm):
 
 async def deploy_charm_if_not_deployed(ops_test: OpsTest, charm, app_name: str, resources=None):
     if not ops_test.model.applications.get(app_name):
-        await ops_test.model.deploy(charm, resources=resources, application_name=app_name)
+        await ops_test.model.deploy(
+            charm, resources=resources, application_name=app_name, series="focal"
+        )
 
     # block until app goes to active/idle
     async with ops_test.fast_forward():

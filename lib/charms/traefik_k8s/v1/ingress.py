@@ -54,7 +54,7 @@ class SomeCharm(CharmBase):
 import logging
 import socket
 import typing
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple, Union
 
 import yaml
 from ops.charm import CharmBase, RelationBrokenEvent, RelationEvent
@@ -69,7 +69,7 @@ LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 3
+LIBPATCH = 5
 
 DEFAULT_RELATION_NAME = "ingress"
 RELATION_INTERFACE = "ingress"
@@ -97,6 +97,7 @@ INGRESS_REQUIRES_APP_SCHEMA = {
         "name": {"type": "string"},
         "host": {"type": "string"},
         "port": {"type": "string"},
+        "strip-prefix": {"type": "string"},
     },
     "required": ["model", "name", "host", "port"],
 }
@@ -115,7 +116,11 @@ except ImportError:
     from typing_extensions import TypedDict  # py35 compat
 
 # Model of the data a unit implementing the requirer will need to provide.
-RequirerData = TypedDict("RequirerData", {"model": str, "name": str, "host": str, "port": int})
+RequirerData = TypedDict(
+    "RequirerData",
+    {"model": str, "name": str, "host": str, "port": int, "strip-prefix": bool},
+    total=False,
+)
 # Provider ingress data model.
 ProviderIngressData = TypedDict("ProviderIngressData", {"url": str})
 # Provider application databag model.
@@ -221,12 +226,14 @@ class _IPAEvent(RelationEvent):
 class IngressPerAppDataProvidedEvent(_IPAEvent):
     """Event representing that ingress data has been provided for an app."""
 
-    __args__ = ("name", "model", "port", "host")
+    __args__ = ("name", "model", "port", "host", "strip_prefix")
+
     if typing.TYPE_CHECKING:
         name = None  # type: str
         model = None  # type: str
         port = None  # type: int
         host = None  # type: str
+        strip_prefix = False  # type: bool
 
 
 class IngressPerAppDataRemovedEvent(RelationEvent):
@@ -266,6 +273,7 @@ class IngressPerAppProvider(_IngressPerAppBase):
                 data["model"],
                 data["port"],
                 data["host"],
+                data.get("strip-prefix", False),
             )
 
     def _handle_relation_broken(self, event):
@@ -297,17 +305,14 @@ class IngressPerAppProvider(_IngressPerAppBase):
             return {}
 
         databag = relation.data[relation.app]
-        try:
-            remote_data = {k: databag[k] for k in ("model", "name", "host", "port")}
-        except KeyError as e:
-            # incomplete data / invalid data
-            log.debug("error {}; ignoring...".format(e))
-            return {}
-        except TypeError as e:
-            raise DataValidationError("Error casting remote data: {}".format(e))
+        remote_data = {}  # type: Dict[str, Union[int, str]]
+        for k in ("port", "host", "model", "name", "mode", "strip-prefix"):
+            v = databag.get(k)
+            if v is not None:
+                remote_data[k] = v
         _validate_data(remote_data, INGRESS_REQUIRES_APP_SCHEMA)
-
         remote_data["port"] = int(remote_data["port"])
+        remote_data["strip-prefix"] = bool(remote_data.get("strip-prefix", False))
         return remote_data
 
     def get_data(self, relation: Relation) -> RequirerData:
@@ -408,6 +413,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         *,
         host: str = None,
         port: int = None,
+        strip_prefix: bool = False,
     ):
         """Constructor for IngressRequirer.
 
@@ -422,6 +428,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
                 relation must be of interface type `ingress` and have "limit: 1")
             host: Hostname to be used by the ingress provider to address the requiring
                 application; if unspecified, the default Kubernetes service name will be used.
+            strip_prefix: configure Traefik to strip the path prefix.
 
         Request Args:
             port: the port of the service
@@ -429,6 +436,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         super().__init__(charm, relation_name)
         self.charm: CharmBase = charm
         self.relation_name = relation_name
+        self._strip_prefix = strip_prefix
 
         self._stored.set_default(current_url=None)
 
@@ -501,6 +509,10 @@ class IngressPerAppRequirer(_IngressPerAppBase):
             "host": host,
             "port": str(port),
         }
+
+        if self._strip_prefix:
+            data["strip-prefix"] = "true"
+
         _validate_data(data, INGRESS_REQUIRES_APP_SCHEMA)
         self.relation.data[self.app].update(data)
 

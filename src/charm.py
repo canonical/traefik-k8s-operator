@@ -104,7 +104,7 @@ class TraefikIngressCharm(CharmBase):
 
         self.ingress_per_app = IngressPerAppProvider(charm=self)
         self.ingress_per_unit = IngressPerUnitProvider(charm=self)
-        self.traefik_route = TraefikRouteProvider(charm=self)
+        self.traefik_route = TraefikRouteProvider(charm=self, external_host=self.external_host)
 
         observe = self.framework.observe
         observe(self.on.traefik_pebble_ready, self._on_traefik_pebble_ready)
@@ -126,6 +126,9 @@ class TraefikIngressCharm(CharmBase):
         observe(self.on.show_proxied_endpoints_action, self._on_show_proxied_endpoints)
 
     def _on_show_proxied_endpoints(self, event: ActionEvent):
+        if not self.ready:
+            return
+
         try:
             result = {}
             result.update(self.ingress_per_unit.proxied_endpoints)
@@ -236,7 +239,7 @@ class TraefikIngressCharm(CharmBase):
     def _on_config_changed(self, _: ConfigChangedEvent):
         # If the external hostname is changed since we last processed it, we need to
         # to reconsider all data sent over the relations and all configs
-        new_external_host = self._external_host
+        new_external_host = self.external_host
         new_routing_mode = self.config["routing_mode"]
 
         if (
@@ -263,7 +266,7 @@ class TraefikIngressCharm(CharmBase):
             )
             return
 
-        hostname = self._external_host
+        hostname = self.external_host
 
         if not hostname:
             self.unit.status = MaintenanceStatus("resetting ingress relations")
@@ -330,7 +333,7 @@ class TraefikIngressCharm(CharmBase):
     @property
     def ready(self) -> bool:
         """Check whether we have an external host set, and traefik is running."""
-        if not self._external_host:
+        if not self.external_host:
             self._wipe_ingress_for_all_relations()  # fixme: no side-effects in prop
             self.unit.status = WaitingStatus("gateway address unavailable")
             return False
@@ -369,22 +372,14 @@ class TraefikIngressCharm(CharmBase):
         # before continuing. However, the provider will NOT be ready if there are no units on the
         # other side, which is the case for the RelationDeparted for the last unit (i.e., the
         # proxied application scales to zero).
-        gateway_address = self._external_host
-        assert gateway_address, "No gateway address available"
+        if not self.ready:
+            return
 
         provider = self._provider_from_relation(relation)
         if not provider.is_ready(relation):
-            # TODO Cleanup: the provider for ingress_per_unit will NOT be ready
-            #  if there are no units on the other side, which is the case for
-            #  the RelationDeparted for the last unit (i.e., the proxied
-            #  application scales to zero).
-
-            if provider == self.ingress_per_unit and not relation.units:
-                logger.debug(
-                    "No units found in the ingress-per-unit relation; "
-                    "resetting ingress configurations"
-                )
-                self._wipe_ingress_for_relation(relation)
+            logger.debug(f"Provider {provider} not ready; resetting ingress configurations.")
+            self._wipe_ingress_for_relation(relation)
+            return
 
         rel = f"{relation.name}:{relation.id}"
         self.unit.status = MaintenanceStatus(f"updating ingress configuration for '{rel}'")
@@ -397,9 +392,6 @@ class TraefikIngressCharm(CharmBase):
 
     def _provide_routed_ingress(self, relation: Relation):
         """Provide ingress to a unit related through TraefikRoute."""
-        if not self.traefik_route.is_ready(relation):
-            logger.info("traefik-route not ready on %s", relation)
-            return
         config = self.traefik_route.get_config(relation)
         self._push_configurations(relation, config)
 
@@ -484,11 +476,22 @@ class TraefikIngressCharm(CharmBase):
         name = data["name"].replace("/", "-")
         return f"{data['model']}-{name}"
 
+    def _generate_middleware_config(
+        self, data: Union["RequirerData_IPA", "RequirerData_IPU"], prefix: str
+    ) -> dict:
+        """Generate a stripPrefix middleware for path based routing."""
+        if self._routing_mode is _RoutingMode.path and data.get("strip-prefix", False):
+            return {
+                f"juju-sidecar-noprefix-{prefix}": {
+                    "stripPrefix": {"prefixes": [f"/{prefix}"], "forceSlash": False}
+                }
+            }
+
     def _generate_per_unit_config(self, data: "RequirerData_IPU") -> Tuple[dict, str]:
         """Generate a config dict for a given unit for IngressPerUnit."""
         config = {"http": {"routers": {}, "services": {}}}
         prefix = self._get_prefix(data)
-        host = self._external_host
+        host = self.external_host
         if data["mode"] == "tcp":
             port = data["port"]
             unit_url = f"{host}:{port}"
@@ -522,18 +525,26 @@ class TraefikIngressCharm(CharmBase):
         traefik_router_name = f"juju-{prefix}-router"
         traefik_service_name = f"juju-{prefix}-service"
 
-        config["http"]["routers"][traefik_router_name] = {
+        router_cfg = {
             "rule": route_rule,
             "service": traefik_service_name,
             "entryPoints": ["web"],
         }
+
+        middlewares = self._generate_middleware_config(data, prefix)
+        if middlewares:
+            router_cfg["middlewares"] = list(middlewares.keys())
+
+        config["http"]["middlewares"] = middlewares
+        config["http"]["routers"][traefik_router_name] = router_cfg
+
         config["http"]["services"][traefik_service_name] = {
             "loadBalancer": {"servers": [{"url": f"http://{data['host']}:{data['port']}"}]}
         }
         return config, unit_url
 
     def _generate_per_app_config(self, data: "RequirerData_IPA") -> Tuple[dict, str]:
-        host = self._external_host
+        host = self.external_host
         port = self._port
         prefix = self._get_prefix(data)
 
@@ -547,15 +558,22 @@ class TraefikIngressCharm(CharmBase):
         traefik_router_name = f"juju-{prefix}-router"
         traefik_service_name = f"juju-{prefix}-service"
 
+        router_cfg = {
+            traefik_router_name: {
+                "rule": route_rule,
+                "service": traefik_service_name,
+                "entryPoints": ["web"],
+            }
+        }
+
+        middlewares = self._generate_middleware_config(data, prefix)
+        if middlewares:
+            router_cfg["middlewares"] = list(middlewares.keys())
+
         config = {
             "http": {
-                "routers": {
-                    traefik_router_name: {
-                        "rule": route_rule,
-                        "service": traefik_service_name,
-                        "entryPoints": ["web"],
-                    }
-                },
+                "middlewares": middlewares,
+                "routers": router_cfg,
                 "services": {
                     traefik_service_name: {
                         "loadBalancer": {
@@ -643,7 +661,7 @@ class TraefikIngressCharm(CharmBase):
             return self.traefik_route
 
     @property
-    def _external_host(self):
+    def external_host(self):
         """Determine the external address for the ingress gateway.
 
         It will prefer the `external-hostname` config if that is set, otherwise
@@ -652,9 +670,8 @@ class TraefikIngressCharm(CharmBase):
         If the gateway isn't available or doesn't have a load balancer address yet,
         returns None.
         """
-        if "external_hostname" in self.model.config:
-            if external_hostname := self.model.config["external_hostname"]:
-                return external_hostname
+        if external_hostname := self.model.config.get("external_hostname"):
+            return external_hostname
 
         return _get_loadbalancer_status(namespace=self.model.name, service_name=self.app.name)
 

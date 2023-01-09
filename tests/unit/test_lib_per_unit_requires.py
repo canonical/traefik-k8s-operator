@@ -121,9 +121,11 @@ def test_unit_joining_does_not_trigger_ingress_changed(requirer, harness, url):
         (("foo", 12), True),
     ),
 )
-def test_validator(requirer: IngressPerUnitRequirer, harness, auto_data, ok):
+@pytest.mark.parametrize("strip_prefix", (True, False))
+def test_validator(requirer: IngressPerUnitRequirer, harness, auto_data, ok, strip_prefix):
     harness.set_leader(True)
     harness.add_relation("ingress-per-unit", "remote")
+    requirer._strip_prefix = strip_prefix
     if not ok:
         with pytest.raises(DataValidationError):
             host, port = auto_data
