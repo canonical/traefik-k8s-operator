@@ -55,10 +55,10 @@ def get_endpoints(ops_test: OpsTest, *, scheme: str, netloc: str) -> list:
 
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy(ops_test: OpsTest, traefik_charm):
-    # logger.info("First, disable metallb, in case it's enabled")
-    # await disable_metallb()
-    # logger.info("Now enable metallb")
-    # await enable_metallb()
+    logger.info("First, disable metallb, in case it's enabled")
+    await disable_metallb()
+    logger.info("Now enable metallb")
+    await enable_metallb()
 
     await asyncio.gather(
         ops_test.model.deploy(

@@ -5,10 +5,10 @@
 """Charm Traefik."""
 
 import enum
+import ipaddress
 import json
 import logging
 import re
-import socket
 import typing
 from typing import Any, Dict, List, Optional, Tuple, Union
 from urllib.parse import urlparse
@@ -122,7 +122,7 @@ class TraefikIngressCharm(CharmBase):
         self.service_patch = KubernetesServicePatch(
             charm=self,
             service_type="LoadBalancer",
-            ports=[(f"{self.app.name}", self._port), (f"{self.app.name}-tls", 443)],
+            ports=[(f"{self.app.name}", self._port), (f"{self.app.name}-tls", self._tls_port)],
         )
 
         self.metrics_endpoint = MetricsEndpointProvider(
@@ -148,7 +148,8 @@ class TraefikIngressCharm(CharmBase):
         self.framework.observe(
             # TODO observe a custom event instead, once implemented.
             # https://github.com/canonical/tls-certificates-interface/issues/25
-            self.on.certificates_relation_broken, self._on_certificates_relation_broken
+            self.on.certificates_relation_broken,
+            self._on_certificates_relation_broken,
         )
         self.framework.observe(
             self.certificates.on.certificate_available, self._on_certificate_available
@@ -171,9 +172,9 @@ class TraefikIngressCharm(CharmBase):
         observe(ipu_events.data_provided, self._handle_ingress_data_provided)
         observe(ipu_events.data_removed, self._handle_ingress_data_removed)
 
-        ipr_events = self.traefik_route.on
-        observe(ipr_events.ready, self._handle_traefik_route_ready)
-        observe(ipr_events.data_removed, self._handle_ingress_data_removed)
+        route_events = self.traefik_route.on
+        observe(route_events.ready, self._handle_traefik_route_ready)
+        observe(route_events.data_removed, self._handle_ingress_data_removed)
 
         # Action handlers
         observe(self.on.show_proxied_endpoints_action, self._on_show_proxied_endpoints)
@@ -187,6 +188,8 @@ class TraefikIngressCharm(CharmBase):
         #   File "./src/charm.py", line 179, in _on_certificates_relation_joined
         #     private_key=private_key.encode("utf-8"),
         #  AttributeError: 'NoneType' object has no attribute 'encode'
+        #
+        # Should we use `use_juju_for_storage=True`?
 
     def _on_certificates_relation_joined(self, event: RelationJoinedEvent) -> None:
         private_key = self._stored.private_key
@@ -217,9 +220,19 @@ class TraefikIngressCharm(CharmBase):
     def _on_certificate_expiring(self, event: CertificateExpiringEvent) -> None:
         old_csr = self._stored.csr
         private_key = self._stored.private_key
+
+        if not (subject := self.cert_subject):
+            # TODO: use compound status
+            logging.error(
+                "Cannot generate CSR: invalid cert subject '%s' (is external hostname defined?)",
+                subject,
+            )
+            event.defer()
+            return
+
         new_csr = generate_csr(
             private_key=private_key.encode(),
-            subject=self.cert_subject,
+            subject=subject,
         )
         self.certificates.request_certificate_renewal(
             old_certificate_signing_request=old_csr,
@@ -291,11 +304,6 @@ class TraefikIngressCharm(CharmBase):
             },
             "entryPoints": {
                 "diagnostics": {"address": f":{self._diagnostics_port}"},
-                # "web": {
-                #     "address": f":{self._port}",
-                #     'http': {
-                #         'redirections': {'entryPoint': {'to': 'websecure', 'scheme': 'https'}}}
-                # },
                 "web": {"address": f":{self._port}"},
                 "websecure": {"address": f":{self._tls_port}"},
                 **tcp_entrypoints,
@@ -332,15 +340,6 @@ class TraefikIngressCharm(CharmBase):
                         "keyFile": _CERTIFICATE_KEY_PATH,
                     }
                 ],
-                # "stores": {"default": {"defaultCertificate": {}}},
-                # "stores": {
-                #     "default": {
-                #         "defaultCertificate": {
-                #             "certFile": _CERTIFICATE_PATH,
-                #             "keyFile": _CERTIFICATE_KEY_PATH,
-                #         }
-                #     }
-                # },
             }
         }
 
@@ -640,7 +639,6 @@ class TraefikIngressCharm(CharmBase):
 
     def _generate_per_unit_config(self, data: "RequirerData_IPU") -> Tuple[dict, str]:
         """Generate a config dict for a given unit for IngressPerUnit."""
-        # config = {"http": {"routers": {}, "services": {}}}  # type: Dict[str, Any]
         prefix = self._get_prefix(data)
         host = self.external_host
         if data["mode"] == "tcp":
@@ -869,7 +867,7 @@ class TraefikIngressCharm(CharmBase):
         # Built:        2022-12-07_04:28:37PM
         # OS/Arch:      linux/amd64
 
-        if result := re.search(r"Version:\s*(\d*\.\d*\.\d*)", version_output):
+        if result := re.search(r"Version:\s*((\d+.?)+)", version_output):
             return result.group(1)
         return None
 
@@ -882,10 +880,20 @@ class TraefikIngressCharm(CharmBase):
             )
 
     @property
-    def cert_subject(self) -> str:
+    def cert_subject(self) -> Optional[str]:
         """Provide certificate subject."""
         # TODO: Use a good default for when the external_hostname is None
-        return self.model.config.get("external_hostname", socket.getfqdn())
+        host_or_ip = self.external_host
+        try:
+            ipaddress.ip_address(host_or_ip)
+        except ValueError:
+            # This is not an IP address so assume it's a hostname that can be used as the subject.
+            return host_or_ip
+        else:
+            # This is an IP address, which cannot be used for the subject.
+            # We do not want to return `socket.getfqdn()` because the user's browser would
+            # immediately complain about an invalid cert.
+            return None
 
 
 def _get_loadbalancer_status(namespace: str, service_name: str):

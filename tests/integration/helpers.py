@@ -3,9 +3,9 @@
 
 import asyncio
 import grp
+import logging
 import subprocess
 from typing import List, Optional
-import logging
 
 from pytest_operator.plugin import OpsTest
 
