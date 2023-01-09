@@ -74,12 +74,8 @@ _DYNAMIC_CONFIG_DIR = "/opt/traefik/juju"
 _STATIC_CONFIG_DIR = "/etc/traefik"
 _STATIC_CONFIG_PATH = _STATIC_CONFIG_DIR + "/traefik.yaml"
 _DYNAMIC_CERTS_PATH = _DYNAMIC_CONFIG_DIR + "/certificates.yaml"
-
-# FIXME:
-#  1. Is it ok to store certs/keys in the dynamic config path?
-#  2. If overwritten (in /etc/...), would certs/keys be re-read without certificates.yaml changing?
-_CERTIFICATE_PATH = _STATIC_CONFIG_DIR + "/certificate.cert"
-_CERTIFICATE_KEY_PATH = _STATIC_CONFIG_DIR + "/certificate.key"
+_CERTIFICATE_PATH = _DYNAMIC_CONFIG_DIR + "/certificate.cert"
+_CERTIFICATE_KEY_PATH = _DYNAMIC_CONFIG_DIR + "/certificate.key"
 
 
 class _RoutingMode(enum.Enum):
@@ -143,9 +139,16 @@ class TraefikIngressCharm(CharmBase):
         self.traefik_route = TraefikRouteProvider(charm=self, external_host=self.external_host)
 
         self.certificates = TLSCertificatesRequiresV1(self, "certificates")
+        # TODO update init params once auto-renew is implemented
+        # https://github.com/canonical/tls-certificates-interface/issues/24
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(
             self.on.certificates_relation_joined, self._on_certificates_relation_joined
+        )
+        self.framework.observe(
+            # TODO observe a custom event instead, once implemented.
+            # https://github.com/canonical/tls-certificates-interface/issues/25
+            self.on.certificates_relation_broken, self._on_certificates_relation_broken
         )
         self.framework.observe(
             self.certificates.on.certificate_available, self._on_certificate_available
@@ -193,6 +196,13 @@ class TraefikIngressCharm(CharmBase):
         )
         self._stored.csr = csr.decode()
         self.certificates.request_certificate_creation(certificate_signing_request=csr)
+
+    def _on_certificates_relation_broken(self, event: RelationBrokenEvent) -> None:
+        if self.container.can_connect():
+            self._stored.certificate = None
+            self._stored.private_key = None
+            self.container.remove_path(_CERTIFICATE_PATH, recursive=True)
+            self.container.remove_path(_CERTIFICATE_KEY_PATH, recursive=True)
 
     def _on_certificate_available(self, event: CertificateAvailableEvent) -> None:
         self._stored.certificate = event.certificate
