@@ -1,10 +1,7 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
-import shutil
-from pathlib import Path
 
 import pytest
-import pytest_asyncio
 import yaml
 from pytest_operator.plugin import OpsTest
 
@@ -14,21 +11,6 @@ from tests.integration.conftest import (
     get_address,
     get_relation_data,
 )
-
-ipu_charm_root = (Path(__file__).parent / "testers" / "ipu").absolute()
-meta = yaml.safe_load((ipu_charm_root / "metadata.yaml").read_text())
-ipu_tester_resources = {
-    name: val["upstream-source"] for name, val in meta.get("resources", {}).items()
-}
-
-
-@pytest_asyncio.fixture
-async def ipu_tester_charm(ops_test: OpsTest):
-    lib_source = Path() / "lib" / "charms" / "traefik_k8s" / "v1" / "ingress_per_unit.py"
-    libs_folder = ipu_charm_root / "lib" / "charms" / "traefik_k8s" / "v1"
-    libs_folder.mkdir(parents=True, exist_ok=True)
-    shutil.copy(lib_source, libs_folder)
-    return await ops_test.build_charm(ipu_charm_root)
 
 
 @pytest.mark.abort_on_fail
@@ -50,7 +32,7 @@ async def test_relate(ops_test: OpsTest):
         await ops_test.model.wait_for_idle(["traefik-k8s", "ipu-tester"])
 
 
-async def assert_ipu_charm_has_ingress(ops_test: OpsTest):
+def assert_ipu_charm_has_ingress(ops_test: OpsTest):
     data = get_relation_data(
         requirer_endpoint="ipu-tester/0:ingress-per-unit",
         provider_endpoint="traefik-k8s/0:ingress-per-unit",
@@ -63,7 +45,7 @@ async def assert_ipu_charm_has_ingress(ops_test: OpsTest):
 
 
 async def test_ipu_charm_has_ingress(ops_test: OpsTest):
-    await assert_ipu_charm_has_ingress(ops_test)
+    assert_ipu_charm_has_ingress(ops_test)
 
 
 @pytest.mark.abort_on_fail
