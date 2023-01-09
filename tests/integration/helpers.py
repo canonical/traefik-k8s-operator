@@ -2,27 +2,18 @@
 # See LICENSE file for licensing details.
 
 import asyncio
-import grp
 import logging
 import subprocess
-from typing import List, Optional
+from typing import Optional
 
 from pytest_operator.plugin import OpsTest
 
 logger = logging.getLogger(__name__)
 
 
-def get_sg_params() -> List[str]:
-    groups = list(map(lambda grp_strct: grp_strct.gr_name, grp.getgrall()))
-    for grp_name in ["microk8s", "snap_microk8s"]:
-        if "microk8s" in groups:  # this means the itest is running in a github runner
-            return ["sg", grp_name, "-c"]
-    return []
-
-
 async def disable_metallb():
     try:
-        cmd = get_sg_params() + "microk8s disable metallb".split(" ")
+        cmd = ["sg", "microk8s", "-c", "microk8s disable metallb"]
         subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     except subprocess.CalledProcessError as e:
         logger.error(e.stdout.decode())
@@ -41,7 +32,7 @@ async def enable_metallb():
     ip = result.stdout.decode("utf-8").strip()
 
     try:
-        cmd = get_sg_params() + f"microk8s enable metallb:{ip}-{ip}".split(" ")
+        cmd = ["sg", "microk8s", "-c", f"microk8s enable metallb:{ip}-{ip}"]
         subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     except Exception as e:
         print(e)
