@@ -4,3 +4,4 @@ lightkube >= 0.8.1
 lightkube-models >= 1.22.0.4
 # The following is needed by lib/charms/traefik_k8s/*
 jsonschema
+scenario

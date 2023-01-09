@@ -4,9 +4,9 @@ from unittest.mock import patch, PropertyMock
 import yaml
 
 from charm import TraefikIngressCharm
-from charms.harness_extensions.v0.evt_sequences import (
-    Scenario, RelationMeta, RelationSpec, Context, NetworkSpec, Network, Event,
-    CharmSpec, ContainerSpec)
+from scenario import Scenario
+from scenario.structs import RelationMeta, RelationSpec, Context, NetworkSpec, Event, CharmSpec, ContainerSpec, network, \
+    State, event, Scene
 
 META = yaml.safe_load((Path(__file__).parent.parent.parent / 'metadata.yaml').read_text())
 
@@ -14,20 +14,19 @@ META = yaml.safe_load((Path(__file__).parent.parent.parent / 'metadata.yaml').re
 @patch("charm.KubernetesServicePatch")
 @patch("lightkube.core.client.GenericSyncClient")
 @patch("charm.TraefikIngressCharm.external_host", PropertyMock(return_value='foo.bar'))
-# @patch("charm.MimirK8SOperatorCharm._current_mimir_config", new_callable=PropertyMock)
-# @patch("charm.MimirK8SOperatorCharm._set_alerts", new_callable=Mock)
 def test_start(*_):
-    my_scenario = Scenario(
+    scenario = Scenario(
         charm_spec=CharmSpec(
             TraefikIngressCharm,
             meta=META)
     )
 
-    with my_scenario as scenario:
-        null_ctx = Context()
-        scenario.play(
+    null_ctx = Context()
+    scenario.play(
+        Scene(
             context=null_ctx,
-            event=Event('start'))
+            event=event('start'))
+    )
 
 
 def test_start_as_follower(*_):
@@ -55,25 +54,27 @@ def test_ipu_changed():
     with my_scenario as scenario:
         scenario.play(
             context=Context(
-                containers=(
-                    ContainerSpec('mimir', can_connect=False),
+                state=State(
+                    containers=(
+                        ContainerSpec('mimir', can_connect=False),
+                    ),
+                    networks=(
+                        NetworkSpec(
+                            name='endpoint', bind_id=2,
+                            network=network(private_address='0.0.0.2')),
+                    ),
+                    relations=(
+                        RelationSpec(
+                            application_data={'foo': 'bar'},
+                            units_data={0: {'baz': 'qux'}},
+                            meta=RelationMeta(
+                                remote_app_name='remote',
+                                relation_id=2,
+                                endpoint='remote-db',
+                                remote_unit_ids=(0,),
+                                interface='db')),
+                    ),
+                    leader=True
                 ),
-                networks=(
-                    NetworkSpec(
-                        name='endpoint', bind_id=2,
-                        network=Network(private_address='0.0.0.2')),
-                ),
-                relations=(
-                    RelationSpec(
-                        application_data={'foo': 'bar'},
-                        units_data={0: {'baz': 'qux'}},
-                        meta=RelationMeta(
-                            remote_app_name='remote',
-                            relation_id=2,
-                            endpoint='remote-db',
-                            remote_unit_ids=(0,),
-                            interface='db')),
-                ),
-                leader=True
             ),
             event=Event('ingress-per-unit-relation-changed'))
