@@ -639,9 +639,10 @@ class TestTraefikIngressCharm(unittest.TestCase):
     @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
     def test_show_proxied_endpoints_action_no_relations(self):
         self.harness.begin_with_initial_hooks()
+        self.harness.container_pebble_ready("traefik")
 
         action_event = Mock(spec=ActionEvent)
-        self.harness.charm.model.config._data["external_hostname"] = "foo"
+        self.harness.update_config({"external_hostname": "foo"})
         self.harness.charm._on_show_proxied_endpoints(action_event)
         action_event.set_results.assert_called_once_with({"proxied-endpoints": "{}"})
 

@@ -215,10 +215,10 @@ class _IPAEvent(RelationEvent):
                     "manually.".format(obj)
                 ) from e
 
-        return dct
+        return dct  # type: ignore
 
     def restore(self, snapshot: dict) -> None:
-        super().restore(snapshot)
+        super().restore(snapshot)  # type: ignore
         for attr, obj in snapshot.items():
             setattr(self, attr, obj)
 
@@ -250,7 +250,7 @@ class IngressPerAppProviderEvents(ObjectEvents):
 class IngressPerAppProvider(_IngressPerAppBase):
     """Implementation of the provider of ingress."""
 
-    on = IngressPerAppProviderEvents()
+    on = IngressPerAppProviderEvents()  # type: ignore
 
     def __init__(self, charm: CharmBase, relation_name: str = DEFAULT_RELATION_NAME):
         """Constructor for IngressPerAppProvider.
@@ -406,8 +406,8 @@ class IngressPerAppRequirerEvents(ObjectEvents):
 class IngressPerAppRequirer(_IngressPerAppBase):
     """Implementation of the requirer of the ingress relation."""
 
-    on = IngressPerAppRequirerEvents()
-    # used to prevent spur1ious urls to be sent out if the event we're currently
+    on = IngressPerAppRequirerEvents()  # type: ignore
+    # used to prevent spurious urls to be sent out if the event we're currently
     # handling is a relation-broken one.
     _stored = StoredState()
 

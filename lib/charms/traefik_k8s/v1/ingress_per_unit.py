@@ -317,7 +317,7 @@ class IngressPerUnitProviderEvents(ObjectEvents):
 class IngressPerUnitProvider(_IngressPerUnitBase):
     """Implementation of the provider of ingress_per_unit."""
 
-    on = IngressPerUnitProviderEvents()
+    on = IngressPerUnitProviderEvents()  # type: ignore
 
     def _handle_relation(self, event):
         relation = event.relation
@@ -397,7 +397,7 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
         return self._get_requirer_unit_data(relation, unit)
 
     def publish_url(self, relation: Relation, unit_name: str, url: str):
-        """Place the ingress url in the application data bag for the units on the requires side.
+        """Place the ingress url in the application data bag for the units on the requirer side.
 
         Assumes that this unit is leader.
         """
@@ -575,10 +575,10 @@ class _IPUEvent(RelationEvent):
                     "override this method and do it "
                     "manually.".format(obj)
                 ) from e
-        return dct
+        return dct  # type: ignore
 
     def restore(self, snapshot: dict) -> None:
-        super().restore(snapshot)
+        super().restore(snapshot)  # type: ignore
         for attr, obj in snapshot.items():
             setattr(self, attr, obj)
 
