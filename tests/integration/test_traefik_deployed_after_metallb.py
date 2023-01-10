@@ -67,9 +67,7 @@ async def test_build_and_deploy(ops_test: OpsTest, traefik_charm):
     await enable_metallb()
 
     await asyncio.gather(
-        ops_test.model.deploy(
-            traefik_charm, resources=trfk.resources, application_name=trfk.name
-        ),
+        ops_test.model.deploy(traefik_charm, resources=trfk.resources, application_name=trfk.name),
         ops_test.model.deploy(
             ipu.charm,
             application_name=ipu.name,

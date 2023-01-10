@@ -41,9 +41,7 @@ async def test_build_and_deploy(
     await disable_metallb()
 
     await asyncio.gather(
-        ops_test.model.deploy(
-            traefik_charm, resources=resources, application_name="traefik"
-        ),
+        ops_test.model.deploy(traefik_charm, resources=resources, application_name="traefik"),
         ops_test.model.deploy(ipu_tester_charm, application_name="ipu-tester"),
         ops_test.model.deploy(ipa_tester_charm, application_name="ipa-tester"),
         ops_test.model.deploy(route_tester_charm, application_name="route-tester"),
