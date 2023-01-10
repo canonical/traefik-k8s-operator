@@ -76,7 +76,7 @@ def spellbook_fetch(  # noqa: C901
     def do_build():
         logging.info(f"building {charm_root}")
         try:
-            pack_out = check_output(f"charmcraft pack -p {charm_root}")
+            pack_out = check_output(("charmcraft", "pack", "-p", str(charm_root)))
         except CalledProcessError as e:
             raise RuntimeError(
                 "Charmcraft pack failed. " "Attempt a `charmcraft clean` or inspect the logs."
