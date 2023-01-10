@@ -79,7 +79,7 @@ def spellbook_fetch(  # noqa: C901
             pack_out = check_output(("charmcraft", "pack", "-p", str(charm_root)))
         except CalledProcessError as e:
             raise RuntimeError(
-                "Charmcraft pack failed. " "Attempt a `charmcraft clean` or inspect the logs."
+                "Charmcraft pack failed. Attempt a `charmcraft clean` or inspect the logs."
             ) from e
         # if everything went OK, `charmcraft pack`'s last line is the packed charm filename.
         return (Path(os.getcwd()) / pack_out.decode("utf-8").split("\n")[-1].strip()).absolute()
