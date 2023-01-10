@@ -85,7 +85,9 @@ def spellbook_fetch(  # noqa: C901
         charm_name = pack_out.decode("utf-8").strip().split("\n")[-1].strip()
         packed_charm_path = (Path(os.getcwd()) / charm_name).absolute()
         if not packed_charm_path.exists():
-            raise RuntimeError(f'Could not determine path to packed charm file from charmcraft pack output: {pack_out!r}')
+            raise RuntimeError(
+                f"Could not determine path to packed charm file from charmcraft pack output: {pack_out!r}"
+            )
         return packed_charm_path
 
     if not use_cache:
