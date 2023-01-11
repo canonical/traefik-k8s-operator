@@ -88,7 +88,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 5
+LIBPATCH = 6
 
 log = logging.getLogger(__name__)
 
@@ -175,8 +175,13 @@ class TraefikRouteProvider(Object):
         self._update_stored_external_host()
         return self._stored.external_host or ""
 
+    @property
+    def relations(self):
+        """The list of Relation instances associated with this endpoint."""
+        return list(self._charm.model.relations[self._relation_name])
+
     def _update_stored_external_host(self) -> None:
-        """Ensure that the stored host is up to date.
+        """Ensure that the stored host is up-to-date.
 
         This is split out into a separate method since, in the case of multi-unit deployments,
         removal of a `TraefikRouteRequirer` will not cause a `RelationEvent`, but the guard on

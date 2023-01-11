@@ -168,9 +168,6 @@ async def test_tls_termination(ops_test: OpsTest, temp_dir):
     with open(cert_path, "wt") as f:
         f.writelines(cert)
 
-    logger.info("Attempting to read %s", temp_dir / "local.cert")
-    logger.info((temp_dir / "local.cert").read_text())
-
     ip = await get_address(ops_test, trfk.name)
     await curl_endpoints(ops_test, temp_dir, cert_path, ip)
 
@@ -186,6 +183,4 @@ async def test_tls_termination_after_charm_upgrade(ops_test: OpsTest, traefik_ch
     )
     await ops_test.model.wait_for_idle(status="active", timeout=600, idle_period=30)
     ip = await get_address(ops_test, trfk.name)
-    logger.info("Attempting to read %s", temp_dir / "local.cert")
-    logger.info((temp_dir / "local.cert").read_text())
     await curl_endpoints(ops_test, temp_dir, temp_dir / "local.cert", ip)

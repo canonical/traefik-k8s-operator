@@ -435,7 +435,11 @@ class TraefikIngressCharm(CharmBase):
             self._clear_all_configs_and_restart_traefik()
             # we do this BEFORE processing the relations.
 
-        for ingress_relation in self.ingress_per_app.relations + self.ingress_per_unit.relations:
+        for ingress_relation in (
+            self.ingress_per_app.relations
+            + self.ingress_per_unit.relations
+            + self.traefik_route.relations
+        ):
             self._process_ingress_relation(ingress_relation)
 
         if isinstance(self.unit.status, MaintenanceStatus):
