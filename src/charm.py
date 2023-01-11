@@ -16,7 +16,6 @@ from urllib.parse import urlparse
 import yaml
 from charms.observability_libs.v0.kubernetes_service_patch import KubernetesServicePatch
 
-# from charms.observability_libs.v1.kubernetes_service_patch import KubernetesServicePatch
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 from charms.tls_certificates_interface.v1.tls_certificates import (
     CertificateAvailableEvent,
@@ -37,7 +36,6 @@ from charms.traefik_route_k8s.v0.traefik_route import (
 from deepmerge import always_merger
 from lightkube.core.client import Client
 
-# from lightkube.models.core_v1 import ServicePort
 from lightkube.resources.core_v1 import Service
 from ops.charm import (
     ActionEvent,
@@ -114,11 +112,6 @@ class TraefikIngressCharm(CharmBase):
 
         self.container = self.unit.get_container(_TRAEFIK_CONTAINER_NAME)
 
-        # ports = [
-        #     ServicePort(self._port, targetPort=self._port, name=f"{self.app.name}"),
-        #     ServicePort(self._tls_port, targetPort=self._tls_port, name=f"{self.app.name}-tls"),
-        # ]
-        # self.service_patcher = KubernetesServicePatch(self, ports, "LoadBalancer")
         self.service_patch = KubernetesServicePatch(
             charm=self,
             service_type="LoadBalancer",
@@ -731,7 +724,6 @@ class TraefikIngressCharm(CharmBase):
                 "rule": route_rule,
                 "service": service_name,
                 "entryPoints": ["websecure"],
-                # "tls": {},
                 "tls": {
                     "domains": [
                         {
@@ -880,12 +872,12 @@ class TraefikIngressCharm(CharmBase):
     @property
     def cert_subject(self) -> Optional[str]:
         """Provide certificate subject."""
-        # TODO: Use a good default for when the external_hostname is None
         host_or_ip = self.external_host
         try:
             ipaddress.ip_address(host_or_ip)
         except ValueError:
             # This is not an IP address so assume it's a hostname that can be used as the subject.
+            # Note: a ValueError will be raised if `host_or_ip` is None, which is ok here.
             return host_or_ip
         else:
             # This is an IP address, which cannot be used for the subject.
