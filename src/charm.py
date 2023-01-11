@@ -184,12 +184,6 @@ class TraefikIngressCharm(CharmBase):
         # https://github.com/traefik/traefik/pull/6518
         private_key = generate_private_key()
         self._stored.private_key = private_key.decode()
-        # FIXME this (occasionally?!) doesn't survive a charm upgrade, and results in:
-        #   File "./src/charm.py", line 179, in _on_certificates_relation_joined
-        #     private_key=private_key.encode("utf-8"),
-        #  AttributeError: 'NoneType' object has no attribute 'encode'
-        #
-        # Should we use `use_juju_for_storage=True`?
 
     def _on_certificates_relation_joined(self, event: RelationJoinedEvent) -> None:
         private_key = self._stored.private_key
