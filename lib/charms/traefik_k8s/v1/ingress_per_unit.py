@@ -801,7 +801,7 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
         if not relation:
             return {}
 
-        if not all([r for r in [relation.app, relation.app.name]]):  # type: ignore
+        if not relation.app and relation.app.name:  # type: ignore
             # FIXME Workaround for https://github.com/canonical/operator/issues/693
             # We must be in a relation_broken hook
             return {}
