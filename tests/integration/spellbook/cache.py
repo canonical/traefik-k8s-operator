@@ -6,7 +6,7 @@ import shutil
 from datetime import datetime
 from hashlib import md5
 from pathlib import Path
-from subprocess import getoutput
+from subprocess import CalledProcessError, check_output, getoutput
 from typing import List, Union
 
 import yaml
@@ -40,7 +40,7 @@ def _get_libpath(base, source):
     return root.absolute()
 
 
-def spellbook_fetch(  # ignore: C901
+def spellbook_fetch(  # noqa: C901
     charm_root: Union[str, Path] = "./",
     charm_name: str = None,
     hash_paths: List[Path] = None,
@@ -75,8 +75,20 @@ def spellbook_fetch(  # ignore: C901
 
     def do_build():
         logging.info(f"building {charm_root}")
-        pack_out = getoutput(f"charmcraft pack -p {charm_root}")
-        return (Path(os.getcwd()) / pack_out.split("\n")[-1].strip()).absolute()
+        try:
+            pack_out = check_output(("charmcraft", "pack", "-p", str(charm_root)))
+        except CalledProcessError as e:
+            raise RuntimeError(
+                "Charmcraft pack failed. " "Attempt a `charmcraft clean` or inspect the logs."
+            ) from e
+        # if everything went OK, `charmcraft pack`'s last line is the packed charm filename.
+        charm_name = pack_out.decode("utf-8").strip().split("\n")[-1].strip()
+        packed_charm_path = (Path(os.getcwd()) / charm_name).absolute()
+        if not packed_charm_path.exists():
+            raise RuntimeError(
+                f"Could not determine path to packed charm file from charmcraft pack output: {pack_out!r}"
+            )
+        return packed_charm_path
 
     if not use_cache:
         logging.info("not using cache")
