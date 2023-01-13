@@ -182,10 +182,20 @@ class TraefikIngressCharm(CharmBase):
         self._stored.private_key = private_key.decode()
 
     def _on_certificates_relation_joined(self, event: RelationJoinedEvent) -> None:
+
         private_key = self._stored.private_key
+        if not (subject := self.cert_subject):
+            logger.warning(
+                "Cannot generate CSR: subject is invalid "
+                "(hostname is '%s', which is probably invalid)",
+                self.external_host,
+            )
+            # TODO set BlockedStatus here when compound_status is introduced
+            return
+
         csr = generate_csr(
             private_key=private_key.encode("utf-8"),
-            subject=self.cert_subject,
+            subject=subject,
         )
         self._stored.csr = csr.decode()
         self.certificates.request_certificate_creation(certificate_signing_request=csr)
