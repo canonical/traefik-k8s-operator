@@ -93,7 +93,7 @@ class TraefikIngressCharm(CharmBase):
         self.service_patch = KubernetesServicePatch(
             charm=self,
             service_type="LoadBalancer",
-            ports=[ServicePort(self._port, f"{self.app.name}")],
+            ports=[ServicePort(self._port, name=f"{self.app.name}")],
         )
 
         self.metrics_endpoint = MetricsEndpointProvider(
