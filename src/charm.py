@@ -9,10 +9,11 @@ import ipaddress
 import json
 import logging
 import re
+import socket
 import typing
 from typing import Any, Dict, List, Optional, Tuple, Union
 from urllib.parse import urlparse
-import socket
+
 import yaml
 from charms.observability_libs.v1.kubernetes_service_patch import (
     KubernetesServicePatch,
@@ -186,6 +187,7 @@ class TraefikIngressCharm(CharmBase):
         self.refresh_csr()
 
     def refresh_csr(self):
+        """Refresh the CSR, overwriting any existing."""
         if not list(self.model.relations["certificates"]):
             # Relation "certificates" does not exist
             return
