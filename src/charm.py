@@ -12,7 +12,7 @@ import re
 import typing
 from typing import Any, Dict, List, Optional, Tuple, Union
 from urllib.parse import urlparse
-
+import socket
 import yaml
 from charms.observability_libs.v1.kubernetes_service_patch import (
     KubernetesServicePatch,
@@ -182,10 +182,17 @@ class TraefikIngressCharm(CharmBase):
         self._stored.private_key = private_key.decode()
 
     def _on_certificates_relation_joined(self, event: RelationJoinedEvent) -> None:
+        # Assuming there can be only one (metadata also has `limit: 1` on the relation).
+        self.refresh_csr()
+
+    def refresh_csr(self):
+        if not list(self.model.relations["certificates"]):
+            # Relation "certificates" does not exist
+            return
 
         private_key = self._stored.private_key
         if not (subject := self.cert_subject):
-            logger.warning(
+            logger.debug(
                 "Cannot generate CSR: subject is invalid "
                 "(hostname is '%s', which is probably invalid)",
                 self.external_host,
@@ -199,11 +206,13 @@ class TraefikIngressCharm(CharmBase):
         )
         self._stored.csr = csr.decode()
         self.certificates.request_certificate_creation(certificate_signing_request=csr)
+        logger.debug("CSR sent")
 
     def _on_certificates_relation_broken(self, event: RelationBrokenEvent) -> None:
         if self.container.can_connect():
             self._stored.certificate = None
             self._stored.private_key = None
+            self._stored.csr = None
             self.container.remove_path(_CERTIFICATE_PATH, recursive=True)
             self.container.remove_path(_CERTIFICATE_KEY_PATH, recursive=True)
 
@@ -374,6 +383,9 @@ class TraefikIngressCharm(CharmBase):
         # reconsider all data sent over the relations and all configs
         new_external_host = self.external_host
         new_routing_mode = self.config["routing_mode"]
+
+        if self._stored.current_external_host != new_external_host or not self._stored.csr:
+            self.refresh_csr()
 
         if (
             self._stored.current_external_host != new_external_host
@@ -886,16 +898,28 @@ class TraefikIngressCharm(CharmBase):
     def cert_subject(self) -> Optional[str]:
         """Provide certificate subject."""
         host_or_ip = self.external_host
-        try:
-            ipaddress.ip_address(host_or_ip)
-        except ValueError:
-            # This is not an IP address so assume it's a hostname that can be used as the subject.
-            # Note: a ValueError will be raised if `host_or_ip` is None, which is ok here.
+
+        def is_hostname(st: Optional[str]) -> bool:
+            try:
+                ipaddress.ip_address(st)
+                # No exception raised so this is an IP address.
+                return False
+            except ValueError:
+                # This is not an IP address so assume it's a hostname.
+                # Note: a ValueError will be raised if `st` is None, which is ok here.
+                return st is not None
+
+        if is_hostname(host_or_ip):
             return host_or_ip
-        else:
-            # This is an IP address, which cannot be used for the subject.
+
+        # This is an IP address. Try to look up the hostname.
+        try:
+            lookup = socket.gethostbyaddr(host_or_ip)[0]
+            return lookup if is_hostname(lookup) else None
+        except (OSError, TypeError):
             # We do not want to return `socket.getfqdn()` because the user's browser would
-            # immediately complain about an invalid cert.
+            # immediately complain about an invalid cert. If we can't resolve it via any method,
+            # return None
             return None
 
 

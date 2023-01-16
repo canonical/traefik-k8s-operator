@@ -30,35 +30,46 @@ class TlsWithExternalHostname(unittest.TestCase):
 
     @patch("charm._get_loadbalancer_status", lambda **_: "10.0.0.1")
     @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
-    def test_external_hostname_not_set(self):
+    def test_external_hostname_is_set_after_relation_joins(self):
         # GIVEN an external hostname is not set
         self.assertFalse(self.harness.charm.config.get("external_hostname"))
-        self.assertEquals(self.harness.charm.external_host, "10.0.0.1")
+        self.assertEqual(self.harness.charm.external_host, "10.0.0.1")
 
         # WHEN a "certificates" relation is formed
-        # THEN the charm logs a warning
-        with self.assertLogs(level="WARNING") as cm:
+        # THEN the charm logs an appropriate DEBUG line
+        with self.assertLogs(level="DEBUG") as cm:
             self.rel_id = self.harness.add_relation("certificates", "root-ca")
             self.harness.add_relation_unit(self.rel_id, "root-ca/0")
 
-        self.assertEquals(
+        self.assertEqual(
             cm.output,
             [
-                "WARNING:charm:Cannot generate CSR: subject is invalid "
+                "DEBUG:charm:Cannot generate CSR: subject is invalid "
                 "(hostname is '10.0.0.1', which is probably invalid)"
             ],
         )
 
+        # AND WHEN an external hostname is set
+        self.harness.update_config({"external_hostname": "testhostname"})
+        self.assertEqual(self.harness.charm.external_host, "testhostname")
+
+        # THEN a CSR is sent
+        with self.assertLogs(level="DEBUG") as cm:
+            self.harness.add_relation_unit(self.rel_id, "root-ca/0")
+
+        self.assertIn("DEBUG:charm:CSR sent", cm.output)
+
     @patch("charm._get_loadbalancer_status", lambda **_: "10.0.0.1")
     @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
-    def test_external_hostname_is_set(self):
+    def test_external_hostname_is_set_before_relation_joins(self):
         # GIVEN an external hostname is set
         self.harness.update_config({"external_hostname": "testhostname"})
-        self.assertEquals(self.harness.charm.external_host, "testhostname")
+        self.assertEqual(self.harness.charm.external_host, "testhostname")
 
         # WHEN a "certificates" relation is formed
-        self.rel_id = self.harness.add_relation("certificates", "root-ca")
-        self.harness.add_relation_unit(self.rel_id, "root-ca/0")
+        # THEN a CSR is sent
+        with self.assertLogs(level="DEBUG") as cm:
+            self.rel_id = self.harness.add_relation("certificates", "root-ca")
+            self.harness.add_relation_unit(self.rel_id, "root-ca/0")
 
-        # THEN nothing raises
-        # (Nothing to assert)
+        self.assertIn("DEBUG:charm:CSR sent", cm.output)
