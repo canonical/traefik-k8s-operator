@@ -158,6 +158,7 @@ class TraefikIngressCharm(CharmBase):
         observe = self.framework.observe
         observe(self.on.traefik_pebble_ready, self._on_traefik_pebble_ready)
         observe(self.on.start, self._on_start)
+        observe(self.on.stop, self._on_stop)
         observe(self.on.update_status, self._on_update_status)
         observe(self.on.config_changed, self._on_config_changed)
 
@@ -200,6 +201,7 @@ class TraefikIngressCharm(CharmBase):
                 self.external_host,
             )
             # TODO set BlockedStatus here when compound_status is introduced
+            #  https://github.com/canonical/operator/issues/665
             return
 
         csr = generate_csr(
@@ -375,6 +377,11 @@ class TraefikIngressCharm(CharmBase):
 
     def _on_start(self, _: StartEvent):
         self._process_status_and_configurations()
+
+    def _on_stop(self, _):
+        # If obtaining the workload version after an upgrade fails, we do not want juju to display
+        # the workload version from before the upgrade.
+        self.unit.set_workload_version("")
 
     def _on_update_status(self, _: UpdateStatusEvent):
         self._process_status_and_configurations()
