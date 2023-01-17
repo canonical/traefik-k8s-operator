@@ -335,7 +335,7 @@ class IngressPerAppProvider(_IngressPerAppBase):
         try:
             remote_data = {
                 k: databag[k] for k in ("model", "name", "host", "port", "strip-prefix")
-            }
+            }  # type: Dict[str, Union[int, str]]
         except KeyError as e:
             # incomplete data / invalid data
             log.debug("error {}; ignoring...".format(e))
@@ -561,7 +561,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
             data["strip-prefix"] = "true"
 
         _validate_data(data, INGRESS_REQUIRES_APP_SCHEMA)
-        self.relation.data[self.app].update(data)
+        rel.data[self.app].update(data)
 
     @property
     def relation(self):
