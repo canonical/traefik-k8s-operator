@@ -25,7 +25,7 @@
   "fiscalYearStartMonth": 0,
   "gnetId": 6293,
   "graphTooltip": 0,
-  "id": 5,
+  "id": 2,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -250,7 +250,7 @@
           "refId": "A"
         }
       ],
-      "title": "Panel Title",
+      "title": "Top 5 http return codes",
       "type": "piechart"
     },
     {
@@ -393,7 +393,7 @@
       ],
       "thresholds": [],
       "timeRegions": [],
-      "title": "Average response time",
+      "title": "Average response time (last hour)",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -479,7 +479,7 @@
           "format": "time_series",
           "interval": "",
           "intervalFactor": 2,
-          "legendFormat": "{{backend}} ",
+          "legendFormat": "",
           "refId": "A",
           "step": 240
         }
@@ -591,12 +591,14 @@
       },
       "yaxes": [
         {
+          "$$hashKey": "object:207",
           "decimals": 0,
           "format": "short",
           "logBase": 1,
           "show": true
         },
         {
+          "$$hashKey": "object:208",
           "decimals": 0,
           "format": "short",
           "label": "",
@@ -662,7 +664,7 @@
           "format": "time_series",
           "interval": "",
           "intervalFactor": 2,
-          "legendFormat": "{{ instance }}",
+          "legendFormat": "",
           "refId": "A",
           "step": 240
         }
@@ -683,11 +685,15 @@
       },
       "yaxes": [
         {
+          "$$hashKey": "object:94",
+          "decimals": 0,
           "format": "short",
+          "label": "",
           "logBase": 1,
           "show": true
         },
         {
+          "$$hashKey": "object:95",
           "format": "short",
           "logBase": 1,
           "show": true
@@ -754,7 +760,7 @@
           "format": "time_series",
           "interval": "",
           "intervalFactor": 2,
-          "legendFormat": "{{backend}} {{method}} {{code}}",
+          "legendFormat": "",
           "refId": "A",
           "step": 240
         }
@@ -847,7 +853,7 @@
           "expr": "sum(traefik_entrypoint_open_connections) by (method)",
           "format": "time_series",
           "intervalFactor": 1,
-          "legendFormat": "{{ method }}",
+          "legendFormat": "",
           "refId": "A"
         }
       ],
@@ -867,11 +873,15 @@
       },
       "yaxes": [
         {
+          "$$hashKey": "object:157",
+          "decimals": 0,
           "format": "short",
+          "label": "",
           "logBase": 1,
           "show": true
         },
         {
+          "$$hashKey": "object:158",
           "format": "short",
           "logBase": 1,
           "show": false
@@ -938,7 +948,7 @@
           "expr": "sum(traefik_backend_open_connections) by (method)",
           "format": "time_series",
           "intervalFactor": 1,
-          "legendFormat": "{{ method }}",
+          "legendFormat": "",
           "refId": "A"
         }
       ],
@@ -958,11 +968,14 @@
       },
       "yaxes": [
         {
+          "$$hashKey": "object:182",
+          "decimals": 0,
           "format": "short",
           "logBase": 1,
           "show": true
         },
         {
+          "$$hashKey": "object:183",
           "format": "short",
           "logBase": 1,
           "show": false
@@ -1033,7 +1046,7 @@
           "expr": "sum(increase(traefik_backend_requests_total{protocol=~\"$protocol\"}[$interval])) by (code)",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{code}}",
+          "legendFormat": "",
           "refId": "A",
           "step": 120
         }
@@ -1054,6 +1067,7 @@
       },
       "yaxes": [
         {
+          "$$hashKey": "object:236",
           "decimals": 0,
           "format": "short",
           "label": "",
@@ -1062,6 +1076,7 @@
           "show": true
         },
         {
+          "$$hashKey": "object:237",
           "format": "short",
           "logBase": 1,
           "show": false
@@ -1257,8 +1272,8 @@
       {
         "current": {
           "selected": false,
-          "text": "juju_foo_44bfc66e-93cd-468a-87b2-d13da0235c5c_loki_0",
-          "value": "juju_foo_44bfc66e-93cd-468a-87b2-d13da0235c5c_loki_0"
+          "text": "juju_koo_4586f1df-5006-4d21-8af0-c0d49b49c669_loki_0",
+          "value": "juju_koo_4586f1df-5006-4d21-8af0-c0d49b49c669_loki_0"
         },
         "hide": 0,
         "includeAll": false,
@@ -1274,8 +1289,8 @@
       {
         "current": {
           "selected": false,
-          "text": "juju_foo_44bfc66e-93cd-468a-87b2-d13da0235c5c_prom_0",
-          "value": "juju_foo_44bfc66e-93cd-468a-87b2-d13da0235c5c_prom_0"
+          "text": "juju_koo_4586f1df-5006-4d21-8af0-c0d49b49c669_prom_0",
+          "value": "juju_koo_4586f1df-5006-4d21-8af0-c0d49b49c669_prom_0"
         },
         "hide": 0,
         "includeAll": false,
@@ -1321,7 +1336,7 @@
       },
       {
         "current": {
-          "selected": true,
+          "selected": false,
           "text": "trfk",
           "value": "trfk"
         },
@@ -1386,7 +1401,7 @@
         "definition": "label_values(up,juju_model)",
         "hide": 0,
         "includeAll": false,
-        "label": "Juju Model",
+        "label": "Juju model",
         "multi": false,
         "name": "juju_model",
         "options": [],
