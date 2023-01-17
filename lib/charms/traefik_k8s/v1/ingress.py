@@ -257,9 +257,9 @@ class IngressPerAppDataProvidedEvent(_IPAEvent):
     if typing.TYPE_CHECKING:
         name = None  # type: Optional[str]
         model = None  # type: Optional[str]
-        port = None  # type: Optional[int]
+        port = None  # type: Optional[str]
         host = None  # type: Optional[str]
-        strip_prefix = None  # type: bool
+        strip_prefix = False  # type: bool
 
 
 class IngressPerAppDataRemovedEvent(RelationEvent):
@@ -345,6 +345,7 @@ class IngressPerAppProvider(_IngressPerAppBase):
         _validate_data(remote_data, INGRESS_REQUIRES_APP_SCHEMA)
 
         remote_data["port"] = int(remote_data["port"])
+        remote_data["strip-prefix"] = bool(remote_data.get("strip-prefix", False))
         return remote_data
 
     def get_data(self, relation: Relation) -> RequirerData:  # type: ignore
@@ -577,6 +578,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
 
     def _get_url_from_relation_data(self) -> Optional[str]:
         """The full ingress URL to reach the current unit.
+
         Returns None if the URL isn't available yet.
         """
         relation = self.relation
@@ -605,7 +607,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
     def url(self) -> Optional[str]:
         """The full ingress URL to reach the current unit.
 
-        May return None if the URL isn't available yet.
+        Returns None if the URL isn't available yet.
         """
         data = self._stored.current_url or self._get_url_from_relation_data()  # type: ignore
         assert isinstance(data, (str, type(None)))  # for static checker
