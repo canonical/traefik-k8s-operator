@@ -188,7 +188,7 @@ def _validate_data(data, schema):
         raise DataValidationError(data, schema) from e
 
 
-def _relation_data_exists(relation: Relation):
+def _can_access_relation_data(relation: Relation):
     """Helper to verify that relation data exists.
 
     In some cases when we receive a relation event, the relation data
@@ -271,10 +271,11 @@ class _IngressPerUnitBase(Object):
 
         observe = self.framework.observe
         rel_events = charm.on[relation_name]
-        observe(rel_events.relation_created, self._handle_relation)
-        observe(rel_events.relation_joined, self._handle_relation)
-        observe(rel_events.relation_changed, self._handle_relation)
-        observe(rel_events.relation_broken, self._handle_relation_broken)
+        observe(rel_events.relation_created, self._handle_relation_available)
+        observe(rel_events.relation_joined, self._handle_relation_available)
+        observe(rel_events.relation_changed, self._handle_relation_available)
+        observe(rel_events.relation_broken, self._handle_relation_unavailable)
+        observe(rel_events.relation_departed, self._handle_relation_unavailable)
         observe(charm.on.leader_elected, self._handle_upgrade_or_leader)  # type: ignore
         observe(charm.on.upgrade_charm, self._handle_upgrade_or_leader)  # type: ignore
 
@@ -284,13 +285,13 @@ class _IngressPerUnitBase(Object):
         all_relations = self.charm.model.relations[self.relation_name]
         # we filter out relations whose data is unaccessible, these are
         # probably ghost relations (TODO: reference juju bug?)
-        return list(filter(_relation_data_exists, all_relations))
+        return list(filter(_can_access_relation_data, all_relations))
 
-    def _handle_relation(self, event):
+    def _handle_relation_available(self, event):
         """Subclasses should implement this method to handle a relation update."""
         pass
 
-    def _handle_relation_broken(self, event):
+    def _handle_relation_unavailable(self, event):
         """Subclasses should implement this method to handle a relation breaking."""
         pass
 
@@ -345,10 +346,13 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
 
     on = IngressPerUnitProviderEvents()
 
-    def _handle_relation(self, event):
+    def _handle_relation_available(self, event):
         relation = event.relation
-        if not _relation_data_exists(relation):
-            return event.defer()
+        if not _can_access_relation_data(relation):
+            # no relation data: we could be handling a
+            # relation-joined/relation-created event,
+            # where no data is available yet.
+            return
 
         try:
             self.validate(relation)
@@ -364,7 +368,8 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
         else:
             self.on.data_removed.emit(relation)  # type: ignore
 
-    def _handle_relation_broken(self, event):
+    def _handle_relation_unavailable(self, event):
+        self.wipe_ingress_data(event.relation)
         # relation broken -> we revoke in any case
         self.on.data_removed.emit(event.relation)  # type: ignore
 
@@ -460,7 +465,6 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
 
         Assumes that this unit is leader.
         """
-        _leader_check(self.unit)
         try:
             relation.data
         except ModelError as e:
@@ -470,6 +474,9 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
                 "lingering around.".format(e, relation.name)
             )
             return
+        # do this at the very last moment in case fetching relation.data
+        # took longer than 30s
+        _leader_check(self.unit)
         del relation.data[self.app]["ingress"]
 
     def _requirer_units_data(self, relation: Relation) -> RequirerUnitData:
@@ -728,25 +735,28 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
         self.listen_to = listen_to
 
         self.framework.observe(
-            self.charm.on[self.relation_name].relation_changed, self._handle_relation
+            self.charm.on[self.relation_name].relation_changed, self._handle_relation_available
         )
         self.framework.observe(
-            self.charm.on[self.relation_name].relation_broken, self._handle_relation
+            self.charm.on[self.relation_name].relation_broken, self._handle_relation_unavailable
         )
 
-    def _handle_relation(self, event: RelationEvent):
+    def _handle_relation_available(self, event: RelationEvent):
         rel = event.relation
         if not isinstance(rel, Relation):  # type guard
-            raise RuntimeError('event.relation is not Relation but {}'.format(rel))
-        if not _relation_data_exists(rel):
-            return event.defer()
+            raise RuntimeError("event.relation is not Relation but {}".format(rel))
+        if not _can_access_relation_data(rel):
+            return
+
         # we calculate the diff between the urls we were aware of
         # before and those we know now
+        # TODO: [BEWARE] if urls ever becomes more complex than Dict[str,str],
+        #  we need to be careful to how we do the comparison.
+        #  Cfr: https://github.com/canonical/operator/pull/572#issuecomment-931529580
         previous_urls = self._stored.current_urls or {}  # type: ignore
         current_urls = (
             {} if isinstance(event, RelationBrokenEvent) else self._urls_from_relation_data
         )
-        self._stored.current_urls = current_urls  # type: ignore
 
         removed = previous_urls.keys() - current_urls.keys()  # type: ignore
         changed = {a for a in current_urls if current_urls[a] != previous_urls.get(a)}  # type: ignore
@@ -789,13 +799,18 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
         if not relations:
             return None
         if len(relations) > 2:
-            raise RuntimeError("Too many ingress relations: {}".format(relations))
+            raise RuntimeError(
+                "Too many ingress relations: {} relations found;"
+                "but the ingress-per-unit "
+                "relation has limit 1.".format(len(relations))
+            )
         return relations[0]
 
     def is_ready(self) -> bool:
-        """Checks whether ingress is ready.
+        """Checks whether the given relation is ready.
 
-        I.e. if the remote side has sent valid data.
+        Or any relation if not specified.
+        A given relation is ready if the remote side has sent valid data.
         """
         if not self.relation:
             return False
@@ -887,7 +902,6 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
 
         May return None if the URL isn't available yet.
         """
-        urls = self.urls
-        if not urls:
+        if not self.urls:
             return None
-        return urls.get(self.charm.unit.name)
+        return self.urls.get(self.charm.unit.name)
