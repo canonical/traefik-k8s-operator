@@ -117,7 +117,7 @@ except ImportError:
 
 # Model of the data a unit implementing the requirer will need to provide.
 RequirerData = TypedDict(
-    "RequirerData",
+    "RequirerData", 
     {"model": str, "name": str, "host": str, "port": int, "strip-prefix": bool},
     total=False,
 )
@@ -180,10 +180,11 @@ class _IngressPerAppBase(Object):
 
         observe = self.framework.observe
         rel_events = charm.on[relation_name]
-        observe(rel_events.relation_created, self._handle_relation)
-        observe(rel_events.relation_joined, self._handle_relation)
-        observe(rel_events.relation_changed, self._handle_relation)
-        observe(rel_events.relation_broken, self._handle_relation_broken)
+        observe(rel_events.relation_created, self._handle_relation_available)
+        observe(rel_events.relation_joined, self._handle_relation_available)
+        observe(rel_events.relation_changed, self._handle_relation_available)
+        observe(rel_events.relation_broken, self._handle_relation_unavailable)
+        observe(rel_events.relation_departed, self._handle_relation_unavailable)
         observe(charm.on.leader_elected, self._handle_upgrade_or_leader)  # type: ignore
         observe(charm.on.upgrade_charm, self._handle_upgrade_or_leader)  # type: ignore
 
@@ -195,11 +196,11 @@ class _IngressPerAppBase(Object):
         # probably ghost relations (TODO: reference juju bug?)
         return list(filter(_relation_data_exists, all_relations))
 
-    def _handle_relation(self, event):
+    def _handle_relation_available(self, event):
         """Subclasses should implement this method to handle a relation update."""
         pass
 
-    def _handle_relation_broken(self, event):
+    def _handle_relation_unavailable(self, event):
         """Subclasses should implement this method to handle a relation breaking."""
         pass
 
@@ -253,13 +254,13 @@ class IngressPerAppDataProvidedEvent(_IPAEvent):
     """Event representing that ingress data has been provided for an app."""
 
     __args__ = ("name", "model", "port", "host", "strip_prefix")
-
     if typing.TYPE_CHECKING:
         name = None  # type: Optional[str]
         model = None  # type: Optional[str]
-        port = None  # type: Optional[str]
+        port = None  # type: Optional[int]
         host = None  # type: Optional[str]
-        strip_prefix = False  # type: bool
+        strip_prefix = None  # type: bool
+
 
 
 class IngressPerAppDataRemovedEvent(RelationEvent):
@@ -288,7 +289,7 @@ class IngressPerAppProvider(_IngressPerAppBase):
         """
         super().__init__(charm, relation_name)
 
-    def _handle_relation(self, event):
+    def _handle_relation_available(self, event):
         # created, joined or changed: if remote side has sent the required data:
         # notify listeners.
         if self.is_ready(event.relation):
@@ -302,7 +303,7 @@ class IngressPerAppProvider(_IngressPerAppBase):
                 data.get("strip-prefix", False),
             )
 
-    def _handle_relation_broken(self, event):
+    def _handle_relation_unavailable(self, event):
         self.on.data_removed.emit(event.relation)  # type: ignore
 
     def wipe_ingress_data(self, relation: Relation):
@@ -332,14 +333,17 @@ class IngressPerAppProvider(_IngressPerAppBase):
             return {}
 
         databag = relation.data[relation.app]
-        remote_data = {}  # type: Dict[str, Union[int, str]]
-        for k in ("port", "host", "model", "name", "mode", "strip-prefix"):
-            v = databag.get(k)
-            if v is not None:
-                remote_data[k] = v
+        try:
+            remote_data = {k: databag[k] for k in ("model", "name", "host", "port", "strip-prefix")}
+        except KeyError as e:
+            # incomplete data / invalid data
+            log.debug("error {}; ignoring...".format(e))
+            return {}
+        except TypeError as e:
+            raise DataValidationError("Error casting remote data: {}".format(e))
         _validate_data(remote_data, INGRESS_REQUIRES_APP_SCHEMA)
+
         remote_data["port"] = int(remote_data["port"])
-        remote_data["strip-prefix"] = bool(remote_data.get("strip-prefix", False))
         return remote_data
 
     def get_data(self, relation: Relation) -> RequirerData:  # type: ignore
@@ -433,7 +437,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
     """Implementation of the requirer of the ingress relation."""
 
     on = IngressPerAppRequirerEvents()
-    # used to prevent spur1ious urls to be sent out if the event we're currently
+    # used to prevent spurious urls to be sent out if the event we're currently
     # handling is a relation-broken one.
     _stored = StoredState()
 
@@ -478,9 +482,9 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         else:
             self._auto_data = None
 
-    def _handle_relation(self, event):
+    def _handle_relation_available(self, event):
         if not _relation_data_exists(event.relation):
-            return event.defer()
+            return
 
         # created, joined or changed: if we have auto data: publish it
         self._publish_auto_data(event.relation)
@@ -496,7 +500,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
                 self._stored.current_url = new_url  # type: ignore
                 self.on.ready.emit(event.relation, new_url)  # type: ignore
 
-    def _handle_relation_broken(self, event):
+    def _handle_relation_unavailable(self, event):
         self._stored.current_url = None  # type: ignore
         self.on.revoked.emit(event.relation)  # type: ignore
 
@@ -518,7 +522,9 @@ class IngressPerAppRequirer(_IngressPerAppBase):
             host, port = self._auto_data
             self.provide_ingress_requirements(host=host, port=port, relation=relation)
 
-    def provide_ingress_requirements(self, *, host: Optional[str] = None, port: int, relation: Optional[Relation] = None):
+    def provide_ingress_requirements(
+        self, *, host: Optional[str] = None, port: int, relation: Optional[Relation] = None
+    ):
         """Publishes the data that Traefik needs to provide ingress.
 
         NB only the leader unit is supposed to do this.
@@ -562,12 +568,12 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         if not relations:
             return None
         if len(relations) > 2:
-            raise RuntimeError("Too many ingress relations: {}".format(relations))
+            raise RuntimeError("Too many ingress relations: {} relations found;"
+                               "but the ingress relation has limit 1.".format(len(relations)))
         return relations[0]
 
     def _get_url_from_relation_data(self) -> Optional[str]:
         """The full ingress URL to reach the current unit.
-
         Returns None if the URL isn't available yet.
         """
         relation = self.relation
@@ -596,7 +602,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
     def url(self) -> Optional[str]:
         """The full ingress URL to reach the current unit.
 
-        Returns None if the URL isn't available yet.
+        May return None if the URL isn't available yet.
         """
         data = self._stored.current_url or self._get_url_from_relation_data()  # type: ignore
         assert isinstance(data, (str, type(None)))  # for static checker
