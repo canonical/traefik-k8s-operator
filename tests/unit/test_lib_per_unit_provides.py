@@ -5,8 +5,10 @@ from textwrap import dedent
 
 import pytest
 import yaml
-from charms.traefik_k8s.v1.ingress_per_unit import IngressPerUnitProvider, \
-    LeadershipError
+from charms.traefik_k8s.v1.ingress_per_unit import (
+    IngressPerUnitProvider,
+    LeadershipError,
+)
 from ops.charm import CharmBase
 from ops.model import Relation
 from ops.testing import Harness
@@ -104,7 +106,6 @@ def test_ingress_unit_provider_request_response_nonleader(
     _requirer_provide_ingress_requirements(
         harness, port, relation, host=host, strip_prefix=strip_prefix
     )
-
     unit_data = provider.get_data(relation, relation.units.pop())
     assert unit_data["model"] == "test-model"
     assert unit_data["name"] == "remote/0"
