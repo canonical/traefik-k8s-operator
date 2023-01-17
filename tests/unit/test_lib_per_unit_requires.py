@@ -257,7 +257,7 @@ def _requirer_revoke_ingress(harness: Harness[MockRequirerCharm], relation: Rela
 
 
 def test_ingress_unit_provider_cleanup(requirer, harness: Harness[MockRequirerCharm]):
-    # test that requirer.url is falsy if traefik revokes ingress
+    # test that requirer.url is 'falsy' if traefik revokes ingress
     relation = relate(harness)
     harness.set_leader(True)
     _requirer_provide_ingress(harness, harness.charm.unit.name, "foo.com", relation)
@@ -266,4 +266,3 @@ def test_ingress_unit_provider_cleanup(requirer, harness: Harness[MockRequirerCh
 
     _requirer_revoke_ingress(harness, relation)
     assert not harness.charm.ipu.url
-
