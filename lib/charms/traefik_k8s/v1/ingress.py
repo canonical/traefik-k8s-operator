@@ -117,7 +117,7 @@ except ImportError:
 
 # Model of the data a unit implementing the requirer will need to provide.
 RequirerData = TypedDict(
-    "RequirerData", 
+    "RequirerData",
     {"model": str, "name": str, "host": str, "port": int, "strip-prefix": bool},
     total=False,
 )
@@ -262,7 +262,6 @@ class IngressPerAppDataProvidedEvent(_IPAEvent):
         strip_prefix = None  # type: bool
 
 
-
 class IngressPerAppDataRemovedEvent(RelationEvent):
     """Event representing that ingress data has been removed for an app."""
 
@@ -334,7 +333,9 @@ class IngressPerAppProvider(_IngressPerAppBase):
 
         databag = relation.data[relation.app]
         try:
-            remote_data = {k: databag[k] for k in ("model", "name", "host", "port", "strip-prefix")}
+            remote_data = {
+                k: databag[k] for k in ("model", "name", "host", "port", "strip-prefix")
+            }
         except KeyError as e:
             # incomplete data / invalid data
             log.debug("error {}; ignoring...".format(e))
@@ -568,8 +569,10 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         if not relations:
             return None
         if len(relations) > 2:
-            raise RuntimeError("Too many ingress relations: {} relations found;"
-                               "but the ingress relation has limit 1.".format(len(relations)))
+            raise RuntimeError(
+                "Too many ingress relations: {} relations found;"
+                "but the ingress relation has limit 1.".format(len(relations))
+            )
         return relations[0]
 
     def _get_url_from_relation_data(self) -> Optional[str]:
