@@ -85,13 +85,12 @@ def spellbook_fetch(  # noqa: C901
             ) from e
         # if everything went OK, `charmcraft pack` returns the packed charm filename
         try:
-            charm_path = json.loads(pack_out.decode("utf-8"))
-            charms = charm_path["charms"]
-            charm_filename = charms[0]
-        except (json.JSONDecodeError, KeyError, IndexError):
+            charmcraft_pack_out = json.loads(pack_out.decode("utf-8"))
+            charm_filename = charmcraft_pack_out["charms"][0]
+        except (json.JSONDecodeError, KeyError, IndexError) as e:
             raise RuntimeError(
                 f"Could not determine path to packed charm file from charmcraft pack output: {pack_out!r}"
-            )
+            ) from e
 
         packed_charm_path = (Path(os.getcwd()) / charm_filename).absolute()
         if not packed_charm_path.exists():
