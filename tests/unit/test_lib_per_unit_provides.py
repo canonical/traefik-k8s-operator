@@ -5,7 +5,8 @@ from textwrap import dedent
 
 import pytest
 import yaml
-from charms.traefik_k8s.v1.ingress_per_unit import IngressPerUnitProvider
+from charms.traefik_k8s.v1.ingress_per_unit import IngressPerUnitProvider, \
+    LeadershipError
 from ops.charm import CharmBase
 from ops.model import Relation
 from ops.testing import Harness
@@ -111,7 +112,7 @@ def test_ingress_unit_provider_request_response_nonleader(
     assert unit_data["port"] == port
 
     # fail because unit isn't leader
-    with pytest.raises(AssertionError):
+    with pytest.raises(LeadershipError):
         provider.publish_url(relation, unit_data["name"], "http://url/")
 
 

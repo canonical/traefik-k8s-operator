@@ -82,7 +82,7 @@ LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 6
+LIBPATCH = 7
 
 log = logging.getLogger(__name__)
 
@@ -188,9 +188,32 @@ def _validate_data(data, schema):
         raise DataValidationError(data, schema) from e
 
 
+def _relation_data_exists(relation: Relation):
+    """Helper to verify that relation data exists.
+
+    In some cases when we receive a relation event, the relation data
+    is not ready (yet).
+    """
+    try:
+        _ = relation.data
+        return True
+    except ModelError as e:
+        log.debug("relation data access failed with {!r}".format(e))
+        return False
+
+
 # EXCEPTIONS
 class DataValidationError(RuntimeError):
     """Raised when data validation fails on IPU relation data."""
+
+
+class LeadershipError(RuntimeError):
+    """Raised when a follower unit attempts an operation that requires leadership."""
+
+
+def _leader_check(unit: Unit):
+    if not unit.is_leader():
+        raise LeadershipError(unit)
 
 
 class RelationException(RuntimeError):
@@ -258,7 +281,10 @@ class _IngressPerUnitBase(Object):
     @property
     def relations(self):
         """The list of Relation instances associated with this relation_name."""
-        return list(self.charm.model.relations[self.relation_name])
+        all_relations = self.charm.model.relations[self.relation_name]
+        # we filter out relations whose data is unaccessible, these are
+        # probably ghost relations (TODO: reference juju bug?)
+        return list(filter(_relation_data_exists, all_relations))
 
     def _handle_relation(self, event):
         """Subclasses should implement this method to handle a relation update."""
@@ -321,6 +347,9 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
 
     def _handle_relation(self, event):
         relation = event.relation
+        if not _relation_data_exists(relation):
+            return event.defer()
+
         try:
             self.validate(relation)
         except RelationDataMismatchError as e:
@@ -401,8 +430,7 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
 
         Assumes that this unit is leader.
         """
-        assert self.unit.is_leader(), "only leaders can do this"
-
+        _leader_check(self.unit)
         raw_data = relation.data[self.app].get("ingress", None)
         data = yaml.safe_load(raw_data) if raw_data else {}
         ingress = {"ingress": data}
@@ -432,7 +460,7 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
 
         Assumes that this unit is leader.
         """
-        assert self.unit.is_leader(), "only leaders can do this"
+        _leader_check(self.unit)
         try:
             relation.data
         except ModelError as e:
@@ -707,6 +735,11 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
         )
 
     def _handle_relation(self, event: RelationEvent):
+        rel = event.relation
+        if not isinstance(rel, Relation):  # type guard
+            raise RuntimeError('event.relation is not Relation but {}'.format(rel))
+        if not _relation_data_exists(rel):
+            return event.defer()
         # we calculate the diff between the urls we were aware of
         # before and those we know now
         previous_urls = self._stored.current_urls or {}  # type: ignore
@@ -737,26 +770,32 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
             for unit_name in removed:
                 self.on.revoked.emit(self.relation, unit_name)  # type: ignore
 
-        self._publish_auto_data()
+        self._stored.current_urls = current_urls  # type: ignore
+
+        self._publish_auto_data(rel)
 
     def _handle_upgrade_or_leader(self, event):
-        if self.relations:
-            self._publish_auto_data()
+        for relation in self.relations:
+            self._publish_auto_data(relation)
 
-    def _publish_auto_data(self):
+    def _publish_auto_data(self, relation: Relation):
         if self._port:
-            self.provide_ingress_requirements(host=self._host, port=self._port)
+            self.provide_ingress_requirements(host=self._host, port=self._port, relation=relation)
 
     @property
     def relation(self) -> Optional[Relation]:
         """The established Relation instance, or None if still unrelated."""
-        return self.relations[0] if self.relations else None
+        relations = self.relations
+        if not relations:
+            return None
+        if len(relations) > 2:
+            raise RuntimeError("Too many ingress relations: {}".format(relations))
+        return relations[0]
 
     def is_ready(self) -> bool:
-        """Checks whether the given relation is ready.
+        """Checks whether ingress is ready.
 
-        Or any relation if not specified.
-        A given relation is ready if the remote side has sent valid data.
+        I.e. if the remote side has sent valid data.
         """
         if not self.relation:
             return False
@@ -764,15 +803,23 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
             return False
         return bool(self.url)
 
-    def provide_ingress_requirements(self, *, host: Optional[str] = None, port: int):
+    def provide_ingress_requirements(
+        self, *, host: Optional[str] = None, port: int, relation: Optional[Relation] = None
+    ):
         """Publishes the data that Traefik needs to provide ingress.
 
         Args:
             host: Hostname to be used by the ingress provider to address the
              requirer unit; if unspecified, FQDN will be used instead
             port: the port of the service (required)
+            relation: the relation via which ingress should be provided.
+            If unspecified, will default to the (unique) established
+            'ingress' relation.
+
         """
-        assert self.relation, "no relation"
+        rel = relation or self.relation
+        if not rel:
+            raise RuntimeError("no relation; cannot provide ingress requirements")
 
         if not host:
             host = socket.getfqdn()
@@ -789,7 +836,7 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
             data["strip-prefix"] = "true"
 
         _validate_data(data, INGRESS_REQUIRES_UNIT_SCHEMA)
-        self.relation.data[self.unit].update(data)
+        rel.data[self.unit].update(data)
 
     @property
     def _urls_from_relation_data(self) -> Dict[str, str]:

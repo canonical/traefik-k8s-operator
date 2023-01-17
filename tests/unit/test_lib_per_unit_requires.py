@@ -250,3 +250,20 @@ class TestInterlibDependency(unittest.TestCase):
         # THEN the dependee (defined in the charm's constructor before ingress-ready is emitted),
         # still has up-to-date value regardless of code ordering.
         self.assertEqual(self.harness.charm.dependee, self.harness.charm.ipu.url)
+
+
+def _requirer_revoke_ingress(harness: Harness[MockRequirerCharm], relation: Relation):
+    harness.update_relation_data(relation.id, "remote", {"ingress": ""})
+
+
+def test_ingress_unit_provider_cleanup(requirer, harness: Harness[MockRequirerCharm]):
+    # test that requirer.url is falsy if traefik revokes ingress
+    relation = relate(harness)
+    harness.set_leader(True)
+    _requirer_provide_ingress(harness, harness.charm.unit.name, "foo.com", relation)
+
+    assert harness.charm.ipu.url == "foo.com"
+
+    _requirer_revoke_ingress(harness, relation)
+    assert not harness.charm.ipu.url
+
