@@ -18,16 +18,23 @@ from scenario.structs import (
 
 from charm import TraefikIngressCharm
 
-META = yaml.safe_load((Path(__file__).parent.parent.parent / "metadata.yaml").read_text())
-
 
 @patch("charm.KubernetesServicePatch")
 @patch("lightkube.core.client.GenericSyncClient")
 @patch("charm.TraefikIngressCharm.external_host", PropertyMock(return_value="foo.bar"))
 def test_start(*_):
-    scenario = Scenario(charm_spec=CharmSpec(TraefikIngressCharm, meta=META))
-    scenario.play(Scene(state=State(), event=event("start")))
+    charm_spec = CharmSpec.from_charm(TraefikIngressCharm)
+    # equivalent to:
+    # META = yaml.safe_load((Path(__file__).parent.parent.parent / "metadata.yaml").read_text())
+    # ACTIONS = yaml.safe_load((Path(__file__).parent.parent.parent / "actions.yaml").read_text())
+    # CONFIG = yaml.safe_load((Path(__file__).parent.parent.parent / "config.yaml").read_text())
+    # charm_spec = CharmSpec(TraefikIngressCharm, meta=META, config=CONFIG, actions=ACTIONS))
 
+    scenario = Scenario(charm_spec=charm_spec)
+    scenario.play(Scene(
+        state=State(config={"routing_mode": "path"},
+                    containers=[ContainerSpec(name="traefik", can_connect=False)]),
+        event=event("start")))
 
 # def test_start_as_follower(*_):
 #     my_scenario = Scenario(
