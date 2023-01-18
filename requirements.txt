@@ -1,4 +1,4 @@
-ops == 1.5.2
+ops == 2.0.0rc2
 deepmerge
 lightkube >= 0.8.1
 lightkube-models >= 1.22.0.4
