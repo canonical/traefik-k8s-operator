@@ -69,7 +69,7 @@ LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 8
+LIBPATCH = 9
 
 DEFAULT_RELATION_NAME = "ingress"
 RELATION_INTERFACE = "ingress"
@@ -202,7 +202,7 @@ class _IPAEvent(RelationEvent):
             obj = kwargs.get(attr, default)
             setattr(self, attr, obj)
 
-    def snapshot(self) -> dict:
+    def snapshot(self):
         dct = super().snapshot()
         for attr in self.__attrs__():
             obj = getattr(self, attr)
@@ -217,7 +217,7 @@ class _IPAEvent(RelationEvent):
 
         return dct
 
-    def restore(self, snapshot: dict) -> None:
+    def restore(self, snapshot) -> None:
         super().restore(snapshot)
         for attr, obj in snapshot.items():
             setattr(self, attr, obj)
@@ -250,7 +250,7 @@ class IngressPerAppProviderEvents(ObjectEvents):
 class IngressPerAppProvider(_IngressPerAppBase):
     """Implementation of the provider of ingress."""
 
-    on = IngressPerAppProviderEvents()
+    on = IngressPerAppProviderEvents()  # type: ignore
 
     def __init__(self, charm: CharmBase, relation_name: str = DEFAULT_RELATION_NAME):
         """Constructor for IngressPerAppProvider.
@@ -406,7 +406,8 @@ class IngressPerAppRequirerEvents(ObjectEvents):
 class IngressPerAppRequirer(_IngressPerAppBase):
     """Implementation of the requirer of the ingress relation."""
 
-    on = IngressPerAppRequirerEvents()
+    on = IngressPerAppRequirerEvents()  # type: ignore
+
     # used to prevent spur1ious urls to be sent out if the event we're currently
     # handling is a relation-broken one.
     _stored = StoredState()

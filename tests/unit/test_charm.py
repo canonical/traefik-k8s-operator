@@ -566,13 +566,14 @@ class TestTraefikIngressCharm(unittest.TestCase):
             pass
 
     @patch("charm._get_loadbalancer_status", lambda **unused: None)
+    @patch("charm.TraefikIngressCharm._on_config_changed", lambda self, event: None)
     @patch("charm.TraefikIngressCharm._traefik_service_running", lambda **unused: True)
     @patch("charm.KubernetesServicePatch", lambda **unused: None)
     def test_show_proxied_endpoints_action_no_relations(self):
         self.harness.begin_with_initial_hooks()
 
         action_event = Mock(spec=ActionEvent)
-        self.harness.charm.model.config._data["external_hostname"] = "foo"
+        self.harness.update_config({"external_hostname": "foo"})
         self.harness.charm._on_show_proxied_endpoints(action_event)
         action_event.set_results.assert_called_once_with({"proxied-endpoints": "{}"})
 
