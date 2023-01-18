@@ -32,8 +32,20 @@ def test_start(*_):
 
     scenario = Scenario(charm_spec=charm_spec)
     scenario.play(Scene(
-        state=State(config={"routing_mode": "path"},
-                    containers=[ContainerSpec(name="traefik", can_connect=False)]),
+        state=State(
+            # ATM scenario can't use the defaults specified in config.yaml, so we need to provide ourselves the values
+            # of each config option
+            config={"routing_mode": "path"},
+            # you need to specify which containers are present, otherwise the charm will raise exceptions when
+            # assuming that there is a "traefik" container.
+            containers=[
+                ContainerSpec(name="traefik",
+                              # we need to set can_connect=False for now because I didn't write yet the mocking code for
+                              # the other pebble interactions yet. So if the charm tries to get_services, get_plan,
+                              # push, pull etc, there will be errors.
+                              # Can implement this tomorrow so you can proceed.
+                              can_connect=False)
+            ]),
         event=event("start")))
 
 # def test_start_as_follower(*_):
