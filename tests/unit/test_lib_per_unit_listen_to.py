@@ -24,7 +24,7 @@ def listen_to(request):
 def charm_cls(listen_to):
     class MyCharm(CharmBase):
         def __init__(self, framework):
-            super().__init__(framework, None)
+            super().__init__(framework)
             self.ipu = IngressPerUnitRequirer(self, host="foo.com", port=80, listen_to=listen_to)
 
             self.framework.observe(self.ipu.on.ready, self._on_event)
