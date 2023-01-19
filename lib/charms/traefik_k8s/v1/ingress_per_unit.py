@@ -563,7 +563,7 @@ class _IPUEvent(RelationEvent):
             obj = kwargs.get(attr, default)
             setattr(self, attr, obj)
 
-    def snapshot(self) -> dict:
+    def snapshot(self):
         dct = super().snapshot()
         for attr in self.__attrs__():
             obj = getattr(self, attr)
@@ -575,10 +575,10 @@ class _IPUEvent(RelationEvent):
                     "override this method and do it "
                     "manually.".format(obj)
                 ) from e
-        return dct  # type: ignore
+        return dct
 
-    def restore(self, snapshot: dict) -> None:
-        super().restore(snapshot)  # type: ignore
+    def restore(self, snapshot) -> None:
+        super().restore(snapshot)
         for attr, obj in snapshot.items():
             setattr(self, attr, obj)
 
