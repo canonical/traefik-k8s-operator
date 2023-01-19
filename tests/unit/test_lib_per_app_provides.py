@@ -50,7 +50,7 @@ def test_ingress_app_provider_related(harness, provider: IngressPerAppProvider):
     assert not provider.is_ready(relation)
 
 
-@pytest.mark.parametrize("strip_prefix", (True, False))
+@pytest.mark.parametrize("strip_prefix", ("true", "false"))
 def test_ingress_app_provider_relate_provide(
     provider: IngressPerAppProvider, harness, strip_prefix
 ):

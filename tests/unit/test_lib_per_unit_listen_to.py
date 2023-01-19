@@ -24,7 +24,7 @@ def listen_to(request):
 def charm_cls(listen_to):
     class MyCharm(CharmBase):
         def __init__(self, framework):
-            super().__init__(framework, None)
+            super().__init__(framework)
             self.ipu = IngressPerUnitRequirer(self, host="foo.com", port=80, listen_to=listen_to)
 
             self.framework.observe(self.ipu.on.ready, self._on_event)
@@ -108,7 +108,7 @@ def test_ready_other_unit(harness, charm, listen_to, url):
     relation = relate(harness)
     _requirer_provide_ingress(harness, charm.unit.name, url, relation)
 
-    new_unit_name = charm.unit.name + "1"
+    new_unit_name = relation.app.name + "1"
     new_unit_url = url + "/new_unit"
     harness.add_relation_unit(relation.id, new_unit_name)
 
