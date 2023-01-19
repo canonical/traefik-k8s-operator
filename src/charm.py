@@ -20,9 +20,10 @@ from charms.observability_libs.v1.kubernetes_service_patch import (
     ServicePort,
 )
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
-from charms.tls_certificates_interface.v1.tls_certificates import (
+from charms.tls_certificates_interface.v2.tls_certificates import (
     CertificateAvailableEvent,
     CertificateExpiringEvent,
+    CertificateInvalidatedEvent,
     TLSCertificatesRequiresV1,
     generate_csr,
     generate_private_key,
@@ -143,16 +144,17 @@ class TraefikIngressCharm(CharmBase):
             self.on.certificates_relation_joined, self._on_certificates_relation_joined
         )
         self.framework.observe(
-            # TODO observe a custom event instead, once implemented.
-            # https://github.com/canonical/tls-certificates-interface/issues/25
-            self.on.certificates_relation_broken,
-            self._on_certificates_relation_broken,
-        )
-        self.framework.observe(
             self.certificates.on.certificate_available, self._on_certificate_available
         )
         self.framework.observe(
             self.certificates.on.certificate_expiring, self._on_certificate_expiring
+        )
+        self.framework.observe(
+            self.certificates.on.certificate_invalidated, self._on_certificate_invalidated
+        )
+        self.framework.observe(
+            self.certificates.on.all_certificates_invalidated,
+            self._on_all_certificates_invalidated,
         )
 
         observe = self.framework.observe
@@ -212,7 +214,14 @@ class TraefikIngressCharm(CharmBase):
         self.certificates.request_certificate_creation(certificate_signing_request=csr)
         logger.debug("CSR sent")
 
-    def _on_certificates_relation_broken(self, event: RelationBrokenEvent) -> None:
+    def _on_certificate_invalidated(self, event: CertificateInvalidatedEvent):
+        # Assuming there can be only one cert (metadata also has `limit: 1` on the relation).
+        # Assuming the `on-expiring` handle successfully takes care of renewal.
+        # Keeping the cert on traefik's filesystem even if the cert does end up being invalidated.
+        # Nothing to do here.
+        pass
+
+    def _on_all_certificates_invalidated(self, event: RelationBrokenEvent) -> None:
         if self.container.can_connect():
             self._stored.certificate = None
             self._stored.private_key = None
