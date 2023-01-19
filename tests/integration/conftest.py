@@ -281,12 +281,6 @@ def assert_can_ping(ip, port):
     assert response == 0, f"{ip}:{port} is down/unreachable"
 
 
-async def get_address(ops_test: OpsTest, app_name: str, unit=0):
-    status = await ops_test.model.get_status()  # noqa: F821
-    addr = list(status.applications[app_name].units.values())[unit].address
-    return addr
-
-
 async def deploy_traefik_if_not_deployed(ops_test: OpsTest, traefik_charm):
     try:
         await ops_test.model.deploy(
@@ -295,16 +289,6 @@ async def deploy_traefik_if_not_deployed(ops_test: OpsTest, traefik_charm):
     except JujuError as e:
         if 'cannot add application "traefik-k8s": application already exists' not in str(e):
             raise e
-
-    # block until traefik goes to...
-    async with ops_test.fast_forward():
-        await ops_test.model.wait_for_idle(["traefik-k8s"], timeout=1000)
-
-    # we set the external hostname to traefik-k8s's own ip
-    traefik_address = await get_address(ops_test, "traefik-k8s")
-    await ops_test.model.applications["traefik-k8s"].set_config(
-        {"external_hostname": traefik_address}
-    )
 
     # now we're most definitely active.
     async with ops_test.fast_forward():

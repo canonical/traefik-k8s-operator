@@ -1,23 +1,33 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
+import asyncio
+from pathlib import Path
+
 import pytest
 import yaml
 from pytest_operator.plugin import OpsTest
 
-from tests.integration.conftest import (
-    assert_can_ping,
-    deploy_traefik_if_not_deployed,
-    get_address,
-    get_relation_data,
-)
+from tests.integration.conftest import assert_can_ping, get_relation_data
+from tests.integration.helpers import get_address
+
+trfk_root = Path(__file__).parent.parent.parent
+trfk_meta = yaml.safe_load((trfk_root / "metadata.yaml").read_text())
+trfk_resources = {name: val["upstream-source"] for name, val in trfk_meta["resources"].items()}
 
 
 @pytest.mark.abort_on_fail
 async def test_deployment(ops_test: OpsTest, traefik_charm, ipa_tester_charm):
-    await deploy_traefik_if_not_deployed(ops_test, traefik_charm)
-    await ops_test.model.deploy(ipa_tester_charm, "ipa-tester")
+    await asyncio.gather(
+        ops_test.model.deploy(
+            traefik_charm, application_name="traefik-k8s", resources=trfk_resources
+        ),
+        ops_test.model.deploy(ipa_tester_charm, "ipa-tester"),
+    )
+
     async with ops_test.fast_forward():
-        await ops_test.model.wait_for_idle(["traefik-k8s", "ipa-tester"], status="active")
+        await ops_test.model.wait_for_idle(
+            ["traefik-k8s", "ipa-tester"], status="active", timeout=1000
+        )
 
 
 @pytest.mark.abort_on_fail

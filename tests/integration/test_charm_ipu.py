@@ -8,9 +8,9 @@ from pytest_operator.plugin import OpsTest
 from tests.integration.conftest import (
     assert_can_ping,
     deploy_traefik_if_not_deployed,
-    get_address,
     get_relation_data,
 )
+from tests.integration.helpers import get_address
 
 
 @pytest.mark.abort_on_fail
