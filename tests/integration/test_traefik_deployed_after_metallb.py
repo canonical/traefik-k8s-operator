@@ -24,7 +24,7 @@ import pytest
 import yaml
 from pytest_operator.plugin import OpsTest
 
-from tests.integration.helpers import disable_metallb, enable_metallb, get_address
+from tests.integration.helpers import get_address
 
 logger = logging.getLogger(__name__)
 
