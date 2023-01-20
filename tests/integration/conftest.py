@@ -12,6 +12,7 @@ from subprocess import PIPE, Popen
 import juju
 import pytest
 import yaml
+from helpers import disable_metallb, enable_metallb
 from juju.errors import JujuError
 from pytest_operator.plugin import OpsTest
 
@@ -25,6 +26,14 @@ _JUJU_DATA_CACHE = {}
 _JUJU_KEYS = ("egress-subnets", "ingress-address", "private-address")
 
 logger = logging.getLogger(__name__)
+
+
+@pytest.fixture(scope="module", autouse=True)
+async def reenable_metallb():
+    logger.info("First, disable metallb, in case it's enabled")
+    await disable_metallb()
+    logger.info("Now enable metallb")
+    await enable_metallb()
 
 
 class Store(defaultdict):

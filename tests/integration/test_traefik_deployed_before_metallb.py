@@ -34,6 +34,13 @@ idle_period = 90
 
 
 @pytest.mark.abort_on_fail
+async def test_setup_env(ops_test: OpsTest):
+    await ops_test.model.set_config(
+        {"update-status-hook-interval": "60m", "logging-config": "<root>=WARNING; unit=DEBUG"}
+    )
+
+
+@pytest.mark.abort_on_fail
 async def test_build_and_deploy(
     ops_test: OpsTest, traefik_charm, ipa_tester_charm, ipu_tester_charm, route_tester_charm
 ):
@@ -46,8 +53,6 @@ async def test_build_and_deploy(
         ops_test.model.deploy(ipa_tester_charm, application_name="ipa-tester"),
         ops_test.model.deploy(route_tester_charm, application_name="route-tester"),
     )
-
-    await ops_test.model.wait_for_idle(timeout=600, idle_period=30)
 
     await asyncio.gather(
         ops_test.model.add_relation("ipu-tester", "traefik"),

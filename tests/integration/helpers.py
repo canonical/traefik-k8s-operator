@@ -34,8 +34,8 @@ async def enable_metallb():
     try:
         cmd = ["sg", "microk8s", "-c", f"microk8s enable metallb:{ip}-{ip}"]
         subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    except Exception as e:
-        print(e)
+    except subprocess.CalledProcessError as e:
+        logger.error(e.stdout.decode())
         raise
 
     await asyncio.sleep(30)  # why? just because, for now
