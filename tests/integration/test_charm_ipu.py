@@ -44,6 +44,7 @@ def assert_ipu_charm_has_ingress(ops_test: OpsTest):
     assert_can_ping(ip, port)
 
 
+@pytest.mark.abort_on_fail
 async def test_ipu_charm_has_ingress(ops_test: OpsTest):
     assert_ipu_charm_has_ingress(ops_test)
 
@@ -78,6 +79,7 @@ async def test_relation_data_shape(ops_test: OpsTest):
     }
 
 
+@pytest.mark.abort_on_fail
 async def test_remove_relation(ops_test: OpsTest):
     await ops_test.juju("relate", "ipu-tester:ingress-per-unit", "traefik-k8s:ingress-per-unit")
     async with ops_test.fast_forward():

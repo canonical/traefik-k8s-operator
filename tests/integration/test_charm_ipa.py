@@ -49,6 +49,7 @@ def assert_ipa_charm_has_ingress(ops_test: OpsTest):
     assert_can_ping(ip, port)
 
 
+@pytest.mark.abort_on_fail
 async def test_ipa_charm_has_ingress(ops_test: OpsTest):
     assert_ipa_charm_has_ingress(ops_test)
 
@@ -80,6 +81,7 @@ async def test_relation_data_shape(ops_test: OpsTest):
     assert provider_app_data == {"url": f"http://{traefik_address}:80/{model}-ipa-tester"}
 
 
+@pytest.mark.abort_on_fail
 async def test_remove_relation(ops_test: OpsTest):
     await ops_test.juju("remove-relation", "ipa-tester:ingress", "traefik-k8s:ingress")
     async with ops_test.fast_forward():

@@ -88,10 +88,12 @@ async def assert_tcp_charm_has_ingress(ops_test: OpsTest):
     assert data == b"Hello, world"
 
 
+@pytest.mark.abort_on_fail
 async def test_tcp_connection(ops_test: OpsTest):
     await assert_tcp_charm_has_ingress(ops_test)
 
 
+@pytest.mark.abort_on_fail
 async def test_remove_relation(ops_test: OpsTest):
     await ops_test.juju(
         "remove-relation", "tcp-tester:ingress-per-unit", "traefik-k8s:ingress-per-unit"

@@ -112,10 +112,14 @@ async def ipu_tester_charm():
 @pytest.fixture(scope="module")
 async def tcp_tester_charm():
     tcp_charm_root = (Path(__file__).parent / "testers" / "tcp").absolute()
+    libs_root = trfk_root / "lib" / "charms"
     return spellbook_fetch(
         tcp_charm_root,
         charm_name="tcp-tester",
-        pull_libs=[trfk_root / "lib" / "charms" / "traefik_k8s" / "v1" / "ingress_per_unit.py"],
+        pull_libs=[
+            libs_root / "traefik_k8s" / "v1" / "ingress_per_unit.py",
+            libs_root / "observability_libs" / "v1" / "kubernetes_service_patch.py",
+        ],
     )
 
 
