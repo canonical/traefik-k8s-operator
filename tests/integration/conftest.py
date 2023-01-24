@@ -4,6 +4,7 @@ import functools
 import grp
 import logging
 import os
+import shutil
 import subprocess
 from collections import defaultdict
 from dataclasses import dataclass
@@ -99,64 +100,67 @@ def timed_memoizer(func):
     return wrapper
 
 
+@pytest.fixture(scope="module", autouse="True")
+def copy_traefik_library_into_tester_charms(ops_test):
+    """Ensure the tester charms have the requisite libraries."""
+    libraries = [
+        "traefik_k8s/v1/ingress.py",
+        "traefik_k8s/v1/ingress_per_unit.py",
+        "observability_libs/v1/kubernetes_service_patch.py",
+        "traefik_route_k8s/v0/traefik_route.py",
+    ]
+    for tester in ["ipa", "ipu", "tcp", "route"]:
+        for lib in libraries:
+            install_path = f"tests/integration/testers/{tester}/lib/charms/{lib}"
+            os.makedirs(os.path.dirname(install_path), exist_ok=True)
+            shutil.copyfile(f"lib/charms/{lib}", install_path)
+
+
 @pytest.fixture(scope="module")
 @timed_memoizer
-async def traefik_charm():
-    return spellbook_fetch(
-        trfk_root,
-        charm_name="traefik",
-        hash_paths=[
-            trfk_root / "src",
-            trfk_root / "lib",
-            trfk_root / "metadata.yaml",
-            trfk_root / "config.yaml",
-            trfk_root / "charmcraft.yaml",
-        ],
-    )
+async def traefik_charm(ops_test):
+    charm = await ops_test.build_charm(".")
+    return charm
 
 
 @pytest.fixture(scope="module")
-async def ipa_tester_charm():
-    ipa_charm_root = (Path(__file__).parent / "testers" / "ipa").absolute()
-    return spellbook_fetch(
-        ipa_charm_root,
-        charm_name="ipa-tester",
-        pull_libs=[trfk_root / "lib" / "charms" / "traefik_k8s" / "v1" / "ingress.py"],
-    )
+@timed_memoizer
+async def ipa_tester_charm(ops_test):
+    charm_path = (Path(__file__).parent / "testers" / "ipa").absolute()
+    clean_cmd = ["charmcraft", "clean", "-p", charm_path]
+    await ops_test.run(*clean_cmd)
+    charm = await ops_test.build_charm(charm_path)
+    return charm
 
 
 @pytest.fixture(scope="module")
-async def ipu_tester_charm():
-    ipu_charm_root = (Path(__file__).parent / "testers" / "ipu").absolute()
-    return spellbook_fetch(
-        ipu_charm_root,
-        charm_name="ipu-tester",
-        pull_libs=[trfk_root / "lib" / "charms" / "traefik_k8s" / "v1" / "ingress_per_unit.py"],
-    )
+@timed_memoizer
+async def ipu_tester_charm(ops_test):
+    charm_path = (Path(__file__).parent / "testers" / "ipu").absolute()
+    clean_cmd = ["charmcraft", "clean", "-p", charm_path]
+    await ops_test.run(*clean_cmd)
+    charm = await ops_test.build_charm(charm_path)
+    return charm
 
 
 @pytest.fixture(scope="module")
-async def tcp_tester_charm():
-    tcp_charm_root = (Path(__file__).parent / "testers" / "tcp").absolute()
-    libs_root = trfk_root / "lib" / "charms"
-    return spellbook_fetch(
-        tcp_charm_root,
-        charm_name="tcp-tester",
-        pull_libs=[
-            libs_root / "traefik_k8s" / "v1" / "ingress_per_unit.py",
-            libs_root / "observability_libs" / "v1" / "kubernetes_service_patch.py",
-        ],
-    )
+@timed_memoizer
+async def tcp_tester_charm(ops_test):
+    charm_path = (Path(__file__).parent / "testers" / "tcp").absolute()
+    clean_cmd = ["charmcraft", "clean", "-p", charm_path]
+    await ops_test.run(*clean_cmd)
+    charm = await ops_test.build_charm(charm_path)
+    return charm
 
 
 @pytest.fixture(scope="module")
-async def route_tester_charm():
-    route_charm_root = (Path(__file__).parent / "testers" / "route").absolute()
-    return spellbook_fetch(
-        route_charm_root,
-        charm_name="route-tester",
-        pull_libs=[trfk_root / "lib" / "charms" / "traefik_route_k8s" / "v0" / "traefik_route.py"],
-    )
+@timed_memoizer
+async def route_tester_charm(ops_test):
+    charm_path = (Path(__file__).parent / "testers" / "route").absolute()
+    clean_cmd = ["charmcraft", "clean", "-p", charm_path]
+    await ops_test.run(*clean_cmd)
+    charm = await ops_test.build_charm(charm_path)
+    return charm
 
 
 @pytest.fixture(scope="module")
