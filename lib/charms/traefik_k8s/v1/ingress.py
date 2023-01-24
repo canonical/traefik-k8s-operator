@@ -408,7 +408,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
 
     on = IngressPerAppRequirerEvents()  # type: ignore
 
-    # used to prevent spur1ious urls to be sent out if the event we're currently
+    # used to prevent spurious urls to be sent out if the event we're currently
     # handling is a relation-broken one.
     _stored = StoredState()
 

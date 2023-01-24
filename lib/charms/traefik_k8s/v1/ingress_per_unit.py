@@ -397,7 +397,7 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
         return self._get_requirer_unit_data(relation, unit)
 
     def publish_url(self, relation: Relation, unit_name: str, url: str):
-        """Place the ingress url in the application data bag for the units on the requires side.
+        """Place the ingress url in the application data bag for the units on the requirer side.
 
         Assumes that this unit is leader.
         """
