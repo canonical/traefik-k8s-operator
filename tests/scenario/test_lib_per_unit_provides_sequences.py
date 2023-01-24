@@ -3,10 +3,19 @@
 
 import pytest
 from ops.charm import CharmBase
-from scenario import Scene, Scenario
-from scenario.scenario import check_builtin_sequences
+from scenario import Scenario, Scene
 from scenario.runtime.runtime import Runtime
-from scenario.structs import RelationMeta, RelationSpec, Model, Context, Event, CharmSpec, State, event
+from scenario.scenario import check_builtin_sequences
+from scenario.structs import (
+    CharmSpec,
+    Context,
+    Event,
+    Model,
+    RelationMeta,
+    RelationSpec,
+    State,
+    event,
+)
 
 Runtime.install()
 
@@ -22,16 +31,9 @@ class MockProviderCharm(CharmBase):
 charm_spec = CharmSpec(
     charm_type=MockProviderCharm,
     meta={
-        'name': 'test-provider',
-        'provides':
-            {
-                'ingress-per-unit':
-                    {
-                        'interface': 'ingress_per_unit',
-                        'limit': 1
-                    }
-            }
-    }
+        "name": "test-provider",
+        "provides": {"ingress-per-unit": {"interface": "ingress_per_unit", "limit": 1}},
+    },
 )
 
 
@@ -42,24 +44,24 @@ def scenario():
 
 @pytest.fixture
 def base_ctx():
-    return Context(state=State(model=Model(name='test-model')))
+    return Context(state=State(model=Model(name="test-model")))
 
 
 @pytest.fixture
 def ipu_base_meta():
-    return RelationMeta(endpoint='ingress-per-unit',
-                        interface='ingress_per_unit',
-                        remote_app_name='remote',
-                        relation_id=0)
+    return RelationMeta(
+        endpoint="ingress-per-unit",
+        interface="ingress_per_unit",
+        remote_app_name="remote",
+        relation_id=0,
+    )
 
 
 @pytest.fixture
 def ipu_related(ipu_base_meta, base_ctx):
     """Context in which there is an IPU relation."""
     return base_ctx.replace(
-        state=base_ctx.state.replace(
-            relations=[RelationSpec(meta=ipu_base_meta)]
-        )
+        state=base_ctx.state.replace(relations=[RelationSpec(meta=ipu_base_meta)])
     )
 
 
@@ -68,16 +70,15 @@ def ipu_related_data_provided(ipu_base_meta, ipu_related):
     """Context in which there is an IPU relation, and the remote side (single unit) has
     provided its side of the relation data.
     """
-    data = {"port": '10',
-            "host": 'foo.bar',
-            "model": "test-model",
-            "name": "remote/0",
-            "mode": 'http'}
+    data = {
+        "port": "10",
+        "host": "foo.bar",
+        "model": "test-model",
+        "name": "remote/0",
+        "mode": "http",
+    }
     return ipu_related.with_relations(
-        (
-            RelationSpec(meta=ipu_base_meta,
-                         remote_units_data={0: data}),
-        )
+        (RelationSpec(meta=ipu_base_meta, remote_units_data={0: data}),)
     )
 
 
@@ -138,11 +139,13 @@ def test_builtin_sequences():
 
 
 @pytest.mark.parametrize("leader", (True, False))
-@pytest.mark.parametrize("event_name", ('update-status', 'install', 'start',
-                                        'ingress-per-unit-relation-changed',
-                                        'config-changed'))
-def test_ingress_unit_provider_related_is_ready(leader, event_name,
-                                                ipu_related_data_provided, scenario):
+@pytest.mark.parametrize(
+    "event_name",
+    ("update-status", "install", "start", "ingress-per-unit-relation-changed", "config-changed"),
+)
+def test_ingress_unit_provider_related_is_ready(
+    leader, event_name, ipu_related_data_provided, scenario
+):
     # patch the ctx with leadership
     ctx = ipu_related_data_provided.replace(
         state=ipu_related_data_provided.state.replace(leader=leader)
@@ -151,26 +154,27 @@ def test_ingress_unit_provider_related_is_ready(leader, event_name,
     # shouldn't actually matter what event we test.
     # IPU should report ready because in this context
     # we can find remote relation data
-    scenario.play(Scene(context=ctx, event=event('start')))
+    scenario.play(Scene(context=ctx, event=event("start")))
 
     # todo: write assertions for ready and remote-data
 
 
 @pytest.mark.parametrize("leader", (True, False))
-@pytest.mark.parametrize("url", ('url.com', 'http://foo.bar.baz'))
+@pytest.mark.parametrize("url", ("url.com", "http://foo.bar.baz"))
 @pytest.mark.parametrize("port, host", ((80, "1.1.1.1"), (81, "10.1.10.1")))
-def test_ingress_unit_provider_request_response(port, host, leader, url, ipu_base_meta,
-                                                ipu_related,
-                                                scenario):
-    mock_data = {"port": str(port), "host": str(host),
-                 "model": "test-model",
-                 "name": "remote/0",
-                 "mode": 'http'}
+def test_ingress_unit_provider_request_response(
+    port, host, leader, url, ipu_base_meta, ipu_related, scenario
+):
+    mock_data = {
+        "port": str(port),
+        "host": str(host),
+        "model": "test-model",
+        "name": "remote/0",
+        "mode": "http",
+    }
 
     ipu = RelationSpec(meta=ipu_base_meta, remote_units_data={0: mock_data})
-    ctx = ipu_related.with_leadership(leader).with_relations(
-        (ipu,)
-    )
+    ctx = ipu_related.with_leadership(leader).with_relations((ipu,))
     scenario.play(Scene(context=ctx, event=ipu.changed))
 
     # relation = emitter.harness.model.get_relation('ingress-per-unit')

@@ -5,19 +5,13 @@
 
 from unittest.mock import MagicMock, PropertyMock, patch
 
-import pytest
 from scenario.scenario import Scenario
 from scenario.structs import (
     CharmSpec,
     ContainerSpec,
-    Event,
-    NetworkSpec,
-    RelationMeta,
-    RelationSpec,
     Scene,
     State,
     event,
-    network,
 )
 
 from charm import _TRAEFIK_SERVICE_NAME, TraefikIngressCharm
