@@ -1,0 +1,7 @@
+alert: ErrorLevelLogsFound
+expr: rate({%%juju_topology%%} |= "level=error"[1m]) > 0
+for: 1m
+labels:
+  severity: critical
+annotations:
+  summary: error level logs found.

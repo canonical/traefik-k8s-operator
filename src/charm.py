@@ -12,7 +12,10 @@ from typing import Any, Dict, List, Tuple, Union
 from urllib.parse import urlparse
 
 import yaml
-from charms.observability_libs.v0.kubernetes_service_patch import KubernetesServicePatch
+from charms.observability_libs.v1.kubernetes_service_patch import (
+    KubernetesServicePatch,
+    ServicePort,
+)
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 from charms.traefik_k8s.v1.ingress import IngressPerAppProvider
 from charms.traefik_k8s.v1.ingress_per_unit import (
@@ -90,7 +93,7 @@ class TraefikIngressCharm(CharmBase):
         self.service_patch = KubernetesServicePatch(
             charm=self,
             service_type="LoadBalancer",
-            ports=[(f"{self.app.name}", self._port)],
+            ports=[ServicePort(self._port, name=f"{self.app.name}")],
         )
 
         self.metrics_endpoint = MetricsEndpointProvider(

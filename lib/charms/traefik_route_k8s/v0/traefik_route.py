@@ -88,7 +88,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 3
+LIBPATCH = 7
 
 log = logging.getLogger(__name__)
 
@@ -105,6 +105,10 @@ class TraefikRouteProviderReadyEvent(RelationEvent):
     """Event emitted when Traefik is ready to provide ingress for a routed unit."""
 
 
+class TraefikRouteProviderDataRemovedEvent(RelationEvent):
+    """Event emitted when a routed ingress relation is removed."""
+
+
 class TraefikRouteRequirerReadyEvent(RelationEvent):
     """Event emitted when a unit requesting ingress has provided all data Traefik needs."""
 
@@ -118,7 +122,8 @@ class TraefikRouteRequirerEvents(CharmEvents):
 class TraefikRouteProviderEvents(CharmEvents):
     """Container for TraefikRouteProvider events."""
 
-    ready = EventSource(TraefikRouteProviderReadyEvent)
+    ready = EventSource(TraefikRouteProviderReadyEvent)  # TODO rename to data_provided in v1
+    data_removed = EventSource(TraefikRouteProviderDataRemovedEvent)
 
 
 class TraefikRouteProvider(Object):
@@ -144,6 +149,7 @@ class TraefikRouteProvider(Object):
             charm: The charm that is instantiating the instance.
             relation_name: The name of the relation relation_name to bind to
                 (defaults to "traefik-route").
+            external_host: The external host.
         """
         super().__init__(charm, relation_name)
         self._stored.set_default(external_host=None)
@@ -159,34 +165,46 @@ class TraefikRouteProvider(Object):
         self.framework.observe(
             self._charm.on[relation_name].relation_changed, self._on_relation_changed
         )
+        self.framework.observe(
+            self._charm.on[relation_name].relation_broken, self._on_relation_broken
+        )
 
     @property
     def external_host(self) -> str:
         """Return the external host set by Traefik, if any."""
         self._update_stored_external_host()
-        return self._stored.external_host or ""
+        return self._stored.external_host or ""  # type: ignore
+
+    @property
+    def relations(self):
+        """The list of Relation instances associated with this endpoint."""
+        return list(self._charm.model.relations[self._relation_name])
 
     def _update_stored_external_host(self) -> None:
-        """Ensure that the stored host is up to date.
+        """Ensure that the stored host is up-to-date.
 
         This is split out into a separate method since, in the case of multi-unit deployments,
         removal of a `TraefikRouteRequirer` will not cause a `RelationEvent`, but the guard on
         app data ensures that only the previous leader will know what it is. Separating it
         allows for re-use both when the property is called and if the relation changes, so a
-        leader change where the new leader checks the property will do the right thing."""
+        leader change where the new leader checks the property will do the right thing.
+        """
         if self._charm.unit.is_leader():
             for relation in self._charm.model.relations[self._relation_name]:
                 if not relation.app:
                     self._stored.external_host = ""
                     return
                 external_host = relation.data[relation.app].get("external_host", "")
-                self._stored.external_host = external_host or self._stored.external_host
+                self._stored.external_host = external_host or self._stored.external_host  # type: ignore
 
     def _on_relation_changed(self, event: RelationEvent):
         if self.is_ready(event.relation):
             # todo check data is valid here?
             self._update_requirers_with_external_host()
             self.on.ready.emit(event.relation)
+
+    def _on_relation_broken(self, event: RelationEvent):
+        self.on.data_removed.emit(event.relation)
 
     def _update_requirers_with_external_host(self):
         """Ensure that requirers know the external host for Traefik."""
@@ -198,13 +216,18 @@ class TraefikRouteProvider(Object):
 
     @staticmethod
     def is_ready(relation: Relation) -> bool:
-        """Whether TraefikRoute is ready on this relation: i.e. the remote app shared the config."""
+        """Whether TraefikRoute is ready on this relation.
+
+        Returns True when the remote app shared the config; False otherwise.
+        """
+        assert relation.app is not None  # not currently handled anyway
         return "config" in relation.data[relation.app]
 
     @staticmethod
     def get_config(relation: Relation) -> Optional[str]:
         """Retrieve the config published by the remote application."""
-        # todo validate this config
+        # TODO: validate this config
+        assert relation.app is not None  # not currently handled anyway
         return relation.data[relation.app].get("config")
 
 
@@ -243,7 +266,7 @@ class TraefikRouteRequirer(Object):
     def external_host(self) -> str:
         """Return the external host set by Traefik, if any."""
         self._update_stored_external_host()
-        return self._stored.external_host or ""
+        return self._stored.external_host or ""  # type: ignore
 
     def _update_stored_external_host(self) -> None:
         """Ensure that the stored host is up-to-date.
@@ -252,7 +275,8 @@ class TraefikRouteRequirer(Object):
         removal of a `TraefikRouteRequirer` will not cause a `RelationEvent`, but the guard on
         app data ensures that only the previous leader will know what it is. Separating it
         allows for re-use both when the property is called and if the relation changes, so a
-        leader change where the new leader checks the property will do the right thing."""
+        leader change where the new leader checks the property will do the right thing.
+        """
         if self._charm.unit.is_leader():
             if self._relation:
                 for relation in self._charm.model.relations[self._relation.name]:
@@ -260,7 +284,7 @@ class TraefikRouteRequirer(Object):
                         self._stored.external_host = ""
                         return
                     external_host = relation.data[relation.app].get("external_host", "")
-                    self._stored.external_host = external_host or self._stored.external_host
+                    self._stored.external_host = external_host or self._stored.external_host  # type: ignore
 
     def _on_relation_changed(self, event: RelationEvent) -> None:
         """Update StoredState with external_host and other information from Traefik."""
