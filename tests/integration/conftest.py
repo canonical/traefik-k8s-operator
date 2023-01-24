@@ -17,8 +17,6 @@ import yaml
 from juju.errors import JujuError
 from pytest_operator.plugin import OpsTest
 
-from tests.integration.spellbook.cache import spellbook_fetch
-
 trfk_root = Path(__file__).parent.parent.parent
 trfk_meta = yaml.safe_load((trfk_root / "metadata.yaml").read_text())
 trfk_resources = {name: val["upstream-source"] for name, val in trfk_meta["resources"].items()}
