@@ -115,12 +115,37 @@ class TraefikIngressCharm(CharmBase):
 
         self.container = self.unit.get_container(_TRAEFIK_CONTAINER_NAME)
 
+        # FIXME: Do not move these lower. They must exist before `_tcp_ports` is called. The
+        # better long-term solution is to allow dynamic modification of the object, and to try
+        # to build the list first from tcp entrypoints on the filesystem, and append later.
+        #
+        # alternatively, a `Callable` could be passed into the KubernetesServicePatch, but the
+        # service spec MUST have TCP/UCP ports listed if the loadbalancer is to send requests
+        # to it.
+        #
+        # TODO
+        # FIXME
+        # stored.tcp_entrypoints would be used for this list instead, but it's never accessed.
+        # intentional or can it be used so we don't need to worry about ordering?
+        self.ingress_per_app = IngressPerAppProvider(charm=self)
+        self.ingress_per_unit = IngressPerUnitProvider(charm=self)
+        self.traefik_route = TraefikRouteProvider(charm=self, external_host=self.external_host)
+
         web = ServicePort(self._port, name=f"{self.app.name}")
         websecure = ServicePort(self._tls_port, name=f"{self.app.name}-tls")
+        tcp_ports = [ServicePort(int(port), name=name) for name, port in self._tcp_ports.items()]
         self.service_patch = KubernetesServicePatch(
             charm=self,
             service_type="LoadBalancer",
-            ports=[web, websecure],
+            ports=[web, websecure] + tcp_ports,
+            refresh_event=[
+                self.ingress_per_app.on.data_provided,
+                self.ingress_per_app.on.data_removed,
+                self.ingress_per_unit.on.data_provided,
+                self.ingress_per_unit.on.data_removed,
+                self.traefik_route.on.ready,
+                self.traefik_route.on.data_removed,
+            ],
         )
 
         self.metrics_endpoint = MetricsEndpointProvider(
@@ -131,10 +156,6 @@ class TraefikIngressCharm(CharmBase):
                 },
             ],
         )
-
-        self.ingress_per_app = IngressPerAppProvider(charm=self)
-        self.ingress_per_unit = IngressPerUnitProvider(charm=self)
-        self.traefik_route = TraefikRouteProvider(charm=self, external_host=self.external_host)
 
         self.certificates = TLSCertificatesRequiresV1(self, "certificates")
         # TODO update init params once auto-renew is implemented
@@ -296,6 +317,16 @@ class TraefikIngressCharm(CharmBase):
                     entrypoints[entrypoint_name] = {"address": f":{data['port']}"}
 
         return entrypoints
+
+    @property
+    def _tcp_ports(self) -> Dict[str, str]:
+        # for each unit related via IPU in tcp mode, we need to generate the tcp
+        # ports for the servicepatch so they can be bound on metallb
+        entrypoints = self._tcp_entrypoints()
+        return {
+            name: re.sub(r"^.*?:(.*)", r"\1", entry["address"])
+            for name, entry in entrypoints.items()
+        }
 
     def _clear_dynamic_configs(self):
         try:
