@@ -11,6 +11,7 @@ from subprocess import PIPE, Popen
 
 import juju
 import pytest
+import pytest_asyncio
 import yaml
 from juju.errors import JujuError
 from pytest_operator.plugin import OpsTest
@@ -64,7 +65,7 @@ def timed_memoizer(func):
     return wrapper
 
 
-@pytest.fixture(scope="module")
+@pytest_asyncio.fixture(scope="module")
 @timed_memoizer
 async def traefik_charm():
     return spellbook_fetch(
@@ -80,7 +81,7 @@ async def traefik_charm():
     )
 
 
-@pytest.fixture(scope="module")
+@pytest_asyncio.fixture(scope="module")
 async def ipa_tester_charm():
     ipa_charm_root = (Path(__file__).parent / "testers" / "ipa").absolute()
     return spellbook_fetch(
@@ -90,7 +91,7 @@ async def ipa_tester_charm():
     )
 
 
-@pytest.fixture(scope="module")
+@pytest_asyncio.fixture(scope="module")
 async def ipu_tester_charm():
     ipu_charm_root = (Path(__file__).parent / "testers" / "ipu").absolute()
     return spellbook_fetch(
@@ -100,7 +101,7 @@ async def ipu_tester_charm():
     )
 
 
-@pytest.fixture(scope="module")
+@pytest_asyncio.fixture(scope="module")
 async def tcp_tester_charm():
     tcp_charm_root = (Path(__file__).parent / "testers" / "tcp").absolute()
     return spellbook_fetch(
@@ -110,7 +111,7 @@ async def tcp_tester_charm():
     )
 
 
-@pytest.fixture(scope="module")
+@pytest_asyncio.fixture(scope="module")
 async def route_tester_charm():
     route_charm_root = (Path(__file__).parent / "testers" / "route").absolute()
     return spellbook_fetch(
