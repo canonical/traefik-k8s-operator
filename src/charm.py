@@ -24,7 +24,7 @@ from charms.tls_certificates_interface.v2.tls_certificates import (
     CertificateAvailableEvent,
     CertificateExpiringEvent,
     CertificateInvalidatedEvent,
-    TLSCertificatesRequiresV1,
+    TLSCertificatesRequiresV2,
     generate_csr,
     generate_private_key,
 )
@@ -157,7 +157,7 @@ class TraefikIngressCharm(CharmBase):
             ],
         )
 
-        self.certificates = TLSCertificatesRequiresV1(self, "certificates")
+        self.certificates = TLSCertificatesRequiresV2(self, "certificates")
         # TODO update init params once auto-renew is implemented
         # https://github.com/canonical/tls-certificates-interface/issues/24
         self.framework.observe(self.on.install, self._on_install)

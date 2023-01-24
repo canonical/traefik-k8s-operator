@@ -11,7 +11,7 @@ interface.
 From a charm directory, fetch the library using `charmcraft`:
 
 ```shell
-charmcraft fetch-lib charms.tls_certificates_interface.v1.tls_certificates
+charmcraft fetch-lib charms.tls_certificates_interface.v2.tls_certificates
 ```
 
 Add the following libraries to the charm's `requirements.txt` file:
@@ -36,10 +36,10 @@ this example, the provider charm is storing its private key using a peer relatio
 
 Example:
 ```python
-from charms.tls_certificates_interface.v1.tls_certificates import (
+from charms.tls_certificates_interface.v2.tls_certificates import (
     CertificateCreationRequestEvent,
     CertificateRevocationRequestEvent,
-    TLSCertificatesProvidesV1,
+    TLSCertificatesProvidesV2,
     generate_private_key,
 )
 from ops.charm import CharmBase, InstallEvent
@@ -59,7 +59,7 @@ class ExampleProviderCharm(CharmBase):
 
     def __init__(self, *args):
         super().__init__(*args)
-        self.certificates = TLSCertificatesProvidesV1(self, "certificates")
+        self.certificates = TLSCertificatesProvidesV2(self, "certificates")
         self.framework.observe(
             self.certificates.on.certificate_request,
             self._on_certificate_request
@@ -126,11 +126,11 @@ this example, the requirer charm is storing its certificates using a peer relati
 
 Example:
 ```python
-from charms.tls_certificates_interface.v1.tls_certificates import (
+from charms.tls_certificates_interface.v2.tls_certificates import (
     CertificateAvailableEvent,
     CertificateExpiringEvent,
     CertificateRevokedEvent,
-    TLSCertificatesRequiresV1,
+    TLSCertificatesRequiresV2,
     generate_csr,
     generate_private_key,
 )
@@ -145,7 +145,7 @@ class ExampleRequirerCharm(CharmBase):
     def __init__(self, *args):
         super().__init__(*args)
         self.cert_subject = "whatever"
-        self.certificates = TLSCertificatesRequiresV1(self, "certificates")
+        self.certificates = TLSCertificatesRequiresV2(self, "certificates")
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(
             self.on.certificates_relation_joined, self._on_certificates_relation_joined
@@ -306,10 +306,9 @@ LIBAPI = 2
 # to 0 if you are raising the major API version
 LIBPATCH = 0
 
-
 REQUIRER_JSON_SCHEMA = {
     "$schema": "http://json-schema.org/draft-04/schema#",
-    "$id": "https://canonical.github.io/charm-relation-interfaces/tls_certificates/v1/schemas/requirer.json",  # noqa: E501
+    "$id": "https://canonical.github.io/charm-relation-interfaces/tls_certificates/v2/schemas/requirer.json",  # noqa: E501
     "type": "object",
     "title": "`tls_certificates` requirer root schema",
     "description": "The `tls_certificates` root schema comprises the entire requirer databag for this interface.",  # noqa: E501
@@ -341,7 +340,7 @@ REQUIRER_JSON_SCHEMA = {
 
 PROVIDER_JSON_SCHEMA = {
     "$schema": "http://json-schema.org/draft-04/schema#",
-    "$id": "https://canonical.github.io/charm-relation-interfaces/tls_certificates/v1/schemas/provider.json",  # noqa: E501
+    "$id": "https://canonical.github.io/charm-relation-interfaces/tls_certificates/v2/schemas/provider.json",  # noqa: E501
     "type": "object",
     "title": "`tls_certificates` provider root schema",
     "description": "The `tls_certificates` root schema comprises the entire provider databag for this interface.",  # noqa: E501
@@ -879,7 +878,7 @@ class CertificatesRequirerCharmEvents(CharmEvents):
     all_certificates_invalidated = EventSource(AllCertificatesInvalidatedEvent)
 
 
-class TLSCertificatesProvidesV1(Object):
+class TLSCertificatesProvidesV2(Object):
     """TLS certificates provider class to be instantiated by TLS certificates providers."""
 
     on = CertificatesProviderCharmEvents()
@@ -1128,7 +1127,7 @@ class TLSCertificatesProvidesV1(Object):
                 self.remove_certificate(certificate=certificate["certificate"])
 
 
-class TLSCertificatesRequiresV1(Object):
+class TLSCertificatesRequiresV2(Object):
     """TLS certificates requirer class to be instantiated by TLS certificates requirers."""
 
     on = CertificatesRequirerCharmEvents()
@@ -1349,6 +1348,9 @@ class TLSCertificatesRequiresV1(Object):
 
     def _on_relation_broken(self, event: RelationBrokenEvent) -> None:
         """Handler triggered on relation broken event.
+
+        Emitting `all_certificates_invalidated` from `relation-broken` rather
+        than `relation-departed` since certs are stored in app data.
 
         Args:
             event: Juju event
