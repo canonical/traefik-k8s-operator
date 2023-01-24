@@ -1,18 +1,18 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 import functools
+import grp
 import logging
 import os
+import subprocess
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from subprocess import PIPE, Popen
 
 import juju
 import pytest
 import yaml
-from helpers import disable_metallb, enable_metallb
 from juju.errors import JujuError
 from pytest_operator.plugin import OpsTest
 
@@ -29,11 +29,37 @@ logger = logging.getLogger(__name__)
 
 
 @pytest.fixture(scope="module", autouse=True)
-async def reenable_metallb():
-    logger.info("First, disable metallb, in case it's enabled")
-    await disable_metallb()
-    logger.info("Now enable metallb")
-    await enable_metallb()
+async def enable_metallb():
+    logger.info("Enable metallb, in case it's disabled")
+    cmd = [
+        "sh",
+        "-c",
+        "ip -4 -j route get 2.2.2.2 | jq -r '.[] | .prefsrc'",
+    ]
+    result = subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    ip = result.stdout.decode("utf-8").strip()
+
+    if os.environ.get("RUNNER_OS"):
+        # Running inside a GitHub runner
+        # Need to find the correct group name https://github.com/canonical/microk8s/pull/3222
+        try:
+            # Classically confined microk8s
+            uk8s_group = grp.getgrnam("microk8s").gr_name
+        except KeyError:
+            # Strictly confined microk8s
+            uk8s_group = "snap_microk8s"
+        cmd = ["sg", uk8s_group, "-c", f"microk8s enable metallb:{ip}-{ip}"]
+    else:
+        # Running locally
+        cmd = ["sudo", "microk8s", "enable", f"metallb:{ip}-{ip}"]
+
+    try:
+        subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    except subprocess.CalledProcessError as e:
+        logger.error(e.stdout.decode())
+        raise
+
+    return ip
 
 
 class Store(defaultdict):
@@ -173,7 +199,7 @@ def get_unit_info(unit_name: str, model: str = None) -> dict:
         cmd.insert(2, "-m")
         cmd.insert(3, model)
 
-    proc = Popen(cmd, stdout=PIPE)
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE)
     raw_data = proc.stdout.read().decode("utf-8").strip()
 
     data = yaml.safe_load(raw_data) if raw_data else None

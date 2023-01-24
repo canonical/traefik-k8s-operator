@@ -320,10 +320,11 @@ class TraefikIngressCharm(CharmBase):
 
     @property
     def _tcp_ports(self) -> Dict[str, str]:
-        # for each unit related via IPU in tcp mode, we need to generate the tcp
-        # ports for the servicepatch so they can be bound on metallb
+        # For each unit related via IPU in tcp mode, we need to generate the tcp
+        # ports for the servicepatch, so they can be bound on metallb.
         entrypoints = self._tcp_entrypoints()
         return {
+            # Everything past a colon is assumed to be the port
             name: re.sub(r"^.*?:(.*)", r"\1", entry["address"])
             for name, entry in entrypoints.items()
         }
