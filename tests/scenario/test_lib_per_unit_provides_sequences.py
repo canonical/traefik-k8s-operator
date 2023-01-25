@@ -3,12 +3,11 @@
 
 import pytest
 from ops.charm import CharmBase
-from scenario import Scenario, Scene
-from scenario.runtime.runtime import Runtime
+from scenario.scenario import Scenario, Scene
+from scenario.runtime import Runtime
 from scenario.scenario import check_builtin_sequences
 from scenario.structs import (
     CharmSpec,
-    Context,
     Event,
     Model,
     RelationMeta,
@@ -16,8 +15,6 @@ from scenario.structs import (
     State,
     event,
 )
-
-Runtime.install()
 
 from charms.traefik_k8s.v1.ingress_per_unit import IngressPerUnitProvider
 
@@ -42,10 +39,6 @@ def scenario():
     return Scenario(charm_spec=charm_spec)
 
 
-@pytest.fixture
-def base_ctx():
-    return Context(state=State(model=Model(name="test-model")))
-
 
 @pytest.fixture
 def ipu_base_meta():
@@ -58,11 +51,10 @@ def ipu_base_meta():
 
 
 @pytest.fixture
-def ipu_related(ipu_base_meta, base_ctx):
+def ipu_related(ipu_base_meta, ):
     """Context in which there is an IPU relation."""
-    return base_ctx.replace(
-        state=base_ctx.state.replace(relations=[RelationSpec(meta=ipu_base_meta)])
-    )
+    return State(model=Model(name="test-model"),
+                 relations=[RelationSpec(meta=ipu_base_meta)])
 
 
 @pytest.fixture
