@@ -28,8 +28,3 @@ lightkube-models >= 1.22.0.4
 # Docs: https://ops.rtfd.io/
 # Deps: charm
 ops
-
-
-# The following is needed by lib/charms/traefik_k8s/*
-jsonschema
-# scenario
