@@ -23,7 +23,7 @@ def itester(interface_tester: InterfaceTester):
                     "routing_mode": "path",
                 },
                 containers=[
-                    # unless traefik reports active, the charm won't publish the ingress url.
+                    # unless the traefik service reports active, the charm won't publish the ingress url.
                     container(name='traefik',
                               can_connect=True,
                               layers=[
