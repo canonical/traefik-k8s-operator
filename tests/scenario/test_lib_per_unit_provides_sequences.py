@@ -2,21 +2,10 @@
 # See LICENSE file for licensing details.
 
 import pytest
-from ops.charm import CharmBase
-from scenario.scenario import Scenario, Scene
-from scenario.runtime import Runtime
-from scenario.scenario import check_builtin_sequences
-from scenario.structs import (
-    CharmSpec,
-    Event,
-    Model,
-    RelationMeta,
-    RelationSpec,
-    State,
-    event,
-)
-
 from charms.traefik_k8s.v1.ingress_per_unit import IngressPerUnitProvider
+from ops.charm import CharmBase
+from scenario.scenario import Scenario, Scene, check_builtin_sequences
+from scenario.structs import CharmSpec, Model, RelationMeta, RelationSpec, State, event
 
 
 class MockProviderCharm(CharmBase):
@@ -39,7 +28,6 @@ def scenario():
     return Scenario(charm_spec=charm_spec)
 
 
-
 @pytest.fixture
 def ipu_base_meta():
     return RelationMeta(
@@ -51,15 +39,16 @@ def ipu_base_meta():
 
 
 @pytest.fixture
-def ipu_related(ipu_base_meta, ):
+def ipu_related(ipu_base_meta):
     """Context in which there is an IPU relation."""
-    return State(model=Model(name="test-model"),
-                 relations=[RelationSpec(meta=ipu_base_meta)])
+    return State(model=Model(name="test-model"), relations=[RelationSpec(meta=ipu_base_meta)])
 
 
 @pytest.fixture
 def ipu_related_data_provided(ipu_base_meta, ipu_related):
-    """Context in which there is an IPU relation, and the remote side (single unit) has
+    """IPU relation context.
+
+    Context in which there is an IPU relation, and the remote side (single unit) has
     provided its side of the relation data.
     """
     data = {
@@ -97,7 +86,8 @@ def ipu_related_data_provided(ipu_base_meta, ipu_related):
 #     relation = h.model.get_relation('ingress-per-unit')
 #     if not value:
 #         assert h.charm.ipu.proxied_endpoints == {}
-#         assert not relation.data[h.model.app], 'non-leader IPU providers should not have app data'
+#         assert not relation.data[h.model.app], \
+#           'non-leader IPU providers should not have app data'
 #         assert not relation.data[
 #             h.model.unit], 'non-leader IPU providers should not have unit data'
 #         return
