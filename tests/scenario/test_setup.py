@@ -6,13 +6,7 @@
 from unittest.mock import MagicMock, PropertyMock, patch
 
 from scenario.scenario import Scenario
-from scenario.structs import (
-    CharmSpec,
-    ContainerSpec,
-    Scene,
-    State,
-    event,
-)
+from scenario.structs import CharmSpec, ContainerSpec, Scene, State, event
 
 from charm import _TRAEFIK_SERVICE_NAME, TraefikIngressCharm
 
