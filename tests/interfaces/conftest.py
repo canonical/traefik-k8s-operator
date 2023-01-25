@@ -2,28 +2,40 @@ from unittest.mock import patch
 
 import pytest
 from pytest_interface_tester import InterfaceTester
-
-
-from pytest_interface_tester import InterfaceTester
-from scenario.structs import State, NetworkSpec, network
+from scenario.structs import State, NetworkSpec, network, container
 
 from charm import TraefikIngressCharm
+
 
 @pytest.fixture
 def itester(interface_tester: InterfaceTester):
     with patch("charm.KubernetesServicePatch", lambda **unused: None):
         interface_tester.configure(
+            repo="https://github.com/PietroPasotti/charm-relation-interfaces",
+            branch="tester",
             target=TraefikIngressCharm,
             state_template=State(
+                leader=True,
                 config={
+                    # if we don't pass external_hostname, we have to mock all sorts of lightkube calls
                     "external_hostname": "0.0.0.0",
+                    # since we're passing a config, we have to provide all defaulted values
+                    "routing_mode": "path",
                 },
-                networks=[
-                    NetworkSpec(
-                        'metrics-endpoint',
-                        bind_id=0,
-                        network=network()
-                    )
+                containers=[
+                    # unless traefik reports active, the charm won't publish the ingress url.
+                    container(name='traefik',
+                              can_connect=True,
+                              layers=[
+                                  {'summary': 'foo',
+                                   'description': 'bar',
+                                   'services': {'traefik':
+                                                    {'startup': 'enabled',
+                                                     'current': 'active',
+                                                     'name': 'traefik'}
+                                                },
+                                   'checks': {}}
+                              ])
                 ]
             )
         )
