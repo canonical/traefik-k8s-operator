@@ -69,7 +69,7 @@ LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 9
+LIBPATCH = 10
 
 DEFAULT_RELATION_NAME = "ingress"
 RELATION_INTERFACE = "ingress"
@@ -408,7 +408,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
 
     on = IngressPerAppRequirerEvents()  # type: ignore
 
-    # used to prevent spur1ious urls to be sent out if the event we're currently
+    # used to prevent spurious urls to be sent out if the event we're currently
     # handling is a relation-broken one.
     _stored = StoredState()
 

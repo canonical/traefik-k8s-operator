@@ -13,3 +13,9 @@ parts:
   charm:
     build-packages:
       - git
+
+      # The following are needed for tls-certificates-interface
+      - libffi-dev
+      - libssl-dev
+      - rustc
+      - cargo
