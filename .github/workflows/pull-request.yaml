@@ -23,9 +23,5 @@ jobs:
         uses: actions/checkout@v2
         with:
           fetch-depth: 0
-      - name: Install charmcraft
-        run: snap install charmcraft
-      - name: Fetch dependencies
-        run: charmcraft fetch-lib charms.harness_extensions.v0.evt_sequences
       - name: Run scenario tests
         run: tox -vve scenario
