@@ -15,9 +15,12 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 from urllib.parse import urlparse
 
 import yaml
-from charms.observability_libs.v1.kubernetes_service_patch import KubernetesServicePatch, ServicePort
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from charms.loki_k8s.v0.loki_push_api import LogProxyConsumer
+from charms.observability_libs.v1.kubernetes_service_patch import (
+    KubernetesServicePatch,
+    ServicePort,
+)
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 from charms.tls_certificates_interface.v2.tls_certificates import (
     CertificateAvailableEvent,
