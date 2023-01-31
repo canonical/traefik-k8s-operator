@@ -10,7 +10,7 @@ testers_root = Path(__file__).parent.parent / "testers"
 
 def main():
     spellbook_fetch(
-        charm_name="fockit",
+        charm_name="traefik",
         charm_root=traefik_root,
         hash_paths=[
             traefik_root / "src",

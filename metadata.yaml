@@ -27,7 +27,7 @@ resources:
     type: oci-image
     description: OCI image for traefik (https://hub.docker.com/_/traefik/)
     # Included for simplicity in integration tests
-    upstream-source: docker.io/jnsgruk/traefik:2.7.0 ### Update this when we settle which image we want to use
+    upstream-source: docker.io/jnsgruk/traefik:2.9.6 ### Update this when we settle which image we want to use
 
 storage:
   # We need to store the configurations in a volume, as Traefik's directory
@@ -54,12 +54,19 @@ provides:
     description: |
       Provides endpoint for a traefik-route charm to sit between Traefik and a
       charm in need of ingress, configuring the relation on a per-unit basis.
+
+requires:
+  certificates:
+    interface: tls-certificates
+    limit: 1
+    description: |
+      Requires certificates-generating charm for TLS.
+
   grafana-dashboard:
     description: |
       Forwards the built-in grafana dashboard(s) for monitoring traefik.
     interface: grafana_dashboard
 
-requires:
   logging:
     interface: loki_push_api
     description: |

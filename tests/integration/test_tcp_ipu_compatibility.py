@@ -43,5 +43,5 @@ async def tcp_ipu_deployment(
 
 
 async def test_tcp_ipu_compatibility(ops_test, tcp_ipu_deployment):
-    assert_tcp_charm_has_ingress(ops_test)
+    await assert_tcp_charm_has_ingress(ops_test)
     assert_ipu_charm_has_ingress(ops_test)

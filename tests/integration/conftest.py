@@ -1,21 +1,21 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 import functools
+import grp
 import logging
 import os
+import shutil
+import subprocess
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from subprocess import PIPE, Popen
 
 import juju
 import pytest
 import yaml
 from juju.errors import JujuError
 from pytest_operator.plugin import OpsTest
-
-from tests.integration.spellbook.cache import spellbook_fetch
 
 trfk_root = Path(__file__).parent.parent.parent
 trfk_meta = yaml.safe_load((trfk_root / "metadata.yaml").read_text())
@@ -25,6 +25,40 @@ _JUJU_DATA_CACHE = {}
 _JUJU_KEYS = ("egress-subnets", "ingress-address", "private-address")
 
 logger = logging.getLogger(__name__)
+
+
+@pytest.fixture(scope="module", autouse=True)
+async def enable_metallb():
+    logger.info("Enable metallb, in case it's disabled")
+    cmd = [
+        "sh",
+        "-c",
+        "ip -4 -j route get 2.2.2.2 | jq -r '.[] | .prefsrc'",
+    ]
+    result = subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    ip = result.stdout.decode("utf-8").strip()
+
+    if os.environ.get("RUNNER_OS"):
+        # Running inside a GitHub runner
+        # Need to find the correct group name https://github.com/canonical/microk8s/pull/3222
+        try:
+            # Classically confined microk8s
+            uk8s_group = grp.getgrnam("microk8s").gr_name
+        except KeyError:
+            # Strictly confined microk8s
+            uk8s_group = "snap_microk8s"
+        cmd = ["sg", uk8s_group, "-c", f"microk8s enable metallb:{ip}-{ip}"]
+    else:
+        # Running locally
+        cmd = ["sudo", "microk8s", "enable", f"metallb:{ip}-{ip}"]
+
+    try:
+        subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    except subprocess.CalledProcessError as e:
+        logger.error(e.stdout.decode())
+        raise
+
+    return ip
 
 
 class Store(defaultdict):
@@ -64,60 +98,72 @@ def timed_memoizer(func):
     return wrapper
 
 
+@pytest.fixture(scope="module", autouse="True")
+def copy_traefik_library_into_tester_charms(ops_test):
+    """Ensure the tester charms have the requisite libraries."""
+    libraries = [
+        "traefik_k8s/v1/ingress.py",
+        "traefik_k8s/v1/ingress_per_unit.py",
+        "observability_libs/v1/kubernetes_service_patch.py",
+        "traefik_route_k8s/v0/traefik_route.py",
+    ]
+    for tester in ["ipa", "ipu", "tcp", "route"]:
+        for lib in libraries:
+            install_path = f"tests/integration/testers/{tester}/lib/charms/{lib}"
+            os.makedirs(os.path.dirname(install_path), exist_ok=True)
+            shutil.copyfile(f"lib/charms/{lib}", install_path)
+
+
 @pytest.fixture(scope="module")
 @timed_memoizer
-async def traefik_charm():
-    return spellbook_fetch(
-        trfk_root,
-        charm_name="traefik",
-        hash_paths=[
-            trfk_root / "src",
-            trfk_root / "lib",
-            trfk_root / "metadata.yaml",
-            trfk_root / "config.yaml",
-            trfk_root / "charmcraft.yaml",
-        ],
-    )
+async def traefik_charm(ops_test):
+    charm = await ops_test.build_charm(".")
+    return charm
 
 
 @pytest.fixture(scope="module")
-async def ipa_tester_charm():
-    ipa_charm_root = (Path(__file__).parent / "testers" / "ipa").absolute()
-    return spellbook_fetch(
-        ipa_charm_root,
-        charm_name="ipa-tester",
-        pull_libs=[trfk_root / "lib" / "charms" / "traefik_k8s" / "v1" / "ingress.py"],
-    )
+@timed_memoizer
+async def ipa_tester_charm(ops_test):
+    charm_path = (Path(__file__).parent / "testers" / "ipa").absolute()
+    clean_cmd = ["charmcraft", "clean", "-p", charm_path]
+    await ops_test.run(*clean_cmd)
+    charm = await ops_test.build_charm(charm_path)
+    return charm
 
 
 @pytest.fixture(scope="module")
-async def ipu_tester_charm():
-    ipu_charm_root = (Path(__file__).parent / "testers" / "ipu").absolute()
-    return spellbook_fetch(
-        ipu_charm_root,
-        charm_name="ipu-tester",
-        pull_libs=[trfk_root / "lib" / "charms" / "traefik_k8s" / "v1" / "ingress_per_unit.py"],
-    )
+@timed_memoizer
+async def ipu_tester_charm(ops_test):
+    charm_path = (Path(__file__).parent / "testers" / "ipu").absolute()
+    clean_cmd = ["charmcraft", "clean", "-p", charm_path]
+    await ops_test.run(*clean_cmd)
+    charm = await ops_test.build_charm(charm_path)
+    return charm
 
 
 @pytest.fixture(scope="module")
-async def tcp_tester_charm():
-    tcp_charm_root = (Path(__file__).parent / "testers" / "tcp").absolute()
-    return spellbook_fetch(
-        tcp_charm_root,
-        charm_name="tcp-tester",
-        pull_libs=[trfk_root / "lib" / "charms" / "traefik_k8s" / "v1" / "ingress_per_unit.py"],
-    )
+@timed_memoizer
+async def tcp_tester_charm(ops_test):
+    charm_path = (Path(__file__).parent / "testers" / "tcp").absolute()
+    clean_cmd = ["charmcraft", "clean", "-p", charm_path]
+    await ops_test.run(*clean_cmd)
+    charm = await ops_test.build_charm(charm_path)
+    return charm
 
 
 @pytest.fixture(scope="module")
-async def route_tester_charm():
-    route_charm_root = (Path(__file__).parent / "testers" / "route").absolute()
-    return spellbook_fetch(
-        route_charm_root,
-        charm_name="route-tester",
-        pull_libs=[trfk_root / "lib" / "charms" / "traefik_route_k8s" / "v0" / "traefik_route.py"],
-    )
+@timed_memoizer
+async def route_tester_charm(ops_test):
+    charm_path = (Path(__file__).parent / "testers" / "route").absolute()
+    clean_cmd = ["charmcraft", "clean", "-p", charm_path]
+    await ops_test.run(*clean_cmd)
+    charm = await ops_test.build_charm(charm_path)
+    return charm
+
+
+@pytest.fixture(scope="module")
+def temp_dir(tmp_path_factory):
+    return tmp_path_factory.mktemp("data")
 
 
 def purge(data: dict):
@@ -155,7 +201,7 @@ def get_unit_info(unit_name: str, model: str = None) -> dict:
         cmd.insert(2, "-m")
         cmd.insert(3, model)
 
-    proc = Popen(cmd, stdout=PIPE)
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE)
     raw_data = proc.stdout.read().decode("utf-8").strip()
 
     data = yaml.safe_load(raw_data) if raw_data else None
@@ -276,30 +322,14 @@ def assert_can_ping(ip, port):
     assert response == 0, f"{ip}:{port} is down/unreachable"
 
 
-async def get_address(ops_test: OpsTest, app_name: str, unit=0):
-    status = await ops_test.model.get_status()  # noqa: F821
-    addr = list(status.applications[app_name].units.values())[unit].address
-    return addr
-
-
 async def deploy_traefik_if_not_deployed(ops_test: OpsTest, traefik_charm):
     try:
         await ops_test.model.deploy(
-            traefik_charm, application_name="traefik-k8s", resources=trfk_resources, series="focal"
+            traefik_charm, application_name="traefik-k8s", resources=trfk_resources
         )
     except JujuError as e:
         if 'cannot add application "traefik-k8s": application already exists' not in str(e):
             raise e
-
-    # block until traefik goes to...
-    async with ops_test.fast_forward():
-        await ops_test.model.wait_for_idle(["traefik-k8s"], timeout=1000)
-
-    # we set the external hostname to traefik-k8s's own ip
-    traefik_address = await get_address(ops_test, "traefik-k8s")
-    await ops_test.model.applications["traefik-k8s"].set_config(
-        {"external_hostname": traefik_address}
-    )
 
     # now we're most definitely active.
     async with ops_test.fast_forward():
@@ -308,9 +338,7 @@ async def deploy_traefik_if_not_deployed(ops_test: OpsTest, traefik_charm):
 
 async def deploy_charm_if_not_deployed(ops_test: OpsTest, charm, app_name: str, resources=None):
     if not ops_test.model.applications.get(app_name):
-        await ops_test.model.deploy(
-            charm, resources=resources, application_name=app_name, series="focal"
-        )
+        await ops_test.model.deploy(charm, resources=resources, application_name=app_name)
 
     # block until app goes to active/idle
     async with ops_test.fast_forward():

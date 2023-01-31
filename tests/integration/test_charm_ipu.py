@@ -8,15 +8,15 @@ from pytest_operator.plugin import OpsTest
 from tests.integration.conftest import (
     assert_can_ping,
     deploy_traefik_if_not_deployed,
-    get_address,
     get_relation_data,
 )
+from tests.integration.helpers import get_address
 
 
 @pytest.mark.abort_on_fail
 async def test_deployment(ops_test: OpsTest, traefik_charm, ipu_tester_charm):
     await deploy_traefik_if_not_deployed(ops_test, traefik_charm)
-    await ops_test.model.deploy(ipu_tester_charm, "ipu-tester", series="focal")
+    await ops_test.model.deploy(ipu_tester_charm, "ipu-tester")
     async with ops_test.fast_forward():
         await ops_test.model.wait_for_idle(
             ["traefik-k8s", "ipu-tester"], status="active", timeout=1000
@@ -44,6 +44,7 @@ def assert_ipu_charm_has_ingress(ops_test: OpsTest):
     assert_can_ping(ip, port)
 
 
+@pytest.mark.abort_on_fail
 async def test_ipu_charm_has_ingress(ops_test: OpsTest):
     assert_ipu_charm_has_ingress(ops_test)
 
@@ -78,6 +79,7 @@ async def test_relation_data_shape(ops_test: OpsTest):
     }
 
 
+@pytest.mark.abort_on_fail
 async def test_remove_relation(ops_test: OpsTest):
     await ops_test.juju("relate", "ipu-tester:ingress-per-unit", "traefik-k8s:ingress-per-unit")
     async with ops_test.fast_forward():

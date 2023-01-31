@@ -39,7 +39,7 @@ def charm_cls(event_container):
         event = None
 
         def __init__(self, framework):
-            super().__init__(framework, None)
+            super().__init__(framework)
             self.framework.observe(self.on.event, self._on_event)
 
         def _on_event(self, event):

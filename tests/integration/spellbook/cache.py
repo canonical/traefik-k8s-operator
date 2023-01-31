@@ -1,12 +1,13 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
+import json
 import logging
 import os
 import shutil
 from datetime import datetime
 from hashlib import md5
 from pathlib import Path
-from subprocess import getoutput
+from subprocess import CalledProcessError, check_output, getoutput
 from typing import List, Union
 
 import yaml
@@ -15,12 +16,13 @@ charm_cache = Path(__file__).parent / "cache"
 charm_shelf = Path(__file__).parent / "shelf"
 
 COPY_TAG = "unfrozen"  # tag for charm copies
-USE_CACHE = True  # you can flip this to true when testing locally. Do not commit!
+USE_CACHE = os.getenv("SPELLBOOK_CACHE", "1") == "1"
 if USE_CACHE:
     logging.warning(
         "USE_CACHE:: charms will be packed once and stored in "
         "./tests/integration/charms. Clear them manually if you "
         "have made changes to the charm code."
+        "Set the environment var SPELLBOOK_CACHE=0 to disable caching."
     )
 
 
@@ -40,7 +42,7 @@ def _get_libpath(base, source):
     return root.absolute()
 
 
-def spellbook_fetch(  # ignore: C901
+def spellbook_fetch(  # noqa: C901
     charm_root: Union[str, Path] = "./",
     charm_name: str = None,
     hash_paths: List[Path] = None,
@@ -75,11 +77,30 @@ def spellbook_fetch(  # ignore: C901
 
     def do_build():
         logging.info(f"building {charm_root}")
-        pack_out = getoutput(f"charmcraft pack -p {charm_root}")
-        return (Path(os.getcwd()) / pack_out.split("\n")[-1].strip()).absolute()
+        try:
+            pack_out = check_output(("charmcraft", "pack", "--format=json", "-p", str(charm_root)))
+        except CalledProcessError as e:
+            raise RuntimeError(
+                "Charmcraft pack failed. " "Attempt a `charmcraft clean` or inspect the logs."
+            ) from e
+        # if everything went OK, `charmcraft pack` returns the packed charm filename
+        try:
+            charmcraft_pack_out = json.loads(pack_out.decode("utf-8"))
+            charm_filename = charmcraft_pack_out["charms"][0]
+        except (json.JSONDecodeError, KeyError, IndexError) as e:
+            raise RuntimeError(
+                f"Could not determine path to packed charm file from charmcraft pack output: {pack_out!r}"
+            ) from e
+
+        packed_charm_path = (Path(os.getcwd()) / charm_filename).absolute()
+        if not packed_charm_path.exists():
+            raise RuntimeError(
+                f"Could not determine path to packed charm file from charmcraft pack output: {pack_out!r}"
+            )
+        return packed_charm_path
 
     if not use_cache:
-        logging.info("not using cache")
+        logging.info("Caching disabled. Set the environment var SPELLBOOK_CACHE=1 to enable it.")
         return do_build()
 
     # ensure cache dirs exist
