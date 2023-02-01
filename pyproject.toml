@@ -13,6 +13,9 @@ minversion = "6.0"
 log_cli_level = "INFO"
 asyncio_mode = "auto"
 
+[tool.pyright]
+reportTypedDictNotRequiredAccess = false
+
 # Formatting tools configuration
 [tool.black]
 line-length = 99

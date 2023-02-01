@@ -69,7 +69,7 @@ LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 10
+LIBPATCH = 11
 
 DEFAULT_RELATION_NAME = "ingress"
 RELATION_INTERFACE = "ingress"
@@ -314,7 +314,7 @@ class IngressPerAppProvider(_IngressPerAppBase):
         _validate_data(remote_data, INGRESS_REQUIRES_APP_SCHEMA)
         remote_data["port"] = int(remote_data["port"])
         remote_data["strip-prefix"] = bool(remote_data.get("strip-prefix", False))
-        return remote_data
+        return typing.cast(RequirerData, remote_data)
 
     def get_data(self, relation: Relation) -> RequirerData:  # type: ignore
         """Fetch the remote app's databag, i.e. the requirer data."""
@@ -339,7 +339,7 @@ class IngressPerAppProvider(_IngressPerAppBase):
             # relation_broken events.
             # Also, only leader units can read own app databags.
             # FIXME https://github.com/canonical/traefik-k8s-operator/issues/34
-            return {}  # noqa
+            return typing.cast(ProviderIngressData, {})  # noqa
 
         # fetch the provider's app databag
         raw_data = relation.data[self.app].get("ingress")
