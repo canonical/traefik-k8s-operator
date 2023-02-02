@@ -2,16 +2,17 @@
 # See LICENSE file for licensing details.
 
 import pytest
+from charms.traefik_k8s.v1.ingress_per_unit import IngressPerUnitProvider
 from ops.charm import CharmBase
 from scenario import Model, Relation, State
 from scenario.sequences import check_builtin_sequences
 
-from charms.traefik_k8s.v1.ingress_per_unit import IngressPerUnitProvider
-
 
 class MockProviderCharm(CharmBase):
-    META = {'name': 'my-charm',
-            "provides": {"ingress-per-unit": {"interface": "ingress_per_unit", "limit": 1}}}
+    META = {
+        "name": "my-charm",
+        "provides": {"ingress-per-unit": {"interface": "ingress_per_unit", "limit": 1}},
+    }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -101,9 +102,7 @@ def test_builtin_sequences():
     "event_name",
     ("update-status", "install", "start", "RELCHANGED", "config-changed"),
 )
-def test_ingress_unit_provider_related_is_ready(
-        leader, event_name, ipu_empty, model
-):
+def test_ingress_unit_provider_related_is_ready(leader, event_name, ipu_empty, model):
     # patch the state with leadership
 
     state = State(model=model, relations=[ipu_empty], leader=leader)
@@ -118,9 +117,7 @@ def test_ingress_unit_provider_related_is_ready(
     else:
         event = event_name
 
-    state.trigger(event=event,
-                  charm_type=MockProviderCharm,
-                  meta=MockProviderCharm.META)
+    state.trigger(event=event, charm_type=MockProviderCharm, meta=MockProviderCharm.META)
 
     # todo: write assertions for ready and remote-data
 
@@ -128,9 +125,7 @@ def test_ingress_unit_provider_related_is_ready(
 @pytest.mark.parametrize("leader", (True, False))
 @pytest.mark.parametrize("url", ("url.com", "http://foo.bar.baz"))
 @pytest.mark.parametrize("port, host", ((80, "1.1.1.1"), (81, "10.1.10.1")))
-def test_ingress_unit_provider_request_response(
-        port, host, leader, url, ipu_empty, model
-):
+def test_ingress_unit_provider_request_response(port, host, leader, url, ipu_empty, model):
     mock_data = {
         "port": str(port),
         "host": str(host),
@@ -140,13 +135,13 @@ def test_ingress_unit_provider_request_response(
     }
 
     ipu_remote_provided = ipu_empty.replace(remote_units_data={0: mock_data})
-    state = State(model=model,
-                  relations=[ipu_remote_provided],
-                  leader=leader)
+    state = State(model=model, relations=[ipu_remote_provided], leader=leader)
 
-    state.trigger(event=ipu_remote_provided.changed_event,
-                  charm_type=MockProviderCharm,
-                  meta=MockProviderCharm.META)
+    state.trigger(
+        event=ipu_remote_provided.changed_event,
+        charm_type=MockProviderCharm,
+        meta=MockProviderCharm.META,
+    )
 
     # relation = emitter.harness.model.get_relation('ingress-per-unit')
     # provider: IngressPerUnitProvider = emitter.harness.charm.ipu
