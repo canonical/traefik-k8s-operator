@@ -28,8 +28,3 @@ lightkube-models >= 1.22.0.4
 # Docs: https://ops.rtfd.io/
 # Deps: charm
 ops
-
-# Scenario testing framework
-# Code: https://github.com/PietroPasotti/ops-scenario/
-# Docs: https://ops.rtfd.io/
-ops-scenario==2.0.0
