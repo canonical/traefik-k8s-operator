@@ -82,7 +82,7 @@ LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 6
+LIBPATCH = 9
 
 log = logging.getLogger(__name__)
 
@@ -317,7 +317,7 @@ class IngressPerUnitProviderEvents(ObjectEvents):
 class IngressPerUnitProvider(_IngressPerUnitBase):
     """Implementation of the provider of ingress_per_unit."""
 
-    on = IngressPerUnitProviderEvents()
+    on = IngressPerUnitProviderEvents()  # type: ignore
 
     def _handle_relation(self, event):
         relation = event.relation
@@ -397,7 +397,7 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
         return self._get_requirer_unit_data(relation, unit)
 
     def publish_url(self, relation: Relation, unit_name: str, url: str):
-        """Place the ingress url in the application data bag for the units on the requires side.
+        """Place the ingress url in the application data bag for the units on the requirer side.
 
         Assumes that this unit is leader.
         """
@@ -491,7 +491,7 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
         _validate_data(remote_data, INGRESS_REQUIRES_UNIT_SCHEMA)
         remote_data["port"] = int(remote_data["port"])
         remote_data["strip-prefix"] = bool(remote_data.get("strip-prefix", False))
-        return remote_data
+        return typing.cast(RequirerData, remote_data)
 
     def _provider_app_data(self, relation: Relation) -> ProviderApplicationData:
         """Fetch and validate the provider's app databag."""
@@ -563,7 +563,7 @@ class _IPUEvent(RelationEvent):
             obj = kwargs.get(attr, default)
             setattr(self, attr, obj)
 
-    def snapshot(self) -> dict:
+    def snapshot(self):
         dct = super().snapshot()
         for attr in self.__attrs__():
             obj = getattr(self, attr)
@@ -577,7 +577,7 @@ class _IPUEvent(RelationEvent):
                 ) from e
         return dct
 
-    def restore(self, snapshot: dict) -> None:
+    def restore(self, snapshot) -> None:
         super().restore(snapshot)
         for attr, obj in snapshot.items():
             setattr(self, attr, obj)
@@ -801,7 +801,7 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
         if not relation:
             return {}
 
-        if not all((relation.app, relation.app.name)):  # type: ignore
+        if not relation.app and not relation.app.name:  # type: ignore
             # FIXME Workaround for https://github.com/canonical/operator/issues/693
             # We must be in a relation_broken hook
             return {}

@@ -95,7 +95,7 @@ def test_unit_joining_does_not_trigger_ingress_changed(requirer, harness, url):
     with capture(harness.charm, IngressPerUnitReadyForUnitEvent):
         _requirer_provide_ingress(harness, harness.charm.unit.name, url, relation)
 
-    new_peer = harness.charm.unit.name + "1"
+    new_peer = relation.app.name + "1"
     with capture_events(harness.charm, IngressPerUnitReadyForUnitEvent) as captured:
         # another unit joining shouldn't give this charm any changed event
         harness.add_relation_unit(relation.id, new_peer)

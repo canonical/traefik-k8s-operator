@@ -88,7 +88,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 6
+LIBPATCH = 7
 
 log = logging.getLogger(__name__)
 
@@ -173,7 +173,7 @@ class TraefikRouteProvider(Object):
     def external_host(self) -> str:
         """Return the external host set by Traefik, if any."""
         self._update_stored_external_host()
-        return self._stored.external_host or ""
+        return self._stored.external_host or ""  # type: ignore
 
     @property
     def relations(self):
@@ -195,7 +195,7 @@ class TraefikRouteProvider(Object):
                     self._stored.external_host = ""
                     return
                 external_host = relation.data[relation.app].get("external_host", "")
-                self._stored.external_host = external_host or self._stored.external_host
+                self._stored.external_host = external_host or self._stored.external_host  # type: ignore
 
     def _on_relation_changed(self, event: RelationEvent):
         if self.is_ready(event.relation):
@@ -220,12 +220,14 @@ class TraefikRouteProvider(Object):
 
         Returns True when the remote app shared the config; False otherwise.
         """
+        assert relation.app is not None  # not currently handled anyway
         return "config" in relation.data[relation.app]
 
     @staticmethod
     def get_config(relation: Relation) -> Optional[str]:
         """Retrieve the config published by the remote application."""
-        # todo validate this config
+        # TODO: validate this config
+        assert relation.app is not None  # not currently handled anyway
         return relation.data[relation.app].get("config")
 
 
@@ -264,7 +266,7 @@ class TraefikRouteRequirer(Object):
     def external_host(self) -> str:
         """Return the external host set by Traefik, if any."""
         self._update_stored_external_host()
-        return self._stored.external_host or ""
+        return self._stored.external_host or ""  # type: ignore
 
     def _update_stored_external_host(self) -> None:
         """Ensure that the stored host is up-to-date.
@@ -282,7 +284,7 @@ class TraefikRouteRequirer(Object):
                         self._stored.external_host = ""
                         return
                     external_host = relation.data[relation.app].get("external_host", "")
-                    self._stored.external_host = external_host or self._stored.external_host
+                    self._stored.external_host = external_host or self._stored.external_host  # type: ignore
 
     def _on_relation_changed(self, event: RelationEvent) -> None:
         """Update StoredState with external_host and other information from Traefik."""

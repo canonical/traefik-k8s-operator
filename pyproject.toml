@@ -12,6 +12,9 @@ show_missing = true
 minversion = "6.0"
 log_cli_level = "INFO"
 
+[tool.pyright]
+reportTypedDictNotRequiredAccess = false
+
 # Formatting tools configuration
 [tool.black]
 line-length = 99
