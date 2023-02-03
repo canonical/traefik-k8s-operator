@@ -55,10 +55,7 @@ def test_start_traefik_no_hostname(*_):
     out = State(
         config={"routing_mode": "path"},
         containers=[Container(name="traefik", can_connect=False)],
-    ).trigger(
-        "start",
-        TraefikIngressCharm
-    )
+    ).trigger("start", TraefikIngressCharm)
     assert out.status.unit == ("waiting", "gateway address unavailable")
 
 
@@ -71,10 +68,7 @@ def test_start_traefik_active(*_):
     out = State(
         config={"routing_mode": "path"},
         containers=[Container(name="traefik", can_connect=False)],
-    ).trigger(
-        "start",
-        TraefikIngressCharm
-    )
+    ).trigger("start", TraefikIngressCharm)
 
     assert out.status.unit == ("active", "")
 
@@ -86,7 +80,5 @@ def test_start_traefik_invalid_routing_mode(*_):
     out = State(
         config={"routing_mode": "invalid_routing"},
         containers=[Container(name="traefik", can_connect=False)],
-    ).trigger(
-        "start", TraefikIngressCharm
-    )
+    ).trigger("start", TraefikIngressCharm)
     assert out.status.unit == ("blocked", "invalid routing mode: invalid_routing; see logs.")
