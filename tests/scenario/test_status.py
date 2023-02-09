@@ -1,7 +1,12 @@
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 import unittest
 from unittest.mock import MagicMock, PropertyMock, patch
+
 from scenario import Container, State
-from charm import _TRAEFIK_SERVICE_NAME, TraefikIngressCharm
+
+from charm import TraefikIngressCharm
 
 
 @patch("charm.KubernetesServicePatch")
@@ -56,8 +61,10 @@ class TestUnitStatus(unittest.TestCase):
         out = state.trigger("start", TraefikIngressCharm)
 
         # THEN unit status is `blocked`
-        self.assertEqual(out.status.unit, ("blocked", "invalid routing mode: invalid_routing; see logs."))
+        self.assertEqual(
+            out.status.unit, ("blocked", "invalid routing mode: invalid_routing; see logs.")
+        )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()
