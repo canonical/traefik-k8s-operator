@@ -54,6 +54,11 @@ provides:
     description: |
       Provides endpoint for a traefik-route charm to sit between Traefik and a
       charm in need of ingress, configuring the relation on a per-unit basis.
+  grafana-dashboard:
+    description: |
+      Forwards the built-in grafana dashboard(s) for monitoring traefik.
+    interface: grafana_dashboard
+
 
 requires:
   certificates:
@@ -61,3 +66,7 @@ requires:
     limit: 1
     description: |
       Requires certificates-generating charm for TLS.
+  logging:
+    interface: loki_push_api
+    description: |
+      Receives Loki's push api endpoint address to push logs to, and forwards charm's built-in alert rules to Loki.
