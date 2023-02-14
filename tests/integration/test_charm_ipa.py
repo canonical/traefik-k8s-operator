@@ -1,18 +1,17 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 import asyncio
-from pathlib import Path
 
 import pytest
 import yaml
 from pytest_operator.plugin import OpsTest
 
-from tests.integration.conftest import assert_can_ping, get_relation_data
+from tests.integration.conftest import (
+    assert_can_ping,
+    get_relation_data,
+    trfk_resources,
+)
 from tests.integration.helpers import get_address
-
-trfk_root = Path(__file__).parent.parent.parent
-trfk_meta = yaml.safe_load((trfk_root / "metadata.yaml").read_text())
-trfk_resources = {name: val["upstream-source"] for name, val in trfk_meta["resources"].items()}
 
 
 @pytest.mark.abort_on_fail
