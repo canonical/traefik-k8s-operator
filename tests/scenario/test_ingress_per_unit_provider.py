@@ -81,7 +81,7 @@ def test_ingress_unit_provider_request_response(port, host, leader, url, ipu_emp
         "mode": "http",
     }
 
-    URL = "http://foo.com/babooz"
+    test_url = "http://foo.com/babooz"
 
     def callback(charm: MockProviderCharm):
         ingress = charm.model.get_relation("ingress-per-unit")
@@ -98,10 +98,10 @@ def test_ingress_unit_provider_request_response(port, host, leader, url, ipu_emp
         assert data["port"] == port
 
         if leader:
-            charm.ipu.publish_url(ingress, remote_unit.name, URL)
+            charm.ipu.publish_url(ingress, remote_unit.name, test_url)
         else:
             with pytest.raises(AssertionError):
-                charm.ipu.publish_url(ingress, remote_unit.name, URL)
+                charm.ipu.publish_url(ingress, remote_unit.name, test_url)
 
         print(data)
 
@@ -117,6 +117,6 @@ def test_ingress_unit_provider_request_response(port, host, leader, url, ipu_emp
 
     if leader:
         local_ipa_data = out.relations[0].local_app_data
-        assert local_ipa_data
+        assert local_ipa_data["ingress"] == "remote/0:\n  url: http://foo.com/babooz\n"
     else:
         assert not out.relations[0].local_app_data
