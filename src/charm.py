@@ -80,6 +80,7 @@ _DYNAMIC_CERTS_PATH = _DYNAMIC_CONFIG_DIR + "/certificates.yaml"
 _CERTIFICATE_PATH = _DYNAMIC_CONFIG_DIR + "/certificate.cert"
 _CERTIFICATE_KEY_PATH = _DYNAMIC_CONFIG_DIR + "/certificate.key"
 BIN_PATH = "/usr/bin/traefik"
+PRIVATE_KEY_SECRET_LABEL = "PRIVATE_KEY"
 
 
 class _RoutingMode(enum.Enum):
@@ -219,7 +220,9 @@ class TraefikIngressCharm(CharmBase):
         # Generate key without a passphrase as traefik does not support it
         # https://github.com/traefik/traefik/pull/6518
         private_key = generate_private_key()
-        self._stored.private_key = private_key.decode()
+        content = {"private-key": private_key.decode()}
+        self.app.add_secret(content, label=PRIVATE_KEY_SECRET_LABEL)
+        # self._stored.private_key = private_key.decode()
 
     def _on_certificates_relation_joined(self, event: RelationJoinedEvent) -> None:
         # Assuming there can be only one (metadata also has `limit: 1` on the relation).
@@ -231,7 +234,8 @@ class TraefikIngressCharm(CharmBase):
             # Relation "certificates" does not exist
             return
 
-        private_key = self._stored.private_key
+        # private_key = self._stored.private_key
+        private_key = self.model.get_secret(label=PRIVATE_KEY_SECRET_LABEL)["private-key"]
         if not (subject := self.cert_subject):
             logger.debug(
                 "Cannot generate CSR: subject is invalid "
@@ -260,7 +264,9 @@ class TraefikIngressCharm(CharmBase):
     def _on_all_certificates_invalidated(self, event: RelationBrokenEvent) -> None:
         if self.container.can_connect():
             self._stored.certificate = None
-            self._stored.private_key = None
+            # self._stored.private_key = None
+            secret = self.model.get_secret(label=PRIVATE_KEY_SECRET_LABEL)
+            secret.remove_all_revisions()
             self._stored.csr = None
             self.container.remove_path(_CERTIFICATE_PATH, recursive=True)
             self.container.remove_path(_CERTIFICATE_KEY_PATH, recursive=True)
@@ -271,13 +277,17 @@ class TraefikIngressCharm(CharmBase):
         self._stored.chain = event.chain
         # TODO: Store files in container and modify config file
         self.container.push(_CERTIFICATE_PATH, self._stored.certificate, make_dirs=True)
-        self.container.push(_CERTIFICATE_KEY_PATH, self._stored.private_key, make_dirs=True)
+        self.container.push(
+            _CERTIFICATE_KEY_PATH,
+            self.model.get_secret(label=PRIVATE_KEY_SECRET_LABEL)["private-key"],
+            make_dirs=True
+        )
         self._push_config()
         self._process_status_and_configurations()
 
     def _on_certificate_expiring(self, event: CertificateExpiringEvent) -> None:
         old_csr = self._stored.csr
-        private_key = self._stored.private_key
+        private_key = self.model.get_secret(label=PRIVATE_KEY_SECRET_LABEL)["private-key"]
 
         if not (subject := self.cert_subject):
             # TODO: use compound status
@@ -289,7 +299,7 @@ class TraefikIngressCharm(CharmBase):
             return
 
         new_csr = generate_csr(
-            private_key=private_key.encode(),
+            private_key=self.model.get_secret(label=PRIVATE_KEY_SECRET_LABEL)["private-key"].encode(),
             subject=subject,
         )
         self.certificates.request_certificate_renewal(
