@@ -66,7 +66,7 @@ from ops.pebble import APIError, PathError
 
 if typing.TYPE_CHECKING:
     from charms.traefik_k8s.v1.ingress import RequirerData as RequirerData_IPA
-    from charms.traefik_k8s.v1.ingress_per_unit import RequirerData as RequirerData_IPU
+    from charms.traefik_k8s.v1.ingress_per_unit import RequirerData as RequirerData_IPUj
 
 logger = logging.getLogger(__name__)
 
@@ -235,7 +235,7 @@ class TraefikIngressCharm(CharmBase):
             return
 
         # private_key = self._stored.private_key
-        private_key = self.model.get_secret(label=PRIVATE_KEY_SECRET_LABEL)["private-key"]
+        private_key = self.model.get_secret(label=PRIVATE_KEY_SECRET_LABEL).get_content()["private-key"]
         if not (subject := self.cert_subject):
             logger.debug(
                 "Cannot generate CSR: subject is invalid "
@@ -287,7 +287,7 @@ class TraefikIngressCharm(CharmBase):
 
     def _on_certificate_expiring(self, event: CertificateExpiringEvent) -> None:
         old_csr = self._stored.csr
-        private_key = self.model.get_secret(label=PRIVATE_KEY_SECRET_LABEL)["private-key"]
+        private_key = self.model.get_secret(label=PRIVATE_KEY_SECRET_LABEL).get_content()["private-key"]
 
         if not (subject := self.cert_subject):
             # TODO: use compound status
@@ -299,7 +299,7 @@ class TraefikIngressCharm(CharmBase):
             return
 
         new_csr = generate_csr(
-            private_key=self.model.get_secret(label=PRIVATE_KEY_SECRET_LABEL)["private-key"].encode(),
+            private_key=self.model.get_secret(label=PRIVATE_KEY_SECRET_LABEL).get_content()["private-key"].encode(),
             subject=subject,
         )
         self.certificates.request_certificate_renewal(
