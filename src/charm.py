@@ -66,7 +66,7 @@ from ops.pebble import APIError, PathError
 
 if typing.TYPE_CHECKING:
     from charms.traefik_k8s.v1.ingress import RequirerData as RequirerData_IPA
-    from charms.traefik_k8s.v1.ingress_per_unit import RequirerData as RequirerData_IPUj
+    from charms.traefik_k8s.v1.ingress_per_unit import RequirerData as RequirerData_IPU
 
 logger = logging.getLogger(__name__)
 
@@ -110,7 +110,6 @@ class TraefikIngressCharm(CharmBase):
             current_external_host=None,
             current_routing_mode=None,
             tcp_entrypoints=None,
-            private_key=None,
             csr=None,
             certificate=None,
             ca=None,
@@ -222,7 +221,6 @@ class TraefikIngressCharm(CharmBase):
         private_key = generate_private_key()
         content = {"private-key": private_key.decode()}
         self.app.add_secret(content, label=PRIVATE_KEY_SECRET_LABEL)
-        # self._stored.private_key = private_key.decode()
 
     def _on_certificates_relation_joined(self, event: RelationJoinedEvent) -> None:
         # Assuming there can be only one (metadata also has `limit: 1` on the relation).
@@ -234,8 +232,9 @@ class TraefikIngressCharm(CharmBase):
             # Relation "certificates" does not exist
             return
 
-        # private_key = self._stored.private_key
-        private_key = self.model.get_secret(label=PRIVATE_KEY_SECRET_LABEL).get_content()["private-key"]
+        private_key = self.model.get_secret(label=PRIVATE_KEY_SECRET_LABEL).get_content()[
+            "private-key"
+        ]
         if not (subject := self.cert_subject):
             logger.debug(
                 "Cannot generate CSR: subject is invalid "
@@ -264,7 +263,6 @@ class TraefikIngressCharm(CharmBase):
     def _on_all_certificates_invalidated(self, event: RelationBrokenEvent) -> None:
         if self.container.can_connect():
             self._stored.certificate = None
-            # self._stored.private_key = None
             secret = self.model.get_secret(label=PRIVATE_KEY_SECRET_LABEL)
             secret.remove_all_revisions()
             self._stored.csr = None
@@ -279,15 +277,14 @@ class TraefikIngressCharm(CharmBase):
         self.container.push(_CERTIFICATE_PATH, self._stored.certificate, make_dirs=True)
         self.container.push(
             _CERTIFICATE_KEY_PATH,
-            self.model.get_secret(label=PRIVATE_KEY_SECRET_LABEL)["private-key"],
-            make_dirs=True
+            self.model.get_secret(label=PRIVATE_KEY_SECRET_LABEL).get_content()["private-key"],
+            make_dirs=True,
         )
         self._push_config()
         self._process_status_and_configurations()
 
     def _on_certificate_expiring(self, event: CertificateExpiringEvent) -> None:
         old_csr = self._stored.csr
-        private_key = self.model.get_secret(label=PRIVATE_KEY_SECRET_LABEL).get_content()["private-key"]
 
         if not (subject := self.cert_subject):
             # TODO: use compound status
@@ -299,7 +296,9 @@ class TraefikIngressCharm(CharmBase):
             return
 
         new_csr = generate_csr(
-            private_key=self.model.get_secret(label=PRIVATE_KEY_SECRET_LABEL).get_content()["private-key"].encode(),
+            private_key=self.model.get_secret(label=PRIVATE_KEY_SECRET_LABEL)
+            .get_content()["private-key"]
+            .encode(),
             subject=subject,
         )
         self.certificates.request_certificate_renewal(
