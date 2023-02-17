@@ -325,9 +325,9 @@ def assert_can_ping(ip, port):
 async def deploy_traefik_if_not_deployed(ops_test: OpsTest, traefik_charm):
     try:
         await ops_test.model.deploy(
-            traefik_charm, application_name="traefik-k8s",
-            resources=trfk_resources,
-            config={'external_hostname': "itesting.com"}
+            traefik_charm,
+            application_name="traefik-k8s",
+            resources=trfk_resources
         )
     except JujuError as e:
         if 'cannot add application "traefik-k8s": application already exists' not in str(e):
