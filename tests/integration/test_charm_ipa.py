@@ -7,7 +7,7 @@ import yaml
 from pytest_operator.plugin import OpsTest
 
 from tests.integration.conftest import (
-    assert_can_ping,
+    assert_can_connect,
     get_relation_data,
     trfk_resources,
 )
@@ -45,7 +45,7 @@ def assert_ipa_charm_has_ingress(ops_test: OpsTest):
     provider_app_data = yaml.safe_load(data.provider.application_data["ingress"])
     url = provider_app_data["url"]
     ip, port = url.split("//")[1].split("/")[0].split(":")
-    assert_can_ping(ip, port)
+    assert_can_connect(ip, port)
 
 
 @pytest.mark.abort_on_fail

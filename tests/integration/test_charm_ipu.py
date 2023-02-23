@@ -6,7 +6,7 @@ import yaml
 from pytest_operator.plugin import OpsTest
 
 from tests.integration.conftest import (
-    assert_can_ping,
+    assert_can_connect,
     deploy_traefik_if_not_deployed,
     get_relation_data,
 )
@@ -41,7 +41,7 @@ def assert_ipu_charm_has_ingress(ops_test: OpsTest):
     provider_app_data = yaml.safe_load(data.provider.application_data["ingress"])
     url = provider_app_data["ipu-tester/0"]["url"]
     ip, port = url.split("//")[1].split("/")[0].split(":")
-    assert_can_ping(ip, port)
+    assert_can_connect(ip, port)
 
 
 @pytest.mark.abort_on_fail
