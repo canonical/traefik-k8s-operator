@@ -3,7 +3,7 @@
 # See LICENSE file for licensing details.
 
 """Charm Traefik."""
-
+import os
 import enum
 import ipaddress
 import json
@@ -54,12 +54,14 @@ from ops.charm import (
     UpdateStatusEvent,
 )
 from ops.framework import StoredState
+from ops.jujuversion import JujuVersion
 from ops.main import main
 from ops.model import (
     ActiveStatus,
     BlockedStatus,
     MaintenanceStatus,
     Relation,
+    SecretNotFoundError,
     WaitingStatus,
 )
 from ops.pebble import APIError, PathError
@@ -75,12 +77,11 @@ _TRAEFIK_CONTAINER_NAME = _TRAEFIK_LAYER_NAME = _TRAEFIK_SERVICE_NAME = "traefik
 # as that is usually safer for Traefik
 _DYNAMIC_CONFIG_DIR = "/opt/traefik/juju"
 _STATIC_CONFIG_DIR = "/etc/traefik"
-_STATIC_CONFIG_PATH = _STATIC_CONFIG_DIR + "/traefik.yaml"
-_DYNAMIC_CERTS_PATH = _DYNAMIC_CONFIG_DIR + "/certificates.yaml"
-_CERTIFICATE_PATH = _DYNAMIC_CONFIG_DIR + "/certificate.cert"
-_CERTIFICATE_KEY_PATH = _DYNAMIC_CONFIG_DIR + "/certificate.key"
+_STATIC_CONFIG_PATH = f"{_STATIC_CONFIG_DIR}/traefik.yaml"
+_DYNAMIC_CERTS_PATH = f"{_DYNAMIC_CONFIG_DIR}/certificates.yaml"
+_CERTIFICATE_PATH = f"{_DYNAMIC_CONFIG_DIR}/certificate.cert"
+_CERTIFICATE_KEY_PATH = f"{_DYNAMIC_CONFIG_DIR}/certificate.key"
 BIN_PATH = "/usr/bin/traefik"
-PRIVATE_KEY_SECRET_LABEL = "PRIVATE_KEY"
 
 
 class _RoutingMode(enum.Enum):
@@ -106,15 +107,29 @@ class TraefikIngressCharm(CharmBase):
     def __init__(self, *args):
         super().__init__(*args)
 
-        self._stored.set_default(  # pyright: reportGeneralTypeIssues=false
-            current_external_host=None,
-            current_routing_mode=None,
-            tcp_entrypoints=None,
-            csr=None,
-            certificate=None,
-            ca=None,
-            chain=None,
-        )
+        self.secret_store = SecretStore(self)
+
+        if self.secret_store.using_juju_secrets:
+            self._stored.set_default(  # pyright: reportGeneralTypeIssues=false
+                current_external_host=None,
+                current_routing_mode=None,
+                tcp_entrypoints=None,
+                private_key=None,
+                csr=None,
+                certificate=None,
+                ca=None,
+                chain=None,
+            )
+        else:
+            self._stored.set_default(  # pyright: reportGeneralTypeIssues=false
+                current_external_host=None,
+                current_routing_mode=None,
+                tcp_entrypoints=None,
+                csr=None,
+                certificate=None,
+                ca=None,
+                chain=None,
+            )
 
         self.container = self.unit.get_container(_TRAEFIK_CONTAINER_NAME)
 
@@ -219,8 +234,9 @@ class TraefikIngressCharm(CharmBase):
         # Generate key without a passphrase as traefik does not support it
         # https://github.com/traefik/traefik/pull/6518
         private_key = generate_private_key()
-        content = {"private-key": private_key.decode()}
-        self.app.add_secret(content, label=PRIVATE_KEY_SECRET_LABEL)
+        # content = {"private-key": private_key.decode()}
+        self.secret_store.store_private_key(private_key.decode())
+        # self.app.add_secret(content, label=PRIVATE_KEY_SECRET_LABEL)
 
     def _on_certificates_relation_joined(self, event: RelationJoinedEvent) -> None:
         # Assuming there can be only one (metadata also has `limit: 1` on the relation).
@@ -232,9 +248,10 @@ class TraefikIngressCharm(CharmBase):
             # Relation "certificates" does not exist
             return
 
-        private_key = self.model.get_secret(label=PRIVATE_KEY_SECRET_LABEL).get_content()[
-            "private-key"
-        ]
+        # private_key = self.model.get_secret(label=PRIVATE_KEY_SECRET_LABEL).get_content()[
+        #     "private-key"
+        # ]
+        private_key = self.secret_store.private_key
         if not (subject := self.cert_subject):
             logger.debug(
                 "Cannot generate CSR: subject is invalid "
@@ -263,8 +280,17 @@ class TraefikIngressCharm(CharmBase):
     def _on_all_certificates_invalidated(self, event: RelationBrokenEvent) -> None:
         if self.container.can_connect():
             self._stored.certificate = None
-            secret = self.model.get_secret(label=PRIVATE_KEY_SECRET_LABEL)
-            secret.remove_all_revisions()
+
+            # if _using_juju_secrets():
+            #     try:
+            #         secret = self.model.get_secret(label=PRIVATE_KEY_SECRET_LABEL)
+            #         secret.remove_all_revisions()
+            #     except SecretNotFoundError:
+            #         logger.debug("No secrets to remove.")
+            # else:
+            #     self._stored.private_key = None
+            self.secret_store.remove_private_key()
+
             self._stored.csr = None
             self.container.remove_path(_CERTIFICATE_PATH, recursive=True)
             self.container.remove_path(_CERTIFICATE_KEY_PATH, recursive=True)
@@ -277,7 +303,7 @@ class TraefikIngressCharm(CharmBase):
         self.container.push(_CERTIFICATE_PATH, self._stored.certificate, make_dirs=True)
         self.container.push(
             _CERTIFICATE_KEY_PATH,
-            self.model.get_secret(label=PRIVATE_KEY_SECRET_LABEL).get_content()["private-key"],
+            self.secret_store.private_key,
             make_dirs=True,
         )
         self._push_config()
@@ -296,7 +322,7 @@ class TraefikIngressCharm(CharmBase):
             return
 
         new_csr = generate_csr(
-            private_key=self.model.get_secret(label=PRIVATE_KEY_SECRET_LABEL)
+            private_key=self.secret_store.private_key
             .get_content()["private-key"]
             .encode(),
             subject=subject,
@@ -996,6 +1022,60 @@ class TraefikIngressCharm(CharmBase):
             # immediately complain about an invalid cert. If we can't resolve it via any method,
             # return None
             return None
+
+
+# TODO: Ensures backwards compatibility with Juju versions with no secrets support.
+class SecretStore:
+    """"Provides wrapper to store and retrieve private key data in a backend. 
+    The backend can either be Juju secrets or stored state,
+    depending on the availability of Juju secrets in the environment."""
+    
+    _PRIVATE_KEY_SECRET_LABEL = "PRIVATE_KEY"
+
+    def __init__(self, charm: TraefikIngressCharm):
+        self.charm = charm
+
+    def store_private_key(self, private_key: str) -> None:
+        """Stores the private key in the backend."""
+        if self.using_juju_secrets():
+            content = {"private-key": private_key}
+            self.charm.app.add_secret(content, label=self._PRIVATE_KEY_SECRET_LABEL)
+        else:
+            self.charm._stored.private_key = private_key
+
+    def remove_private_key(self) -> None:
+        """Removes the private key from the backend."""
+        if self.using_juju_secrets():
+            try:
+                secret = self.charm.model.get_secret(
+                    label=self._PRIVATE_KEY_SECRET_LABEL
+                ).get_content()["private-key"]
+                secret.remove_all_revisions()
+            except SecretNotFoundError:
+                logger.info("No private key secret found, nothing to delete.")
+        else:
+            self.charm._stored.private_key = None
+
+    @property
+    def private_key(self) -> Optional[str]:
+        """Returns the private key from the backend."""
+        return (
+            self.charm.model.get_secret(label=self._PRIVATE_KEY_SECRET_LABEL).get_content()[
+                "private-key"
+            ]
+            if self.using_juju_secrets()
+            else self.charm._stored.private_key
+        )
+
+    @property
+    def using_juju_secrets() -> bool:
+        """Returns True if Juju secrets are available."""
+        os.getenv("JUJU_SECRETS")
+        if JujuVersion.from_environ().has_secrets:
+            logger.debug("Juju version is compatible with secrets.")
+            return True
+        logger.debug("Juju version not compatible with secrets, using stored state.")
+        return False
 
 
 def _get_loadbalancer_status(namespace: str, service_name: str):
