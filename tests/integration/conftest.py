@@ -5,6 +5,7 @@ import grp
 import logging
 import os
 import shutil
+import socket
 import subprocess
 from collections import defaultdict
 from dataclasses import dataclass
@@ -317,9 +318,19 @@ def get_relation_data(
     return RelationData(provider=provider_data, requirer=requirer_data)
 
 
-def assert_can_ping(ip, port):
-    response = os.system(f"ping -c 1 {ip} -p {port}")
-    assert response == 0, f"{ip}:{port} is down/unreachable"
+def _can_connect(ip, port) -> bool:
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.connect((ip, int(port)))
+        return True
+    except:  # noqa: E722
+        return False
+    finally:
+        s.close()
+
+
+def assert_can_connect(ip, port):
+    assert _can_connect(ip, port), f"{ip}:{port} is down/unreachable"
 
 
 async def deploy_traefik_if_not_deployed(ops_test: OpsTest, traefik_charm):
