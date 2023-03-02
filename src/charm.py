@@ -107,28 +107,17 @@ class TraefikIngressCharm(CharmBase):
         super().__init__(*args)
         self.secret_store = SecretStore(self)
 
-        # TODO: Extract to method
-        if self.secret_store.using_juju_secrets:
-            self._stored.set_default(  # pyright: reportGeneralTypeIssues=false
-                current_external_host=None,
-                current_routing_mode=None,
-                tcp_entrypoints=None,
-                csr=None,
-                certificate=None,
-                ca=None,
-                chain=None,
-            )
-        else:
-            self._stored.set_default(  # pyright: reportGeneralTypeIssues=false
-                current_external_host=None,
-                current_routing_mode=None,
-                tcp_entrypoints=None,
-                private_key=None,
-                csr=None,
-                certificate=None,
-                ca=None,
-                chain=None,
-            )
+        # TODO: call migrate pk
+        self._stored.set_default(  # pyright: reportGeneralTypeIssues=false
+            current_external_host=None,
+            current_routing_mode=None,
+            tcp_entrypoints=None,
+            private_key=None,
+            csr=None,
+            certificate=None,
+            ca=None,
+            chain=None,
+        )
 
         self.container = self.unit.get_container(_TRAEFIK_CONTAINER_NAME)
 
@@ -233,9 +222,7 @@ class TraefikIngressCharm(CharmBase):
         # Generate key without a passphrase as traefik does not support it
         # https://github.com/traefik/traefik/pull/6518
         private_key = generate_private_key()
-        # content = {"private-key": private_key.decode()}
         self.secret_store.store_private_key(private_key.decode())
-        # self.app.add_secret(content, label=PRIVATE_KEY_SECRET_LABEL)
 
     def _on_certificates_relation_joined(self, event: RelationJoinedEvent) -> None:
         # Assuming there can be only one (metadata also has `limit: 1` on the relation).
@@ -247,9 +234,6 @@ class TraefikIngressCharm(CharmBase):
             # Relation "certificates" does not exist
             return
 
-        # private_key = self.model.get_secret(label=PRIVATE_KEY_SECRET_LABEL).get_content()[
-        #     "private-key"
-        # ]
         private_key = self.secret_store.private_key
         if not (subject := self.cert_subject):
             logger.debug(
@@ -279,10 +263,8 @@ class TraefikIngressCharm(CharmBase):
     def _on_all_certificates_invalidated(self, event: RelationBrokenEvent) -> None:
         if self.container.can_connect():
             self._stored.certificate = None
-            self.secret_store.remove_private_key()
             self._stored.csr = None
             self.container.remove_path(_CERTIFICATE_PATH, recursive=True)
-            self.container.remove_path(_CERTIFICATE_KEY_PATH, recursive=True)
 
     def _on_certificate_available(self, event: CertificateAvailableEvent) -> None:
         self._stored.certificate = event.certificate
@@ -1025,82 +1007,71 @@ class SecretStore:
 
     def store_private_key(self, private_key: str) -> None:
         """Stores the private key in the backend."""
-        logger.warning(
-            "######################## store private key secrets ########################"
-        )
         if self.using_juju_secrets:
-            logger.warning(
-                "######################## store private key secrets if ########################"
-            )
             content = {"private-key": private_key}
             self.charm.app.add_secret(content, label=self._PRIVATE_KEY_SECRET_LABEL)
         else:
-            logger.warning(
-                "######################## store private key secrets stored ########################"
-            )
             self.charm._stored.private_key = private_key
 
     def remove_private_key(self) -> None:
         """Removes the private key from the backend."""
-        logger.warning("######################### remove private key ########################")
         if self.using_juju_secrets:
             try:
-                logger.warning(
-                    "######################## remove private key using secrets ########################"
-                )
                 secret = self.charm.model.get_secret(label=self._PRIVATE_KEY_SECRET_LABEL)
                 secret.remove_all_revisions()
             except SecretNotFoundError:
                 logger.info("No private key secret found, nothing to delete.")
         else:
-            logger.warning(
-                "######################## remove private key using stored ########################"
-            )
             self.charm._stored.private_key = None
 
     @property
-    def private_key(self) -> Optional[str]:
+    def private_key(self) -> str:
         """Returns the private key from the backend."""
-        logger.warning("######################## private_key ########################")
-        return (
-            self.charm.model.get_secret(label=self._PRIVATE_KEY_SECRET_LABEL).get_content()[
-                "private-key"
-            ]
-            if self.using_juju_secrets
-            else self.charm._stored.private_key
-        )
+        if self.using_juju_secrets:
+            try:
+                private_key_secret = self.charm.model.get_secret(
+                    label=self._PRIVATE_KEY_SECRET_LABEL
+                )
+            except SecretNotFoundError:
+                logger.warning("Private key secret not found.")
+                return self.migrate_private_key()
+            if private_key := private_key_secret.get_content()["private-key"]:
+                return private_key
+            else:
+                logger.warning("`private-key` not found in secret content.")
+                # return None
+        return self.charm._stored.private_key
 
     @property
     def using_juju_secrets(self) -> bool:
         """True if Juju secrets are available."""
-        logging.warning("######################## using_juju_secrets ########################")
         if JujuVersion.from_environ().has_secrets:
-            logging.warning("######################## has secrets true ########################")
             logger.debug("Juju version is compatible with secrets.")
             return True
         logger.debug("Juju version not compatible with secrets, using stored state.")
-        logging.warning("######################## has secrets false ########################")
         return False
 
     # TODO: Use this method to migrate private key from stored state to secrets.
-    def migrate_private_key(self) -> None:
+    def migrate_private_key(self) -> Optional[str]:
         """Migrates the private key from stored state to Juju secrets.
 
         The migration will happen only if Juju secrets are available, and
         there is a private key stored in the charm's stored state.
         """
-        logging.warning("######################## migrate_private_key ########################")
         if not self.using_juju_secrets:
             logger.debug("Juju secrets not available, private key will remain in stored state.")
             return
         if not self.charm._stored.private_key:
             logger.debug("No private key found in stored state, nothing to migrate.")
             return
-        logger.info("Juju secrets are available, migrating private key.")
-        self.store_private_key(self.charm._stored.private_key)
-        logger.info("Deleting private key from stored state.")
+        private_key = self.charm._stored.private_key
+        logger.debug("Juju secrets are available, migrating private key.")
+        self.store_private_key(private_key)
+        logger.debug("Deleting private key from stored state.")
         self.charm._stored.private_key = None
-        logger.info("Private key migrated successfully.")
+        logger.debug("Private key migrated successfully.")
+
+        return private_key
 
 
 def _get_loadbalancer_status(namespace: str, service_name: str):

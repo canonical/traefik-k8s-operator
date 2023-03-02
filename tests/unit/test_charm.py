@@ -116,13 +116,8 @@ class TestTraefikIngressCharm(unittest.TestCase):
         self.harness.container_pebble_ready("traefik")
 
         traefik_container = self.harness.charm.unit.get_container("traefik")
-        try:
-            yaml.safe_load(traefik_container.pull("/opt/traefik/juju").read())
-            raise Exception("The previous line should have failed")
-        except IsADirectoryError:
-            # If the directory did not exist, the method would have thrown
-            # a FileNotFoundError instead.
-            pass
+
+        self.assertTrue(traefik_container.isdir("/opt/traefik/juju"))
 
         self.assertEqual(self.harness.charm.unit.status, ActiveStatus())
 
@@ -626,13 +621,11 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
         traefik_container = self.harness.charm.unit.get_container("traefik")
 
-        try:
-            traefik_container.pull(
+        self.assertFalse(
+            traefik_container.exists(
                 f"/opt/traefik/juju/juju_ingress_{relation.name}_{relation.id}_{relation.app.name}.yaml"
-            ).read()
-            raise Exception("The line above should fail")
-        except FileNotFoundError:
-            pass
+            )
+        )
 
     @patch("charm._get_loadbalancer_status", lambda **__: None)
     @patch("charm.TraefikIngressCharm._traefik_service_running", lambda **__: True)

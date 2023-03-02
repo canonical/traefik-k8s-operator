@@ -27,10 +27,37 @@ class TlsWithExternalHostname(unittest.TestCase):
         self.harness.set_leader(True)
         self.harness.begin_with_initial_hooks()
         self.harness.container_pebble_ready("traefik")
-        
-        self.maxDiff = None
 
-    # b
+    @patch("charm._get_loadbalancer_status", lambda **_: "10.0.0.1")
+    @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
+    def test_external_hostname_is_set_after_relation_joins(self):
+        # GIVEN an external hostname is not set
+        self.assertFalse(self.harness.charm.config.get("external_hostname"))
+        self.assertEqual(self.harness.charm.external_host, "10.0.0.1")
+
+        # WHEN a "certificates" relation is formed
+        # THEN the charm logs an appropriate DEBUG line
+        with self.assertLogs(level="DEBUG") as cm:
+            self.rel_id = self.harness.add_relation("certificates", "root-ca")
+            self.harness.add_relation_unit(self.rel_id, "root-ca/0")
+
+        self.assertEqual(
+            cm.output,
+            [
+                "DEBUG:charm:Cannot generate CSR: subject is invalid "
+                "(hostname is '10.0.0.1', which is probably invalid)"
+            ],
+        )
+
+        # AND WHEN an external hostname is set
+        self.harness.update_config({"external_hostname": "testhostname"})
+        self.assertEqual(self.harness.charm.external_host, "testhostname")
+
+        # THEN a CSR is sent
+        with self.assertLogs(level="DEBUG") as cm:
+            self.harness.add_relation_unit(self.rel_id, "root-ca/0")
+
+        self.assertIn("DEBUG:charm:CSR sent", cm.output)
 
     @patch("charm._get_loadbalancer_status", lambda **_: "10.0.0.1")
     @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
