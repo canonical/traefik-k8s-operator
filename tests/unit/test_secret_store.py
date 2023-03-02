@@ -25,7 +25,6 @@ class MockModel:
 
 class TestSecretStore(unittest.TestCase):
     def setUp(self):
-        # TODO: do I need to re-create the instance of the charm for each test?
         self.charm = MagicMock(spec=TraefikIngressCharm)
         self.secret_store = SecretStore(self.charm)
         self.dummy_private_key = "dummy_private_key"
