@@ -1042,12 +1042,12 @@ class SecretStore:
                     label=self._PRIVATE_KEY_SECRET_LABEL
                 )
             except SecretNotFoundError:
-                logger.warning("Private key secret not found.")
+                logger.debug("Private key secret not found.")
                 return self.migrate_private_key()
             if private_key := private_key_secret.get_content()["private-key"]:
                 return private_key
             else:
-                logger.warning("`private-key` not found in secret content.")
+                logger.debug("`private-key` not found in secret content.")
         return self.charm._stored.private_key
 
     @property
