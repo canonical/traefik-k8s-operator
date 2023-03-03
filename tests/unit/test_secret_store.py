@@ -20,14 +20,14 @@ class MockModel:
 
     def get_secret(self, label):
         backend = self.framework.model._backend
-        return Secret(backend=backend, label="dummy_label")
+        return Secret(backend=backend, label="sample_label")
 
 
 class TestSecretStore(unittest.TestCase):
     def setUp(self):
         self.charm = MagicMock(spec=TraefikIngressCharm)
         self.secret_store = SecretStore(self.charm)
-        self.dummy_private_key = "dummy_private_key"
+        self.sample_private_key = "sample_private_key"
 
     @patch("charm.JujuVersion.from_environ")
     def test_given_juju_has_secrets_when_using_juju_secrets_is_called_then_returns_true(
@@ -60,9 +60,9 @@ class TestSecretStore(unittest.TestCase):
         patch_juju_version = Mock()
         patch_from_environ.return_value = patch_juju_version
         patch_juju_version.has_secrets = True
-        content = {"private-key": self.dummy_private_key}
+        content = {"private-key": self.sample_private_key}
 
-        self.secret_store.store_private_key(self.dummy_private_key)
+        self.secret_store.store_private_key(self.sample_private_key)
 
         self.charm.app.add_secret.assert_called_with(content, label="PRIVATE_KEY")
 
@@ -74,10 +74,10 @@ class TestSecretStore(unittest.TestCase):
         patch_from_environ.return_value = patch_juju_version
         patch_juju_version.has_secrets = False
 
-        self.secret_store.store_private_key(self.dummy_private_key)
+        self.secret_store.store_private_key(self.sample_private_key)
 
         private_key = self.charm._stored.private_key
-        expected_private_key = self.dummy_private_key
+        expected_private_key = self.sample_private_key
         self.assertEqual(private_key, expected_private_key)
 
     @patch("charm.SecretStore._PRIVATE_KEY_SECRET_LABEL", new_callable=PropertyMock)
@@ -90,7 +90,7 @@ class TestSecretStore(unittest.TestCase):
         patch_juju_version = Mock()
         patch_from_environ.return_value = patch_juju_version
         patch_juju_version.has_secrets = True
-        content = {"private-key": self.dummy_private_key}
+        content = {"private-key": self.sample_private_key}
         self.charm.model.get_secret.return_value = Secret(
             backend=Mock(), label=test_label, content=content
         )
@@ -98,7 +98,7 @@ class TestSecretStore(unittest.TestCase):
         private_key = self.secret_store.private_key
 
         self.charm.model.get_secret.assert_called_with(label=test_label)
-        self.assertEqual(private_key, self.dummy_private_key)
+        self.assertEqual(private_key, self.sample_private_key)
 
     @patch("charm.JujuVersion.from_environ")
     def test_given_juju_has_no_secrets_when_get_private_key_then_private_key_is_retrieved_from_stored_state(
@@ -108,11 +108,11 @@ class TestSecretStore(unittest.TestCase):
         patch_juju_version = Mock()
         patch_from_environ.return_value = patch_juju_version
         patch_juju_version.has_secrets = False
-        self.charm._stored.private_key = self.dummy_private_key
+        self.charm._stored.private_key = self.sample_private_key
 
         private_key = secret_store.private_key
 
-        expected_private_key = self.dummy_private_key
+        expected_private_key = self.sample_private_key
         self.assertEqual(private_key, expected_private_key)
 
     @patch("ops.model.Secret.remove_all_revisions")
@@ -137,7 +137,7 @@ class TestSecretStore(unittest.TestCase):
         patch_juju_version = Mock()
         patch_from_environ.return_value = patch_juju_version
         patch_juju_version.has_secrets = False
-        self.charm._stored.private_key = self.dummy_private_key
+        self.charm._stored.private_key = self.sample_private_key
 
         secret_store.remove_private_key()
 
@@ -151,12 +151,12 @@ class TestSecretStore(unittest.TestCase):
         patch_juju_version = Mock()
         patch_from_environ.return_value = patch_juju_version
         patch_juju_version.has_secrets = False
-        self.charm._stored.private_key = self.dummy_private_key
+        self.charm._stored.private_key = self.sample_private_key
 
         self.secret_store.migrate_private_key()
 
         patch_store_private_key.assert_not_called()
-        self.assertEquals(self.charm._stored.private_key, self.dummy_private_key)
+        self.assertEquals(self.charm._stored.private_key, self.sample_private_key)
 
     @patch("charm.SecretStore.store_private_key")
     @patch("charm.JujuVersion.from_environ")
@@ -166,7 +166,7 @@ class TestSecretStore(unittest.TestCase):
         patch_juju_version = Mock()
         patch_from_environ.return_value = patch_juju_version
         patch_juju_version.has_secrets = True
-        self.charm._stored.private_key = self.dummy_private_key
+        self.charm._stored.private_key = self.sample_private_key
 
         self.secret_store.migrate_private_key()
 

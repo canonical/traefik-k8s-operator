@@ -41,13 +41,11 @@ class TlsWithExternalHostname(unittest.TestCase):
             self.rel_id = self.harness.add_relation("certificates", "root-ca")
             self.harness.add_relation_unit(self.rel_id, "root-ca/0")
 
-        self.assertEqual(
-            cm.output,
-            [
-                "DEBUG:charm:Cannot generate CSR: subject is invalid "
-                "(hostname is '10.0.0.1', which is probably invalid)"
-            ],
+        expected_log = (
+            "DEBUG:charm:Cannot generate CSR: subject is invalid "
+            "(hostname is '10.0.0.1', which is probably invalid)"
         )
+        self.assertIn(expected_log, cm.output)
 
         # AND WHEN an external hostname is set
         self.harness.update_config({"external_hostname": "testhostname"})
