@@ -16,7 +16,7 @@ from tests.integration.helpers import get_address
 @pytest.mark.abort_on_fail
 async def test_deployment(ops_test: OpsTest, traefik_charm, ipu_tester_charm):
     await deploy_traefik_if_not_deployed(ops_test, traefik_charm)
-    await ops_test.model.deploy(ipu_tester_charm, "ipu-tester")
+    await ops_test.model.deploy(ipu_tester_charm, "ipu-tester", series="focal")
     async with ops_test.fast_forward():
         await ops_test.model.wait_for_idle(
             ["traefik-k8s", "ipu-tester"], status="active", timeout=1000

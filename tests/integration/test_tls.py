@@ -62,24 +62,29 @@ async def test_setup_env(ops_test: OpsTest):
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy(ops_test: OpsTest, traefik_charm):
     await asyncio.gather(
-        ops_test.model.deploy(traefik_charm, resources=trfk.resources, application_name=trfk.name),
+        ops_test.model.deploy(
+            traefik_charm, resources=trfk.resources, application_name=trfk.name, series="focal"
+        ),
         ops_test.model.deploy(
             ipu.charm,
             application_name=ipu.name,
             channel="edge",  # TODO change to "stable" once available
             trust=True,
+            series="focal",
         ),
         ops_test.model.deploy(
             ipa.charm,
             application_name=ipa.name,
             channel="edge",  # TODO change to "stable" once available
             trust=True,
+            series="focal",
         ),
         ops_test.model.deploy(
             ipr.charm,
             application_name=ipr.name,
             channel="edge",  # TODO change to "stable" once available
             trust=True,
+            series="focal",
         ),
     )
 
@@ -141,6 +146,7 @@ async def test_tls_termination(ops_test: OpsTest, temp_dir):
         "ch:tls-certificates-operator",
         application_name="root-ca",
         channel="edge",
+        series="focal",
     )
     await ops_test.model.applications["root-ca"].set_config(
         {

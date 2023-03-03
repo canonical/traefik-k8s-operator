@@ -19,9 +19,9 @@ trfk_resources = {name: val["upstream-source"] for name, val in trfk_meta["resou
 async def test_deployment(ops_test: OpsTest, traefik_charm, ipa_tester_charm):
     await asyncio.gather(
         ops_test.model.deploy(
-            traefik_charm, application_name="traefik-k8s", resources=trfk_resources
+            traefik_charm, application_name="traefik-k8s", resources=trfk_resources, series="focal"
         ),
-        ops_test.model.deploy(ipa_tester_charm, "ipa-tester"),
+        ops_test.model.deploy(ipa_tester_charm, "ipa-tester", series="focal"),
     )
 
     async with ops_test.fast_forward():
