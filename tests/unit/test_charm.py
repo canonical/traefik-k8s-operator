@@ -10,6 +10,7 @@ import ops.testing
 import yaml
 from ops.charm import ActionEvent
 from ops.model import ActiveStatus, Application, BlockedStatus, Relation, WaitingStatus
+from ops.pebble import PathError
 from ops.testing import Harness
 
 from charm import _STATIC_CONFIG_PATH, TraefikIngressCharm
@@ -119,7 +120,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
         try:
             yaml.safe_load(traefik_container.pull("/opt/traefik/juju").read())
             raise Exception("The previous line should have failed")
-        except IsADirectoryError:
+        except (IsADirectoryError, PathError):
             # If the directory did not exist, the method would have thrown
             # a FileNotFoundError instead.
             pass
@@ -631,7 +632,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
                 f"/opt/traefik/juju/juju_ingress_{relation.name}_{relation.id}_{relation.app.name}.yaml"
             ).read()
             raise Exception("The line above should fail")
-        except FileNotFoundError:
+        except (FileNotFoundError, PathError):
             pass
 
     @patch("charm._get_loadbalancer_status", lambda **__: None)
