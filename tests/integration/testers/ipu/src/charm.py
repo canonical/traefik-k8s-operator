@@ -8,7 +8,7 @@ from ops.model import ActiveStatus
 
 class IPURequirerMock(CharmBase):
     def __init__(self, framework):
-        super().__init__(framework, None)
+        super().__init__(framework)
         self.ipu = IngressPerUnitRequirer(self, host="foo.bar", port=80)
         self.unit.status = ActiveStatus("ready")
 
