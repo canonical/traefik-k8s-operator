@@ -179,4 +179,4 @@ async def test_tls_termination_after_charm_upgrade(ops_test: OpsTest, traefik_ch
     await ops_test.model.wait_for_idle(status="active", timeout=600, idle_period=30)
     ip = await get_address(ops_test, trfk.name)
     await curl_endpoints(ops_test, temp_dir, temp_dir / "local.cert", ip)
-    await ops_test.forget_model()
+    await ops_test.forget_model(ops_test.model_name)
