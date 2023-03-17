@@ -43,4 +43,6 @@ async def tcp_ipa_deployment(
 async def test_tcp_ipa_compatibility(ops_test, tcp_ipa_deployment):
     await assert_tcp_charm_has_ingress(ops_test)
     assert_ipa_charm_has_ingress(ops_test)
-    await ops_test.forget_model(ops_test.model_name)
+    await ops_test.model.applications["traefik-k8s"].destroy(
+        destroy_storage=True, force=True, no_wait=True
+    )
