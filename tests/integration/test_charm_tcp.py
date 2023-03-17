@@ -101,3 +101,4 @@ async def test_remove_relation(ops_test: OpsTest):
     async with ops_test.fast_forward():
         await ops_test.model.wait_for_idle(["traefik-k8s"], status="active")
         # the tcp-tester is allowed to bork out, we don't really care
+    await ops_test.forget_model()

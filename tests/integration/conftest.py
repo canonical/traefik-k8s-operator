@@ -118,8 +118,17 @@ def copy_traefik_library_into_tester_charms(ops_test):
 @pytest.fixture(scope="module")
 @timed_memoizer
 async def traefik_charm(ops_test):
-    charm = await ops_test.build_charm(".")
-    return charm
+    count = 0
+    while True:
+        try:
+            charm = await ops_test.build_charm(".")
+            return charm
+        except RuntimeError:
+            logger.warning("Failed to build traefik. Trying again!")
+            count += 1
+
+            if count == 3:
+                raise
 
 
 @pytest.fixture(scope="module")
