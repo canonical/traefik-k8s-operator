@@ -28,40 +28,6 @@ _JUJU_KEYS = ("egress-subnets", "ingress-address", "private-address")
 logger = logging.getLogger(__name__)
 
 
-@pytest.fixture(scope="module", autouse=True)
-async def enable_metallb():
-    logger.info("Enable metallb, in case it's disabled")
-    cmd = [
-        "sh",
-        "-c",
-        "ip -4 -j route get 2.2.2.2 | jq -r '.[] | .prefsrc'",
-    ]
-    result = subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    ip = result.stdout.decode("utf-8").strip()
-
-    if os.environ.get("RUNNER_OS"):
-        # Running inside a GitHub runner
-        # Need to find the correct group name https://github.com/canonical/microk8s/pull/3222
-        try:
-            # Classically confined microk8s
-            uk8s_group = grp.getgrnam("microk8s").gr_name
-        except KeyError:
-            # Strictly confined microk8s
-            uk8s_group = "snap_microk8s"
-        cmd = ["sg", uk8s_group, "-c", f"microk8s enable metallb:{ip}-{ip}"]
-    else:
-        # Running locally
-        cmd = ["sudo", "microk8s", "enable", f"metallb:{ip}-{ip}"]
-
-    try:
-        subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    except subprocess.CalledProcessError as e:
-        logger.error(e.stdout.decode())
-        raise
-
-    return ip
-
-
 class Store(defaultdict):
     def __init__(self):
         super(Store, self).__init__(Store)
