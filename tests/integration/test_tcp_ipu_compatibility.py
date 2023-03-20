@@ -33,10 +33,17 @@ async def tcp_ipu_deployment(
         safe_relate(ops_test, "tcp-tester:ingress-per-unit", "traefik-k8s:ingress-per-unit"),
         safe_relate(ops_test, "ipu-tester:ingress-per-unit", "traefik-k8s:ingress-per-unit"),
     )
+
+    # Make sure update-status triggers so everything is up-to-date
     async with ops_test.fast_forward():
-        await ops_test.model.wait_for_idle(
-            ["traefik-k8s", "tcp-tester", "ipu-tester"], status="active", timeout=1000
-        )
+        await asyncio.sleep(15)
+
+    # Use "idle_period" to make sure traefik is functioning
+    # Otherwise, occasionally getting "Connection refused"
+    await ops_test.model.wait_for_idle(
+        ["traefik-k8s", "tcp-tester", "ipu-tester"], status="active", timeout=1000, idle_period=30,
+    )
+
     yield
     await ops_test.model.applications["tcp-tester"].remove()
     await ops_test.model.applications["ipu-tester"].remove()
