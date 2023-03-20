@@ -41,7 +41,10 @@ async def tcp_ipu_deployment(
     # Use "idle_period" to make sure traefik is functioning
     # Otherwise, occasionally getting "Connection refused"
     await ops_test.model.wait_for_idle(
-        ["traefik-k8s", "tcp-tester", "ipu-tester"], status="active", timeout=1000, idle_period=30,
+        ["traefik-k8s", "tcp-tester", "ipu-tester"],
+        status="active",
+        timeout=1000,
+        idle_period=30,
     )
 
     yield

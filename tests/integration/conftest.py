@@ -1,7 +1,6 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 import functools
-import grp
 import logging
 import os
 import shutil
