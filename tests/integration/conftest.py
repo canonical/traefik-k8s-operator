@@ -121,7 +121,7 @@ async def traefik_charm(ops_test):
     count = 0
     while True:
         try:
-            charm = await ops_test.build_charm(".")
+            charm = await ops_test.build_charm(".", verbosity="debug")
             return charm
         except RuntimeError:
             logger.warning("Failed to build traefik. Trying again!")
@@ -137,7 +137,7 @@ async def ipa_tester_charm(ops_test):
     charm_path = (Path(__file__).parent / "testers" / "ipa").absolute()
     clean_cmd = ["charmcraft", "clean", "-p", charm_path]
     await ops_test.run(*clean_cmd)
-    charm = await ops_test.build_charm(charm_path)
+    charm = await ops_test.build_charm(charm_path, verbosity="debug")
     return charm
 
 
@@ -147,7 +147,7 @@ async def ipu_tester_charm(ops_test):
     charm_path = (Path(__file__).parent / "testers" / "ipu").absolute()
     clean_cmd = ["charmcraft", "clean", "-p", charm_path]
     await ops_test.run(*clean_cmd)
-    charm = await ops_test.build_charm(charm_path)
+    charm = await ops_test.build_charm(charm_path, verbosity="debug")
     return charm
 
 
@@ -157,7 +157,7 @@ async def tcp_tester_charm(ops_test):
     charm_path = (Path(__file__).parent / "testers" / "tcp").absolute()
     clean_cmd = ["charmcraft", "clean", "-p", charm_path]
     await ops_test.run(*clean_cmd)
-    charm = await ops_test.build_charm(charm_path)
+    charm = await ops_test.build_charm(charm_path, verbosity="debug")
     return charm
 
 
@@ -167,7 +167,7 @@ async def route_tester_charm(ops_test):
     charm_path = (Path(__file__).parent / "testers" / "route").absolute()
     clean_cmd = ["charmcraft", "clean", "-p", charm_path]
     await ops_test.run(*clean_cmd)
-    charm = await ops_test.build_charm(charm_path)
+    charm = await ops_test.build_charm(charm_path, verbosity="debug")
     return charm
 
 
