@@ -196,6 +196,6 @@ async def test_cleanup(ops_test):
     await asyncio.wait(tasks, timeout=60)
 
     # Now, after traefik the workload has hopefully terminated, force removal on the juju leftovers
-    await ops_test.model.applications["traefik-k8s"].destroy(
+    await ops_test.model.applications["traefik"].destroy(
         destroy_storage=True, force=True, no_wait=True
     )
