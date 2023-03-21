@@ -1,6 +1,5 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
-import asyncio
 import logging
 import socket
 from pathlib import Path
@@ -10,7 +9,7 @@ import yaml
 from pytest_operator.plugin import OpsTest
 
 from tests.integration.conftest import deploy_traefik_if_not_deployed, get_relation_data
-from tests.integration.helpers import get_address
+from tests.integration.helpers import get_address, remove_application
 
 logger = logging.getLogger(__name__)
 
@@ -105,20 +104,4 @@ async def test_remove_relation(ops_test: OpsTest):
 
 
 async def test_cleanup(ops_test):
-    # In CI, tests consistently timeout on `waiting: gateway address unavailable`.
-    # Just in case there's an unreleased socket, let's try to remove traefik more gently.
-
-    # Wrapping in `create_task` to be able to timeout with `wait`
-    tasks = [
-        asyncio.create_task(
-            ops_test.model.applications["traefik-k8s"].destroy(
-                destroy_storage=True, force=False, no_wait=False
-            )
-        )
-    ]
-    await asyncio.wait(tasks, timeout=60)
-
-    # Now, after traefik the workload has hopefully terminated, force removal on the juju leftovers
-    await ops_test.model.applications["traefik-k8s"].destroy(
-        destroy_storage=True, force=True, no_wait=True
-    )
+    await remove_application(ops_test, "traefik-k8s", timeout=60)
