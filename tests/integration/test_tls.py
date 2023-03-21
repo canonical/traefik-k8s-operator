@@ -188,7 +188,7 @@ async def test_cleanup(ops_test):
     # Wrapping in `create_task` to be able to timeout with `wait`
     tasks = [
         asyncio.create_task(
-            ops_test.model.applications["traefik-k8s"].destroy(
+            ops_test.model.applications["traefik"].destroy(
                 destroy_storage=True, force=False, no_wait=False
             )
         )
