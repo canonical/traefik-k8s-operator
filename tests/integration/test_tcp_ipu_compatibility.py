@@ -44,7 +44,7 @@ async def tcp_ipu_deployment(
     await ops_test.model.wait_for_idle(
         ["traefik-k8s", "tcp-tester", "ipu-tester"],
         status="active",
-        timeout=1000,
+        timeout=3000,
         idle_period=30,
     )
 
