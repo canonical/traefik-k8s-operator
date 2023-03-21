@@ -179,6 +179,23 @@ async def test_tls_termination_after_charm_upgrade(ops_test: OpsTest, traefik_ch
     await ops_test.model.wait_for_idle(status="active", timeout=600, idle_period=30)
     ip = await get_address(ops_test, trfk.name)
     await curl_endpoints(ops_test, temp_dir, temp_dir / "local.cert", ip)
-    await ops_test.model.applications[trfk.name].destroy(
+
+
+async def test_cleanup(ops_test):
+    # In CI, tests consistently timeout on `waiting: gateway address unavailable`.
+    # Just in case there's an unreleased socket, let's try to remove traefik more gently.
+
+    # Wrapping in `create_task` to be able to timeout with `wait`
+    tasks = [
+        asyncio.create_task(
+            ops_test.model.applications["traefik-k8s"].destroy(
+                destroy_storage=True, force=False, no_wait=False
+            )
+        )
+    ]
+    await asyncio.wait(tasks, timeout=60)
+
+    # Now, after traefik the workload has hopefully terminated, force removal on the juju leftovers
+    await ops_test.model.applications["traefik-k8s"].destroy(
         destroy_storage=True, force=True, no_wait=True
     )
