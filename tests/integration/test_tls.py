@@ -24,7 +24,7 @@ import pytest
 import yaml
 from pytest_operator.plugin import OpsTest
 
-from tests.integration.helpers import get_address
+from tests.integration.helpers import get_address, remove_application
 
 logger = logging.getLogger(__name__)
 
@@ -179,3 +179,7 @@ async def test_tls_termination_after_charm_upgrade(ops_test: OpsTest, traefik_ch
     await ops_test.model.wait_for_idle(status="active", timeout=600, idle_period=30)
     ip = await get_address(ops_test, trfk.name)
     await curl_endpoints(ops_test, temp_dir, temp_dir / "local.cert", ip)
+
+
+async def test_cleanup(ops_test):
+    await remove_application(ops_test, "traefik", timeout=60)

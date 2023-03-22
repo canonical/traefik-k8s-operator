@@ -11,7 +11,7 @@ from tests.integration.conftest import (
     get_relation_data,
     trfk_resources,
 )
-from tests.integration.helpers import get_address
+from tests.integration.helpers import get_address, remove_application
 
 
 @pytest.mark.abort_on_fail
@@ -85,3 +85,7 @@ async def test_remove_relation(ops_test: OpsTest):
     await ops_test.juju("remove-relation", "ipa-tester:ingress", "traefik-k8s:ingress")
     async with ops_test.fast_forward():
         await ops_test.model.wait_for_idle(["traefik-k8s", "ipa-tester"], status="active")
+
+
+async def test_cleanup(ops_test):
+    await remove_application(ops_test, "traefik-k8s", timeout=60)
