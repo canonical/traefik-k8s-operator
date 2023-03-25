@@ -483,7 +483,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 17
+LIBPATCH = 18
 
 logger = logging.getLogger(__name__)
 
@@ -1450,6 +1450,7 @@ class ConsumerBase(Object):
         relation_name: str = DEFAULT_RELATION_NAME,
         alert_rules_path: str = DEFAULT_ALERT_RULES_RELATIVE_PATH,
         recursive: bool = False,
+        skip_alert_topology_labeling: bool = False,
     ):
         super().__init__(charm, relation_name)
         self._charm = charm
@@ -1465,6 +1466,7 @@ class ConsumerBase(Object):
                 e.message,
             )
         self._alert_rules_path = alert_rules_path
+        self._skip_alert_topology_labeling = skip_alert_topology_labeling
 
         self._recursive = recursive
 
@@ -1472,7 +1474,9 @@ class ConsumerBase(Object):
         if not self._charm.unit.is_leader():
             return
 
-        alert_rules = AlertRules(self.topology)
+        alert_rules = (
+            AlertRules(None) if self._skip_alert_topology_labeling else AlertRules(self.topology)
+        )
         alert_rules.add_path(self._alert_rules_path, recursive=self._recursive)
         alert_rules_as_dict = alert_rules.as_dict()
 
@@ -1520,6 +1524,7 @@ class LokiPushApiConsumer(ConsumerBase):
         relation_name: str = DEFAULT_RELATION_NAME,
         alert_rules_path: str = DEFAULT_ALERT_RULES_RELATIVE_PATH,
         recursive: bool = True,
+        skip_alert_topology_labeling: bool = False,
     ):
         """Construct a Loki charm client.
 
@@ -1565,7 +1570,9 @@ class LokiPushApiConsumer(ConsumerBase):
         _validate_relation_by_interface_and_direction(
             charm, relation_name, RELATION_INTERFACE_NAME, RelationRole.requires
         )
-        super().__init__(charm, relation_name, alert_rules_path, recursive)
+        super().__init__(
+            charm, relation_name, alert_rules_path, recursive, skip_alert_topology_labeling
+        )
         events = self._charm.on[relation_name]
         self.framework.observe(self._charm.on.upgrade_charm, self._on_lifecycle_event)
         self.framework.observe(events.relation_joined, self._on_logging_relation_joined)
