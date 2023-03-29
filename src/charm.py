@@ -258,14 +258,22 @@ class TraefikIngressCharm(CharmBase):
         pass
 
     def _on_all_certificates_invalidated(self, event: RelationBrokenEvent) -> None:
-        if self.container.can_connect():
-            self._stored.certificate = None
-            self._stored.private_key = None
-            self._stored.csr = None
-            self.container.remove_path(_CERTIFICATE_PATH, recursive=True)
-            self.container.remove_path(_CERTIFICATE_KEY_PATH, recursive=True)
+        if not self.container.can_connect():
+            event.defer()
+            return
+
+        self._stored.certificate = None
+        self._stored.private_key = None
+        self._stored.csr = None
+        self.container.remove_path(_CERTIFICATE_PATH, recursive=True)
+        self.container.remove_path(_CERTIFICATE_KEY_PATH, recursive=True)
 
     def _on_certificate_available(self, event: CertificateAvailableEvent) -> None:
+        # On slow machines, this event may come up before pebble is ready
+        if not self.container.can_connect():
+            event.defer()
+            return
+
         self._stored.certificate = event.certificate
         self._stored.ca = event.ca
         self._stored.chain = event.chain
