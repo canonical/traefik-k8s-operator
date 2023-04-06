@@ -1,5 +1,13 @@
 # Contributing
 
+![GitHub License](https://img.shields.io/github/license/canonical/traefik-k8s-operator)
+![GitHub Commit Activity](https://img.shields.io/github/commit-activity/y/canonical/traefik-k8s-operator)
+![GitHub Lines of Code](https://img.shields.io/tokei/lines/github/canonical/traefik-k8s-operator)
+![GitHub Issues](https://img.shields.io/github/issues/canonical/traefik-k8s-operator)
+![GitHub PRs](https://img.shields.io/github/issues-pr/canonical/traefik-k8s-operator)
+![GitHub Contributors](https://img.shields.io/github/contributors/canonical/traefik-k8s-operator)
+![GitHub Watchers](https://img.shields.io/github/watchers/canonical/traefik-k8s-operator?style=social)
+
 This documents explains the processes and practices recommended for contributing enhancements to this operator.
 
 - Generally, before developing enhancements to this charm, you should consider [opening an issue](https://github.com/canonical/traefik-k8s-operator/issues) explaining your use case.
