@@ -1,10 +1,11 @@
-from pytest_interface_tester import InterfaceTester
+from interface_tester import InterfaceTester
 
 
-def test_ingress_interface(itester: InterfaceTester, subtests):
-    itester.configure(
+def test_ingress_interface(interface_tester: InterfaceTester):
+    interface_tester.configure(
+        # TODO: remove when the tester branch hits main
         repo="https://github.com/PietroPasotti/charm-relation-interfaces",
-        branch="tester",
+        branch="interface_tester/tester_plugin",
         interface_name="ingress",
     )
-    itester.run(subtests=subtests)
+    interface_tester.run()

@@ -1,20 +1,21 @@
 from unittest.mock import patch
 
 import pytest
-from pytest_interface_tester import InterfaceTester
-from scenario.structs import NetworkSpec, State, container, network
+from interface_tester import InterfaceTester
+from ops.pebble import Layer
+from scenario.state import State, Container
 
 from charm import TraefikIngressCharm
 
 
 @pytest.fixture
-def itester(interface_tester: InterfaceTester):
+def interface_tester(interface_tester: InterfaceTester):
     with patch("charm.KubernetesServicePatch", lambda **unused: None):
         interface_tester.configure(
             # TODO: remove when the tester branch hits main
             repo="https://github.com/PietroPasotti/charm-relation-interfaces",
-            branch="tester",
-            target=TraefikIngressCharm,
+            branch="interface_tester/tester_plugin",
+            charm_type=TraefikIngressCharm,
             state_template=State(
                 leader=True,
                 config={
@@ -25,10 +26,10 @@ def itester(interface_tester: InterfaceTester):
                 },
                 containers=[
                     # unless the traefik service reports active, the charm won't publish the ingress url.
-                    container(
+                    Container(
                         name="traefik",
                         can_connect=True,
-                        layers=[
+                        layers={"foo": Layer(
                             {
                                 "summary": "foo",
                                 "description": "bar",
@@ -41,7 +42,8 @@ def itester(interface_tester: InterfaceTester):
                                 },
                                 "checks": {},
                             }
-                        ],
+                        )
+                        }
                     )
                 ],
             ),
