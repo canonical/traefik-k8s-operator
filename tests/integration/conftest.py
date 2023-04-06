@@ -1,10 +1,10 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 import functools
-import grp
 import logging
 import os
 import shutil
+import socket
 import subprocess
 from collections import defaultdict
 from dataclasses import dataclass
@@ -25,40 +25,6 @@ _JUJU_DATA_CACHE = {}
 _JUJU_KEYS = ("egress-subnets", "ingress-address", "private-address")
 
 logger = logging.getLogger(__name__)
-
-
-@pytest.fixture(scope="module", autouse=True)
-async def enable_metallb():
-    logger.info("Enable metallb, in case it's disabled")
-    cmd = [
-        "sh",
-        "-c",
-        "ip -4 -j route get 2.2.2.2 | jq -r '.[] | .prefsrc'",
-    ]
-    result = subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    ip = result.stdout.decode("utf-8").strip()
-
-    if os.environ.get("RUNNER_OS"):
-        # Running inside a GitHub runner
-        # Need to find the correct group name https://github.com/canonical/microk8s/pull/3222
-        try:
-            # Classically confined microk8s
-            uk8s_group = grp.getgrnam("microk8s").gr_name
-        except KeyError:
-            # Strictly confined microk8s
-            uk8s_group = "snap_microk8s"
-        cmd = ["sg", uk8s_group, "-c", f"microk8s enable metallb:{ip}-{ip}"]
-    else:
-        # Running locally
-        cmd = ["sudo", "microk8s", "enable", f"metallb:{ip}-{ip}"]
-
-    try:
-        subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    except subprocess.CalledProcessError as e:
-        logger.error(e.stdout.decode())
-        raise
-
-    return ip
 
 
 class Store(defaultdict):
@@ -117,8 +83,17 @@ def copy_traefik_library_into_tester_charms(ops_test):
 @pytest.fixture(scope="module")
 @timed_memoizer
 async def traefik_charm(ops_test):
-    charm = await ops_test.build_charm(".")
-    return charm
+    count = 0
+    while True:
+        try:
+            charm = await ops_test.build_charm(".", verbosity="debug")
+            return charm
+        except RuntimeError:
+            logger.warning("Failed to build traefik. Trying again!")
+            count += 1
+
+            if count == 3:
+                raise
 
 
 @pytest.fixture(scope="module")
@@ -127,7 +102,7 @@ async def ipa_tester_charm(ops_test):
     charm_path = (Path(__file__).parent / "testers" / "ipa").absolute()
     clean_cmd = ["charmcraft", "clean", "-p", charm_path]
     await ops_test.run(*clean_cmd)
-    charm = await ops_test.build_charm(charm_path)
+    charm = await ops_test.build_charm(charm_path, verbosity="debug")
     return charm
 
 
@@ -137,7 +112,7 @@ async def ipu_tester_charm(ops_test):
     charm_path = (Path(__file__).parent / "testers" / "ipu").absolute()
     clean_cmd = ["charmcraft", "clean", "-p", charm_path]
     await ops_test.run(*clean_cmd)
-    charm = await ops_test.build_charm(charm_path)
+    charm = await ops_test.build_charm(charm_path, verbosity="debug")
     return charm
 
 
@@ -147,7 +122,7 @@ async def tcp_tester_charm(ops_test):
     charm_path = (Path(__file__).parent / "testers" / "tcp").absolute()
     clean_cmd = ["charmcraft", "clean", "-p", charm_path]
     await ops_test.run(*clean_cmd)
-    charm = await ops_test.build_charm(charm_path)
+    charm = await ops_test.build_charm(charm_path, verbosity="debug")
     return charm
 
 
@@ -157,7 +132,7 @@ async def route_tester_charm(ops_test):
     charm_path = (Path(__file__).parent / "testers" / "route").absolute()
     clean_cmd = ["charmcraft", "clean", "-p", charm_path]
     await ops_test.run(*clean_cmd)
-    charm = await ops_test.build_charm(charm_path)
+    charm = await ops_test.build_charm(charm_path, verbosity="debug")
     return charm
 
 
@@ -317,9 +292,19 @@ def get_relation_data(
     return RelationData(provider=provider_data, requirer=requirer_data)
 
 
-def assert_can_ping(ip, port):
-    response = os.system(f"ping -c 1 {ip} -p {port}")
-    assert response == 0, f"{ip}:{port} is down/unreachable"
+def _can_connect(ip, port) -> bool:
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.connect((ip, int(port)))
+        return True
+    except:  # noqa: E722
+        return False
+    finally:
+        s.close()
+
+
+def assert_can_connect(ip, port):
+    assert _can_connect(ip, port), f"{ip}:{port} is down/unreachable"
 
 
 async def deploy_traefik_if_not_deployed(ops_test: OpsTest, traefik_charm):

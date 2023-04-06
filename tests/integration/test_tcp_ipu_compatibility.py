@@ -10,6 +10,7 @@ from tests.integration.conftest import (
     deploy_traefik_if_not_deployed,
     safe_relate,
 )
+from tests.integration.helpers import remove_application
 from tests.integration.test_charm_ipa import assert_ipa_charm_has_ingress  # noqa
 from tests.integration.test_charm_ipu import assert_ipu_charm_has_ingress  # noqa
 from tests.integration.test_charm_tcp import (  # noqa
@@ -33,10 +34,20 @@ async def tcp_ipu_deployment(
         safe_relate(ops_test, "tcp-tester:ingress-per-unit", "traefik-k8s:ingress-per-unit"),
         safe_relate(ops_test, "ipu-tester:ingress-per-unit", "traefik-k8s:ingress-per-unit"),
     )
+
+    # Make sure update-status triggers so everything is up-to-date
     async with ops_test.fast_forward():
-        await ops_test.model.wait_for_idle(
-            ["traefik-k8s", "tcp-tester", "ipu-tester"], status="active", timeout=1000
-        )
+        await asyncio.sleep(15)
+
+    # Use "idle_period" to make sure traefik is functioning
+    # Otherwise, occasionally getting "Connection refused"
+    await ops_test.model.wait_for_idle(
+        ["traefik-k8s", "tcp-tester", "ipu-tester"],
+        status="active",
+        timeout=3000,
+        idle_period=30,
+    )
+
     yield
     await ops_test.model.applications["tcp-tester"].remove()
     await ops_test.model.applications["ipu-tester"].remove()
@@ -45,3 +56,7 @@ async def tcp_ipu_deployment(
 async def test_tcp_ipu_compatibility(ops_test, tcp_ipu_deployment):
     await assert_tcp_charm_has_ingress(ops_test)
     assert_ipu_charm_has_ingress(ops_test)
+
+
+async def test_cleanup(ops_test):
+    await remove_application(ops_test, "traefik-k8s", timeout=60)

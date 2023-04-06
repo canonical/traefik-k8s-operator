@@ -6,11 +6,11 @@ import yaml
 from pytest_operator.plugin import OpsTest
 
 from tests.integration.conftest import (
-    assert_can_ping,
+    assert_can_connect,
     deploy_traefik_if_not_deployed,
     get_relation_data,
 )
-from tests.integration.helpers import get_address
+from tests.integration.helpers import get_address, remove_application
 
 
 @pytest.mark.abort_on_fail
@@ -41,7 +41,7 @@ def assert_ipu_charm_has_ingress(ops_test: OpsTest):
     provider_app_data = yaml.safe_load(data.provider.application_data["ingress"])
     url = provider_app_data["ipu-tester/0"]["url"]
     ip, port = url.split("//")[1].split("/")[0].split(":")
-    assert_can_ping(ip, port)
+    assert_can_connect(ip, port)
 
 
 @pytest.mark.abort_on_fail
@@ -84,3 +84,7 @@ async def test_remove_relation(ops_test: OpsTest):
     await ops_test.juju("relate", "ipu-tester:ingress-per-unit", "traefik-k8s:ingress-per-unit")
     async with ops_test.fast_forward():
         await ops_test.model.wait_for_idle(["traefik-k8s", "ipu-tester"], status="active")
+
+
+async def test_cleanup(ops_test):
+    await remove_application(ops_test, "traefik-k8s", timeout=60)

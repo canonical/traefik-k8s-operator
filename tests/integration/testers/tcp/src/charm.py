@@ -17,7 +17,7 @@ class TCPRequirerMock(CharmBase):
     _tcp_port = 9999  # port is hard-coded in workload.py
 
     def __init__(self, framework):
-        super().__init__(framework, None)
+        super().__init__(framework)
 
         self.service_patch = KubernetesServicePatch(
             charm=self,
