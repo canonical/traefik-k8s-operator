@@ -851,7 +851,7 @@ class TraefikIngressCharm(CharmBase):
         # logic before pebble in the traefik container is up and running. If that
         # is the case, nevermind, we will wipe the dangling config files anyhow
         # during _on_traefik_pebble_ready .
-        if self.container.can_connect():
+        if self.container.can_connect() and relation.app:
             try:
                 config_path = f"{_DYNAMIC_CONFIG_DIR}/{self._relation_config_file(relation)}"
                 self.container.remove_path(config_path, recursive=True)
