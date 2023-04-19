@@ -8,7 +8,7 @@ on:
 jobs:
   pull-request:
     name: PR
-    uses: canonical/observability/.github/workflows/pull-request.yaml@main
+    uses: canonical/observability/.github/workflows/pull-request.yaml@runner-test
     secrets: inherit
 
   scenario-tests:
