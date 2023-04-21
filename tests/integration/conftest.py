@@ -318,7 +318,7 @@ async def deploy_traefik_if_not_deployed(ops_test: OpsTest, traefik_charm):
 
     # now we're most definitely active.
     async with ops_test.fast_forward():
-        await ops_test.model.wait_for_idle(["traefik-k8s"], status="active", timeout=1000)
+        await ops_test.model.wait_for_idle(["traefik-k8s"], timeout=1000)
 
 
 async def deploy_charm_if_not_deployed(ops_test: OpsTest, charm, app_name: str, resources=None):
