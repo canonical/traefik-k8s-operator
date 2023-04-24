@@ -14,5 +14,6 @@ def test_ingress_interface(interface_tester: InterfaceTester, interface_name: st
         repo="https://github.com/PietroPasotti/charm-relation-interfaces",
         branch="interface_tester/tester_plugin",
         interface_name=interface_name,
+        interface_version=1,
     )
     interface_tester.run()
