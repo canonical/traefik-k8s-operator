@@ -5,9 +5,8 @@ from unittest.mock import Mock, patch
 
 import pytest
 import yaml
-from ops.testing import Harness
-
 from charm import TraefikIngressCharm
+from ops.testing import Harness
 
 MODEL_NAME = "test-model"
 REMOTE_APP_NAME = "traefikRouteApp"

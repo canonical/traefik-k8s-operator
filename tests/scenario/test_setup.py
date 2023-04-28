@@ -5,9 +5,8 @@
 
 from unittest.mock import MagicMock, PropertyMock, patch
 
-from scenario import Container, State
-
 from charm import _TRAEFIK_SERVICE_NAME, TraefikIngressCharm
+from scenario import Container, State
 
 
 @patch("charm.KubernetesServicePatch")
