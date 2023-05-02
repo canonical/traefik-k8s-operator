@@ -20,9 +20,6 @@ from charm import TraefikIngressCharm
 def interface_tester(interface_tester: InterfaceTester):
     with patch("charm.KubernetesServicePatch", lambda **unused: None):
         interface_tester.configure(
-            # TODO: remove when the tester branch hits main
-            repo="https://github.com/PietroPasotti/charm-relation-interfaces",
-            branch="interface_tester/tester_plugin",
             charm_type=TraefikIngressCharm,
             state_template=State(
                 leader=True,
