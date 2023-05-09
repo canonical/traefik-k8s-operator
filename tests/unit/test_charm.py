@@ -8,12 +8,11 @@ from unittest.mock import Mock, patch
 
 import ops.testing
 import yaml
+from charm import _STATIC_CONFIG_PATH, TraefikIngressCharm
 from ops.charm import ActionEvent
 from ops.model import ActiveStatus, Application, BlockedStatus, Relation, WaitingStatus
 from ops.pebble import PathError
 from ops.testing import Harness
-
-from charm import _STATIC_CONFIG_PATH, TraefikIngressCharm
 
 ops.testing.SIMULATE_CAN_CONNECT = True
 
@@ -58,8 +57,8 @@ def _requirer_provide_ingress_requirements(
 
 
 class _RequirerMock:
-    local_app = None  # type: Application
-    relation = None  # type: Relation
+    local_app: Application = None
+    relation: Relation = None
 
     def is_ready(self):
         try:

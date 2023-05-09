@@ -3,11 +3,10 @@
 from unittest.mock import patch
 
 import pytest
+from charm import TraefikIngressCharm
 from interface_tester import InterfaceTester
 from ops.pebble import Layer
 from scenario.state import Container, State
-
-from charm import TraefikIngressCharm
 
 
 # Interface tests are centrally hosted at https://github.com/canonical/charm-relation-interfaces.

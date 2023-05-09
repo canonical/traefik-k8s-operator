@@ -69,7 +69,7 @@ LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 12
+LIBPATCH = 13
 
 DEFAULT_RELATION_NAME = "ingress"
 RELATION_INTERFACE = "ingress"
@@ -183,8 +183,8 @@ class _IngressPerAppBase(Object):
 
 
 class _IPAEvent(RelationEvent):
-    __args__ = ()  # type: Tuple[str, ...]
-    __optional_kwargs__ = {}  # type: Dict[str, Any]
+    __args__: Tuple[str, ...] = ()
+    __optional_kwargs__: Dict[str, Any] = {}
 
     @classmethod
     def __attrs__(cls):
@@ -229,11 +229,11 @@ class IngressPerAppDataProvidedEvent(_IPAEvent):
     __args__ = ("name", "model", "port", "host", "strip_prefix")
 
     if typing.TYPE_CHECKING:
-        name = None  # type: Optional[str]
-        model = None  # type: Optional[str]
-        port = None  # type: Optional[str]
-        host = None  # type: Optional[str]
-        strip_prefix = False  # type: bool
+        name: Optional[str] = None
+        model: Optional[str] = None
+        port: Optional[str] = None
+        host: Optional[str] = None
+        strip_prefix: bool = False
 
 
 class IngressPerAppDataRemovedEvent(RelationEvent):
@@ -305,7 +305,7 @@ class IngressPerAppProvider(_IngressPerAppBase):
             return {}
 
         databag = relation.data[relation.app]
-        remote_data = {}  # type: Dict[str, Union[int, str]]
+        remote_data: Dict[str, Union[int, str]] = {}
         for k in ("port", "host", "model", "name", "mode", "strip-prefix"):
             v = databag.get(k)
             if v is not None:
@@ -387,7 +387,7 @@ class IngressPerAppReadyEvent(_IPAEvent):
 
     __args__ = ("url",)
     if typing.TYPE_CHECKING:
-        url = None  # type: Optional[str]
+        url: Optional[str] = None
 
 
 class IngressPerAppRevokedEvent(RelationEvent):
