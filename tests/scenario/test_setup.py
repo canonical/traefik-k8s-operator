@@ -6,8 +6,7 @@
 from unittest.mock import MagicMock, PropertyMock, patch
 
 from charm import _TRAEFIK_SERVICE_NAME, TraefikIngressCharm
-from scenario import Container, State
-from scenario.runtime import trigger
+from scenario import Container, Context, State
 
 
 @patch("charm.KubernetesServicePatch")
@@ -21,31 +20,27 @@ def test_start_traefik_is_not_running(*_):
     # CONFIG = yaml.safe_load((Path(__file__).parent.parent.parent / "config.yaml").read_text())
     # charm_spec = CharmSpec(TraefikIngressCharm, meta=META, config=CONFIG, actions=ACTIONS))
 
-    out = trigger(
-        State(
-            # ATM scenario can't use the defaults specified in config.yaml,
-            # so we need to provide ourselves the values
-            # of each config option
-            config={"routing_mode": "path"},
-            # you need to specify which containers are present, otherwise
-            # the charm will raise exceptions when
-            # assuming that there is a "traefik" container.
-            containers=[
-                Container(
-                    name="traefik",
-                    # we need to set can_connect=False for now because I didn't write
-                    # yet the mocking code for the other pebble interactions yet.
-                    # So if the charm tries to get_services, get_plan,
-                    # push, pull etc..., there will be errors.
-                    # Can implement this tomorrow so you can proceed.
-                    can_connect=False,
-                )
-            ],
-        ),
-        "start",
-        TraefikIngressCharm,
+    state = State(
+        # ATM scenario can't use the defaults specified in config.yaml,
+        # so we need to provide ourselves the values
+        # of each config option
+        config={"routing_mode": "path"},
+        # you need to specify which containers are present, otherwise
+        # the charm will raise exceptions when
+        # assuming that there is a "traefik" container.
+        containers=[
+            Container(
+                name="traefik",
+                # we need to set can_connect=False for now because I didn't write
+                # yet the mocking code for the other pebble interactions yet.
+                # So if the charm tries to get_services, get_plan,
+                # push, pull etc..., there will be errors.
+                # Can implement this tomorrow so you can proceed.
+                can_connect=False,
+            )
+        ],
     )
-
+    out = Context(charm_type=TraefikIngressCharm).run("start", state)
     assert out.status.unit == ("waiting", f"waiting for service: '{_TRAEFIK_SERVICE_NAME}'")
 
 
@@ -53,14 +48,11 @@ def test_start_traefik_is_not_running(*_):
 @patch("lightkube.core.client.GenericSyncClient")
 @patch("charm.TraefikIngressCharm.external_host", PropertyMock(return_value=False))
 def test_start_traefik_no_hostname(*_):
-    out = trigger(
-        State(
-            config={"routing_mode": "path"},
-            containers=[Container(name="traefik", can_connect=False)],
-        ),
-        "start",
-        TraefikIngressCharm,
+    state = State(
+        config={"routing_mode": "path"},
+        containers=[Container(name="traefik", can_connect=False)],
     )
+    out = Context(charm_type=TraefikIngressCharm).run("start", state)
     assert out.status.unit == ("waiting", "gateway address unavailable")
 
 
@@ -70,15 +62,11 @@ def test_start_traefik_no_hostname(*_):
 @patch("charm.TraefikIngressCharm._traefik_service_running", PropertyMock(return_value=True))
 @patch("charm.TraefikIngressCharm._tcp_entrypoints_changed", MagicMock(return_value=False))
 def test_start_traefik_active(*_):
-    out = trigger(
-        State(
-            config={"routing_mode": "path"},
-            containers=[Container(name="traefik", can_connect=False)],
-        ),
-        "start",
-        TraefikIngressCharm,
+    state = State(
+        config={"routing_mode": "path"},
+        containers=[Container(name="traefik", can_connect=False)],
     )
-
+    out = Context(charm_type=TraefikIngressCharm).run("start", state)
     assert out.status.unit == ("active", "")
 
 
@@ -86,12 +74,9 @@ def test_start_traefik_active(*_):
 @patch("lightkube.core.client.GenericSyncClient")
 @patch("charm.TraefikIngressCharm.external_host", PropertyMock(return_value=False))
 def test_start_traefik_invalid_routing_mode(*_):
-    out = trigger(
-        State(
-            config={"routing_mode": "invalid_routing"},
-            containers=[Container(name="traefik", can_connect=False)],
-        ),
-        "start",
-        TraefikIngressCharm,
+    state = State(
+        config={"routing_mode": "invalid_routing"},
+        containers=[Container(name="traefik", can_connect=False)],
     )
+    out = Context(charm_type=TraefikIngressCharm).run("start", state)
     assert out.status.unit == ("blocked", "invalid routing mode: invalid_routing; see logs.")

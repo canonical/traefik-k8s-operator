@@ -5,8 +5,7 @@ import unittest
 from unittest.mock import MagicMock, PropertyMock, patch
 
 from charm import TraefikIngressCharm
-from scenario import Container, State
-from scenario.runtime import trigger
+from scenario import Container, Context, State
 
 
 @patch("charm.KubernetesServicePatch")
@@ -23,7 +22,7 @@ class TestUnitStatus(unittest.TestCase):
     def test_start_traefik_is_not_running(self, *_):
         # GIVEN external host is set (see decorator)
         # WHEN a `start` hook fires
-        out = trigger(self.state, "start", TraefikIngressCharm)
+        out = Context(charm_type=TraefikIngressCharm).run("start", self.state)
 
         # THEN unit status is `waiting`
         self.assertEqual(out.status.unit, ("waiting", "waiting for service: 'traefik'"))
@@ -32,7 +31,7 @@ class TestUnitStatus(unittest.TestCase):
     def test_start_traefik_no_hostname(self, *_):
         # GIVEN external host is not set (see decorator)
         # WHEN a `start` hook fires
-        out = trigger(self.state, "start", TraefikIngressCharm)
+        out = Context(charm_type=TraefikIngressCharm).run("start", self.state)
 
         # THEN unit status is `waiting`
         self.assertEqual(out.status.unit, ("waiting", "gateway address unavailable"))
@@ -43,7 +42,7 @@ class TestUnitStatus(unittest.TestCase):
     def test_start_traefik_active(self, *_):
         # GIVEN external host is set (see decorator), plus additional mockery
         # WHEN a `start` hook fires
-        out = trigger(self.state, "start", TraefikIngressCharm)
+        out = Context(charm_type=TraefikIngressCharm).run("start", self.state)
 
         # THEN unit status is `active`
         self.assertEqual(out.status.unit, ("active", ""))
@@ -58,7 +57,7 @@ class TestUnitStatus(unittest.TestCase):
         )
 
         # WHEN a `start` hook fires
-        out = trigger(state, "start", TraefikIngressCharm)
+        out = Context(charm_type=TraefikIngressCharm).run("start", state)
 
         # THEN unit status is `blocked`
         self.assertEqual(
