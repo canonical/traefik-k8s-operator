@@ -8,13 +8,11 @@ from unittest.mock import Mock, patch
 
 import ops.testing
 import yaml
+from charm import _STATIC_CONFIG_PATH, TraefikIngressCharm
 from ops.charm import ActionEvent
-from ops.model import (ActiveStatus, Application, BlockedStatus, Relation,
-                       WaitingStatus)
+from ops.model import ActiveStatus, Application, BlockedStatus, Relation, WaitingStatus
 from ops.pebble import PathError
 from ops.testing import Harness
-
-from charm import _STATIC_CONFIG_PATH, TraefikIngressCharm
 
 ops.testing.SIMULATE_CAN_CONNECT = True
 
