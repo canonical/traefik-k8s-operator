@@ -18,18 +18,19 @@ class TestWorkloadVersion(unittest.TestCase):
             config={"routing_mode": "path"},
             containers=self.containers,
         )
+        self.context = Context(charm_type=TraefikIngressCharm)
 
     @patch("charm.TraefikIngressCharm.external_host", PropertyMock(return_value="foo.bar"))
     @patch("charm.TraefikIngressCharm._traefik_service_running", PropertyMock(return_value=True))
     @patch("charm.TraefikIngressCharm.version", PropertyMock(return_value="1.2.3"))
     def test_workload_version_is_set_on_update_status(self, *_):
         # GIVEN an initial state without the workload version set
-        out = Context(charm_type=TraefikIngressCharm).run("start", self.state)
+        out = self.context.run("start", self.state)
         self.assertEqual(out.status.unit, ActiveStatus(""))
         self.assertEqual(out.status.workload_version, "")
 
         # WHEN update-status is triggered
-        out = Context(charm_type=TraefikIngressCharm).run("update-status", out)
+        out = self.context.run("update-status", out)
 
         # THEN the workload version is set
         self.assertEqual(out.status.workload_version, "1.2.3")
@@ -40,12 +41,12 @@ class TestWorkloadVersion(unittest.TestCase):
     def test_workload_version_clears_on_stop(self, *_):
         # GIVEN a state after update-status (which we know sets the workload version)
         # GIVEN an initial state with the workload version set
-        out = Context(charm_type=TraefikIngressCharm).run("update-status", self.state)
+        out = self.context.run("update-status", self.state)
         self.assertEqual(out.status.unit, ActiveStatus(""))
         self.assertEqual(out.status.workload_version, "1.2.3")
 
         # WHEN the charm is stopped
-        out = Context(charm_type=TraefikIngressCharm).run("stop", out)
+        out = self.context.run("stop", out)
 
         # THEN workload version is cleared
         self.assertEqual(out.status.workload_version, "")
