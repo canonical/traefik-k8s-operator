@@ -5,6 +5,7 @@ import pytest
 from charms.traefik_k8s.v1.ingress_per_unit import IngressPerUnitProvider
 from ops.charm import CharmBase
 from scenario import Model, Relation, State
+from scenario.runtime import trigger
 from scenario.sequences import check_builtin_sequences
 
 
@@ -117,7 +118,7 @@ def test_ingress_unit_provider_related_is_ready(leader, event_name, ipu_empty, m
     else:
         event = event_name
 
-    state.trigger(event=event, charm_type=MockProviderCharm, meta=MockProviderCharm.META)
+    trigger(state, event=event, charm_type=MockProviderCharm, meta=MockProviderCharm.META)
 
     # todo: write assertions for ready and remote-data
 
@@ -137,7 +138,8 @@ def test_ingress_unit_provider_request_response(port, host, leader, url, ipu_emp
     ipu_remote_provided = ipu_empty.replace(remote_units_data={0: mock_data})
     state = State(model=model, relations=[ipu_remote_provided], leader=leader)
 
-    state.trigger(
+    trigger(
+        state,
         event=ipu_remote_provided.changed_event,
         charm_type=MockProviderCharm,
         meta=MockProviderCharm.META,

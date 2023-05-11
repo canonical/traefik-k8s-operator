@@ -187,6 +187,9 @@ class TestTraefikIngressCharm(unittest.TestCase):
                     expected["http"]["routers"]["juju-test-model-remote-0-router"].update(
                         {"middlewares": ["juju-sidecar-noprefix-test-model-remote-0"]},
                     )
+                    expected["http"]["routers"]["juju-test-model-remote-0-router-tls"].update(
+                        {"middlewares": ["juju-sidecar-noprefix-test-model-remote-0"]},
+                    )
 
                 self.assertEqual(conf, expected)
 
@@ -265,6 +268,9 @@ class TestTraefikIngressCharm(unittest.TestCase):
                 if strip_prefix:
                     expected["http"].update(middlewares)
                     expected["http"]["routers"]["juju-test-model-remote-0-router"].update(
+                        {"middlewares": ["juju-sidecar-noprefix-test-model-remote-0"]},
+                    )
+                    expected["http"]["routers"]["juju-test-model-remote-0-router-tls"].update(
                         {"middlewares": ["juju-sidecar-noprefix-test-model-remote-0"]},
                     )
 

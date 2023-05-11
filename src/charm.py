@@ -31,10 +31,7 @@ from charms.tls_certificates_interface.v2.tls_certificates import (
     generate_private_key,
 )
 from charms.traefik_k8s.v1.ingress import IngressPerAppProvider
-from charms.traefik_k8s.v1.ingress_per_unit import (
-    DataValidationError,
-    IngressPerUnitProvider,
-)
+from charms.traefik_k8s.v1.ingress_per_unit import DataValidationError, IngressPerUnitProvider
 from charms.traefik_route_k8s.v0.traefik_route import (
     TraefikRouteProvider,
     TraefikRouteRequirerReadyEvent,
@@ -55,13 +52,7 @@ from ops.charm import (
 )
 from ops.framework import StoredState
 from ops.main import main
-from ops.model import (
-    ActiveStatus,
-    BlockedStatus,
-    MaintenanceStatus,
-    Relation,
-    WaitingStatus,
-)
+from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, Relation, WaitingStatus
 from ops.pebble import APIError, PathError
 
 if typing.TYPE_CHECKING:
@@ -808,6 +799,9 @@ class TraefikIngressCharm(CharmBase):
         if middlewares:
             config["http"]["middlewares"] = middlewares
             router_cfg[traefik_router_name]["middlewares"] = list(middlewares.keys())
+
+            if f"{traefik_router_name}-tls" in router_cfg:
+                router_cfg[f"{traefik_router_name}-tls"]["middlewares"] = list(middlewares.keys())
 
         return config, url
 
