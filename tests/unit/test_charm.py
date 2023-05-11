@@ -34,6 +34,7 @@ def _requirer_provide_ingress_requirements(
     host=socket.getfqdn(),
     mode="http",
     strip_prefix: bool = False,
+    redirect_https: bool = False,
     per_app_relation: bool = False,
 ):
     # same as requirer.provide_ingress_requirements(port=port, host=host)s
@@ -47,6 +48,9 @@ def _requirer_provide_ingress_requirements(
 
     if strip_prefix:
         data["strip-prefix"] = "true"
+
+    if redirect_https:
+        data["redirect-https"] = "true"
 
     harness.update_relation_data(
         relation.id,
@@ -127,14 +131,15 @@ class TestTraefikIngressCharm(unittest.TestCase):
         self.assertEqual(self.harness.charm.unit.status, ActiveStatus())
 
         relation = relate(self.harness)
-        for strip_prefix in (False, True):
+        for inject_middleware in (False, True):
             with self.subTest():
                 _requirer_provide_ingress_requirements(
                     harness=self.harness,
                     relation=relation,
                     host="10.1.10.1",
                     port=9000,
-                    strip_prefix=strip_prefix,
+                    strip_prefix=inject_middleware,
+                    redirect_https=inject_middleware,
                 )
 
                 traefik_container = self.harness.charm.unit.get_container("traefik")
@@ -147,7 +152,8 @@ class TestTraefikIngressCharm(unittest.TestCase):
                             "stripPrefix": {
                                 "prefixes": ["/test-model-remote-0"],
                                 "forceSlash": False,
-                            }
+                            },
+                            "redirectScheme": {"scheme": "https", "port": 443, "permanent": True},
                         }
                     }
                 }
@@ -182,7 +188,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
                     }
                 }
 
-                if strip_prefix:
+                if inject_middleware:
                     expected["http"].update(middlewares)
                     expected["http"]["routers"]["juju-test-model-remote-0-router"].update(
                         {"middlewares": ["juju-sidecar-noprefix-test-model-remote-0"]},
@@ -191,6 +197,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
                         {"middlewares": ["juju-sidecar-noprefix-test-model-remote-0"]},
                     )
 
+                self.maxDiff = None
                 self.assertEqual(conf, expected)
 
                 self.assertEqual(
@@ -210,14 +217,15 @@ class TestTraefikIngressCharm(unittest.TestCase):
         self.assertEqual(self.harness.charm.unit.status, ActiveStatus())
 
         relation = relate(self.harness, per_app_relation=True)
-        for strip_prefix in (False, True):
+        for inject_middleware in (False, True):
             with self.subTest():
                 _requirer_provide_ingress_requirements(
                     harness=self.harness,
                     relation=relation,
                     host="foo.bar",
                     port=3000,
-                    strip_prefix=strip_prefix,
+                    strip_prefix=inject_middleware,
+                    redirect_https=inject_middleware,
                     per_app_relation=True,
                 )
 
@@ -231,7 +239,8 @@ class TestTraefikIngressCharm(unittest.TestCase):
                             "stripPrefix": {
                                 "prefixes": ["/test-model-remote-0"],
                                 "forceSlash": False,
-                            }
+                            },
+                            "redirectScheme": {"scheme": "https", "port": 443, "permanent": True},
                         }
                     }
                 }
@@ -265,7 +274,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
                         },
                     }
                 }
-                if strip_prefix:
+                if inject_middleware:
                     expected["http"].update(middlewares)
                     expected["http"]["routers"]["juju-test-model-remote-0-router"].update(
                         {"middlewares": ["juju-sidecar-noprefix-test-model-remote-0"]},
@@ -297,7 +306,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
         self.assertEqual(self.harness.charm.unit.status, ActiveStatus())
 
         relation = relate(self.harness, per_app_relation=True)
-        for strip_prefix in (False, True):
+        for inject_middleware in (False, True):
             # in subdomain routing mode this should not have any effect
             with self.subTest():
                 _requirer_provide_ingress_requirements(
@@ -305,7 +314,8 @@ class TestTraefikIngressCharm(unittest.TestCase):
                     relation=relation,
                     host="foo.bar",
                     port=3000,
-                    strip_prefix=strip_prefix,
+                    strip_prefix=inject_middleware,
+                    redirect_https=inject_middleware,
                     per_app_relation=True,
                 )
 
@@ -342,6 +352,28 @@ class TestTraefikIngressCharm(unittest.TestCase):
                         },
                     }
                 }
+
+                if inject_middleware:
+                    middlewares = {
+                        "middlewares": {
+                            "juju-sidecar-noprefix-test-model-remote-0": {
+                                "redirectScheme": {
+                                    "scheme": "https",
+                                    "port": 443,
+                                    "permanent": True,
+                                },
+                            }
+                        }
+                    }
+
+                    expected["http"].update(middlewares)
+                    expected["http"]["routers"]["juju-test-model-remote-0-router"].update(
+                        {"middlewares": ["juju-sidecar-noprefix-test-model-remote-0"]},
+                    )
+                    expected["http"]["routers"]["juju-test-model-remote-0-router-tls"].update(
+                        {"middlewares": ["juju-sidecar-noprefix-test-model-remote-0"]},
+                    )
+
                 self.assertEqual(conf, expected)
 
                 self.assertEqual(
@@ -369,7 +401,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
         self.assertEqual(self.harness.charm.unit.status, ActiveStatus())
 
         relation = relate(self.harness)
-        for strip_prefix in (False, True):
+        for inject_middleware in (False, True):
             # in subdomain routing mode this should not have any effect
             with self.subTest():
                 _requirer_provide_ingress_requirements(
@@ -377,7 +409,8 @@ class TestTraefikIngressCharm(unittest.TestCase):
                     relation=relation,
                     host="10.1.10.1",
                     port=9000,
-                    strip_prefix=strip_prefix,
+                    strip_prefix=inject_middleware,
+                    redirect_https=inject_middleware,
                 )
 
                 traefik_container = self.harness.charm.unit.get_container("traefik")
@@ -413,6 +446,27 @@ class TestTraefikIngressCharm(unittest.TestCase):
                         },
                     }
                 }
+                if inject_middleware:
+                    middlewares = {
+                        "middlewares": {
+                            "juju-sidecar-noprefix-test-model-remote-0": {
+                                "redirectScheme": {
+                                    "scheme": "https",
+                                    "port": 443,
+                                    "permanent": True,
+                                },
+                            }
+                        }
+                    }
+
+                    expected["http"].update(middlewares)
+                    expected["http"]["routers"]["juju-test-model-remote-0-router"].update(
+                        {"middlewares": ["juju-sidecar-noprefix-test-model-remote-0"]},
+                    )
+                    expected["http"]["routers"]["juju-test-model-remote-0-router-tls"].update(
+                        {"middlewares": ["juju-sidecar-noprefix-test-model-remote-0"]},
+                    )
+
                 self.assertEqual(conf, expected)
 
                 self.assertEqual(
@@ -444,7 +498,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
         self.assertEqual(self.harness.charm.unit.status, ActiveStatus())
 
         relation = relate(self.harness)
-        for strip_prefix in (False, True):
+        for inject_middleware in (False, True):
             # in subdomain routing mode this should not have any effect
             with self.subTest():
                 _requirer_provide_ingress_requirements(
@@ -452,7 +506,8 @@ class TestTraefikIngressCharm(unittest.TestCase):
                     relation=relation,
                     host="10.1.10.1",
                     port=9000,
-                    strip_prefix=strip_prefix,
+                    strip_prefix=inject_middleware,
+                    redirect_https=inject_middleware,
                 )
 
             traefik_container = self.harness.charm.unit.get_container("traefik")
@@ -488,6 +543,27 @@ class TestTraefikIngressCharm(unittest.TestCase):
                     },
                 }
             }
+
+            if inject_middleware:
+                middlewares = {
+                    "middlewares": {
+                        "juju-sidecar-noprefix-test-model-remote-0": {
+                            "redirectScheme": {
+                                "scheme": "https",
+                                "port": 443,
+                                "permanent": True,
+                            },
+                        }
+                    }
+                }
+
+                expected["http"].update(middlewares)
+                expected["http"]["routers"]["juju-test-model-remote-0-router"].update(
+                    {"middlewares": ["juju-sidecar-noprefix-test-model-remote-0"]},
+                )
+                expected["http"]["routers"]["juju-test-model-remote-0-router-tls"].update(
+                    {"middlewares": ["juju-sidecar-noprefix-test-model-remote-0"]},
+                )
 
             self.assertEqual(conf, expected)
 

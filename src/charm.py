@@ -709,14 +709,17 @@ class TraefikIngressCharm(CharmBase):
     def _generate_middleware_config(
         self, data: Union["RequirerData_IPA", "RequirerData_IPU"], prefix: str
     ) -> dict:
-        """Generate a stripPrefix middleware for path based routing."""
-        if self._routing_mode is _RoutingMode.path and data.get("strip-prefix", False):
-            return {
-                f"juju-sidecar-noprefix-{prefix}": {
-                    "stripPrefix": {"prefixes": [f"/{prefix}"], "forceSlash": False}
-                }
-            }
+        """Generate a middleware config."""
+        config = {}  # type: Dict[str, Dict[str, Any]]
+        if self._routing_mode is _RoutingMode.path:
+            if data.get("strip-prefix", False):
+                config.update({"stripPrefix": {"prefixes": [f"/{prefix}"], "forceSlash": False}})
 
+        if data.get("redirect-https", False):
+            config.update({"redirectScheme": {"scheme": "https", "port": 443, "permanent": True}})
+
+        if config:
+            return {f"juju-sidecar-noprefix-{prefix}": config}
         return {}
 
     def _generate_per_unit_config(self, data: "RequirerData_IPU") -> Tuple[dict, str]:
