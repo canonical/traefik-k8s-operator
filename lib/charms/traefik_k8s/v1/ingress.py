@@ -429,7 +429,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         host: Optional[str] = None,
         port: Optional[int] = None,
         strip_prefix: bool = False,
-        redirect_https: Optional[str] = None,
+        redirect_https: bool = False,
     ):
         """Constructor for IngressRequirer.
 
