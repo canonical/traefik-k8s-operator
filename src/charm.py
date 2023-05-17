@@ -30,6 +30,7 @@ from charms.tls_certificates_interface.v2.tls_certificates import (
     generate_csr,
     generate_private_key,
 )
+from charms.traefik_k8s.v0.ingress_per_leader import IngressPerLeaderProvider
 from charms.traefik_k8s.v1.ingress import IngressPerAppProvider
 from charms.traefik_k8s.v1.ingress_per_unit import DataValidationError, IngressPerUnitProvider
 from charms.traefik_route_k8s.v0.traefik_route import (
@@ -83,6 +84,7 @@ class _RoutingMode(enum.Enum):
 class _IngressRelationType(enum.Enum):
     per_app = "per_app"
     per_unit = "per_unit"
+    per_leader = "per_leader"
     routed = "routed"
 
 
@@ -124,6 +126,7 @@ class TraefikIngressCharm(CharmBase):
         # stored.tcp_entrypoints would be used for this list instead, but it's never accessed.
         # intentional or can it be used so we don't need to worry about ordering?
         self.ingress_per_app = IngressPerAppProvider(charm=self)
+        self.ingress_per_leader = IngressPerLeaderProvider(charm=self)
         self.ingress_per_unit = IngressPerUnitProvider(charm=self)
         self.traefik_route = TraefikRouteProvider(charm=self, external_host=self.external_host)
 
@@ -139,6 +142,8 @@ class TraefikIngressCharm(CharmBase):
                 self.ingress_per_app.on.data_removed,
                 self.ingress_per_unit.on.data_provided,
                 self.ingress_per_unit.on.data_removed,
+                self.ingress_per_leader.on.data_provided,
+                self.ingress_per_leader.on.data_removed,
                 self.traefik_route.on.ready,
                 self.traefik_route.on.data_removed,
             ],
@@ -193,13 +198,10 @@ class TraefikIngressCharm(CharmBase):
         observe(self.on.update_status, self._on_update_status)
         observe(self.on.config_changed, self._on_config_changed)
 
-        ipa_events = self.ingress_per_app.on
-        observe(ipa_events.data_provided, self._handle_ingress_data_provided)
-        observe(ipa_events.data_removed, self._handle_ingress_data_removed)
-
-        ipu_events = self.ingress_per_unit.on
-        observe(ipu_events.data_provided, self._handle_ingress_data_provided)
-        observe(ipu_events.data_removed, self._handle_ingress_data_removed)
+        # observe data_provided and data_removed events for all types of ingress we offer:
+        for ingress_per in (self.ingress_per_leader, self.ingress_per_unit, self.ingress_per_app):
+            observe(ingress_per.on.data_provided, self._handle_ingress_data_provided)
+            observe(ingress_per.on.data_removed, self._handle_ingress_data_removed)
 
         route_events = self.traefik_route.on
         observe(route_events.ready, self._handle_traefik_route_ready)
@@ -909,9 +911,11 @@ class TraefikIngressCharm(CharmBase):
             return self.ingress_per_app
         if relation_type is _IngressRelationType.per_unit:
             return self.ingress_per_unit
+        if relation_type is _IngressRelationType.per_leader:
+            return self.ingress_per_leader
         if relation_type is _IngressRelationType.routed:
             return self.traefik_route
-        raise RuntimeError("Invalid relation type (shouldn't happen)")
+        raise RuntimeError(f"Invalid relation type: {relation_type} ({relation.name})")
 
     @property
     def external_host(self):
@@ -1009,6 +1013,8 @@ def _get_relation_type(relation: Relation) -> _IngressRelationType:
         return _IngressRelationType.per_app
     if relation.name == "ingress-per-unit":
         return _IngressRelationType.per_unit
+    if relation.name == "ingress-per-leader":
+        return _IngressRelationType.per_leader
     if relation.name == "traefik-route":
         return _IngressRelationType.routed
     raise RuntimeError("Invalid relation name (shouldn't happen)")

@@ -10,10 +10,8 @@ from scenario import Container, State
 from scenario.runtime import trigger
 
 
-@patch("charm.KubernetesServicePatch")
-@patch("lightkube.core.client.GenericSyncClient")
 @patch("charm.TraefikIngressCharm.external_host", PropertyMock(return_value="foo.bar"))
-def test_start_traefik_is_not_running(*_):
+def test_start_traefik_is_not_running(*_, traefik_charm):
     #
     # equivalent to:
     # META = yaml.safe_load((Path(__file__).parent.parent.parent / "metadata.yaml").read_text())
@@ -43,55 +41,49 @@ def test_start_traefik_is_not_running(*_):
             ],
         ),
         "start",
-        TraefikIngressCharm,
+        traefik_charm,
     )
 
     assert out.status.unit == ("waiting", f"waiting for service: '{_TRAEFIK_SERVICE_NAME}'")
 
 
-@patch("charm.KubernetesServicePatch")
-@patch("lightkube.core.client.GenericSyncClient")
 @patch("charm.TraefikIngressCharm.external_host", PropertyMock(return_value=False))
-def test_start_traefik_no_hostname(*_):
+def test_start_traefik_no_hostname(*_, traefik_charm):
     out = trigger(
         State(
             config={"routing_mode": "path"},
             containers=[Container(name="traefik", can_connect=False)],
         ),
         "start",
-        TraefikIngressCharm,
+        traefik_charm,
     )
     assert out.status.unit == ("waiting", "gateway address unavailable")
 
 
-@patch("charm.KubernetesServicePatch")
-@patch("lightkube.core.client.GenericSyncClient")
 @patch("charm.TraefikIngressCharm.external_host", PropertyMock(return_value="foo.bar"))
 @patch("charm.TraefikIngressCharm._traefik_service_running", PropertyMock(return_value=True))
 @patch("charm.TraefikIngressCharm._tcp_entrypoints_changed", MagicMock(return_value=False))
-def test_start_traefik_active(*_):
+def test_start_traefik_active(*_, traefik_charm):
     out = trigger(
         State(
             config={"routing_mode": "path"},
             containers=[Container(name="traefik", can_connect=False)],
         ),
         "start",
-        TraefikIngressCharm,
+        traefik_charm,
     )
 
     assert out.status.unit == ("active", "")
 
 
-@patch("charm.KubernetesServicePatch")
-@patch("lightkube.core.client.GenericSyncClient")
 @patch("charm.TraefikIngressCharm.external_host", PropertyMock(return_value=False))
-def test_start_traefik_invalid_routing_mode(*_):
+def test_start_traefik_invalid_routing_mode(*_, traefik_charm):
     out = trigger(
         State(
             config={"routing_mode": "invalid_routing"},
             containers=[Container(name="traefik", can_connect=False)],
         ),
         "start",
-        TraefikIngressCharm,
+        traefik_charm,
     )
     assert out.status.unit == ("blocked", "invalid routing mode: invalid_routing; see logs.")

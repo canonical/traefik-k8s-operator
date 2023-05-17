@@ -5,7 +5,8 @@ r"""# Interface Library for ingress.
 
 This library wraps relation endpoints using the `ingress` interface
 and provides a Python API for both requesting and providing per-application
-ingress, with load-balancing occurring across all traefik units.
+ingress, without load balancing across Traefik units: all traffic is routed
+through the leader instead.
 
 ## Getting Started
 
@@ -28,26 +29,26 @@ requires:
 Then, to initialise the library:
 
 ```python
-from charms.traefik_k8s.v1.ingress import (IngressPerAppRequirer,
-  IngressPerAppReadyEvent, IngressPerAppRevokedEvent)
+from charms.traefik_k8s.v1.ingress import (IngressPerLeaderRequirer,
+  IngressPerLeaderReadyEvent, IngressPerLeaderRevokedEvent)
 
 class SomeCharm(CharmBase):
   def __init__(self, *args):
     # ...
-    self.ingress = IngressPerAppRequirer(self, port=80)
+    self.ingress_per_leader = IngressPerLeaderRequirer(self, port=80)
     # The following event is triggered when the ingress URL to be used
     # by this deployment of the `SomeCharm` is ready (or changes).
     self.framework.observe(
-        self.ingress.on.ready, self._on_ingress_ready
+        self.ingress_per_leader.on.ready, self._on_ingress_per_leader_ready
     )
     self.framework.observe(
-        self.ingress.on.revoked, self._on_ingress_revoked
+        self.ingress_per_leader.on.revoked, self._on_ingress_per_leader_revoked
     )
 
-    def _on_ingress_ready(self, event: IngressPerAppReadyEvent):
+    def _on_ingress_per_leader_ready(self, event: IngressPerLeaderReadyEvent):
         logger.info("This app's ingress URL: %s", event.url)
 
-    def _on_ingress_revoked(self, event: IngressPerAppRevokedEvent):
+    def _on_ingress_per_leader_revoked(self, event: IngressPerLeaderRevokedEvent):
         logger.info("This app no longer has ingress")
 """
 
@@ -62,17 +63,17 @@ from ops.framework import EventSource, Object, ObjectEvents, StoredState
 from ops.model import ModelError, Relation
 
 # The unique Charmhub library identifier, never change it
-LIBID = "e6de2a5cd5b34422a204668f3b8f90d2"
+LIBID = "2d82215fac204344af5915cc4b0296a6"
 
 # Increment this major API version when introducing breaking changes
-LIBAPI = 1
+LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 14
+LIBPATCH = 1
 
-DEFAULT_RELATION_NAME = "ingress"
-RELATION_INTERFACE = "ingress"
+DEFAULT_RELATION_NAME = "ingress-per-leader"
+RELATION_INTERFACE = "ingress_per_leader"
 
 log = logging.getLogger(__name__)
 
@@ -144,7 +145,7 @@ class DataValidationError(RuntimeError):
     """Raised when data validation fails on IPU relation data."""
 
 
-class _IngressPerAppBase(Object):
+class _IngressPerLeaderBase(Object):
     """Base class for IngressPerUnit interface classes."""
 
     def __init__(self, charm: CharmBase, relation_name: str = DEFAULT_RELATION_NAME):
@@ -223,7 +224,7 @@ class _IPAEvent(RelationEvent):
             setattr(self, attr, obj)
 
 
-class IngressPerAppDataProvidedEvent(_IPAEvent):
+class IngressPerLeaderDataProvidedEvent(_IPAEvent):
     """Event representing that ingress data has been provided for an app."""
 
     __args__ = ("name", "model", "port", "host", "strip_prefix")
@@ -236,24 +237,24 @@ class IngressPerAppDataProvidedEvent(_IPAEvent):
         strip_prefix: bool = False
 
 
-class IngressPerAppDataRemovedEvent(RelationEvent):
+class IngressPerLeaderDataRemovedEvent(RelationEvent):
     """Event representing that ingress data has been removed for an app."""
 
 
-class IngressPerAppProviderEvents(ObjectEvents):
+class IngressPerLeaderProviderEvents(ObjectEvents):
     """Container for IPA Provider events."""
 
-    data_provided = EventSource(IngressPerAppDataProvidedEvent)
-    data_removed = EventSource(IngressPerAppDataRemovedEvent)
+    data_provided = EventSource(IngressPerLeaderDataProvidedEvent)
+    data_removed = EventSource(IngressPerLeaderDataRemovedEvent)
 
 
-class IngressPerAppProvider(_IngressPerAppBase):
+class IngressPerLeaderProvider(_IngressPerLeaderBase):
     """Implementation of the provider of ingress."""
 
-    on = IngressPerAppProviderEvents()  # type: ignore
+    on = IngressPerLeaderProviderEvents()  # type: ignore
 
     def __init__(self, charm: CharmBase, relation_name: str = DEFAULT_RELATION_NAME):
-        """Constructor for IngressPerAppProvider.
+        """Constructor for IngressPerLeaderProvider.
 
         Args:
             charm: The charm that is instantiating the instance.
@@ -357,9 +358,9 @@ class IngressPerAppProvider(_IngressPerAppBase):
 
     @property
     def proxied_endpoints(self):
-        """Returns the ingress settings provided to applications by this IngressPerAppProvider.
+        """Returns the ingress settings provided to applications by this IngressPerLeaderProvider.
 
-        For example, when this IngressPerAppProvider has provided the
+        For example, when this IngressPerLeaderProvider has provided the
         `http://foo.bar/my-model.my-app` URL to the my-app application, the returned dictionary
         will be:
 
@@ -382,7 +383,7 @@ class IngressPerAppProvider(_IngressPerAppBase):
         return results
 
 
-class IngressPerAppReadyEvent(_IPAEvent):
+class IngressPerLeaderReadyEvent(_IPAEvent):
     """Event representing that ingress for an app is ready."""
 
     __args__ = ("url",)
@@ -390,21 +391,21 @@ class IngressPerAppReadyEvent(_IPAEvent):
         url: Optional[str] = None
 
 
-class IngressPerAppRevokedEvent(RelationEvent):
+class IngressPerLeaderRevokedEvent(RelationEvent):
     """Event representing that ingress for an app has been revoked."""
 
 
-class IngressPerAppRequirerEvents(ObjectEvents):
+class IngressPerLeaderRequirerEvents(ObjectEvents):
     """Container for IPA Requirer events."""
 
-    ready = EventSource(IngressPerAppReadyEvent)
-    revoked = EventSource(IngressPerAppRevokedEvent)
+    ready = EventSource(IngressPerLeaderReadyEvent)
+    revoked = EventSource(IngressPerLeaderRevokedEvent)
 
 
-class IngressPerAppRequirer(_IngressPerAppBase):
+class IngressPerLeaderRequirer(_IngressPerLeaderBase):
     """Implementation of the requirer of the ingress relation."""
 
-    on = IngressPerAppRequirerEvents()  # type: ignore
+    on = IngressPerLeaderRequirerEvents()  # type: ignore
 
     # used to prevent spurious urls to be sent out if the event we're currently
     # handling is a relation-broken one.
@@ -505,6 +506,8 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         assert self.relation, "no relation"
 
         if not host:
+            # use the local fqdn as hostname; since only the leader unit gets to call this method,
+            # this is effectively the traefik leader hostname for all related apps.
             host = socket.getfqdn()
 
         data = {
