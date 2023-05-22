@@ -54,7 +54,7 @@ class SomeCharm(CharmBase):
 import logging
 import socket
 import typing
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import Any, Dict, Optional, Tuple, Union, List, Sequence
 
 import yaml
 from ops.charm import CharmBase, RelationBrokenEvent, RelationEvent
@@ -95,11 +95,17 @@ INGRESS_REQUIRES_APP_SCHEMA = {
     "properties": {
         "model": {"type": "string"},
         "name": {"type": "string"},
-        "host": {"type": "string"},
-        "port": {"type": "string"},
         "strip-prefix": {"type": "string"},
     },
-    "required": ["model", "name", "host", "port"],
+    "required": ["model", "name"],
+}
+INGRESS_REQUIRES_UNIT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "host": {"type": "string"},
+        "port": {"type": "integer"},
+    },
+    "required": ["host", "port"],
 }
 
 INGRESS_PROVIDES_APP_SCHEMA = {
@@ -115,12 +121,14 @@ try:
 except ImportError:
     from typing_extensions import TypedDict  # py35 compat
 
-# Model of the data a unit implementing the requirer will need to provide.
-RequirerData = TypedDict(
-    "RequirerData",
-    {"model": str, "name": str, "host": str, "port": int, "strip-prefix": bool},
+# Model of the application data the requirer will need to provide.
+RequirerLeaderData = TypedDict(
+    "RequirerLeaderData",
+    {"model": str, "name": str, "strip-prefix": bool},
     total=False,
 )
+# Model of the data each requirer unit will need to provide.
+RequirerFollowerData = TypedDict("RequirerFollowerData", {"host": str, "port": int})
 # Provider ingress data model.
 ProviderIngressData = TypedDict("ProviderIngressData", {"url": str})
 # Provider application databag model.
@@ -226,13 +234,13 @@ class _IPAEvent(RelationEvent):
 class IngressPerAppDataProvidedEvent(_IPAEvent):
     """Event representing that ingress data has been provided for an app."""
 
-    __args__ = ("name", "model", "port", "host", "strip_prefix")
+    __args__ = ("name", "model", "hosts", "strip_prefix")
 
     if typing.TYPE_CHECKING:
         name: Optional[str] = None
         model: Optional[str] = None
-        port: Optional[str] = None
-        host: Optional[str] = None
+        # sequence of hostname, port pairs
+        hosts: Sequence[RequirerFollowerData] = None
         strip_prefix: bool = False
 
 
@@ -266,14 +274,13 @@ class IngressPerAppProvider(_IngressPerAppBase):
         # created, joined or changed: if remote side has sent the required data:
         # notify listeners.
         if self.is_ready(event.relation):
-            data = self._get_requirer_data(event.relation)
+            leader_data, followers_data = self._get_requirer_data(event.relation)
             self.on.data_provided.emit(  # type: ignore
                 event.relation,
-                data["name"],
-                data["model"],
-                data["port"],
-                data["host"],
-                data.get("strip-prefix", False),
+                leader_data["name"],
+                leader_data["model"],
+                followers_data,
+                leader_data.get("strip-prefix", False),
             )
 
     def _handle_relation_broken(self, event):
@@ -293,7 +300,40 @@ class IngressPerAppProvider(_IngressPerAppBase):
             return
         del relation.data[self.app]["ingress"]
 
-    def _get_requirer_data(self, relation: Relation) -> RequirerData:  # type: ignore
+    def _get_requirer_followers_data(self, relation: Relation) -> List[RequirerFollowerData]:  # type: ignore
+        """Fetch and validate the requirer's app databag.
+
+        We cast port to int for convenience.
+        """
+        out: List[RequirerFollowerData] = []
+
+        for unit in relation.units:
+            databag = relation.data[unit]
+            remote_unit_data: Dict[str, Union[int, str]] = {}
+            for key in ("host", "port"):
+                remote_unit_data[key] = databag.get(key)
+            remote_unit_data["port"] = (
+                int(remote_unit_data["port"]) if remote_unit_data["port"] else None
+            )
+            _validate_data(remote_unit_data, INGRESS_REQUIRES_UNIT_SCHEMA)
+            out.append(typing.cast(RequirerFollowerData, remote_unit_data))
+        return out
+
+    def _get_requirer_leader_data(self, relation: Relation) -> RequirerLeaderData:  # type: ignore
+        """Fetch and validate the requirer's app databag."""
+        databag = relation.data[relation.app]
+        remote_app_data: Dict[str, Union[int, str]] = {}
+        for k in ("model", "name", "mode", "strip-prefix"):
+            v = databag.get(k)
+            if v is not None:
+                remote_app_data[k] = v
+        _validate_data(remote_app_data, INGRESS_REQUIRES_APP_SCHEMA)
+        remote_app_data["strip-prefix"] = bool(remote_app_data.get("strip-prefix", False))
+        return typing.cast(RequirerLeaderData, remote_app_data)
+
+    def _get_requirer_data(
+        self, relation: Relation
+    ) -> Tuple[RequirerLeaderData, List[RequirerFollowerData]]:  # type: ignore
         """Fetch and validate the requirer's app databag.
 
         For convenience, we convert 'port' to integer.
@@ -304,18 +344,9 @@ class IngressPerAppProvider(_IngressPerAppBase):
             # FIXME https://github.com/canonical/traefik-k8s-operator/issues/34
             return {}
 
-        databag = relation.data[relation.app]
-        remote_data: Dict[str, Union[int, str]] = {}
-        for k in ("port", "host", "model", "name", "mode", "strip-prefix"):
-            v = databag.get(k)
-            if v is not None:
-                remote_data[k] = v
-        _validate_data(remote_data, INGRESS_REQUIRES_APP_SCHEMA)
-        remote_data["port"] = int(remote_data["port"])
-        remote_data["strip-prefix"] = bool(remote_data.get("strip-prefix", False))
-        return typing.cast(RequirerData, remote_data)
+        return self._get_requirer_leader_data(relation), self._get_requirer_followers_data(relation)
 
-    def get_data(self, relation: Relation) -> RequirerData:  # type: ignore
+    def get_data(self, relation: Relation) -> Tuple[RequirerLeaderData, List[RequirerFollowerData]]:  # type: ignore
         """Fetch the remote app's databag, i.e. the requirer data."""
         return self._get_requirer_data(relation)
 
@@ -328,7 +359,8 @@ class IngressPerAppProvider(_IngressPerAppBase):
             return bool(self._get_requirer_data(relation))
         except DataValidationError as e:
             log.warning("Requirer not ready; validation error encountered: %s" % str(e))
-            return False
+            # return False
+            raise
 
     def _provided_url(self, relation: Relation) -> ProviderIngressData:  # type: ignore
         """Fetch and validate this app databag; return the ingress url."""

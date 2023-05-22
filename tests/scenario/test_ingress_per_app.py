@@ -57,17 +57,15 @@ def traefik_container(temp_opt):
 
 @pytest.mark.parametrize("port, host", ((80, "1.1.1.1"), (81, "10.1.10.1")))
 @pytest.mark.parametrize("event_name", ("joined", "changed"))
-def test_ingress_per_leader_created(context, port, host, model, traefik_container, event_name, temp_opt):
+def test_ingress_per_app_created(context, port, host, model, traefik_container, event_name, temp_opt):
     """Check the config when a new ingress per leader is created or changes (single remote unit)."""
-    mock_data = {
-        "port": str(port),
-        "host": host,
-        "model": "test-model",
-        "name": "remote/0",
-        "mode": "http",
-    }
     ipl = Relation('ingress',
-                   remote_app_data=mock_data,
+                   remote_app_data={
+                       "model": "test-model",
+                       "name": "remote/0",
+                       "mode": "http",
+                   },
+                   remote_units_data={0: {"port": str(port), "host": host}},
                    relation_id=1)
     state = State(
         model=model,
@@ -91,11 +89,11 @@ def test_ingress_per_leader_created(context, port, host, model, traefik_containe
 
 @pytest.mark.parametrize("port, host", ((80, "1.1.1.{}"), (81, "10.1.10.{}")))
 @pytest.mark.parametrize("n_units", (2, 3, 10))
-@pytest.mark.parametrize("mode", ("http", "https"))
-def test_ingress_per_leader_scale(context, host, port, model, temp_opt, n_units, mode):
+def test_ingress_per_app_scale(context, host, port, model, traefik_container, temp_opt, n_units):
     """Check the config when a new ingress per leader unit joins."""
     cfg_file = temp_opt.joinpath("traefik", "juju", "juju_ingress_ingress_1_remote.yaml")
     cfg_file.parent.mkdir(parents=True)
+
     # config that would have been generated from mock_data_0
     # same as config output of the previous test
     initial_cfg = {'http': {'routers': {
@@ -110,27 +108,29 @@ def test_ingress_per_leader_scale(context, host, port, model, temp_opt, n_units,
             'tls': {'domains': [{'main': 'foo.com', 'sans': ['*.foo.com']}]}}},
         'services': {
             'juju-test-model-remote-0-service': {
-                'loadBalancer': {'servers': [{'url': f'{mode}://{host}:{port}'}]}}}}}
+                'loadBalancer': {'servers': [{'url': f'http://{host}:{port}'}]}}}}}
     cfg_file.write_text(yaml.safe_dump(initial_cfg))
 
     def _get_mock_data(n: int):
         return {
             "port": str(port+n),
             "host": host.format(n),
-            "model": "test-model",
-            "name": f"remote/{n}",
-            "mode": mode,
         }
 
     ipl = Relation('ingress',
+                   remote_app_data={
+                       "model": "test-model",
+                       "name": "remote/0",
+                   },
                    remote_units_data={
                        n: _get_mock_data(n) for n in range(n_units)
-                   })
+                   },
+                   relation_id=1)
     state = State(
         model=model,
         config={"routing_mode": "path",
                 "external_hostname": "foo.com"},
-        containers=[Container(name="traefik", can_connect=False)],
+        containers=[traefik_container],
         relations=[ipl]
     )
 
@@ -138,7 +138,18 @@ def test_ingress_per_leader_scale(context, host, port, model, temp_opt, n_units,
 
     new_config = yaml.safe_load(cfg_file.read_text())
     # verify that the config has changed!
-    new_lbs = new_config['http']['services']['juju-test-model-remote-0-service']['loadBalancer']['servers']
+    new_lbs = new_config['http']['services'][f'juju-test-model-remote-0-service']['loadBalancer']['servers']
+
     assert len(new_lbs) == n_units
     for n in range(n_units):
-        assert {'url': f'{mode}://{host.format(n)}:{port+n}'} in new_lbs
+        assert {'url': f'http://{host.format(n)}:{port+n}'} in new_lbs
+
+        # expected config:
+
+        # IPA:
+        # len(d["service"][svc_name]["loadBalancer"]["servers"]) == num_units
+        # [x["url"] for x in d["service"][svc_name]["loadBalancer"]["servers"]] == all_units_urls
+
+        # IPL:
+        # len(d["service"][svc_name]["loadBalancer"]["servers"]) == 1
+        # d["service"][svc_name]["loadBalancer"]["servers"][0]["url"] == leader_url
