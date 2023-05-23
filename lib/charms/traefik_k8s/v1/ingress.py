@@ -54,12 +54,12 @@ class SomeCharm(CharmBase):
 import logging
 import socket
 import typing
-from typing import Any, Dict, Optional, Tuple, Union, List, Sequence
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 import yaml
 from ops.charm import CharmBase, RelationBrokenEvent, RelationEvent
 from ops.framework import EventSource, Object, ObjectEvents, StoredState
-from ops.model import ModelError, Relation
+from ops.model import Application, ModelError, Relation
 
 # The unique Charmhub library identifier, never change it
 LIBID = "e6de2a5cd5b34422a204668f3b8f90d2"
@@ -135,7 +135,7 @@ ProviderIngressData = TypedDict("ProviderIngressData", {"url": str})
 ProviderApplicationData = TypedDict("ProviderApplicationData", {"ingress": ProviderIngressData})  # type: ignore
 
 
-def _validate_data(data, schema):
+def _validate_data(data: Any, schema: Any):
     """Checks whether `data` matches `schema`.
 
     Will raise DataValidationError if the data is not valid, else return None.
@@ -148,8 +148,16 @@ def _validate_data(data, schema):
         raise DataValidationError(data, schema) from e
 
 
-class DataValidationError(RuntimeError):
+class IngressError(RuntimeError):
+    """Base class for errors raised by this library."""
+
+
+class DataValidationError(IngressError):
     """Raised when data validation fails on IPU relation data."""
+
+
+class IngressNotReadyError(IngressError):
+    """Raised when the requirer isn't ready, but expected to be."""
 
 
 class _IngressPerAppBase(Object):
@@ -240,7 +248,7 @@ class IngressPerAppDataProvidedEvent(_IPAEvent):
         name: Optional[str] = None
         model: Optional[str] = None
         # sequence of hostname, port pairs
-        hosts: Sequence[RequirerFollowerData] = None
+        hosts: Sequence[RequirerFollowerData] = []
         strip_prefix: bool = False
 
 
@@ -309,19 +317,23 @@ class IngressPerAppProvider(_IngressPerAppBase):
 
         for unit in relation.units:
             databag = relation.data[unit]
-            remote_unit_data: Dict[str, Union[int, str]] = {}
-            for key in ("host", "port"):
-                remote_unit_data[key] = databag.get(key)
-            remote_unit_data["port"] = (
-                int(remote_unit_data["port"]) if remote_unit_data["port"] else None
-            )
+            remote_unit_data: Dict[str, Union[str, int]] = {
+                "host": databag.get("host", ""),
+                "port": databag.get("port", ""),
+            }
+
+            # cast port to int if present
+            if raw_port := remote_unit_data["port"]:
+                remote_unit_data["port"] = int(raw_port)
+
             _validate_data(remote_unit_data, INGRESS_REQUIRES_UNIT_SCHEMA)
             out.append(typing.cast(RequirerFollowerData, remote_unit_data))
         return out
 
     def _get_requirer_leader_data(self, relation: Relation) -> RequirerLeaderData:  # type: ignore
         """Fetch and validate the requirer's app databag."""
-        databag = relation.data[relation.app]
+        # assume that the caller already verified that relation.app is not None
+        databag = relation.data[typing.cast(Application, relation.app)]
         remote_app_data: Dict[str, Union[int, str]] = {}
         for k in ("model", "name", "mode", "strip-prefix"):
             v = databag.get(k)
@@ -334,20 +346,15 @@ class IngressPerAppProvider(_IngressPerAppBase):
     def _get_requirer_data(
         self, relation: Relation
     ) -> Tuple[RequirerLeaderData, List[RequirerFollowerData]]:  # type: ignore
-        """Fetch and validate the requirer's app databag.
-
-        For convenience, we convert 'port' to integer.
-        """
-        if not relation.app or not relation.app.name:  # type: ignore
-            # Handle edge case where remote app name can be missing, e.g.,
-            # relation_broken events.
-            # FIXME https://github.com/canonical/traefik-k8s-operator/issues/34
-            return {}
-
-        return self._get_requirer_leader_data(relation), self._get_requirer_followers_data(relation)
+        """Fetch and validate the requirer's databags."""
+        return self._get_requirer_leader_data(relation), self._get_requirer_followers_data(
+            relation
+        )
 
     def get_data(self, relation: Relation) -> Tuple[RequirerLeaderData, List[RequirerFollowerData]]:  # type: ignore
         """Fetch the remote app's databag, i.e. the requirer data."""
+        if not self.is_ready(relation):
+            raise IngressNotReadyError(relation)
         return self._get_requirer_data(relation)
 
     def is_ready(self, relation: Optional[Relation] = None):
@@ -355,12 +362,19 @@ class IngressPerAppProvider(_IngressPerAppBase):
         if not relation:
             return any(map(self.is_ready, self.relations))
 
+        if not relation.app or not relation.app.name:  # type: ignore
+            # Handle edge case where remote app name can be missing, e.g.,
+            # relation_broken events.
+            # FIXME https://github.com/canonical/traefik-k8s-operator/issues/34
+            return False
+
         try:
-            return bool(self._get_requirer_data(relation))
+            app_data, units_data = self._get_requirer_data(relation)
         except DataValidationError as e:
             log.warning("Requirer not ready; validation error encountered: %s" % str(e))
-            # return False
-            raise
+            return False
+
+        return app_data and units_data
 
     def _provided_url(self, relation: Relation) -> ProviderIngressData:  # type: ignore
         """Fetch and validate this app databag; return the ingress url."""
@@ -523,34 +537,31 @@ class IngressPerAppRequirer(_IngressPerAppBase):
     def provide_ingress_requirements(self, *, host: Optional[str] = None, port: int):
         """Publishes the data that Traefik needs to provide ingress.
 
-        NB only the leader unit is supposed to do this.
-
         Args:
             host: Hostname to be used by the ingress provider to address the
              requirer unit; if unspecified, FQDN will be used instead
             port: the port of the service (required)
         """
-        # get only the leader to publish the data since we only
-        # require one unit to publish it -- it will not differ between units,
-        # unlike in ingress-per-unit.
-        assert self.unit.is_leader(), "only leaders should do this."
         assert self.relation, "no relation"
+
+        if self.unit.is_leader():
+            app_data = {
+                "model": self.model.name,
+                "name": self.app.name,
+            }
+
+            if self._strip_prefix:
+                app_data["strip-prefix"] = "true"
+
+            _validate_data(app_data, INGRESS_REQUIRES_APP_SCHEMA)
+            self.relation.data[self.app].update(app_data)
 
         if not host:
             host = socket.getfqdn()
-
-        data = {
-            "model": self.model.name,
-            "name": self.app.name,
-            "host": host,
-            "port": str(port),
-        }
-
-        if self._strip_prefix:
-            data["strip-prefix"] = "true"
-
-        _validate_data(data, INGRESS_REQUIRES_APP_SCHEMA)
-        self.relation.data[self.app].update(data)
+        unit_data = {"host": host, "port": port}
+        _validate_data(unit_data, INGRESS_REQUIRES_UNIT_SCHEMA)
+        unit_data["port"] = str(unit_data["port"])
+        self.relation.data[self.unit].update(unit_data)
 
     @property
     def relation(self):

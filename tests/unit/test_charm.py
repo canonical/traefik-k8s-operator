@@ -37,23 +37,31 @@ def _requirer_provide_ingress_requirements(
     per_app_relation: bool = False,
 ):
     # same as requirer.provide_ingress_requirements(port=port, host=host)s
-    data = {
-        "port": str(port),
-        "host": host,
+    app_data = {
         "model": "test-model",
         "name": "remote/0",
         "mode": mode,
     }
 
     if strip_prefix:
-        data["strip-prefix"] = "true"
+        app_data["strip-prefix"] = "true"
+
+    unit_data = {"port": str(port), "host": host}
+
+    if not per_app_relation:
+        app_data.update(unit_data)
+    else:
+        # do not emit this event, as we need to 'simultaneously'
+        # update the remote unit and app databags
+        with harness.hooks_disabled():
+            harness.update_relation_data(relation.id, "remote/0", unit_data)
 
     harness.update_relation_data(
         relation.id,
         "remote" if per_app_relation else "remote/0",
-        data,
+        app_data,
     )
-    return data
+    return app_data
 
 
 class _RequirerMock:

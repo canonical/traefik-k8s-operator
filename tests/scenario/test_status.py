@@ -1,15 +1,13 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-import unittest
 from unittest.mock import MagicMock, PropertyMock, patch
 
 import pytest
-from ops import WaitingStatus, ActiveStatus, BlockedStatus
-from scenario import Container, State, Context
-from scenario.runtime import trigger
-
 from charm import TraefikIngressCharm
+from ops import ActiveStatus, BlockedStatus, WaitingStatus
+from scenario import Container, Context, State
+from scenario.runtime import trigger
 
 
 @pytest.fixture
@@ -39,7 +37,7 @@ def test_start_traefik_no_hostname(ctx, *_):
         config={"routing_mode": "path"},
         containers=[Container(name="traefik", can_connect=True)],
     )
-    out = ctx.run('start', state)
+    out = ctx.run("start", state)
 
     # THEN unit status is `waiting`
     assert out.status.unit == WaitingStatus("gateway address unavailable")

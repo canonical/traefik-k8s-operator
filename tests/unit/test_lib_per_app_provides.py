@@ -56,14 +56,18 @@ def test_ingress_app_provider_relate_provide(
 ):
     harness.set_leader(True)
     relation_id = harness.add_relation("ingress", "remote")
-    remote_data = {
-        "host": "host",
-        "port": "42",
+    harness.add_relation_unit(relation_id, "remote/0")
+    remote_app_data = {
         "name": "foo",
         "model": "bar",
         "strip_prefix": strip_prefix,
     }
-    harness.update_relation_data(relation_id, "remote", remote_data)
+    remote_unit_data = {
+        "host": "host",
+        "port": "42",
+    }
+    harness.update_relation_data(relation_id, "remote", remote_app_data)
+    harness.update_relation_data(relation_id, "remote/0", remote_unit_data)
 
     relation = harness.model.get_relation("ingress", relation_id)
     assert provider.is_ready(relation)
