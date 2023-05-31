@@ -5,7 +5,7 @@ import unittest
 from unittest.mock import MagicMock, PropertyMock, patch
 
 from charm import TraefikIngressCharm
-from scenario import Container, Context, State, Relation
+from scenario import Container, Context, Relation, State
 
 
 @patch("charm.KubernetesServicePatch")
@@ -14,7 +14,9 @@ class TestMiddlewares(unittest.TestCase):
     def setUp(self) -> None:
         self.containers = [Container(name="traefik", can_connect=True)]
 
-        version_patcher = patch.object(TraefikIngressCharm, "version", property(lambda *_: "0.0.0"))
+        version_patcher = patch.object(
+            TraefikIngressCharm, "version", property(lambda *_: "0.0.0")
+        )
         self.version_patch = version_patcher.start()
         self.addCleanup(version_patcher.stop)
 
@@ -37,7 +39,7 @@ class TestMiddlewares(unittest.TestCase):
                 "mode": "http",
                 "strip-prefix": "true",
                 "redirect-https": "true",
-            }
+            },
         )
 
         # AND GIVEN external host is set (see also decorator)
@@ -52,7 +54,9 @@ class TestMiddlewares(unittest.TestCase):
         out = Context(charm_type=TraefikIngressCharm).run(relation.changed_event, state)
 
         # THEN the rendered config file contains middlewares
-        with out.get_container("traefik").filesystem.open("/opt/traefik/juju/juju_ingress_ingress_now_what.yaml", "rt") as f:
+        with out.get_container("traefik").filesystem.open(
+            "/opt/traefik/juju/juju_ingress_ingress_now_what.yaml", "rt"
+        ) as f:
             config_file = f.readlines()
         expected = {}  # TODO
         self.assertEqual(expected, config_file)

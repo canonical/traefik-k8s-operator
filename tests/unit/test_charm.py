@@ -1,6 +1,7 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 
+import itertools
 import json
 import socket
 import unittest
@@ -13,7 +14,6 @@ from ops.charm import ActionEvent
 from ops.model import ActiveStatus, Application, BlockedStatus, Relation, WaitingStatus
 from ops.pebble import PathError
 from ops.testing import Harness
-import itertools
 
 ops.testing.SIMULATE_CAN_CONNECT = True
 
@@ -66,15 +66,19 @@ def _render_middlewares(*, strip_prefix: bool = False, redirect_https: bool = Fa
     if redirect_https:
         middlewares.update({"redirectScheme": {"scheme": "https", "port": 443, "permanent": True}})
     if strip_prefix:
-        middlewares.update({"stripPrefix": {
-            "prefixes": ["/test-model-remote-0"],
-            "forceSlash": False,
-        }})
-    return {
-        "middlewares": {
-            "juju-sidecar-noprefix-test-model-remote-0": middlewares
-        }
-    } if middlewares else {}
+        middlewares.update(
+            {
+                "stripPrefix": {
+                    "prefixes": ["/test-model-remote-0"],
+                    "forceSlash": False,
+                }
+            }
+        )
+    return (
+        {"middlewares": {"juju-sidecar-noprefix-test-model-remote-0": middlewares}}
+        if middlewares
+        else {}
+    )
 
 
 class _RequirerMock:
@@ -194,7 +198,9 @@ class TestTraefikIngressCharm(unittest.TestCase):
                     }
                 }
 
-                if middlewares := _render_middlewares(strip_prefix=strip_prefix, redirect_https=redirect_https):
+                if middlewares := _render_middlewares(
+                    strip_prefix=strip_prefix, redirect_https=redirect_https
+                ):
                     expected["http"].update(middlewares)
                     expected["http"]["routers"]["juju-test-model-remote-0-router"].update(
                         {"middlewares": ["juju-sidecar-noprefix-test-model-remote-0"]},
@@ -204,7 +210,9 @@ class TestTraefikIngressCharm(unittest.TestCase):
                     )
 
                 self.maxDiff = None
-                self.assertEqual(expected["http"].get("middlewares", {}), conf["http"].get("middlewares", {}))
+                self.assertEqual(
+                    expected["http"].get("middlewares", {}), conf["http"].get("middlewares", {})
+                )
                 self.assertEqual(conf, expected)
 
                 self.assertEqual(
@@ -269,7 +277,9 @@ class TestTraefikIngressCharm(unittest.TestCase):
                         },
                     }
                 }
-                if middlewares := _render_middlewares(strip_prefix=strip_prefix, redirect_https=redirect_https):
+                if middlewares := _render_middlewares(
+                    strip_prefix=strip_prefix, redirect_https=redirect_https
+                ):
                     expected["http"].update(middlewares)
                     expected["http"]["routers"]["juju-test-model-remote-0-router"].update(
                         {"middlewares": ["juju-sidecar-noprefix-test-model-remote-0"]},
@@ -279,7 +289,9 @@ class TestTraefikIngressCharm(unittest.TestCase):
                     )
 
                 self.maxDiff = None
-                self.assertEqual(expected["http"].get("middlewares", {}), conf["http"].get("middlewares", {}))
+                self.assertEqual(
+                    expected["http"].get("middlewares", {}), conf["http"].get("middlewares", {})
+                )
                 self.assertEqual(conf, expected)
 
                 self.assertEqual(
@@ -350,7 +362,9 @@ class TestTraefikIngressCharm(unittest.TestCase):
                     }
                 }
 
-                if middlewares := _render_middlewares(strip_prefix=False, redirect_https=redirect_https):
+                if middlewares := _render_middlewares(
+                    strip_prefix=False, redirect_https=redirect_https
+                ):
                     expected["http"].update(middlewares)
                     expected["http"]["routers"]["juju-test-model-remote-0-router"].update(
                         {"middlewares": ["juju-sidecar-noprefix-test-model-remote-0"]},
@@ -431,7 +445,9 @@ class TestTraefikIngressCharm(unittest.TestCase):
                         },
                     }
                 }
-                if middlewares := _render_middlewares(strip_prefix=False, redirect_https=redirect_https):
+                if middlewares := _render_middlewares(
+                    strip_prefix=False, redirect_https=redirect_https
+                ):
                     expected["http"].update(middlewares)
                     expected["http"]["routers"]["juju-test-model-remote-0-router"].update(
                         {"middlewares": ["juju-sidecar-noprefix-test-model-remote-0"]},
@@ -517,7 +533,9 @@ class TestTraefikIngressCharm(unittest.TestCase):
                     }
                 }
 
-                if middlewares := _render_middlewares(strip_prefix=False, redirect_https=redirect_https):
+                if middlewares := _render_middlewares(
+                    strip_prefix=False, redirect_https=redirect_https
+                ):
                     expected["http"].update(middlewares)
                     expected["http"]["routers"]["juju-test-model-remote-0-router"].update(
                         {"middlewares": ["juju-sidecar-noprefix-test-model-remote-0"]},
@@ -527,7 +545,9 @@ class TestTraefikIngressCharm(unittest.TestCase):
                     )
 
                 self.maxDiff = None
-                self.assertEqual(expected["http"].get("middlewares", {}), conf["http"].get("middlewares", {}))
+                self.assertEqual(
+                    expected["http"].get("middlewares", {}), conf["http"].get("middlewares", {})
+                )
                 self.assertEqual(conf, expected)
 
                 self.assertEqual(self.harness.charm.unit.status, ActiveStatus())
