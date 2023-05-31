@@ -322,8 +322,8 @@ class IngressPerAppProvider(_IngressPerAppBase):
                 remote_data[k] = v
         _validate_data(remote_data, INGRESS_REQUIRES_APP_SCHEMA)
         remote_data["port"] = int(remote_data["port"])
-        remote_data["strip-prefix"] = bool(remote_data.get("strip-prefix", False))
-        remote_data["redirect-https"] = bool(remote_data.get("redirect-https", False))
+        remote_data["strip-prefix"] = bool(remote_data.get("strip-prefix", "false") == "true")
+        remote_data["redirect-https"] = bool(remote_data.get("redirect-https", "false") == "true")
         return typing.cast(RequirerData, remote_data)
 
     def get_data(self, relation: Relation) -> RequirerData:  # type: ignore
