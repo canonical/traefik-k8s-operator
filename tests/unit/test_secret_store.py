@@ -5,9 +5,8 @@ import logging
 import unittest
 from unittest.mock import MagicMock, Mock, PropertyMock, patch
 
-from ops.model import Secret
-
 from charm import SecretStore, TraefikIngressCharm
+from ops.model import Secret
 
 logging.basicConfig(level=logging.DEBUG)
 logging.getLogger().setLevel(logging.DEBUG)

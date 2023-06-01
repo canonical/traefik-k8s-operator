@@ -1056,8 +1056,7 @@ class SecretStore:
                 return self.migrate_private_key()
             if private_key := private_key_secret.get_content()["private-key"]:
                 return private_key
-            else:
-                logger.debug("`private-key` not found in secret content.")
+            logger.debug("`private-key` not found in secret content.")
         return self.charm._stored.private_key
 
     @property
@@ -1084,10 +1083,10 @@ class SecretStore:
         """
         if not self.using_juju_secrets:
             logger.debug("Juju secrets not available, private key will remain in stored state.")
-            return
+            return None
         if not self.charm._stored.private_key:
             logger.debug("No private key found in stored state, nothing to migrate.")
-            return
+            return None
         private_key = self.charm._stored.private_key
         logger.debug("Juju secrets are available, migrating private key.")
         self.store_private_key(private_key)
