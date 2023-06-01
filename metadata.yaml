@@ -47,7 +47,7 @@ provides:
   ingress-per-leader:
     interface: ingress_per_leader
     description: |
-      Provides ingress-like routing to the leaders of the related Juju application
+      Provides ingress-like routing to only the leader of the related Juju application
   metrics-endpoint:
     interface: prometheus_scrape
     description: |
