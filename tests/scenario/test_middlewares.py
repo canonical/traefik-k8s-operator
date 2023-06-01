@@ -81,6 +81,39 @@ def _render_config(*, routing_mode: str, strip_prefix: bool, redirect_https: boo
     return expected
 
 
+def _create_relation(
+    *, rel_id: int, rel_name: str, app_name: str, strip_prefix: bool, redirect_https: bool
+):
+    data = {
+        "port": str(9000),
+        "host": "10.1.10.1",
+        "model": "test-model",
+        "name": "remote/0",
+        "mode": "http",
+        "strip-prefix": "true" if strip_prefix else "false",
+        "redirect-https": "true" if redirect_https else "false",
+    }
+
+    if rel_name == "ingress":
+        return Relation(
+            endpoint=rel_name,
+            remote_app_name=app_name,
+            relation_id=rel_id,
+            remote_app_data=data,
+        )
+
+    if rel_name == "ingress-per-unit":
+        return Relation(
+            endpoint=rel_name,
+            remote_app_name=app_name,
+            relation_id=rel_id,
+            remote_units_data={0: data},
+        )
+
+    RuntimeError(f"Unexpected relation name: '{rel_name}'")
+    return None
+
+
 @patch("charm.KubernetesServicePatch")
 @patch("lightkube.core.client.GenericSyncClient")
 class TestMiddlewares(unittest.TestCase):
@@ -103,29 +136,22 @@ class TestMiddlewares(unittest.TestCase):
     @patch("charm.TraefikIngressCharm.external_host", PropertyMock(return_value="testhostname"))
     @patch("charm.TraefikIngressCharm._traefik_service_running", PropertyMock(return_value=True))
     @patch("charm.TraefikIngressCharm._tcp_entrypoints_changed", MagicMock(return_value=False))
-    def test_ipa_middlewares(self, *_):
-        for routing_mode, strip_prefix, redirect_https in itertools.product(
-            ("path", "subdomain"), (False, True), (False, True)
+    def test_middlewares(self, *_):
+        for rel_name, routing_mode, strip_prefix, redirect_https in itertools.product(
+            ("ingress", "ingress-per-unit"), ("path", "subdomain"), (False, True), (False, True)
         ):
             with self.subTest(
                 routing_mode=routing_mode, strip_prefix=strip_prefix, redirect_https=redirect_https
             ):
-                # GIVEN an IPA relation is requesting some middlewares
-                mock_rel_id = 0
-                relation = Relation(
-                    endpoint="ingress",
-                    interface="ingress",
-                    remote_app_name="remote",
-                    relation_id=mock_rel_id,
-                    remote_app_data={
-                        "port": str(9000),
-                        "host": "10.1.10.1",
-                        "model": "test-model",
-                        "name": "remote/0",
-                        "mode": "http",
-                        "strip-prefix": "true" if strip_prefix else "false",
-                        "redirect-https": "true" if redirect_https else "false",
-                    },
+                # GIVEN a relation is requesting some middlewares
+                rel_id = 0
+                app_name = "remote"
+                relation = _create_relation(
+                    rel_id=rel_id,
+                    rel_name=rel_name,
+                    app_name=app_name,
+                    strip_prefix=strip_prefix,
+                    redirect_https=redirect_https,
                 )
 
                 # AND GIVEN external host is set (see also decorator)
@@ -141,7 +167,7 @@ class TestMiddlewares(unittest.TestCase):
 
                 # THEN the rendered config file contains middlewares
                 with out.get_container("traefik").filesystem.open(
-                    f"/opt/traefik/juju/juju_ingress_ingress_{mock_rel_id}_remote.yaml",
+                    f"/opt/traefik/juju/juju_ingress_{rel_name}_{rel_id}_{app_name}.yaml",
                 ) as f:
                     config_file = f.read()
                 expected = _render_config(
