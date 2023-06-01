@@ -30,10 +30,7 @@ from charms.tls_certificates_interface.v2.tls_certificates import (
     generate_private_key,
 )
 from charms.traefik_k8s.v1.ingress import IngressPerAppProvider
-from charms.traefik_k8s.v1.ingress_per_unit import (
-    DataValidationError,
-    IngressPerUnitProvider,
-)
+from charms.traefik_k8s.v1.ingress_per_unit import DataValidationError, IngressPerUnitProvider
 from charms.traefik_route_k8s.v0.traefik_route import (
     TraefikRouteProvider,
     TraefikRouteRequirerReadyEvent,
@@ -82,6 +79,8 @@ _CERTIFICATE_PATH = f"{_DYNAMIC_CONFIG_DIR}/certificate.cert"
 _CERTIFICATE_KEY_PATH = f"{_DYNAMIC_CONFIG_DIR}/certificate.key"
 BIN_PATH = "/usr/bin/traefik"
 
+# pyright: reportGeneralTypeIssues=false
+
 
 class _RoutingMode(enum.Enum):
     path = "path"
@@ -107,7 +106,7 @@ class TraefikIngressCharm(CharmBase):
         super().__init__(*args)
         self.secret_store = SecretStore(self)
 
-        self._stored.set_default(  # pyright: reportGeneralTypeIssues=false
+        self._stored.set_default(
             current_external_host=None,
             current_routing_mode=None,
             tcp_entrypoints=None,
@@ -262,12 +261,22 @@ class TraefikIngressCharm(CharmBase):
         pass
 
     def _on_all_certificates_invalidated(self, event: RelationBrokenEvent) -> None:
-        if self.container.can_connect():
-            self._stored.certificate = None
-            self._stored.csr = None
-            self.container.remove_path(_CERTIFICATE_PATH, recursive=True)
+        if not self.container.can_connect():
+            event.defer()
+            return
+
+        self._stored.certificate = None
+        self._stored.private_key = None
+        self._stored.csr = None
+        self.container.remove_path(_CERTIFICATE_PATH, recursive=True)
+        self.container.remove_path(_CERTIFICATE_KEY_PATH, recursive=True)
 
     def _on_certificate_available(self, event: CertificateAvailableEvent) -> None:
+        # On slow machines, this event may come up before pebble is ready
+        if not self.container.can_connect():
+            event.defer()
+            return
+
         self._stored.certificate = event.certificate
         self._stored.ca = event.ca
         self._stored.chain = event.chain
@@ -654,7 +663,7 @@ class TraefikIngressCharm(CharmBase):
             data: "RequirerData_IPA" = provider.get_data(relation)
         except DataValidationError as e:
             logger.error(f"invalid data shared through {relation}... Error: {e}.")
-            return
+            return None
 
         config, app_url = self._generate_per_app_config(data)
         if self.unit.is_leader():
@@ -756,9 +765,8 @@ class TraefikIngressCharm(CharmBase):
             }
             return config, unit_url
 
-        else:
-            lb_servers = [{"url": f"http://{data['host']}:{data['port']}"}]
-            return self._generate_config_block(prefix, lb_servers, data)
+        lb_servers = [{"url": f"http://{data['host']}:{data['port']}"}]
+        return self._generate_config_block(prefix, lb_servers, data)
 
     def _generate_config_block(
         self, prefix: str, lb_servers: List[Dict[str, str]], data: Dict[str, Any]
@@ -805,6 +813,9 @@ class TraefikIngressCharm(CharmBase):
             config["http"]["middlewares"] = middlewares
             router_cfg[traefik_router_name]["middlewares"] = list(middlewares.keys())
 
+            if f"{traefik_router_name}-tls" in router_cfg:
+                router_cfg[f"{traefik_router_name}-tls"]["middlewares"] = list(middlewares.keys())
+
         return config, url
 
     def _generate_tls_block(
@@ -848,7 +859,7 @@ class TraefikIngressCharm(CharmBase):
         # logic before pebble in the traefik container is up and running. If that
         # is the case, nevermind, we will wipe the dangling config files anyhow
         # during _on_traefik_pebble_ready .
-        if self.container.can_connect():
+        if self.container.can_connect() and relation.app:
             try:
                 config_path = f"{_DYNAMIC_CONFIG_DIR}/{self._relation_config_file(relation)}"
                 self.container.remove_path(config_path, recursive=True)
@@ -909,12 +920,11 @@ class TraefikIngressCharm(CharmBase):
         relation_type = _get_relation_type(relation)
         if relation_type is _IngressRelationType.per_app:
             return self.ingress_per_app
-        elif relation_type is _IngressRelationType.per_unit:
+        if relation_type is _IngressRelationType.per_unit:
             return self.ingress_per_unit
-        elif relation_type is _IngressRelationType.routed:
+        if relation_type is _IngressRelationType.routed:
             return self.traefik_route
-        else:
-            raise RuntimeError("Invalid relation type (shouldn't happen)")
+        raise RuntimeError("Invalid relation type (shouldn't happen)")
 
     @property
     def external_host(self):
@@ -1104,9 +1114,9 @@ def _get_loadbalancer_status(namespace: str, service_name: str):
 def _get_relation_type(relation: Relation) -> _IngressRelationType:
     if relation.name == "ingress":
         return _IngressRelationType.per_app
-    elif relation.name == "ingress-per-unit":
+    if relation.name == "ingress-per-unit":
         return _IngressRelationType.per_unit
-    elif relation.name == "traefik-route":
+    if relation.name == "traefik-route":
         return _IngressRelationType.routed
     raise RuntimeError("Invalid relation name (shouldn't happen)")
 

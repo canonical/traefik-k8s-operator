@@ -1,18 +1,17 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 import asyncio
-from pathlib import Path
 
 import pytest
 import yaml
 from pytest_operator.plugin import OpsTest
 
-from tests.integration.conftest import assert_can_ping, get_relation_data
-from tests.integration.helpers import get_address
-
-trfk_root = Path(__file__).parent.parent.parent
-trfk_meta = yaml.safe_load((trfk_root / "metadata.yaml").read_text())
-trfk_resources = {name: val["upstream-source"] for name, val in trfk_meta["resources"].items()}
+from tests.integration.conftest import (
+    assert_can_connect,
+    get_relation_data,
+    trfk_resources,
+)
+from tests.integration.helpers import get_address, remove_application
 
 
 @pytest.mark.abort_on_fail
@@ -46,7 +45,7 @@ def assert_ipa_charm_has_ingress(ops_test: OpsTest):
     provider_app_data = yaml.safe_load(data.provider.application_data["ingress"])
     url = provider_app_data["url"]
     ip, port = url.split("//")[1].split("/")[0].split(":")
-    assert_can_ping(ip, port)
+    assert_can_connect(ip, port)
 
 
 @pytest.mark.abort_on_fail
@@ -86,3 +85,7 @@ async def test_remove_relation(ops_test: OpsTest):
     await ops_test.juju("remove-relation", "ipa-tester:ingress", "traefik-k8s:ingress")
     async with ops_test.fast_forward():
         await ops_test.model.wait_for_idle(["traefik-k8s", "ipa-tester"], status="active")
+
+
+async def test_cleanup(ops_test):
+    await remove_application(ops_test, "traefik-k8s", timeout=60)

@@ -8,11 +8,11 @@ from unittest.mock import Mock, patch
 
 import ops.testing
 import yaml
+from charm import _STATIC_CONFIG_PATH, TraefikIngressCharm
 from ops.charm import ActionEvent
 from ops.model import ActiveStatus, Application, BlockedStatus, Relation, WaitingStatus
+from ops.pebble import PathError
 from ops.testing import Harness
-
-from charm import _STATIC_CONFIG_PATH, TraefikIngressCharm
 
 ops.testing.SIMULATE_CAN_CONNECT = True
 
@@ -57,8 +57,8 @@ def _requirer_provide_ingress_requirements(
 
 
 class _RequirerMock:
-    local_app = None  # type: Application
-    relation = None  # type: Relation
+    local_app: Application = None
+    relation: Relation = None
 
     def is_ready(self):
         try:
@@ -182,6 +182,9 @@ class TestTraefikIngressCharm(unittest.TestCase):
                     expected["http"]["routers"]["juju-test-model-remote-0-router"].update(
                         {"middlewares": ["juju-sidecar-noprefix-test-model-remote-0"]},
                     )
+                    expected["http"]["routers"]["juju-test-model-remote-0-router-tls"].update(
+                        {"middlewares": ["juju-sidecar-noprefix-test-model-remote-0"]},
+                    )
 
                 self.assertEqual(conf, expected)
 
@@ -260,6 +263,9 @@ class TestTraefikIngressCharm(unittest.TestCase):
                 if strip_prefix:
                     expected["http"].update(middlewares)
                     expected["http"]["routers"]["juju-test-model-remote-0-router"].update(
+                        {"middlewares": ["juju-sidecar-noprefix-test-model-remote-0"]},
+                    )
+                    expected["http"]["routers"]["juju-test-model-remote-0-router-tls"].update(
                         {"middlewares": ["juju-sidecar-noprefix-test-model-remote-0"]},
                     )
 

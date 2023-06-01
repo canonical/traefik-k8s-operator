@@ -69,7 +69,7 @@ LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 11
+LIBPATCH = 13
 
 DEFAULT_RELATION_NAME = "ingress"
 RELATION_INTERFACE = "ingress"
@@ -183,8 +183,8 @@ class _IngressPerAppBase(Object):
 
 
 class _IPAEvent(RelationEvent):
-    __args__ = ()  # type: Tuple[str, ...]
-    __optional_kwargs__ = {}  # type: Dict[str, Any]
+    __args__: Tuple[str, ...] = ()
+    __optional_kwargs__: Dict[str, Any] = {}
 
     @classmethod
     def __attrs__(cls):
@@ -229,11 +229,11 @@ class IngressPerAppDataProvidedEvent(_IPAEvent):
     __args__ = ("name", "model", "port", "host", "strip_prefix")
 
     if typing.TYPE_CHECKING:
-        name = None  # type: Optional[str]
-        model = None  # type: Optional[str]
-        port = None  # type: Optional[str]
-        host = None  # type: Optional[str]
-        strip_prefix = False  # type: bool
+        name: Optional[str] = None
+        model: Optional[str] = None
+        port: Optional[str] = None
+        host: Optional[str] = None
+        strip_prefix: bool = False
 
 
 class IngressPerAppDataRemovedEvent(RelationEvent):
@@ -298,15 +298,14 @@ class IngressPerAppProvider(_IngressPerAppBase):
 
         For convenience, we convert 'port' to integer.
         """
-        assert relation.app, "no app in relation (shouldn't happen)"  # for type checker
-        if not all((relation.app, relation.app.name)):
+        if not relation.app or not relation.app.name:  # type: ignore
             # Handle edge case where remote app name can be missing, e.g.,
             # relation_broken events.
             # FIXME https://github.com/canonical/traefik-k8s-operator/issues/34
             return {}
 
         databag = relation.data[relation.app]
-        remote_data = {}  # type: Dict[str, Union[int, str]]
+        remote_data: Dict[str, Union[int, str]] = {}
         for k in ("port", "host", "model", "name", "mode", "strip-prefix"):
             v = databag.get(k)
             if v is not None:
@@ -333,8 +332,7 @@ class IngressPerAppProvider(_IngressPerAppBase):
 
     def _provided_url(self, relation: Relation) -> ProviderIngressData:  # type: ignore
         """Fetch and validate this app databag; return the ingress url."""
-        assert relation.app, "no app in relation (shouldn't happen)"  # for type checker
-        if not all((relation.app, relation.app.name, self.unit.is_leader())):
+        if not relation.app or not relation.app.name or not self.unit.is_leader():  # type: ignore
             # Handle edge case where remote app name can be missing, e.g.,
             # relation_broken events.
             # Also, only leader units can read own app databags.
@@ -389,7 +387,7 @@ class IngressPerAppReadyEvent(_IPAEvent):
 
     __args__ = ("url",)
     if typing.TYPE_CHECKING:
-        url = None  # type: Optional[str]
+        url: Optional[str] = None
 
 
 class IngressPerAppRevokedEvent(RelationEvent):
@@ -533,12 +531,11 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         Returns None if the URL isn't available yet.
         """
         relation = self.relation
-        if not relation:
+        if not relation or not relation.app:
             return None
 
         # fetch the provider's app databag
         try:
-            assert relation.app, "no app in relation (shouldn't happen)"  # for type checker
             raw = relation.data.get(relation.app, {}).get("ingress")
         except ModelError as e:
             log.debug(

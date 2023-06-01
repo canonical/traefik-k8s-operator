@@ -146,7 +146,7 @@ LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 5
+LIBPATCH = 7
 
 ServiceType = Literal["ClusterIP", "LoadBalancer"]
 
@@ -201,6 +201,7 @@ class KubernetesServicePatch(Object):
         # Ensure this patch is applied during the 'install' and 'upgrade-charm' events
         self.framework.observe(charm.on.install, self._patch)
         self.framework.observe(charm.on.upgrade_charm, self._patch)
+        self.framework.observe(charm.on.update_status, self._patch)
 
         # apply user defined events
         if refresh_event:
@@ -309,9 +310,8 @@ class KubernetesServicePatch(Object):
         except ApiError as e:
             if e.status.code == 404 and self.service_name != self._app:
                 return False
-            else:
-                logger.error("Kubernetes service get failed: %s", str(e))
-                raise
+            logger.error("Kubernetes service get failed: %s", str(e))
+            raise
 
         # Construct a list of expected ports, should the patch be applied
         expected_ports = [(p.port, p.targetPort) for p in self.service.spec.ports]

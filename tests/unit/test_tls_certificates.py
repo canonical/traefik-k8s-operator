@@ -5,9 +5,8 @@ import unittest
 from unittest.mock import patch
 
 import ops.testing
-from ops.testing import Harness
-
 from charm import TraefikIngressCharm
+from ops.testing import Harness
 
 ops.testing.SIMULATE_CAN_CONNECT = True
 
