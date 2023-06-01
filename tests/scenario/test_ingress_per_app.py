@@ -80,6 +80,7 @@ def test_ingress_per_app_created(
         relations=[ipl],
     )
 
+    # WHEN any relevant event fires
     event = getattr(ipl, f"{event_name}_event")
     context.run(event, state)
 
