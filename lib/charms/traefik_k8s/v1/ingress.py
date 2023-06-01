@@ -352,7 +352,11 @@ class IngressPerAppProvider(_IngressPerAppBase):
         )
 
     def get_data(self, relation: Relation) -> Tuple[RequirerLeaderData, List[RequirerFollowerData]]:  # type: ignore
-        """Fetch the remote app's databag, i.e. the requirer data."""
+        """Fetch the remote app's databag, i.e. the requirer data.
+        
+        Raises:
+        - IngressNotReadyError, if ingress is not yet ready.
+        """
         if not self.is_ready(relation):
             raise IngressNotReadyError(relation)
         return self._get_requirer_data(relation)
