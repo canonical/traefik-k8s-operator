@@ -31,8 +31,8 @@ from charms.tls_certificates_interface.v2.tls_certificates import (
     generate_private_key,
 )
 from charms.traefik_k8s.v0.ingress_per_leader import IngressPerLeaderProvider
-from charms.traefik_k8s.v1.ingress import IngressPerAppProvider
 from charms.traefik_k8s.v1.ingress_per_unit import DataValidationError, IngressPerUnitProvider
+from charms.traefik_k8s.v2.ingress import IngressPerAppProvider
 from charms.traefik_route_k8s.v0.traefik_route import (
     TraefikRouteProvider,
     TraefikRouteRequirerReadyEvent,
@@ -58,9 +58,9 @@ from ops.pebble import APIError, PathError
 
 if typing.TYPE_CHECKING:
     from charms.traefik_k8s.v0.ingress_per_leader import RequirerData as RequirerData_IPL
-    from charms.traefik_k8s.v1.ingress import RequirerFollowerData as RequirerFollowerData_IPA
-    from charms.traefik_k8s.v1.ingress import RequirerLeaderData as RequirerLeaderData_IPA
     from charms.traefik_k8s.v1.ingress_per_unit import RequirerData as RequirerData_IPU
+    from charms.traefik_k8s.v2.ingress import RequirerFollowerData as RequirerFollowerData_IPA
+    from charms.traefik_k8s.v2.ingress import RequirerLeaderData as RequirerLeaderData_IPA
 
 logger = logging.getLogger(__name__)
 
@@ -202,9 +202,9 @@ class TraefikIngressCharm(CharmBase):
         observe(self.on.config_changed, self._on_config_changed)
 
         # observe data_provided and data_removed events for all types of ingress we offer:
-        for ingress_per in (self.ingress_per_leader, self.ingress_per_unit, self.ingress_per_app):
-            observe(ingress_per.on.data_provided, self._handle_ingress_data_provided)
-            observe(ingress_per.on.data_removed, self._handle_ingress_data_removed)
+        for ingress in (self.ingress_per_leader, self.ingress_per_unit, self.ingress_per_app):
+            observe(ingress.on.data_provided, self._handle_ingress_data_provided)
+            observe(ingress.on.data_removed, self._handle_ingress_data_removed)
 
         route_events = self.traefik_route.on
         observe(route_events.ready, self._handle_traefik_route_ready)

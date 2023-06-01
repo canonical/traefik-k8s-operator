@@ -63,7 +63,7 @@ def test_ingress_per_app_created(
     context, port, host, model, traefik_container, event_name, temp_opt
 ):
     """Check the config when a new ingress per leader is created or changes (single remote unit)."""
-    ipl = Relation(
+    ipa = Relation(
         "ingress",
         remote_app_data={
             "model": "test-model",
@@ -77,11 +77,11 @@ def test_ingress_per_app_created(
         model=model,
         config={"routing_mode": "path", "external_hostname": "foo.com"},
         containers=[traefik_container],
-        relations=[ipl],
+        relations=[ipa],
     )
 
     # WHEN any relevant event fires
-    event = getattr(ipl, f"{event_name}_event")
+    event = getattr(ipa, f"{event_name}_event")
     context.run(event, state)
 
     generated_config = yaml.safe_load(
@@ -134,7 +134,7 @@ def test_ingress_per_app_scale(context, host, port, model, traefik_container, te
             "host": host.format(n),
         }
 
-    ipl = Relation(
+    ipa = Relation(
         "ingress",
         remote_app_data={
             "model": "test-model",
@@ -147,10 +147,10 @@ def test_ingress_per_app_scale(context, host, port, model, traefik_container, te
         model=model,
         config={"routing_mode": "path", "external_hostname": "foo.com"},
         containers=[traefik_container],
-        relations=[ipl],
+        relations=[ipa],
     )
 
-    context.run(ipl.changed_event, state)
+    context.run(ipa.changed_event, state)
 
     new_config = yaml.safe_load(cfg_file.read_text())
     # verify that the config has changed!

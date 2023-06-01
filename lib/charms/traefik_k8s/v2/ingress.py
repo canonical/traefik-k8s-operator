@@ -553,7 +553,12 @@ class IngressPerAppRequirer(_IngressPerAppBase):
              requirer unit; if unspecified, FQDN will be used instead
             port: the port of the service (required)
         """
-        assert self.relation, "no relation"
+        if not self.relation:
+            raise IngressNotReadyError(
+                f"no relation found on {self.relation_name}: "
+                f"can't provide ingress requirements. "
+                f"Gate this call with an is_ready() check."
+            )
 
         if self.unit.is_leader():
             app_data = {
