@@ -22,6 +22,13 @@ tcp_charm_resources = {
 
 
 @pytest.mark.abort_on_fail
+async def test_setup_env(ops_test: OpsTest):
+    await ops_test.model.set_config(
+        {"update-status-hook-interval": "60m", "logging-config": "<root>=WARNING; unit=DEBUG"}
+    )
+
+
+@pytest.mark.abort_on_fail
 async def test_deployment(ops_test: OpsTest, traefik_charm, tcp_tester_charm):
     await deploy_traefik_if_not_deployed(ops_test, traefik_charm)
     await ops_test.model.deploy(tcp_tester_charm, "tcp-tester", resources=tcp_charm_resources)
@@ -77,8 +84,13 @@ async def assert_tcp_charm_has_ingress(ops_test: OpsTest):
     )
     port = data.requirer.unit_data["port"]
 
+    logger.info("Attempting to connect %s:%s...", traefik_ip, int(port))
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        logger.info("Attempting to connect %s:%s...", traefik_ip, int(port))
+        # If we attempt too early (before traefik finished setting everything up), we'd get:
+        # ConnectionRefusedError: [Errno 111] Connection refused
+        await ops_test.model.block_until(lambda: s.connect_ex((traefik_ip, int(port))) == 0, timeout=300, wait_period=5)
+
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.connect((traefik_ip, int(port)))
         s.sendall(b"Hello, world")
         data = s.recv(1024)
