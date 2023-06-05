@@ -69,7 +69,7 @@ LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 13
+LIBPATCH = 14
 
 DEFAULT_RELATION_NAME = "ingress"
 RELATION_INTERFACE = "ingress"
@@ -98,6 +98,7 @@ INGRESS_REQUIRES_APP_SCHEMA = {
         "host": {"type": "string"},
         "port": {"type": "string"},
         "strip-prefix": {"type": "string"},
+        "redirect-https": {"type": "string"},
     },
     "required": ["model", "name", "host", "port"],
 }
@@ -118,7 +119,14 @@ except ImportError:
 # Model of the data a unit implementing the requirer will need to provide.
 RequirerData = TypedDict(
     "RequirerData",
-    {"model": str, "name": str, "host": str, "port": int, "strip-prefix": bool},
+    {
+        "model": str,
+        "name": str,
+        "host": str,
+        "port": int,
+        "strip-prefix": bool,
+        "redirect-https": bool,
+    },
     total=False,
 )
 # Provider ingress data model.
@@ -226,7 +234,7 @@ class _IPAEvent(RelationEvent):
 class IngressPerAppDataProvidedEvent(_IPAEvent):
     """Event representing that ingress data has been provided for an app."""
 
-    __args__ = ("name", "model", "port", "host", "strip_prefix")
+    __args__ = ("name", "model", "port", "host", "strip_prefix", "redirect_https")
 
     if typing.TYPE_CHECKING:
         name: Optional[str] = None
@@ -234,6 +242,7 @@ class IngressPerAppDataProvidedEvent(_IPAEvent):
         port: Optional[str] = None
         host: Optional[str] = None
         strip_prefix: bool = False
+        redirect_https: bool = False
 
 
 class IngressPerAppDataRemovedEvent(RelationEvent):
@@ -274,6 +283,7 @@ class IngressPerAppProvider(_IngressPerAppBase):
                 data["port"],
                 data["host"],
                 data.get("strip-prefix", False),
+                data.get("redirect-https", False),
             )
 
     def _handle_relation_broken(self, event):
@@ -306,13 +316,14 @@ class IngressPerAppProvider(_IngressPerAppBase):
 
         databag = relation.data[relation.app]
         remote_data: Dict[str, Union[int, str]] = {}
-        for k in ("port", "host", "model", "name", "mode", "strip-prefix"):
+        for k in ("port", "host", "model", "name", "mode", "strip-prefix", "redirect-https"):
             v = databag.get(k)
             if v is not None:
                 remote_data[k] = v
         _validate_data(remote_data, INGRESS_REQUIRES_APP_SCHEMA)
         remote_data["port"] = int(remote_data["port"])
-        remote_data["strip-prefix"] = bool(remote_data.get("strip-prefix", False))
+        remote_data["strip-prefix"] = bool(remote_data.get("strip-prefix", "false") == "true")
+        remote_data["redirect-https"] = bool(remote_data.get("redirect-https", "false") == "true")
         return typing.cast(RequirerData, remote_data)
 
     def get_data(self, relation: Relation) -> RequirerData:  # type: ignore
@@ -418,6 +429,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         host: Optional[str] = None,
         port: Optional[int] = None,
         strip_prefix: bool = False,
+        redirect_https: bool = False,
     ):
         """Constructor for IngressRequirer.
 
@@ -433,6 +445,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
             host: Hostname to be used by the ingress provider to address the requiring
                 application; if unspecified, the default Kubernetes service name will be used.
             strip_prefix: configure Traefik to strip the path prefix.
+            redirect_https: redirect incoming requests to the HTTPS.
 
         Request Args:
             port: the port of the service
@@ -441,6 +454,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         self.charm: CharmBase = charm
         self.relation_name = relation_name
         self._strip_prefix = strip_prefix
+        self._redirect_https = redirect_https
 
         self._stored.set_default(current_url=None)  # type: ignore
 
@@ -516,6 +530,9 @@ class IngressPerAppRequirer(_IngressPerAppBase):
 
         if self._strip_prefix:
             data["strip-prefix"] = "true"
+
+        if self._redirect_https:
+            data["redirect-https"] = "true"
 
         _validate_data(data, INGRESS_REQUIRES_APP_SCHEMA)
         self.relation.data[self.app].update(data)

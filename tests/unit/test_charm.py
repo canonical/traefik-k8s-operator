@@ -34,6 +34,7 @@ def _requirer_provide_ingress_requirements(
     host=socket.getfqdn(),
     mode="http",
     strip_prefix: bool = False,
+    redirect_https: bool = False,
     per_app_relation: bool = False,
 ):
     # same as requirer.provide_ingress_requirements(port=port, host=host)s
@@ -45,8 +46,11 @@ def _requirer_provide_ingress_requirements(
         "mode": mode,
     }
 
-    if strip_prefix:
-        data["strip-prefix"] = "true"
+    # Must set these to something, because when used with subTest, the previous relation data
+    # must be overwritten: if a key is omitted, then a plain `update` would keep existing keys.
+    # TODO also need to test what happens when any of these is not specified at all
+    data["strip-prefix"] = "true" if strip_prefix else "false"
+    data["redirect-https"] = "true" if redirect_https else "false"
 
     harness.update_relation_data(
         relation.id,
@@ -54,6 +58,26 @@ def _requirer_provide_ingress_requirements(
         data,
     )
     return data
+
+
+def _render_middlewares(*, strip_prefix: bool = False, redirect_https: bool = False) -> dict:
+    middlewares = {}
+    if redirect_https:
+        middlewares.update({"redirectScheme": {"scheme": "https", "port": 443, "permanent": True}})
+    if strip_prefix:
+        middlewares.update(
+            {
+                "stripPrefix": {
+                    "prefixes": ["/test-model-remote-0"],
+                    "forceSlash": False,
+                }
+            }
+        )
+    return (
+        {"middlewares": {"juju-sidecar-noprefix-test-model-remote-0": middlewares}}
+        if middlewares
+        else {}
+    )
 
 
 class _RequirerMock:
@@ -106,392 +130,6 @@ class TestTraefikIngressCharm(unittest.TestCase):
         self.harness.container_pebble_ready("traefik")
 
         self.assertTrue(self.harness.charm._traefik_service_running)
-
-    @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
-    def test_pebble_ready_with_gateway_address_from_config_and_path_routing_mode(self):
-        """Test round-trip bootstrap and relation with a consumer."""
-        self.harness.update_config({"external_hostname": "testhostname"})
-        self.harness.set_leader(True)
-        self.harness.begin_with_initial_hooks()
-        self.harness.container_pebble_ready("traefik")
-
-        traefik_container = self.harness.charm.unit.get_container("traefik")
-        try:
-            yaml.safe_load(traefik_container.pull("/opt/traefik/juju").read())
-            raise Exception("The previous line should have failed")
-        except (IsADirectoryError, PathError):
-            # If the directory did not exist, the method would have thrown
-            # a FileNotFoundError instead.
-            pass
-
-        self.assertEqual(self.harness.charm.unit.status, ActiveStatus())
-
-        relation = relate(self.harness)
-        for strip_prefix in (False, True):
-            with self.subTest():
-                _requirer_provide_ingress_requirements(
-                    harness=self.harness,
-                    relation=relation,
-                    host="10.1.10.1",
-                    port=9000,
-                    strip_prefix=strip_prefix,
-                )
-
-                traefik_container = self.harness.charm.unit.get_container("traefik")
-                file = f"/opt/traefik/juju/juju_ingress_{relation.name}_{relation.id}_{relation.app.name}.yaml"
-                conf = yaml.safe_load(traefik_container.pull(file).read())
-
-                middlewares = {
-                    "middlewares": {
-                        "juju-sidecar-noprefix-test-model-remote-0": {
-                            "stripPrefix": {
-                                "prefixes": ["/test-model-remote-0"],
-                                "forceSlash": False,
-                            }
-                        }
-                    }
-                }
-
-                expected = {
-                    "http": {
-                        "routers": {
-                            "juju-test-model-remote-0-router": {
-                                "entryPoints": ["web"],
-                                "rule": "PathPrefix(`/test-model-remote-0`)",
-                                "service": "juju-test-model-remote-0-service",
-                            },
-                            "juju-test-model-remote-0-router-tls": {
-                                "entryPoints": ["websecure"],
-                                "rule": "PathPrefix(`/test-model-remote-0`)",
-                                "service": "juju-test-model-remote-0-service",
-                                "tls": {
-                                    "domains": [
-                                        {
-                                            "main": "testhostname",
-                                            "sans": ["*.testhostname"],
-                                        },
-                                    ],
-                                },
-                            },
-                        },
-                        "services": {
-                            "juju-test-model-remote-0-service": {
-                                "loadBalancer": {"servers": [{"url": "http://10.1.10.1:9000"}]}
-                            }
-                        },
-                    }
-                }
-
-                if strip_prefix:
-                    expected["http"].update(middlewares)
-                    expected["http"]["routers"]["juju-test-model-remote-0-router"].update(
-                        {"middlewares": ["juju-sidecar-noprefix-test-model-remote-0"]},
-                    )
-                    expected["http"]["routers"]["juju-test-model-remote-0-router-tls"].update(
-                        {"middlewares": ["juju-sidecar-noprefix-test-model-remote-0"]},
-                    )
-
-                self.assertEqual(conf, expected)
-
-                self.assertEqual(
-                    requirer.urls,
-                    {"remote/0": "http://testhostname:80/test-model-remote-0"},
-                )
-                self.assertEqual(self.harness.charm.unit.status, ActiveStatus())
-
-    @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
-    def test_pebble_ready_with_gateway_address_from_config_and_path_routing_mode_per_app(self):
-        """Test round-trip bootstrap and relation with a consumer."""
-        self.harness.update_config({"external_hostname": "testhostname"})
-        self.harness.set_leader(True)
-        self.harness.begin_with_initial_hooks()
-        self.harness.container_pebble_ready("traefik")
-
-        self.assertEqual(self.harness.charm.unit.status, ActiveStatus())
-
-        relation = relate(self.harness, per_app_relation=True)
-        for strip_prefix in (False, True):
-            with self.subTest():
-                _requirer_provide_ingress_requirements(
-                    harness=self.harness,
-                    relation=relation,
-                    host="foo.bar",
-                    port=3000,
-                    strip_prefix=strip_prefix,
-                    per_app_relation=True,
-                )
-
-                traefik_container = self.harness.charm.unit.get_container("traefik")
-                file = f"/opt/traefik/juju/juju_ingress_{relation.name}_{relation.id}_{relation.app.name}.yaml"
-                conf = yaml.safe_load(traefik_container.pull(file).read())
-
-                middlewares = {
-                    "middlewares": {
-                        "juju-sidecar-noprefix-test-model-remote-0": {
-                            "stripPrefix": {
-                                "prefixes": ["/test-model-remote-0"],
-                                "forceSlash": False,
-                            }
-                        }
-                    }
-                }
-
-                expected = {
-                    "http": {
-                        "routers": {
-                            "juju-test-model-remote-0-router": {
-                                "entryPoints": ["web"],
-                                "rule": "PathPrefix(`/test-model-remote-0`)",
-                                "service": "juju-test-model-remote-0-service",
-                            },
-                            "juju-test-model-remote-0-router-tls": {
-                                "entryPoints": ["websecure"],
-                                "rule": "PathPrefix(`/test-model-remote-0`)",
-                                "service": "juju-test-model-remote-0-service",
-                                "tls": {
-                                    "domains": [
-                                        {
-                                            "main": "testhostname",
-                                            "sans": ["*.testhostname"],
-                                        },
-                                    ],
-                                },
-                            },
-                        },
-                        "services": {
-                            "juju-test-model-remote-0-service": {
-                                "loadBalancer": {"servers": [{"url": "http://foo.bar:3000"}]}
-                            }
-                        },
-                    }
-                }
-                if strip_prefix:
-                    expected["http"].update(middlewares)
-                    expected["http"]["routers"]["juju-test-model-remote-0-router"].update(
-                        {"middlewares": ["juju-sidecar-noprefix-test-model-remote-0"]},
-                    )
-                    expected["http"]["routers"]["juju-test-model-remote-0-router-tls"].update(
-                        {"middlewares": ["juju-sidecar-noprefix-test-model-remote-0"]},
-                    )
-
-                self.assertEqual(conf, expected)
-
-                self.assertEqual(
-                    requirer.url,
-                    "http://testhostname:80/test-model-remote-0",
-                )
-                self.assertEqual(self.harness.charm.unit.status, ActiveStatus())
-
-    @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
-    def test_pebble_ready_with_gateway_address_from_config_and_subdomain_routing_mode_per_app(
-        self,
-    ):
-        """Test round-trip bootstrap and relation with a consumer."""
-        self.harness.update_config(
-            {"external_hostname": "testhostname", "routing_mode": "subdomain"}
-        )
-        self.harness.set_leader(True)
-        self.harness.begin_with_initial_hooks()
-        self.harness.container_pebble_ready("traefik")
-
-        self.assertEqual(self.harness.charm.unit.status, ActiveStatus())
-
-        relation = relate(self.harness, per_app_relation=True)
-        for strip_prefix in (False, True):
-            # in subdomain routing mode this should not have any effect
-            with self.subTest():
-                _requirer_provide_ingress_requirements(
-                    harness=self.harness,
-                    relation=relation,
-                    host="foo.bar",
-                    port=3000,
-                    strip_prefix=strip_prefix,
-                    per_app_relation=True,
-                )
-
-                traefik_container = self.harness.charm.unit.get_container("traefik")
-                file = f"/opt/traefik/juju/juju_ingress_{relation.name}_{relation.id}_{relation.app.name}.yaml"
-                conf = yaml.safe_load(traefik_container.pull(file).read())
-
-                expected = {
-                    "http": {
-                        "routers": {
-                            "juju-test-model-remote-0-router": {
-                                "entryPoints": ["web"],
-                                "rule": "Host(`test-model-remote-0.testhostname`)",
-                                "service": "juju-test-model-remote-0-service",
-                            },
-                            "juju-test-model-remote-0-router-tls": {
-                                "entryPoints": ["websecure"],
-                                "rule": "Host(`test-model-remote-0.testhostname`)",
-                                "service": "juju-test-model-remote-0-service",
-                                "tls": {
-                                    "domains": [
-                                        {
-                                            "main": "testhostname",
-                                            "sans": ["*.testhostname"],
-                                        },
-                                    ],
-                                },
-                            },
-                        },
-                        "services": {
-                            "juju-test-model-remote-0-service": {
-                                "loadBalancer": {"servers": [{"url": "http://foo.bar:3000"}]}
-                            }
-                        },
-                    }
-                }
-                self.assertEqual(conf, expected)
-
-                self.assertEqual(
-                    requirer.url,
-                    "http://test-model-remote-0.testhostname:80/",
-                )
-                self.assertEqual(self.harness.charm.unit.status, ActiveStatus())
-
-    @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
-    def test_pebble_ready_with_gateway_address_from_config_and_subdomain_routing_mode(self):
-        """Test round-trip bootstrap and relation with a consumer."""
-        self.harness.update_config({"external_hostname": "testhostname"})
-        self.harness.set_leader(True)
-        self.harness.begin_with_initial_hooks()
-
-        self.harness.update_config(
-            {
-                "external_hostname": "testhostname",
-                "routing_mode": "subdomain",
-            }
-        )
-
-        self.harness.container_pebble_ready("traefik")
-
-        self.assertEqual(self.harness.charm.unit.status, ActiveStatus())
-
-        relation = relate(self.harness)
-        for strip_prefix in (False, True):
-            # in subdomain routing mode this should not have any effect
-            with self.subTest():
-                _requirer_provide_ingress_requirements(
-                    harness=self.harness,
-                    relation=relation,
-                    host="10.1.10.1",
-                    port=9000,
-                    strip_prefix=strip_prefix,
-                )
-
-                traefik_container = self.harness.charm.unit.get_container("traefik")
-                file = f"/opt/traefik/juju/juju_ingress_{relation.name}_{relation.id}_{relation.app.name}.yaml"
-                conf = yaml.safe_load(traefik_container.pull(file).read())
-
-                expected = {
-                    "http": {
-                        "routers": {
-                            "juju-test-model-remote-0-router": {
-                                "entryPoints": ["web"],
-                                "rule": "Host(`test-model-remote-0.testhostname`)",
-                                "service": "juju-test-model-remote-0-service",
-                            },
-                            "juju-test-model-remote-0-router-tls": {
-                                "entryPoints": ["websecure"],
-                                "rule": "Host(`test-model-remote-0.testhostname`)",
-                                "service": "juju-test-model-remote-0-service",
-                                "tls": {
-                                    "domains": [
-                                        {
-                                            "main": "testhostname",
-                                            "sans": ["*.testhostname"],
-                                        },
-                                    ],
-                                },
-                            },
-                        },
-                        "services": {
-                            "juju-test-model-remote-0-service": {
-                                "loadBalancer": {"servers": [{"url": "http://10.1.10.1:9000"}]}
-                            }
-                        },
-                    }
-                }
-                self.assertEqual(conf, expected)
-
-                self.assertEqual(
-                    requirer.urls,
-                    {"remote/0": "http://test-model-remote-0.testhostname:80/"},
-                )
-                self.assertEqual(self.harness.charm.unit.status, ActiveStatus())
-
-    @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
-    def test_pebble_ready_no_leader_with_gateway_address_from_config_and_subdomain_routing_mode(
-        self,
-    ):
-        """Test round-trip bootstrap and relation with a consumer."""
-        # TODO Make parametric to avoid duplication with
-        # test_pebble_ready_with_gateway_address_from_config_and_subdomain_routing_mode
-        self.harness.update_config({"external_hostname": "testhostname"})
-        self.harness.set_leader(False)
-        self.harness.begin_with_initial_hooks()
-
-        self.harness.update_config(
-            {
-                "external_hostname": "testhostname",
-                "routing_mode": "subdomain",
-            }
-        )
-
-        self.harness.container_pebble_ready("traefik")
-
-        self.assertEqual(self.harness.charm.unit.status, ActiveStatus())
-
-        relation = relate(self.harness)
-        for strip_prefix in (False, True):
-            # in subdomain routing mode this should not have any effect
-            with self.subTest():
-                _requirer_provide_ingress_requirements(
-                    harness=self.harness,
-                    relation=relation,
-                    host="10.1.10.1",
-                    port=9000,
-                    strip_prefix=strip_prefix,
-                )
-
-            traefik_container = self.harness.charm.unit.get_container("traefik")
-            file = f"/opt/traefik/juju/juju_ingress_{relation.name}_{relation.id}_{relation.app.name}.yaml"
-            conf = yaml.safe_load(traefik_container.pull(file).read())
-
-            expected = {
-                "http": {
-                    "routers": {
-                        "juju-test-model-remote-0-router": {
-                            "entryPoints": ["web"],
-                            "rule": "Host(`test-model-remote-0.testhostname`)",
-                            "service": "juju-test-model-remote-0-service",
-                        },
-                        "juju-test-model-remote-0-router-tls": {
-                            "entryPoints": ["websecure"],
-                            "rule": "Host(`test-model-remote-0.testhostname`)",
-                            "service": "juju-test-model-remote-0-service",
-                            "tls": {
-                                "domains": [
-                                    {
-                                        "main": "testhostname",
-                                        "sans": ["*.testhostname"],
-                                    },
-                                ],
-                            },
-                        },
-                    },
-                    "services": {
-                        "juju-test-model-remote-0-service": {
-                            "loadBalancer": {"servers": [{"url": "http://10.1.10.1:9000"}]}
-                        }
-                    },
-                }
-            }
-
-            self.assertEqual(conf, expected)
-
-            self.assertEqual(self.harness.charm.unit.status, ActiveStatus())
 
     @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
     def test_bad_routing_mode_config_and_recovery(self):
@@ -624,8 +262,18 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
         self.assertEqual(requirer.urls, {})
 
+    @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
     def test_relation_broken(self):
-        self.test_pebble_ready_with_gateway_address_from_config_and_path_routing_mode()
+        self.harness.update_config({"external_hostname": "testhostname"})
+        self.harness.set_leader(True)
+        self.harness.begin_with_initial_hooks()
+        relation = relate(self.harness)
+        _requirer_provide_ingress_requirements(
+            harness=self.harness,
+            relation=relation,
+            host="10.1.10.1",
+            port=9000,
+        )
 
         relation = self.harness.model.relations["ingress-per-unit"][0]
         self.harness.remove_relation(relation.id)

@@ -564,6 +564,10 @@ class TraefikIngressCharm(CharmBase):
             return
         self._process_ingress_relation(event.relation)
 
+        # Without the following line, _STATIC_CONFIG_PATH is updated with TCP endpoints only on
+        # update-status.
+        self._process_status_and_configurations()
+
         if isinstance(self.unit.status, MaintenanceStatus):
             self.unit.status = ActiveStatus()
 
@@ -572,6 +576,10 @@ class TraefikIngressCharm(CharmBase):
         self._wipe_ingress_for_relation(
             event.relation, wipe_rel_data=not isinstance(event, RelationBrokenEvent)
         )
+
+        # FIXME? on relation broken, data is still there so cannot simply call
+        #  self._process_status_and_configurations(). For this reason, the static config in
+        #  _STATIC_CONFIG_PATH will be updated only on update-status.
 
     def _handle_traefik_route_ready(self, event: TraefikRouteRequirerReadyEvent):
         """A traefik_route charm has published some ingress data."""
@@ -709,14 +717,17 @@ class TraefikIngressCharm(CharmBase):
     def _generate_middleware_config(
         self, data: Union["RequirerData_IPA", "RequirerData_IPU"], prefix: str
     ) -> dict:
-        """Generate a stripPrefix middleware for path based routing."""
-        if self._routing_mode is _RoutingMode.path and data.get("strip-prefix", False):
-            return {
-                f"juju-sidecar-noprefix-{prefix}": {
-                    "stripPrefix": {"prefixes": [f"/{prefix}"], "forceSlash": False}
-                }
-            }
+        """Generate a middleware config."""
+        config = {}  # type: Dict[str, Dict[str, Any]]
+        if self._routing_mode is _RoutingMode.path:
+            if data.get("strip-prefix", False):
+                config.update({"stripPrefix": {"prefixes": [f"/{prefix}"], "forceSlash": False}})
 
+        if data.get("redirect-https", False):
+            config.update({"redirectScheme": {"scheme": "https", "port": 443, "permanent": True}})
+
+        if config:
+            return {f"juju-sidecar-noprefix-{prefix}": config}
         return {}
 
     def _generate_per_unit_config(self, data: "RequirerData_IPU") -> Tuple[dict, str]:

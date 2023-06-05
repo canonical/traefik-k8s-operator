@@ -15,6 +15,11 @@ description: |
   A Juju-operated Traefik operator that routes requests from the outside of a
   Kubernetes cluster to Juju units and applications.
 
+website: https://charmhub.io/traefik-k8s
+source: https://github.com/canonical/traefik-k8s-operator
+issues: https://github.com/canonical/traefik-k8s-operator/issues
+docs: https://discourse.charmhub.io/t/traefik-k8s-docs-index/10778
+
 containers:
   traefik:
     resource: traefik-image
