@@ -138,26 +138,28 @@ async def test_tls_termination(ops_test: OpsTest, temp_dir):
     await ops_test.model.applications[trfk.name].set_config({"external_hostname": mock_hostname})
 
     await ops_test.model.deploy(
-        "ch:tls-certificates-operator",
+        "ch:self-signed-certificates",
         application_name="root-ca",
         channel="edge",
     )
     await ops_test.model.applications["root-ca"].set_config(
         {
             "ca-common-name": "demo.ca.local",
-            "generate-self-signed-certificates": "true",
         }
     )
     await ops_test.model.add_relation("root-ca", f"{trfk.name}:certificates")
     await ops_test.model.wait_for_idle(status="active", timeout=300)
 
     # Get self-signed cert from peer app data
-    rc, stdout, stderr = await ops_test.run("juju", "show-unit", "root-ca/0", "--format=json")
+    rc, stdout, stderr = await ops_test.run("juju", "show-unit", f"{trfk.name}/0", "--format=json")
     data = json.loads(stdout)
-    peer_data = next(
-        filter(lambda d: d["endpoint"] == "replicas", data["root-ca/0"]["relation-info"])
+    rel_data = next(
+        filter(lambda d: d["endpoint"] == "certificates", data[f"{trfk.name}/0"]["relation-info"])
     )
-    cert = peer_data["application-data"]["self_signed_ca_certificate"]
+    # This is a json-encoded string of List[dict], and each dict has the following fields:
+    # certificate, certificate_signing_request, ca, chain
+    cert_as_json = rel_data["application-data"]["certificates"]
+    cert = json.loads(cert_as_json)[0]["certificate"]
 
     cert_path = temp_dir / "local.cert"
     with open(cert_path, "wt") as f:

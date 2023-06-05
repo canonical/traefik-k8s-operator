@@ -564,6 +564,10 @@ class TraefikIngressCharm(CharmBase):
             return
         self._process_ingress_relation(event.relation)
 
+        # Without the following line, _STATIC_CONFIG_PATH is updated with TCP endpoints only on
+        # update-status.
+        self._process_status_and_configurations()
+
         if isinstance(self.unit.status, MaintenanceStatus):
             self.unit.status = ActiveStatus()
 
@@ -572,6 +576,10 @@ class TraefikIngressCharm(CharmBase):
         self._wipe_ingress_for_relation(
             event.relation, wipe_rel_data=not isinstance(event, RelationBrokenEvent)
         )
+
+        # FIXME? on relation broken, data is still there so cannot simply call
+        #  self._process_status_and_configurations(). For this reason, the static config in
+        #  _STATIC_CONFIG_PATH will be updated only on update-status.
 
     def _handle_traefik_route_ready(self, event: TraefikRouteRequirerReadyEvent):
         """A traefik_route charm has published some ingress data."""

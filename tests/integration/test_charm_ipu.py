@@ -17,10 +17,9 @@ from tests.integration.helpers import get_address, remove_application
 async def test_deployment(ops_test: OpsTest, traefik_charm, ipu_tester_charm):
     await deploy_traefik_if_not_deployed(ops_test, traefik_charm)
     await ops_test.model.deploy(ipu_tester_charm, "ipu-tester")
-    async with ops_test.fast_forward():
-        await ops_test.model.wait_for_idle(
-            ["traefik-k8s", "ipu-tester"], status="active", timeout=1000
-        )
+    await ops_test.model.wait_for_idle(
+        ["traefik-k8s", "ipu-tester"], status="active", timeout=1000
+    )
 
 
 @pytest.mark.abort_on_fail
@@ -28,8 +27,7 @@ async def test_relate(ops_test: OpsTest):
     await ops_test.model.add_relation(
         "ipu-tester:ingress-per-unit", "traefik-k8s:ingress-per-unit"
     )
-    async with ops_test.fast_forward():
-        await ops_test.model.wait_for_idle(["traefik-k8s", "ipu-tester"])
+    await ops_test.model.wait_for_idle(["traefik-k8s", "ipu-tester"])
 
 
 def assert_ipu_charm_has_ingress(ops_test: OpsTest):
@@ -82,8 +80,7 @@ async def test_relation_data_shape(ops_test: OpsTest):
 @pytest.mark.abort_on_fail
 async def test_remove_relation(ops_test: OpsTest):
     await ops_test.juju("relate", "ipu-tester:ingress-per-unit", "traefik-k8s:ingress-per-unit")
-    async with ops_test.fast_forward():
-        await ops_test.model.wait_for_idle(["traefik-k8s", "ipu-tester"], status="active")
+    await ops_test.model.wait_for_idle(["traefik-k8s", "ipu-tester"], status="active")
 
 
 async def test_cleanup(ops_test):
