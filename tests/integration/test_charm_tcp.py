@@ -86,14 +86,16 @@ async def assert_tcp_charm_has_ingress(ops_test: OpsTest):
 
     logger.info("Attempting to connect %s:%s...", traefik_ip, int(port))
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        # By default, sockets are created in blocking mode, which may end up causing the GitHub
+        # action to cancel CI after 6 hours.
+        s.settimeout(10)
+
         # If we attempt too early (before traefik finished setting everything up), we'd get:
         # ConnectionRefusedError: [Errno 111] Connection refused
         await ops_test.model.block_until(
             lambda: s.connect_ex((traefik_ip, int(port))) == 0, timeout=300, wait_period=5
         )
 
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.connect((traefik_ip, int(port)))
         s.sendall(b"Hello, world")
         data = s.recv(1024)
 
