@@ -332,3 +332,13 @@ async def safe_relate(ops_test: OpsTest, ep1, ep2):
         # relation already exists? skip
         logging.error(e)
         pass
+
+
+@pytest.fixture(autouse=True, scope='module')
+async def setup_env(ops_test: OpsTest):
+    # Prevent "update-status" from interfering with the test:
+    # - if fired "too quickly", traefik will flip between active/idle and maintenance;
+    # - make sure charm code does not rely on update-status for correct operation.
+    await ops_test.model.set_config(
+        {"update-status-hook-interval": "60m", "logging-config": "<root>=WARNING; unit=DEBUG"}
+    )

@@ -20,13 +20,6 @@ from tests.integration.test_charm_tcp import (  # noqa
 )
 
 
-@pytest.mark.abort_on_fail
-async def test_setup_env(ops_test: OpsTest):
-    await ops_test.model.set_config(
-        {"update-status-hook-interval": "60m", "logging-config": "<root>=WARNING; unit=DEBUG"}
-    )
-
-
 @pytest_asyncio.fixture
 async def tcp_ipa_deployment(
     ops_test: OpsTest, traefik_charm, tcp_tester_charm, ipa_tester_charm  # noqa
