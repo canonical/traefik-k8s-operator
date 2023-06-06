@@ -334,7 +334,7 @@ async def safe_relate(ops_test: OpsTest, ep1, ep2):
         pass
 
 
-@pytest.fixture(autouse=True, scope='module')
+@pytest.fixture(autouse=True, scope="module")
 async def setup_env(ops_test: OpsTest):
     # Prevent "update-status" from interfering with the test:
     # - if fired "too quickly", traefik will flip between active/idle and maintenance;

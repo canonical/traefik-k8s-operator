@@ -2,7 +2,6 @@
 # See LICENSE file for licensing details.
 import asyncio
 
-import pytest
 import pytest_asyncio
 from pytest_operator.plugin import OpsTest
 
