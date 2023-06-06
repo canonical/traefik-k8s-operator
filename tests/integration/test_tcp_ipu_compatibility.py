@@ -2,6 +2,7 @@
 # See LICENSE file for licensing details.
 import asyncio
 
+import pytest
 import pytest_asyncio
 from pytest_operator.plugin import OpsTest
 
@@ -17,6 +18,15 @@ from tests.integration.test_charm_tcp import (  # noqa
     assert_tcp_charm_has_ingress,
     tcp_charm_resources,
 )
+
+
+@pytest.mark.abort_on_fail
+async def test_setup_env(ops_test: OpsTest):
+    # ensure update-status does not fire "too" quickly, else traefik will flip between
+    # active/idle and maintenance: updating ingress configuration
+    await ops_test.model.set_config(
+        {"update-status-hook-interval": "60m", "logging-config": "<root>=WARNING; unit=DEBUG"}
+    )
 
 
 @pytest_asyncio.fixture
@@ -35,21 +45,14 @@ async def tcp_ipu_deployment(
         safe_relate(ops_test, "ipu-tester:ingress-per-unit", "traefik-k8s:ingress-per-unit"),
     )
 
-    # Make sure update-status triggers once so everything is up-to-date
-    async with ops_test.fast_forward("10s"):
-        await asyncio.sleep(15)
-
-    # ensure update-status does not fire "too" quickly, else traefik will flip between
-    # active/idle and maintenance: updating ingress configuration
-    async with ops_test.fast_forward("60s"):
-        # Use "idle_period" to make sure traefik is functioning
-        # Otherwise, occasionally getting "Connection refused"
-        await ops_test.model.wait_for_idle(
-            ["traefik-k8s", "tcp-tester", "ipu-tester"],
-            status="active",
-            timeout=3000,
-            idle_period=30,
-        )
+    # Use "idle_period" to make sure traefik is functioning
+    # Otherwise, occasionally getting "Connection refused"
+    await ops_test.model.wait_for_idle(
+        ["traefik-k8s", "tcp-tester", "ipu-tester"],
+        status="active",
+        timeout=3000,
+        idle_period=30,
+    )
 
     yield
     await ops_test.model.applications["tcp-tester"].remove()

@@ -2,6 +2,7 @@
 # See LICENSE file for licensing details.
 import asyncio
 
+import pytest
 import pytest_asyncio
 from pytest_operator.plugin import OpsTest
 
@@ -17,6 +18,13 @@ from tests.integration.test_charm_tcp import (  # noqa
     assert_tcp_charm_has_ingress,
     tcp_charm_resources,
 )
+
+
+@pytest.mark.abort_on_fail
+async def test_setup_env(ops_test: OpsTest):
+    await ops_test.model.set_config(
+        {"update-status-hook-interval": "60m", "logging-config": "<root>=WARNING; unit=DEBUG"}
+    )
 
 
 @pytest_asyncio.fixture
@@ -35,10 +43,9 @@ async def tcp_ipa_deployment(
         safe_relate(ops_test, "ipa-tester:ingress", "traefik-k8s:ingress"),
     )
 
-    async with ops_test.fast_forward("1h"):
-        await ops_test.model.wait_for_idle(
-            ["traefik-k8s", "tcp-tester", "ipa-tester"], status="active", timeout=1000
-        )
+    await ops_test.model.wait_for_idle(
+        ["traefik-k8s", "tcp-tester", "ipa-tester"], status="active", timeout=1000
+    )
 
 
 async def test_tcp_ipa_compatibility(ops_test, tcp_ipa_deployment):

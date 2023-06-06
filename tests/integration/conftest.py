@@ -317,10 +317,9 @@ async def deploy_charm_if_not_deployed(ops_test: OpsTest, charm, app_name: str, 
         await ops_test.model.deploy(charm, resources=resources, application_name=app_name)
 
     # block until app goes to active/idle
-    async with ops_test.fast_forward():
-        # if we're running this locally, we need to wait for "waiting"
-        # CI however deploys all in a single model, so traefik is active already.
-        await ops_test.model.wait_for_idle([app_name], status="active", timeout=1000)
+    # if we're running this locally, we need to wait for "waiting"
+    # CI however deploys all in a single model, so traefik is active already.
+    await ops_test.model.wait_for_idle([app_name], status="active", timeout=1000)
 
 
 async def safe_relate(ops_test: OpsTest, ep1, ep2):
