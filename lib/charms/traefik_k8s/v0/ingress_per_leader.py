@@ -14,7 +14,7 @@ To get started using the library, you just need to fetch the library using `char
 
 ```shell
 cd some-charm
-charmcraft fetch-lib charms.traefik_k8s.v1.ingress
+charmcraft fetch-lib charms.traefik_k8s.v2.ingress
 ```
 
 In the `metadata.yaml` of the charm, add the following:
@@ -29,7 +29,7 @@ requires:
 Then, to initialise the library:
 
 ```python
-from charms.traefik_k8s.v1.ingress import (IngressPerLeaderRequirer,
+from charms.traefik_k8s.v2.ingress import (IngressPerLeaderRequirer,
   IngressPerLeaderReadyEvent, IngressPerLeaderRevokedEvent)
 
 class SomeCharm(CharmBase):

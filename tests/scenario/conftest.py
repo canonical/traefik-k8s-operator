@@ -1,9 +1,8 @@
 from unittest.mock import patch
 
 import pytest
-from scenario import Context
-
 from charm import TraefikIngressCharm
+from scenario import Context
 
 
 @pytest.fixture

@@ -6,7 +6,7 @@ from textwrap import dedent
 import pytest
 import yaml
 from charms.harness_extensions.v0.capture_events import capture
-from charms.traefik_k8s.v1.ingress import (
+from charms.traefik_k8s.v2.ingress import (
     DataValidationError,
     IngressPerAppReadyEvent,
     IngressPerAppRequirer,
