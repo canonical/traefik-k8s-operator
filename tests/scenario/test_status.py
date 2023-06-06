@@ -3,41 +3,33 @@
 
 from unittest.mock import MagicMock, PropertyMock, patch
 
-import pytest
-from charm import TraefikIngressCharm
 from ops import ActiveStatus, BlockedStatus, WaitingStatus
-from scenario import Container, Context, State
-from scenario.runtime import trigger
-
-
-@pytest.fixture
-def ctx(traefik_charm):
-    return Context(charm_type=traefik_charm)
+from scenario import Container, State
 
 
 @patch("charm.TraefikIngressCharm.external_host", PropertyMock(return_value="foo.bar"))
-def test_start_traefik_is_not_running(ctx, *_):
+def test_start_traefik_is_not_running(traefik_ctx, *_):
     # GIVEN external host is set (see decorator)
     state = State(
         config={"routing_mode": "path"},
         containers=[Container(name="traefik", can_connect=True)],
     )
     # WHEN a `start` hook fires
-    out = ctx.run("start", state)
+    out = traefik_ctx.run("start", state)
 
     # THEN unit status is `waiting`
     assert out.status.unit == WaitingStatus("waiting for service: 'traefik'")
 
 
 @patch("charm.TraefikIngressCharm.external_host", PropertyMock(return_value=False))
-def test_start_traefik_no_hostname(ctx, *_):
+def test_start_traefik_no_hostname(traefik_ctx, *_):
     # GIVEN external host is not set (see decorator)
     # WHEN a `start` hook fires
     state = State(
         config={"routing_mode": "path"},
         containers=[Container(name="traefik", can_connect=True)],
     )
-    out = ctx.run("start", state)
+    out = traefik_ctx.run("start", state)
 
     # THEN unit status is `waiting`
     assert out.status.unit == WaitingStatus("gateway address unavailable")
@@ -46,7 +38,7 @@ def test_start_traefik_no_hostname(ctx, *_):
 @patch("charm.TraefikIngressCharm.external_host", PropertyMock(return_value="foo.bar"))
 @patch("charm.TraefikIngressCharm._traefik_service_running", PropertyMock(return_value=True))
 @patch("charm.TraefikIngressCharm._tcp_entrypoints_changed", MagicMock(return_value=False))
-def test_start_traefik_active(ctx, *_):
+def test_start_traefik_active(traefik_ctx, *_):
     # GIVEN external host is set (see decorator), plus additional mockery
     state = State(
         config={"routing_mode": "path"},
@@ -54,14 +46,14 @@ def test_start_traefik_active(ctx, *_):
     )
 
     # WHEN a `start` hook fires
-    out = ctx.run("start", state)
+    out = traefik_ctx.run("start", state)
 
     # THEN unit status is `active`
     assert out.status.unit == ActiveStatus()
 
 
 @patch("charm.TraefikIngressCharm.external_host", PropertyMock(return_value=False))
-def test_start_traefik_invalid_routing_mode(ctx, *_):
+def test_start_traefik_invalid_routing_mode(traefik_ctx, *_):
     # GIVEN external host is not set (see decorator)
     # AND an invalid config for routing mode
     state = State(
@@ -70,7 +62,7 @@ def test_start_traefik_invalid_routing_mode(ctx, *_):
     )
 
     # WHEN a `start` hook fires
-    out = trigger(state, "start", TraefikIngressCharm)
+    out = traefik_ctx.run("start", state)
 
     # THEN unit status is `blocked`
     assert out.status.unit == BlockedStatus("invalid routing mode: invalid_routing; see logs.")

@@ -10,16 +10,5 @@ bases:
         channel: "20.04"
 parts:
   charm:
-    charm-binary-python-packages:
-      - setuptools
     build-packages:
       - git
-
-      # The following are needed for tls-certificates-interface
-      - build-essential
-      - python3-dev
-      - pkg-config
-      - libffi-dev
-      - libssl-dev
-      - rustc
-      - cargo
