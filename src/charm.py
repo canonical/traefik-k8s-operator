@@ -580,6 +580,7 @@ class TraefikIngressCharm(CharmBase):
         # FIXME? on relation broken, data is still there so cannot simply call
         #  self._process_status_and_configurations(). For this reason, the static config in
         #  _STATIC_CONFIG_PATH will be updated only on update-status.
+        #  https://github.com/canonical/operator/issues/888
 
     def _handle_traefik_route_ready(self, event: TraefikRouteRequirerReadyEvent):
         """A traefik_route charm has published some ingress data."""

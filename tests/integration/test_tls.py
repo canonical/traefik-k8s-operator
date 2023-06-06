@@ -53,13 +53,6 @@ def get_endpoints(ops_test: OpsTest, *, scheme: str, netloc: str) -> list:
 
 
 @pytest.mark.abort_on_fail
-async def test_setup_env(ops_test: OpsTest):
-    await ops_test.model.set_config(
-        {"update-status-hook-interval": "60m", "logging-config": "<root>=WARNING; unit=DEBUG"}
-    )
-
-
-@pytest.mark.abort_on_fail
 async def test_build_and_deploy(ops_test: OpsTest, traefik_charm):
     await asyncio.gather(
         ops_test.model.deploy(traefik_charm, resources=trfk.resources, application_name=trfk.name),
