@@ -7,6 +7,10 @@ This library wraps relation endpoints using the `ingress` interface
 and provides a Python API for both requesting and providing per-application
 ingress, without load balancing across Traefik units: all traffic is routed
 through the leader instead.
+Should we further warn the reader?
+This is not a typical ingress mode and is intended only for special cases.
+Unless you're sure this is something for you, you should probably be looking at `ingress` or
+`ingress-per-unit` instead.
 
 ## Getting Started
 
@@ -29,7 +33,7 @@ requires:
 Then, to initialise the library:
 
 ```python
-from charms.traefik_k8s.v2.ingress import (IngressPerLeaderRequirer,
+from charms.traefik_k8s.v0.ingress_per_leader import (IngressPerLeaderRequirer,
   IngressPerLeaderReadyEvent, IngressPerLeaderRevokedEvent)
 
 class SomeCharm(CharmBase):
