@@ -160,11 +160,10 @@ class TraefikIngressCharm(CharmBase):
             charm=self,
             jobs=self._scrape_jobs,
             refresh_event=[
-                self.on.grafana_pebble_ready,
+                self.on.traefik_pebble_ready,
                 self.on.update_status,
             ],
         )
-
         self.certificates = TLSCertificatesRequiresV2(self, "certificates")
         # TODO update init params once auto-renew is implemented
         # https://github.com/canonical/tls-certificates-interface/issues/24
