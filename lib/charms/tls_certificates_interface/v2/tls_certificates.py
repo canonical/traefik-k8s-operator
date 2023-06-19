@@ -304,7 +304,7 @@ LIBAPI = 2
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 1
+LIBPATCH = 3
 
 REQUIRER_JSON_SCHEMA = {
     "$schema": "http://json-schema.org/draft-04/schema#",
@@ -1054,7 +1054,7 @@ class TLSCertificatesProvidesV2(Object):
             self._remove_certificate(certificate=certificate, relation_id=certificate_relation.id)
 
     def _on_relation_changed(self, event: RelationChangedEvent) -> None:
-        """Handler triggerred on relation changed event.
+        """Handler triggered on relation changed event.
 
         Looks at the relation data and either emits:
         - certificate request event: If the unit relation data contains a CSR for which
@@ -1363,7 +1363,9 @@ class TLSCertificatesRequiresV2(Object):
         relation = self.model.get_relation(self.relationship_name)
         if not relation:
             return
-        if not relation.data[relation.app].get("certificates"):  # type: ignore[index]
+        if not relation.app or not relation.app.name:
+            return
+        if not relation.data[relation.app].get("certificates"):
             return
         self.on.all_certificates_invalidated.emit()
 
