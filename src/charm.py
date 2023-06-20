@@ -157,14 +157,13 @@ class TraefikIngressCharm(CharmBase):
         # Enable log forwarding for Loki and other charms that implement loki_push_api
         self._logging = LogProxyConsumer(self, relation_name="logging", log_files=[self._log_path])
         self.metrics_endpoint = MetricsEndpointProvider(
-            self,
-            jobs=[
-                {
-                    "static_configs": [{"targets": [f"*:{self._diagnostics_port}"]}],
-                },
+            charm=self,
+            jobs=self._scrape_jobs,
+            refresh_event=[
+                self.on.traefik_pebble_ready,
+                self.on.update_status,
             ],
         )
-
         self.certificates = TLSCertificatesRequiresV2(self, "certificates")
         # TODO update init params once auto-renew is implemented
         # https://github.com/canonical/tls-certificates-interface/issues/24
@@ -1001,6 +1000,18 @@ class TraefikIngressCharm(CharmBase):
             # immediately complain about an invalid cert. If we can't resolve it via any method,
             # return None
             return None
+
+    @property
+    def _hostname(self) -> str:
+        return socket.getfqdn()
+
+    @property
+    def _scrape_jobs(self) -> list:
+        return [
+            {
+                "static_configs": [{"targets": [f"{self._hostname}:{self._diagnostics_port}"]}],
+            }
+        ]
 
 
 def _get_loadbalancer_status(namespace: str, service_name: str):
