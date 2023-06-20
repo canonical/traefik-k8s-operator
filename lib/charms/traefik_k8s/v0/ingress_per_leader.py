@@ -7,6 +7,7 @@ This library wraps relation endpoints using the `ingress` interface
 and provides a Python API for both requesting and providing per-application
 ingress, without load balancing across Traefik units: all traffic is routed
 through the leader instead.
+This is not a typical ingress mode and is intended only for special cases.
 Should we further warn the reader?
 This is not a typical ingress mode and is intended only for special cases.
 Unless you're sure this is something for you, you should probably be looking at `ingress` or
