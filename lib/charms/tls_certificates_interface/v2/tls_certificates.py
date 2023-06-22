@@ -304,7 +304,7 @@ LIBAPI = 2
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 3
+LIBPATCH = 5
 
 REQUIRER_JSON_SCHEMA = {
     "$schema": "http://json-schema.org/draft-04/schema#",
@@ -1072,9 +1072,7 @@ class TLSCertificatesProvidesV2(Object):
         requirer_relation_data = _load_relation_data(event.relation.data[event.unit])
         provider_relation_data = _load_relation_data(event.relation.data[self.charm.app])
         if not self._relation_data_is_valid(requirer_relation_data):
-            logger.warning(
-                f"Relation data did not pass JSON Schema validation: {requirer_relation_data}"
-            )
+            logger.debug("Relation data did not pass JSON Schema validation")
             return
         provider_certificates = provider_relation_data.get("certificates", [])
         requirer_csrs = requirer_relation_data.get("certificate_signing_requests", [])
@@ -1237,12 +1235,10 @@ class TLSCertificatesRequiresV2(Object):
         """
         relation = self.model.get_relation(self.relationship_name)
         if not relation:
-            message = (
+            raise RuntimeError(
                 f"Relation {self.relationship_name} does not exist - "
                 f"The certificate request can't be completed"
             )
-            logger.error(message)
-            raise RuntimeError(message)
         self._add_requirer_csr(certificate_signing_request.decode().strip())
         logger.info("Certificate request sent to provider")
 
@@ -1314,17 +1310,14 @@ class TLSCertificatesRequiresV2(Object):
         """
         relation = self.model.get_relation(self.relationship_name)
         if not relation:
-            logger.warning(f"No relation: {self.relationship_name}")
+            logger.warning("No relation: %s", self.relationship_name)
             return
         if not relation.app:
-            logger.warning(f"No remote app in relation: {self.relationship_name}")
+            logger.warning("No remote app in relation: %s", self.relationship_name)
             return
         provider_relation_data = _load_relation_data(relation.data[relation.app])
         if not self._relation_data_is_valid(provider_relation_data):
-            logger.warning(
-                f"Provider relation data did not pass JSON Schema validation: "
-                f"{event.relation.data[relation.app]}"
-            )
+            logger.debug("Provider relation data did not pass JSON Schema validation")
             return
         requirer_csrs = [
             certificate_creation_request["certificate_signing_request"]
@@ -1365,8 +1358,6 @@ class TLSCertificatesRequiresV2(Object):
             return
         if not relation.app or not relation.app.name:
             return
-        if not relation.data[relation.app].get("certificates"):
-            return
         self.on.all_certificates_invalidated.emit()
 
     def _on_update_status(self, event: UpdateStatusEvent) -> None:
@@ -1384,17 +1375,14 @@ class TLSCertificatesRequiresV2(Object):
         """
         relation = self.model.get_relation(self.relationship_name)
         if not relation:
-            logger.debug(f"No relation: {self.relationship_name}")
+            logger.debug("No relation: %s", self.relationship_name)
             return
         if not relation.app:
-            logger.debug(f"No remote app in relation: {self.relationship_name}")
+            logger.debug("No remote app in relation: %s", self.relationship_name)
             return
         provider_relation_data = _load_relation_data(relation.data[relation.app])
         if not self._relation_data_is_valid(provider_relation_data):
-            logger.warning(
-                f"Provider relation data did not pass JSON Schema validation: "
-                f"{relation.data[relation.app]}"
-            )
+            logger.debug("Provider relation data did not pass JSON Schema validation")
             return
         for certificate_dict in self._provider_certificates:
             try:
