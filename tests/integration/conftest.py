@@ -100,8 +100,6 @@ async def traefik_charm(ops_test):
 @timed_memoizer
 async def ipa_tester_charm(ops_test):
     charm_path = (Path(__file__).parent / "testers" / "ipa").absolute()
-    clean_cmd = ["charmcraft", "clean", "-p", charm_path]
-    await ops_test.run(*clean_cmd)
     charm = await ops_test.build_charm(charm_path, verbosity="debug")
     return charm
 
@@ -110,8 +108,6 @@ async def ipa_tester_charm(ops_test):
 @timed_memoizer
 async def ipu_tester_charm(ops_test):
     charm_path = (Path(__file__).parent / "testers" / "ipu").absolute()
-    clean_cmd = ["charmcraft", "clean", "-p", charm_path]
-    await ops_test.run(*clean_cmd)
     charm = await ops_test.build_charm(charm_path, verbosity="debug")
     return charm
 
@@ -120,8 +116,6 @@ async def ipu_tester_charm(ops_test):
 @timed_memoizer
 async def tcp_tester_charm(ops_test):
     charm_path = (Path(__file__).parent / "testers" / "tcp").absolute()
-    clean_cmd = ["charmcraft", "clean", "-p", charm_path]
-    await ops_test.run(*clean_cmd)
     charm = await ops_test.build_charm(charm_path, verbosity="debug")
     return charm
 
@@ -130,8 +124,6 @@ async def tcp_tester_charm(ops_test):
 @timed_memoizer
 async def route_tester_charm(ops_test):
     charm_path = (Path(__file__).parent / "testers" / "route").absolute()
-    clean_cmd = ["charmcraft", "clean", "-p", charm_path]
-    await ops_test.run(*clean_cmd)
     charm = await ops_test.build_charm(charm_path, verbosity="debug")
     return charm
 
@@ -317,8 +309,7 @@ async def deploy_traefik_if_not_deployed(ops_test: OpsTest, traefik_charm):
             raise e
 
     # now we're most definitely active.
-    async with ops_test.fast_forward():
-        await ops_test.model.wait_for_idle(["traefik-k8s"], timeout=1000)
+    await ops_test.model.wait_for_idle(["traefik-k8s"], timeout=1000)
 
 
 async def deploy_charm_if_not_deployed(ops_test: OpsTest, charm, app_name: str, resources=None):

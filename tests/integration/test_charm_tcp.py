@@ -22,13 +22,19 @@ tcp_charm_resources = {
 
 
 @pytest.mark.abort_on_fail
+async def test_setup_env(ops_test: OpsTest):
+    await ops_test.model.set_config(
+        {"update-status-hook-interval": "60m", "logging-config": "<root>=WARNING; unit=DEBUG"}
+    )
+
+
+@pytest.mark.abort_on_fail
 async def test_deployment(ops_test: OpsTest, traefik_charm, tcp_tester_charm):
     await deploy_traefik_if_not_deployed(ops_test, traefik_charm)
     await ops_test.model.deploy(tcp_tester_charm, "tcp-tester", resources=tcp_charm_resources)
-    async with ops_test.fast_forward():
-        await ops_test.model.wait_for_idle(
-            ["traefik-k8s", "tcp-tester"], status="active", timeout=1000
-        )
+    await ops_test.model.wait_for_idle(
+        ["traefik-k8s", "tcp-tester"], status="active", timeout=1000
+    )
 
 
 @pytest.mark.abort_on_fail
@@ -36,8 +42,7 @@ async def test_relate(ops_test: OpsTest):
     await ops_test.model.add_relation(
         "tcp-tester:ingress-per-unit", "traefik-k8s:ingress-per-unit"
     )
-    async with ops_test.fast_forward():
-        await ops_test.model.wait_for_idle(["traefik-k8s", "tcp-tester"])
+    await ops_test.model.wait_for_idle(["traefik-k8s", "tcp-tester"])
 
 
 @pytest.mark.abort_on_fail
@@ -79,9 +84,18 @@ async def assert_tcp_charm_has_ingress(ops_test: OpsTest):
     )
     port = data.requirer.unit_data["port"]
 
+    logger.info("Attempting to connect %s:%s...", traefik_ip, int(port))
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        logger.info("Attempting to connect %s:%s...", traefik_ip, int(port))
-        s.connect((traefik_ip, int(port)))
+        # By default, sockets are created in blocking mode, which may end up causing the GitHub
+        # action to cancel CI after 6 hours.
+        s.settimeout(10)
+
+        # If we attempt too early (before traefik finished setting everything up), we'd get:
+        # ConnectionRefusedError: [Errno 111] Connection refused
+        await ops_test.model.block_until(
+            lambda: s.connect_ex((traefik_ip, int(port))) == 0, timeout=300, wait_period=5
+        )
+
         s.sendall(b"Hello, world")
         data = s.recv(1024)
 
@@ -98,9 +112,8 @@ async def test_remove_relation(ops_test: OpsTest):
     await ops_test.juju(
         "remove-relation", "tcp-tester:ingress-per-unit", "traefik-k8s:ingress-per-unit"
     )
-    async with ops_test.fast_forward():
-        await ops_test.model.wait_for_idle(["traefik-k8s"], status="active")
-        # the tcp-tester is allowed to bork out, we don't really care
+    await ops_test.model.wait_for_idle(["traefik-k8s"], status="active")
+    # the tcp-tester is allowed to bork out, we don't really care
 
 
 async def test_cleanup(ops_test):

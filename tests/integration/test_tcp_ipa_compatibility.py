@@ -35,7 +35,7 @@ async def tcp_ipa_deployment(
         safe_relate(ops_test, "ipa-tester:ingress", "traefik-k8s:ingress"),
     )
 
-    async with ops_test.fast_forward():
+    async with ops_test.fast_forward("1h"):
         await ops_test.model.wait_for_idle(
             ["traefik-k8s", "tcp-tester", "ipa-tester"], status="active", timeout=1000
         )
