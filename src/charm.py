@@ -11,7 +11,7 @@ import logging
 import re
 import socket
 import typing
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 from urllib.parse import urlparse
 
 import yaml
@@ -30,8 +30,8 @@ from charms.tls_certificates_interface.v2.tls_certificates import (
     generate_csr,
     generate_private_key,
 )
-from charms.traefik_k8s.v1.ingress import IngressPerAppProvider
 from charms.traefik_k8s.v1.ingress_per_unit import DataValidationError, IngressPerUnitProvider
+from charms.traefik_k8s.v2.ingress import IngressPerAppProvider
 from charms.traefik_route_k8s.v0.traefik_route import (
     TraefikRouteProvider,
     TraefikRouteRequirerReadyEvent,
@@ -56,8 +56,9 @@ from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, Relation, 
 from ops.pebble import APIError, PathError
 
 if typing.TYPE_CHECKING:
-    from charms.traefik_k8s.v1.ingress import RequirerData as RequirerData_IPA
     from charms.traefik_k8s.v1.ingress_per_unit import RequirerData as RequirerData_IPU
+    from charms.traefik_k8s.v2.ingress import RequirerAppData as RequirerAppData_IPA
+    from charms.traefik_k8s.v2.ingress import RequirerUnitData as RequirerUnitData_IPA
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +72,7 @@ _DYNAMIC_CERTS_PATH = _DYNAMIC_CONFIG_DIR + "/certificates.yaml"
 _CERTIFICATE_PATH = _DYNAMIC_CONFIG_DIR + "/certificate.cert"
 _CERTIFICATE_KEY_PATH = _DYNAMIC_CONFIG_DIR + "/certificate.key"
 BIN_PATH = "/usr/bin/traefik"
+
 
 # pyright: reportGeneralTypeIssues=false
 
@@ -193,13 +195,10 @@ class TraefikIngressCharm(CharmBase):
         observe(self.on.update_status, self._on_update_status)
         observe(self.on.config_changed, self._on_config_changed)
 
-        ipa_events = self.ingress_per_app.on
-        observe(ipa_events.data_provided, self._handle_ingress_data_provided)
-        observe(ipa_events.data_removed, self._handle_ingress_data_removed)
-
-        ipu_events = self.ingress_per_unit.on
-        observe(ipu_events.data_provided, self._handle_ingress_data_provided)
-        observe(ipu_events.data_removed, self._handle_ingress_data_removed)
+        # observe data_provided and data_removed events for all types of ingress we offer:
+        for ingress in (self.ingress_per_unit, self.ingress_per_app):
+            observe(ingress.on.data_provided, self._handle_ingress_data_provided)
+            observe(ingress.on.data_removed, self._handle_ingress_data_removed)
 
         route_events = self.traefik_route.on
         observe(route_events.ready, self._handle_traefik_route_ready)
@@ -564,6 +563,10 @@ class TraefikIngressCharm(CharmBase):
             return
         self._process_ingress_relation(event.relation)
 
+        # Without the following line, _STATIC_CONFIG_PATH is updated with TCP endpoints only on
+        # update-status.
+        self._process_status_and_configurations()
+
         if isinstance(self.unit.status, MaintenanceStatus):
             self.unit.status = ActiveStatus()
 
@@ -572,6 +575,10 @@ class TraefikIngressCharm(CharmBase):
         self._wipe_ingress_for_relation(
             event.relation, wipe_rel_data=not isinstance(event, RelationBrokenEvent)
         )
+
+        # FIXME? on relation broken, data is still there so cannot simply call
+        #  self._process_status_and_configurations(). For this reason, the static config in
+        #  _STATIC_CONFIG_PATH will be updated only on update-status.
 
     def _handle_traefik_route_ready(self, event: TraefikRouteRequirerReadyEvent):
         """A traefik_route charm has published some ingress data."""
@@ -626,7 +633,9 @@ class TraefikIngressCharm(CharmBase):
         self._push_configurations(relation, config)
 
     def _provide_ingress(
-        self, relation: Relation, provider: Union[IngressPerAppProvider, IngressPerAppProvider]
+        self,
+        relation: Relation,
+        provider: Union[IngressPerAppProvider, IngressPerAppProvider],
     ):
         # to avoid long-gone units from lingering in the databag, we wipe it
         if self.unit.is_leader():
@@ -634,11 +643,12 @@ class TraefikIngressCharm(CharmBase):
 
         # generate configs based on ingress type
         # this will also populate our databags with the urls
-        # fixme no side-effects in _get_ method.
         if provider is self.ingress_per_unit:
             config_getter = self._get_configs_per_unit
-        else:  # self.ingress_per_app
+        elif provider is self.ingress_per_app:
             config_getter = self._get_configs_per_app
+        else:
+            raise ValueError(f"unknown provider: {provider}")
 
         configs = config_getter(relation)
         self._push_configurations(relation, configs)
@@ -647,12 +657,14 @@ class TraefikIngressCharm(CharmBase):
         provider = self.ingress_per_app
 
         try:
-            data: "RequirerData_IPA" = provider.get_data(relation)
+            data: Tuple[
+                "RequirerAppData_IPA", Iterable["RequirerUnitData_IPA"]
+            ] = provider.get_data(relation)
         except DataValidationError as e:
             logger.error(f"invalid data shared through {relation}... Error: {e}.")
             return None
 
-        config, app_url = self._generate_per_app_config(data)
+        config, app_url = self._generate_per_app_config(*data)
         if self.unit.is_leader():
             provider.publish_url(relation, app_url)
 
@@ -702,21 +714,26 @@ class TraefikIngressCharm(CharmBase):
             self._wipe_ingress_for_relation(relation)
 
     @staticmethod
-    def _get_prefix(data: Union["RequirerData_IPU", "RequirerData_IPA"]):
+    def _get_prefix(data: Union["RequirerData_IPU", "RequirerAppData_IPA"]):
         name = data["name"].replace("/", "-")
         return f"{data['model']}-{name}"
 
     def _generate_middleware_config(
-        self, data: Union["RequirerData_IPA", "RequirerData_IPU"], prefix: str
+        self,
+        data: Union["RequirerData_IPU", "RequirerAppData_IPA"],
+        prefix: str,
     ) -> dict:
-        """Generate a stripPrefix middleware for path based routing."""
-        if self._routing_mode is _RoutingMode.path and data.get("strip-prefix", False):
-            return {
-                f"juju-sidecar-noprefix-{prefix}": {
-                    "stripPrefix": {"prefixes": [f"/{prefix}"], "forceSlash": False}
-                }
-            }
+        """Generate a middleware config."""
+        config = {}  # type: Dict[str, Dict[str, Any]]
+        if self._routing_mode is _RoutingMode.path:
+            if data.get("strip-prefix", False):
+                config.update({"stripPrefix": {"prefixes": [f"/{prefix}"], "forceSlash": False}})
 
+        if data.get("redirect-https", False):
+            config.update({"redirectScheme": {"scheme": "https", "port": 443, "permanent": True}})
+
+        if config:
+            return {f"juju-sidecar-noprefix-{prefix}": config}
         return {}
 
     def _generate_per_unit_config(self, data: "RequirerData_IPU") -> Tuple[dict, str]:
@@ -828,11 +845,17 @@ class TraefikIngressCharm(CharmBase):
             }
         }
 
-    def _generate_per_app_config(self, data: "RequirerData_IPA") -> Tuple[dict, str]:
-        prefix = self._get_prefix(data)
-
-        lb_servers = [{"url": f"http://{data['host']}:{data['port']}"}]
-        return self._generate_config_block(prefix, lb_servers, data)
+    def _generate_per_app_config(
+        self,
+        leader_data: "RequirerAppData_IPA",
+        followers_data: Iterable["RequirerUnitData_IPA"],
+    ) -> Tuple[dict, str]:
+        prefix = self._get_prefix(leader_data)
+        lb_servers = [
+            {"url": f"http://{unit_data['host']}:{unit_data['port']}"}
+            for unit_data in followers_data
+        ]
+        return self._generate_config_block(prefix, lb_servers, leader_data)
 
     def _wipe_ingress_for_all_relations(self):
         for relation in self.model.relations["ingress"] + self.model.relations["ingress-per-unit"]:
@@ -861,7 +884,8 @@ class TraefikIngressCharm(CharmBase):
         if wipe_rel_data and self.unit.is_leader() and provider != self.traefik_route:
             provider.wipe_ingress_data(relation)
 
-    def _relation_config_file(self, relation: Relation):
+    @staticmethod
+    def _relation_config_file(relation: Relation):
         # Using both the relation id and the app name in the file to facilitate
         # the debugging experience somewhat when snooping into the container at runtime:
         # Apps not in the same model as Traefik (i.e., if `relation` is a CRM) will have
@@ -911,7 +935,7 @@ class TraefikIngressCharm(CharmBase):
             return self.ingress_per_unit
         if relation_type is _IngressRelationType.routed:
             return self.traefik_route
-        raise RuntimeError("Invalid relation type (shouldn't happen)")
+        raise RuntimeError(f"Invalid relation type: {relation_type} ({relation.name})")
 
     @property
     def external_host(self):
