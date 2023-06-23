@@ -523,8 +523,6 @@ class IngressPerAppRequirer(_IngressPerAppBase):
     def provide_ingress_requirements(self, *, host: Optional[str] = None, port: int):
         """Publishes the data that Traefik needs to provide ingress.
 
-        NB only the leader unit is supposed to do this.
-
         Args:
             host: Hostname to be used by the ingress provider to address the
              requirer unit; if unspecified, FQDN will be used instead
@@ -533,27 +531,34 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         # get only the leader to publish the data since we only
         # require one unit to publish it -- it will not differ between units,
         # unlike in ingress-per-unit.
-        assert self.unit.is_leader(), "only leaders should do this."
         assert self.relation, "no relation"
+
+        if self.unit.is_leader():
+            leader_data = {
+                "model": self.model.name,
+                "name": self.app.name,
+            }
+
+            if self._strip_prefix:
+                leader_data["strip-prefix"] = "true"
+
+            if self._redirect_https:
+                leader_data["redirect-https"] = "true"
+
+            _validate_data(leader_data, INGRESS_REQUIRES_APP_SCHEMA)
+            self.relation.data[self.app].update(leader_data)
 
         if not host:
             host = socket.getfqdn()
 
-        data = {
-            "model": self.model.name,
-            "name": self.app.name,
+        unit_data = {
             "host": host,
-            "port": str(port),
+            "port": port,
         }
+        _validate_data(unit_data, INGRESS_REQUIRES_UNIT_SCHEMA)
 
-        if self._strip_prefix:
-            data["strip-prefix"] = "true"
-
-        if self._redirect_https:
-            data["redirect-https"] = "true"
-
-        _validate_data(data, INGRESS_REQUIRES_APP_SCHEMA)
-        self.relation.data[self.app].update(data)
+        unit_data['port'] = str(port)
+        self.relation.data[self.app].update(unit_data)
 
     @property
     def relation(self):
