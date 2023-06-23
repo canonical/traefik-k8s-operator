@@ -86,7 +86,7 @@ def test_ingress_per_app_created(
 
     generated_config = yaml.safe_load(
         traefik_container.filesystem.open(
-            "/opt/traefik/juju/juju_ingress_ingress_1_remote.yaml"
+            f"/opt/traefik/juju/juju_ingress_ingress_{ipa.relation_id}_remote.yaml"
         ).read()
     )
 

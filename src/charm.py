@@ -667,7 +667,7 @@ class TraefikIngressCharm(CharmBase):
 
         try:
             data: Tuple[
-                "RequirerLeaderData_IPA", Iterable[RequirerFollowerData_IPA]
+                "RequirerAppData_IPA", Iterable["RequirerUnitData_IPA"]
             ] = provider.get_data(relation)
         except DataValidationError as e:
             logger.error(f"invalid data shared through {relation}... Error: {e}.")
@@ -738,13 +738,13 @@ class TraefikIngressCharm(CharmBase):
             self._wipe_ingress_for_relation(relation)
 
     @staticmethod
-    def _get_prefix(data: Union["RequirerData_IPU", "RequirerData_IPL", "RequirerLeaderData_IPA"]):
+    def _get_prefix(data: Union["RequirerData_IPU", "RequirerData_IPL", "RequirerAppData_IPA"]):
         name = data["name"].replace("/", "-")
         return f"{data['model']}-{name}"
 
     def _generate_middleware_config(
         self,
-        data: Union["RequirerData_IPL", "RequirerData_IPU", "RequirerLeaderData_IPA"],
+        data: Union["RequirerData_IPL", "RequirerData_IPU", "RequirerAppData_IPA"],
         prefix: str,
     ) -> dict:
         """Generate a middleware config."""
@@ -871,8 +871,8 @@ class TraefikIngressCharm(CharmBase):
 
     def _generate_per_app_config(
         self,
-        leader_data: "RequirerLeaderData_IPA",
-        followers_data: Iterable["RequirerFollowerData_IPA"],
+        leader_data: "RequirerAppData_IPA",
+        followers_data: Iterable["RequirerUnitData_IPA"],
     ) -> Tuple[dict, str]:
         prefix = self._get_prefix(leader_data)
         lb_servers = [
