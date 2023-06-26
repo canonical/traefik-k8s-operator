@@ -88,6 +88,26 @@ def _render_middlewares(*, strip_prefix: bool = False, redirect_https: bool = Fa
     )
 
 
+def _render_middlewares(*, strip_prefix: bool = False, redirect_https: bool = False) -> dict:
+    middlewares = {}
+    if redirect_https:
+        middlewares.update({"redirectScheme": {"scheme": "https", "port": 443, "permanent": True}})
+    if strip_prefix:
+        middlewares.update(
+            {
+                "stripPrefix": {
+                    "prefixes": ["/test-model-remote-0"],
+                    "forceSlash": False,
+                }
+            }
+        )
+    return (
+        {"middlewares": {"juju-sidecar-noprefix-test-model-remote-0": middlewares}}
+        if middlewares
+        else {}
+    )
+
+
 class _RequirerMock:
     local_app: Application = None
     relation: Relation = None
