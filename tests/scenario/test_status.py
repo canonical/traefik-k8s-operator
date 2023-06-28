@@ -25,7 +25,7 @@ class TestUnitStatus(unittest.TestCase):
         out = Context(charm_type=TraefikIngressCharm).run("start", self.state)
 
         # THEN unit status is `waiting`
-        self.assertEqual(out.status.unit, ("waiting", "waiting for service: 'traefik'"))
+        self.assertEqual(out.unit_status, ("waiting", "waiting for service: 'traefik'"))
 
     @patch("charm.TraefikIngressCharm.external_host", PropertyMock(return_value=False))
     def test_start_traefik_no_hostname(self, *_):
@@ -34,7 +34,7 @@ class TestUnitStatus(unittest.TestCase):
         out = Context(charm_type=TraefikIngressCharm).run("start", self.state)
 
         # THEN unit status is `waiting`
-        self.assertEqual(out.status.unit, ("waiting", "gateway address unavailable"))
+        self.assertEqual(out.unit_status, ("waiting", "gateway address unavailable"))
 
     @patch("charm.TraefikIngressCharm.external_host", PropertyMock(return_value="foo.bar"))
     @patch("charm.TraefikIngressCharm._traefik_service_running", PropertyMock(return_value=True))
@@ -45,7 +45,7 @@ class TestUnitStatus(unittest.TestCase):
         out = Context(charm_type=TraefikIngressCharm).run("start", self.state)
 
         # THEN unit status is `active`
-        self.assertEqual(out.status.unit, ("active", ""))
+        self.assertEqual(out.unit_status, ("active", ""))
 
     @patch("charm.TraefikIngressCharm.external_host", PropertyMock(return_value=False))
     def test_start_traefik_invalid_routing_mode(self, *_):
@@ -61,7 +61,7 @@ class TestUnitStatus(unittest.TestCase):
 
         # THEN unit status is `blocked`
         self.assertEqual(
-            out.status.unit, ("blocked", "invalid routing mode: invalid_routing; see logs.")
+            out.unit_status, ("blocked", "invalid routing mode: invalid_routing; see logs.")
         )
 
 

@@ -41,7 +41,7 @@ def test_start_traefik_is_not_running(*_):
         ],
     )
     out = Context(charm_type=TraefikIngressCharm).run("start", state)
-    assert out.status.unit == ("waiting", f"waiting for service: '{_TRAEFIK_SERVICE_NAME}'")
+    assert out.unit_status == ("waiting", f"waiting for service: '{_TRAEFIK_SERVICE_NAME}'")
 
 
 @patch("charm.KubernetesServicePatch")
@@ -53,7 +53,7 @@ def test_start_traefik_no_hostname(*_):
         containers=[Container(name="traefik", can_connect=False)],
     )
     out = Context(charm_type=TraefikIngressCharm).run("start", state)
-    assert out.status.unit == ("waiting", "gateway address unavailable")
+    assert out.unit_status == ("waiting", "gateway address unavailable")
 
 
 @patch("charm.KubernetesServicePatch")
@@ -67,7 +67,7 @@ def test_start_traefik_active(*_):
         containers=[Container(name="traefik", can_connect=False)],
     )
     out = Context(charm_type=TraefikIngressCharm).run("start", state)
-    assert out.status.unit == ("active", "")
+    assert out.unit_status == ("active", "")
 
 
 @patch("charm.KubernetesServicePatch")
@@ -79,4 +79,4 @@ def test_start_traefik_invalid_routing_mode(*_):
         containers=[Container(name="traefik", can_connect=False)],
     )
     out = Context(charm_type=TraefikIngressCharm).run("start", state)
-    assert out.status.unit == ("blocked", "invalid routing mode: invalid_routing; see logs.")
+    assert out.unit_status == ("blocked", "invalid routing mode: invalid_routing; see logs.")
