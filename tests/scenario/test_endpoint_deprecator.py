@@ -24,7 +24,7 @@ def charm_type():
             super().__init__(framework)
             self.ipa_v1 = ipa_v1 = IPAV1Shim(charm=self)
             self.ipa_v2 = ipa_v2 = IPAV2Shim(charm=self)
-            self.ipa = EventRemapper(self, "ingress", (
+            self.ipa = EventRemapper(self, "ingress", remappings=(
                 (("1", ipa_v1, ipa_v1.is_ready), {
                     ipa_v1.on.data_provided: self._provide_ingress_v1,
                     ipa_v1.on.data_removed: self._remove_ingress_v1
