@@ -31,7 +31,7 @@ from charms.tls_certificates_interface.v2.tls_certificates import (
     generate_private_key,
 )
 from charms.traefik_k8s.v1.ingress_per_unit import DataValidationError, IngressPerUnitProvider
-from charms.traefik_k8s.v2.ingress import IngressPerAppProvider
+from charms.traefik_k8s.v2 import ingress as ingress_v2
 from charms.traefik_route_k8s.v0.traefik_route import (
     TraefikRouteProvider,
     TraefikRouteRequirerReadyEvent,
@@ -57,8 +57,6 @@ from ops.pebble import APIError, PathError
 
 if typing.TYPE_CHECKING:
     from charms.traefik_k8s.v1.ingress_per_unit import RequirerData as RequirerData_IPU
-    from charms.traefik_k8s.v2.ingress import RequirerAppData as RequirerAppData_IPA
-    from charms.traefik_k8s.v2.ingress import RequirerUnitData as RequirerUnitData_IPA
 
 logger = logging.getLogger(__name__)
 
@@ -125,7 +123,7 @@ class TraefikIngressCharm(CharmBase):
         # FIXME
         # stored.tcp_entrypoints would be used for this list instead, but it's never accessed.
         # intentional or can it be used so we don't need to worry about ordering?
-        self.ingress_per_app = IngressPerAppProvider(charm=self)
+        self.ingress_per_app = ingress_v2.IngressPerAppProvider(charm=self)
         self.ingress_per_unit = IngressPerUnitProvider(charm=self)
         self.traefik_route = TraefikRouteProvider(charm=self, external_host=self.external_host)
 
@@ -635,7 +633,7 @@ class TraefikIngressCharm(CharmBase):
     def _provide_ingress(
         self,
         relation: Relation,
-        provider: Union[IngressPerAppProvider, IngressPerAppProvider],
+        provider: Union[ingress_v2.IngressPerAppProvider, ingress_v2.IngressPerAppProvider],
     ):
         # to avoid long-gone units from lingering in the databag, we wipe it
         if self.unit.is_leader():
@@ -658,7 +656,7 @@ class TraefikIngressCharm(CharmBase):
 
         try:
             data: Tuple[
-                "RequirerAppData_IPA", Iterable["RequirerUnitData_IPA"]
+                ingress_v2.RequirerAppData, Iterable[ingress_v2.RequirerUnitData]
             ] = provider.get_data(relation)
         except DataValidationError as e:
             logger.error(f"invalid data shared through {relation}... Error: {e}.")
@@ -714,13 +712,13 @@ class TraefikIngressCharm(CharmBase):
             self._wipe_ingress_for_relation(relation)
 
     @staticmethod
-    def _get_prefix(data: Union["RequirerData_IPU", "RequirerAppData_IPA"]):
+    def _get_prefix(data: Union["RequirerData_IPU", ingress_v2.RequirerAppData]):
         name = data["name"].replace("/", "-")
         return f"{data['model']}-{name}"
 
     def _generate_middleware_config(
         self,
-        data: Union["RequirerData_IPU", "RequirerAppData_IPA"],
+        data: Union["RequirerData_IPU", ingress_v2.RequirerAppData],
         prefix: str,
     ) -> dict:
         """Generate a middleware config."""
@@ -847,8 +845,8 @@ class TraefikIngressCharm(CharmBase):
 
     def _generate_per_app_config(
         self,
-        leader_data: "RequirerAppData_IPA",
-        followers_data: Iterable["RequirerUnitData_IPA"],
+        leader_data: ingress_v2.RequirerAppData,
+        followers_data: Iterable[ingress_v2.RequirerUnitData],
     ) -> Tuple[dict, str]:
         prefix = self._get_prefix(leader_data)
         lb_servers = [
