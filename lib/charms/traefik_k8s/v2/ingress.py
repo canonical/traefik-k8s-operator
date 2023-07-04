@@ -54,6 +54,7 @@ class SomeCharm(CharmBase):
 import logging
 import socket
 import typing
+from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 import yaml
@@ -269,6 +270,13 @@ class NotReadyError(RuntimeError):
     """Raised when a relation is not ready."""
 
 
+@dataclass
+class IngressRequirerData:
+    """Data exposed by the ingress requirer to the provider."""
+    app: RequirerAppData
+    units: List[RequirerUnitData]
+
+
 class IngressPerAppProvider(_IngressPerAppBase):
     """Implementation of the provider of ingress."""
 
@@ -288,14 +296,14 @@ class IngressPerAppProvider(_IngressPerAppBase):
         # created, joined or changed: if remote side has sent the required data:
         # notify listeners.
         if self.is_ready(event.relation):
-            leader_data, followers_data = self.get_data(event.relation)
+            data = self.get_data(event.relation)
             self.on.data_provided.emit(  # type: ignore
                 event.relation,
-                leader_data["name"],
-                leader_data["model"],
-                followers_data,
-                leader_data.get("strip-prefix", False),
-                leader_data.get("redirect-https", False),
+                data.app["name"],
+                data.app["model"],
+                data.units,
+                data.app.get("strip-prefix", False),
+                data.app.get("redirect-https", False),
             )
 
     def _handle_relation_broken(self, event):
@@ -315,7 +323,7 @@ class IngressPerAppProvider(_IngressPerAppBase):
             return
         del relation.data[self.app]["ingress"]
 
-    def _get_requirer_followers_data(self, relation: Relation) -> List[RequirerUnitData]:
+    def _get_requirer_units_data(self, relation: Relation) -> List[RequirerUnitData]:
         """Fetch and validate the requirer's app databag.
 
         We cast port to int for convenience.
@@ -335,7 +343,7 @@ class IngressPerAppProvider(_IngressPerAppBase):
             out.append(typing.cast(RequirerUnitData, remote_unit_data))
         return out
 
-    def _get_requirer_leader_data(self, relation: Relation) -> RequirerAppData:
+    def _get_requirer_app_data(self, relation: Relation) -> RequirerAppData:
         """Fetch and validate the requirer's app databag."""
         app: Optional[Application] = relation.app
         if app is None:
@@ -357,10 +365,13 @@ class IngressPerAppProvider(_IngressPerAppBase):
         )
         return typing.cast(RequirerAppData, remote_app_data)
 
-    def get_data(self, relation: Relation) -> Tuple[RequirerAppData, List[RequirerUnitData]]:
-        """Fetch the remote app and units' databags."""
-        return self._get_requirer_leader_data(relation), self._get_requirer_followers_data(
-            relation
+    def get_data(self, relation: Relation) -> IngressRequirerData:
+        """Fetch the remote (requirer) app and units' databags."""
+        return IngressRequirerData(
+            self._get_requirer_app_data(relation),
+            self._get_requirer_units_data(
+                relation
+            )
         )
 
     def is_ready(self, relation: Optional[Relation] = None):
@@ -369,10 +380,11 @@ class IngressPerAppProvider(_IngressPerAppBase):
             return any(map(self.is_ready, self.relations))
 
         try:
-            return bool(self.get_data(relation))
+            self.get_data(relation)
         except DataValidationError as e:
             log.warning("Requirer not ready; validation error encountered: %s" % str(e))
             return False
+        return True
 
     def _provided_url(self, relation: Relation) -> ProviderIngressData:  # type: ignore
         """Fetch and validate this app databag; return the ingress url."""
@@ -455,14 +467,14 @@ class IngressPerAppRequirer(_IngressPerAppBase):
     _stored = StoredState()
 
     def __init__(
-        self,
-        charm: CharmBase,
-        relation_name: str = DEFAULT_RELATION_NAME,
-        *,
-        host: Optional[str] = None,
-        port: Optional[int] = None,
-        strip_prefix: bool = False,
-        redirect_https: bool = False,
+            self,
+            charm: CharmBase,
+            relation_name: str = DEFAULT_RELATION_NAME,
+            *,
+            host: Optional[str] = None,
+            port: Optional[int] = None,
+            strip_prefix: bool = False,
+            redirect_https: bool = False,
     ):
         """Constructor for IngressRequirer.
 
@@ -549,19 +561,19 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         assert self.relation, "no relation"
 
         if self.unit.is_leader():
-            leader_data = {
+            app_data = {
                 "model": self.model.name,
                 "name": self.app.name,
             }
 
             if self._strip_prefix:
-                leader_data["strip-prefix"] = "true"
+                app_data["strip-prefix"] = "true"
 
             if self._redirect_https:
-                leader_data["redirect-https"] = "true"
+                app_data["redirect-https"] = "true"
 
-            _validate_data(leader_data, INGRESS_REQUIRES_APP_SCHEMA)
-            self.relation.data[self.app].update(leader_data)
+            _validate_data(app_data, INGRESS_REQUIRES_APP_SCHEMA)
+            self.relation.data[self.app].update(app_data)
 
         if not host:
             host = socket.getfqdn()

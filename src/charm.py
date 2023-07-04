@@ -31,7 +31,7 @@ from charms.tls_certificates_interface.v2.tls_certificates import (
     generate_private_key,
 )
 from charms.traefik_k8s.v1.ingress_per_unit import DataValidationError, IngressPerUnitProvider
-from charms.traefik_k8s.v2.ingress import IngressPerAppProvider
+from charms.traefik_k8s.v2.ingress import IngressPerAppProvider, IngressRequirerData
 from charms.traefik_route_k8s.v0.traefik_route import (
     TraefikRouteProvider,
     TraefikRouteRequirerReadyEvent,
@@ -657,14 +657,12 @@ class TraefikIngressCharm(CharmBase):
         provider = self.ingress_per_app
 
         try:
-            data: Tuple[
-                "RequirerAppData_IPA", Iterable["RequirerUnitData_IPA"]
-            ] = provider.get_data(relation)
+            data = provider.get_data(relation)
         except DataValidationError as e:
             logger.error(f"invalid data shared through {relation}... Error: {e}.")
             return None
 
-        config, app_url = self._generate_per_app_config(*data)
+        config, app_url = self._generate_per_app_config(data)
         if self.unit.is_leader():
             provider.publish_url(relation, app_url)
 
@@ -847,15 +845,14 @@ class TraefikIngressCharm(CharmBase):
 
     def _generate_per_app_config(
         self,
-        leader_data: "RequirerAppData_IPA",
-        followers_data: Iterable["RequirerUnitData_IPA"],
+        data: "IngressRequirerData",
     ) -> Tuple[dict, str]:
-        prefix = self._get_prefix(leader_data)
+        prefix = self._get_prefix(data.app)
         lb_servers = [
             {"url": f"http://{unit_data['host']}:{unit_data['port']}"}
-            for unit_data in followers_data
+            for unit_data in data.units
         ]
-        return self._generate_config_block(prefix, lb_servers, leader_data)
+        return self._generate_config_block(prefix, lb_servers, data.app)
 
     def _wipe_ingress_for_all_relations(self):
         for relation in self.model.relations["ingress"] + self.model.relations["ingress-per-unit"]:
