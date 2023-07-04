@@ -60,7 +60,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 import yaml
 from ops.charm import CharmBase, RelationBrokenEvent, RelationEvent
 from ops.framework import EventSource, Object, ObjectEvents, StoredState
-from ops.model import ModelError, Relation, Application, Unit
+from ops.model import Application, ModelError, Relation, Unit
 
 # The unique Charmhub library identifier, never change it
 LIBID = "e6de2a5cd5b34422a204668f3b8f90d2"
@@ -273,6 +273,7 @@ class NotReadyError(RuntimeError):
 @dataclass
 class IngressRequirerData:
     """Data exposed by the ingress requirer to the provider."""
+
     app: RequirerAppData
     units: List[RequirerUnitData]
 
@@ -368,10 +369,7 @@ class IngressPerAppProvider(_IngressPerAppBase):
     def get_data(self, relation: Relation) -> IngressRequirerData:
         """Fetch the remote (requirer) app and units' databags."""
         return IngressRequirerData(
-            self._get_requirer_app_data(relation),
-            self._get_requirer_units_data(
-                relation
-            )
+            self._get_requirer_app_data(relation), self._get_requirer_units_data(relation)
         )
 
     def is_ready(self, relation: Optional[Relation] = None):
@@ -467,14 +465,14 @@ class IngressPerAppRequirer(_IngressPerAppBase):
     _stored = StoredState()
 
     def __init__(
-            self,
-            charm: CharmBase,
-            relation_name: str = DEFAULT_RELATION_NAME,
-            *,
-            host: Optional[str] = None,
-            port: Optional[int] = None,
-            strip_prefix: bool = False,
-            redirect_https: bool = False,
+        self,
+        charm: CharmBase,
+        relation_name: str = DEFAULT_RELATION_NAME,
+        *,
+        host: Optional[str] = None,
+        port: Optional[int] = None,
+        strip_prefix: bool = False,
+        redirect_https: bool = False,
     ):
         """Constructor for IngressRequirer.
 

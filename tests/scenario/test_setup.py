@@ -5,8 +5,8 @@
 
 from unittest.mock import MagicMock, PropertyMock, patch
 
-from charm import _TRAEFIK_SERVICE_NAME
-from scenario import Container, State
+from charm import _TRAEFIK_SERVICE_NAME, TraefikIngressCharm
+from scenario import Container, Context, State
 
 
 @patch("charm.TraefikIngressCharm.external_host", PropertyMock(return_value="foo.bar"))

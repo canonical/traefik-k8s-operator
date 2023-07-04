@@ -11,7 +11,7 @@ import logging
 import re
 import socket
 import typing
-from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 from urllib.parse import urlparse
 
 import yaml
@@ -58,7 +58,6 @@ from ops.pebble import APIError, PathError
 if typing.TYPE_CHECKING:
     from charms.traefik_k8s.v1.ingress_per_unit import RequirerData as RequirerData_IPU
     from charms.traefik_k8s.v2.ingress import RequirerAppData as RequirerAppData_IPA
-    from charms.traefik_k8s.v2.ingress import RequirerUnitData as RequirerUnitData_IPA
 
 logger = logging.getLogger(__name__)
 
@@ -849,8 +848,7 @@ class TraefikIngressCharm(CharmBase):
     ) -> Tuple[dict, str]:
         prefix = self._get_prefix(data.app)
         lb_servers = [
-            {"url": f"http://{unit_data['host']}:{unit_data['port']}"}
-            for unit_data in data.units
+            {"url": f"http://{unit_data['host']}:{unit_data['port']}"} for unit_data in data.units
         ]
         return self._generate_config_block(prefix, lb_servers, data.app)
 
