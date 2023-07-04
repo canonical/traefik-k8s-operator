@@ -60,7 +60,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 import yaml
 from ops.charm import CharmBase, RelationBrokenEvent, RelationEvent
 from ops.framework import EventSource, Object, ObjectEvents, StoredState
-from ops.model import Application, ModelError, Relation, Unit
+from ops.model import ModelError, Relation, Unit
 
 # The unique Charmhub library identifier, never change it
 LIBID = "e6de2a5cd5b34422a204668f3b8f90d2"
@@ -346,14 +346,14 @@ class IngressPerAppProvider(_IngressPerAppBase):
 
     def _get_requirer_app_data(self, relation: Relation) -> RequirerAppData:
         """Fetch and validate the requirer's app databag."""
-        app: Optional[Application] = relation.app
+        app = relation.app
         if app is None:
             raise NotReadyError(relation)
 
         databag = relation.data[app]
         remote_app_data: Dict[str, Union[int, str]] = {}
 
-        for k in ("model", "name", "mode", "strip-prefix"):
+        for k in ("model", "name", "mode", "strip-prefix", "redirect-https"):
             v = databag.get(k)
             if v is not None:
                 remote_app_data[k] = v

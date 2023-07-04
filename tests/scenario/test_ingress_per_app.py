@@ -4,18 +4,11 @@
 # AND WHEN the charm rescales
 # THEN the traefik config file is updated
 
-import tempfile
-from pathlib import Path
 
 import pytest
 import yaml
 from ops import pebble
-from scenario import Container, Context, Model, Mount, Relation, State
-
-
-@pytest.fixture
-def context(traefik_charm):
-    return Context(charm_type=traefik_charm)
+from scenario import Container, Model, Mount, Relation, State
 
 
 @pytest.fixture
@@ -24,13 +17,7 @@ def model():
 
 
 @pytest.fixture
-def temp_opt():
-    with tempfile.TemporaryDirectory() as td:
-        yield Path(td)
-
-
-@pytest.fixture
-def traefik_container(temp_opt):
+def traefik_container(tmp_path):
     layer = pebble.Layer(
         {
             "summary": "Traefik layer",
@@ -46,7 +33,7 @@ def traefik_container(temp_opt):
         }
     )
 
-    opt = Mount("/opt/", temp_opt)
+    opt = Mount("/opt/", tmp_path)
 
     return Container(
         name="traefik",
@@ -58,9 +45,9 @@ def traefik_container(temp_opt):
 
 
 @pytest.mark.parametrize("port, host", ((80, "1.1.1.1"), (81, "10.1.10.1")))
-@pytest.mark.parametrize("event_name", ("joined", "changed"))
+@pytest.mark.parametrize("event_name", ("joined", "changed", "created"))
 def test_ingress_per_app_created(
-    context, port, host, model, traefik_container, event_name, temp_opt
+    traefik_ctx, port, host, model, traefik_container, event_name, tmp_path
 ):
     """Check the config when a new ingress per leader is created or changes (single remote unit)."""
     ipa = Relation(
@@ -82,7 +69,7 @@ def test_ingress_per_app_created(
 
     # WHEN any relevant event fires
     event = getattr(ipa, f"{event_name}_event")
-    context.run(event, state)
+    traefik_ctx.run(event, state)
 
     generated_config = yaml.safe_load(
         traefik_container.filesystem.open(
@@ -97,9 +84,11 @@ def test_ingress_per_app_created(
 
 @pytest.mark.parametrize("port, host", ((80, "1.1.1.{}"), (81, "10.1.10.{}")))
 @pytest.mark.parametrize("n_units", (2, 3, 10))
-def test_ingress_per_app_scale(context, host, port, model, traefik_container, temp_opt, n_units):
+def test_ingress_per_app_scale(
+    traefik_ctx, host, port, model, traefik_container, tmp_path, n_units
+):
     """Check the config when a new ingress per leader unit joins."""
-    cfg_file = temp_opt.joinpath("traefik", "juju", "juju_ingress_ingress_1_remote.yaml")
+    cfg_file = tmp_path.joinpath("traefik", "juju", "juju_ingress_ingress_1_remote.yaml")
     cfg_file.parent.mkdir(parents=True)
 
     # config that would have been generated from mock_data_0
@@ -150,7 +139,7 @@ def test_ingress_per_app_scale(context, host, port, model, traefik_container, te
         relations=[ipa],
     )
 
-    context.run(ipa.changed_event, state)
+    traefik_ctx.run(ipa.changed_event, state)
 
     new_config = yaml.safe_load(cfg_file.read_text())
     # verify that the config has changed!
