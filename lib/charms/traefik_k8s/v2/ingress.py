@@ -55,6 +55,7 @@ import logging
 import socket
 import typing
 from dataclasses import dataclass
+from enum import Enum
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 import yaml
@@ -98,6 +99,7 @@ INGRESS_REQUIRES_APP_SCHEMA = {
         "name": {"type": "string"},
         "strip-prefix": {"type": "string"},
         "redirect-https": {"type": "string"},
+        "scheme": {"type": "string"},
     },
     "required": ["model", "name"],
 }
@@ -120,9 +122,19 @@ INGRESS_PROVIDES_APP_SCHEMA = {
 }
 
 try:
-    from typing import TypedDict
+    from typing import Literal, TypedDict
 except ImportError:
-    from typing_extensions import TypedDict  # py35 compat
+    from typing_extensions import Literal, TypedDict  # py35 compat
+
+
+class Scheme(Enum):
+    """Url scheme."""
+
+    HTTP = "http"
+    HTTPS = "https"
+
+
+SchemeLiteral = Literal["http", "https"]
 
 # Model of the application data the requirer will need to provide.
 RequirerAppData = TypedDict(
@@ -132,6 +144,7 @@ RequirerAppData = TypedDict(
         "name": str,
         "strip-prefix": bool,
         "redirect-https": bool,
+        "scheme": Scheme,
     },
     total=False,
 )
@@ -351,19 +364,28 @@ class IngressPerAppProvider(_IngressPerAppBase):
             raise NotReadyError(relation)
 
         databag = relation.data[app]
-        remote_app_data: Dict[str, Union[int, str]] = {}
+        remote_app_data: Dict[str, Any] = {}
 
-        for k in ("model", "name", "mode", "strip-prefix", "redirect-https"):
+        for k in ("model", "name", "strip-prefix", "redirect-https", "scheme"):
             v = databag.get(k)
             if v is not None:
                 remote_app_data[k] = v
 
         _validate_data(remote_app_data, INGRESS_REQUIRES_APP_SCHEMA)
 
-        remote_app_data["strip-prefix"] = bool(remote_app_data.get("strip-prefix", False))
-        remote_app_data["redirect-https"] = bool(
-            remote_app_data.get("redirect-https", "false") == "true"
-        )
+        def _bool(val):
+            return val == "true"
+
+        def _cast(key, type_, default):
+            raw = remote_app_data.get(key)
+            if not raw:
+                return default
+            return type_(raw)
+
+        # deserialize some strings to more pythonic types
+        remote_app_data["scheme"] = _cast("scheme", Scheme, Scheme.HTTP)
+        remote_app_data["strip-prefix"] = _cast("strip-prefix", _bool, False)
+        remote_app_data["redirect-https"] = _cast("redirect-https", _bool, "false")
         return typing.cast(RequirerAppData, remote_app_data)
 
     def get_data(self, relation: Relation) -> IngressRequirerData:
@@ -473,6 +495,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         port: Optional[int] = None,
         strip_prefix: bool = False,
         redirect_https: bool = False,
+        scheme: Union[Scheme, SchemeLiteral] = Scheme.HTTP,
     ):
         """Constructor for IngressRequirer.
 
@@ -488,7 +511,8 @@ class IngressPerAppRequirer(_IngressPerAppBase):
             host: Hostname to be used by the ingress provider to address the requiring
                 application; if unspecified, the default Kubernetes service name will be used.
             strip_prefix: configure Traefik to strip the path prefix.
-            redirect_https: redirect incoming requests to the HTTPS.
+            redirect_https: redirect incoming requests to HTTPS.
+            scheme: scheme to use when constructing the ingress url.
 
         Request Args:
             port: the port of the service
@@ -498,6 +522,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         self.relation_name = relation_name
         self._strip_prefix = strip_prefix
         self._redirect_https = redirect_https
+        self._scheme = Scheme(scheme)
 
         self._stored.set_default(current_url=None)  # type: ignore
 
@@ -569,6 +594,9 @@ class IngressPerAppRequirer(_IngressPerAppBase):
 
             if self._redirect_https:
                 app_data["redirect-https"] = "true"
+
+            if self._scheme:
+                app_data["scheme"] = self._scheme.value
 
             _validate_data(app_data, INGRESS_REQUIRES_APP_SCHEMA)
             self.relation.data[self.app].update(app_data)

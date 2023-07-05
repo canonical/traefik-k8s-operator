@@ -31,7 +31,7 @@ from charms.tls_certificates_interface.v2.tls_certificates import (
     generate_private_key,
 )
 from charms.traefik_k8s.v1.ingress_per_unit import DataValidationError, IngressPerUnitProvider
-from charms.traefik_k8s.v2.ingress import IngressPerAppProvider, IngressRequirerData
+from charms.traefik_k8s.v2.ingress import IngressPerAppProvider, IngressRequirerData, Scheme
 from charms.traefik_route_k8s.v0.traefik_route import (
     TraefikRouteProvider,
     TraefikRouteRequirerReadyEvent,
@@ -770,7 +770,10 @@ class TraefikIngressCharm(CharmBase):
         return self._generate_config_block(prefix, lb_servers, data)
 
     def _generate_config_block(
-        self, prefix: str, lb_servers: List[Dict[str, str]], data: Dict[str, Any]
+        self,
+        prefix: str,
+        lb_servers: List[Dict[str, str]],
+        data: Union["RequirerData_IPU", "RequirerAppData_IPA"],
     ) -> Tuple[Dict[str, Any], str]:
         """Generate a configuration segment.
 
@@ -779,13 +782,14 @@ class TraefikIngressCharm(CharmBase):
         unit and IPA may be more than one).
         """
         host = self.external_host
+        scheme = data.get("scheme", Scheme.HTTP).value
 
         if self._routing_mode is _RoutingMode.path:
             route_rule = f"PathPrefix(`/{prefix}`)"
-            url = f"http://{host}:{self._port}/{prefix}"
+            url = f"{scheme}://{host}:{self._port}/{prefix}"
         else:  # _RoutingMode.subdomain
             route_rule = f"Host(`{prefix}.{host}`)"
-            url = f"http://{prefix}.{host}:{self._port}/"
+            url = f"{scheme}://{prefix}.{host}:{self._port}/"
 
         traefik_router_name = f"juju-{prefix}-router"
         traefik_service_name = f"juju-{prefix}-service"
@@ -801,6 +805,7 @@ class TraefikIngressCharm(CharmBase):
             self._generate_tls_block(traefik_router_name, route_rule, traefik_service_name)
         )
 
+        # todo: should we use the scheme here too?
         config = {
             "http": {
                 "routers": router_cfg,
@@ -847,8 +852,10 @@ class TraefikIngressCharm(CharmBase):
         data: "IngressRequirerData",
     ) -> Tuple[dict, str]:
         prefix = self._get_prefix(data.app)
+        scheme = data.app["scheme"].value
         lb_servers = [
-            {"url": f"http://{unit_data['host']}:{unit_data['port']}"} for unit_data in data.units
+            {"url": f"{scheme}://{unit_data['host']}:{unit_data['port']}"}
+            for unit_data in data.units
         ]
         return self._generate_config_block(prefix, lb_servers, data.app)
 

@@ -7,6 +7,7 @@
 
 import pytest
 import yaml
+from charms.traefik_k8s.v2.ingress import Scheme
 from ops import pebble
 from scenario import Container, Model, Mount, Relation, State
 
@@ -46,16 +47,18 @@ def traefik_container(tmp_path):
 
 @pytest.mark.parametrize("port, host", ((80, "1.1.1.1"), (81, "10.1.10.1")))
 @pytest.mark.parametrize("event_name", ("joined", "changed", "created"))
+@pytest.mark.parametrize("scheme", Scheme)
 def test_ingress_per_app_created(
-    traefik_ctx, port, host, model, traefik_container, event_name, tmp_path
+    traefik_ctx, port, host, model, traefik_container, event_name, tmp_path, scheme
 ):
-    """Check the config when a new ingress per leader is created or changes (single remote unit)."""
+    """Check the config when a new ingress per app is created or changes (single remote unit)."""
     ipa = Relation(
         "ingress",
         remote_app_data={
             "model": "test-model",
             "name": "remote/0",
             "mode": "http",
+            "scheme": scheme.value,
         },
         remote_units_data={0: {"port": str(port), "host": host}},
         relation_id=1,
@@ -78,16 +81,17 @@ def test_ingress_per_app_created(
     )
 
     assert generated_config["http"]["services"]["juju-test-model-remote-0-service"] == {
-        "loadBalancer": {"servers": [{"url": f"http://{host}:{port}"}]}
+        "loadBalancer": {"servers": [{"url": f"{scheme.value}://{host}:{port}"}]}
     }
 
 
 @pytest.mark.parametrize("port, host", ((80, "1.1.1.{}"), (81, "10.1.10.{}")))
 @pytest.mark.parametrize("n_units", (2, 3, 10))
+@pytest.mark.parametrize("scheme", Scheme)
 def test_ingress_per_app_scale(
-    traefik_ctx, host, port, model, traefik_container, tmp_path, n_units
+    traefik_ctx, host, port, model, traefik_container, tmp_path, n_units, scheme
 ):
-    """Check the config when a new ingress per leader unit joins."""
+    """Check the config when a new ingress per app unit joins."""
     cfg_file = tmp_path.joinpath("traefik", "juju", "juju_ingress_ingress_1_remote.yaml")
     cfg_file.parent.mkdir(parents=True)
 
@@ -125,10 +129,7 @@ def test_ingress_per_app_scale(
 
     ipa = Relation(
         "ingress",
-        remote_app_data={
-            "model": "test-model",
-            "name": "remote/0",
-        },
+        remote_app_data={"model": "test-model", "name": "remote/0", "scheme": scheme.value},
         remote_units_data={n: _get_mock_data(n) for n in range(n_units)},
         relation_id=1,
     )
@@ -149,7 +150,7 @@ def test_ingress_per_app_scale(
 
     assert len(new_lbs) == n_units
     for n in range(n_units):
-        assert {"url": f"http://{host.format(n)}:{port+n}"} in new_lbs
+        assert {"url": f"{scheme.value}://{host.format(n)}:{port+n}"} in new_lbs
 
         # expected config:
 

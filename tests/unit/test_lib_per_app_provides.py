@@ -51,8 +51,9 @@ def test_ingress_app_provider_related(harness, provider: IngressPerAppProvider):
 
 
 @pytest.mark.parametrize("strip_prefix", ("true", "false"))
+@pytest.mark.parametrize("scheme", ("http", "https"))
 def test_ingress_app_provider_relate_provide(
-    provider: IngressPerAppProvider, harness, strip_prefix
+    provider: IngressPerAppProvider, harness, strip_prefix, scheme
 ):
     harness.set_leader(True)
     relation_id = harness.add_relation("ingress", "remote")
@@ -61,6 +62,7 @@ def test_ingress_app_provider_relate_provide(
         "name": "foo",
         "model": "bar",
         "strip_prefix": strip_prefix,
+        "scheme": scheme,
     }
     remote_unit_data = {
         "host": "host",
@@ -72,7 +74,7 @@ def test_ingress_app_provider_relate_provide(
     relation = harness.model.get_relation("ingress", relation_id)
     assert provider.is_ready(relation)
 
-    provider.publish_url(relation, "foo.com")
+    provider.publish_url(relation, "baz://foo.com")
 
     ingress = harness.get_relation_data(relation_id, "test-provider")["ingress"]
-    assert yaml.safe_load(ingress) == {"url": "foo.com"}
+    assert yaml.safe_load(ingress) == {"url": "baz://foo.com"}
