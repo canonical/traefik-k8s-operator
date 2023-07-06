@@ -402,7 +402,7 @@ class IngressPerAppProvider(_IngressPerAppBase):
         try:
             self.get_data(relation)
         except DataValidationError as e:
-            log.warning("Requirer not ready; validation error encountered: %s" % str(e))
+            log.error("Provider not ready; validation error encountered: %s" % str(e))
             return False
         return True
 
@@ -562,7 +562,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         try:
             return bool(self._get_url_from_relation_data())
         except DataValidationError as e:
-            log.warning("Requirer not ready; validation error encountered: %s" % str(e))
+            log.error("Requirer not ready; validation error encountered: %s" % str(e))
             return False
 
     def _publish_auto_data(self, relation: Relation):
