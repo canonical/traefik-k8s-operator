@@ -67,11 +67,11 @@ from ops.model import ModelError, Relation, Unit
 LIBID = "e6de2a5cd5b34422a204668f3b8f90d2"
 
 # Increment this major API version when introducing breaking changes
-LIBAPI = 1
+LIBAPI = 2
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 14
+LIBPATCH = 1
 
 DEFAULT_RELATION_NAME = "ingress"
 RELATION_INTERFACE = "ingress"
