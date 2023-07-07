@@ -31,7 +31,7 @@ from charms.tls_certificates_interface.v2.tls_certificates import (
     generate_private_key,
 )
 from charms.traefik_k8s.v1.ingress_per_unit import DataValidationError, IngressPerUnitProvider
-from charms.traefik_k8s.v2.ingress import IngressPerAppProvider, IngressRequirerData, Scheme
+from charms.traefik_k8s.v2.ingress import IngressPerAppProvider, IngressRequirerData
 from charms.traefik_route_k8s.v0.traefik_route import (
     TraefikRouteProvider,
     TraefikRouteRequirerReadyEvent,
@@ -782,7 +782,7 @@ class TraefikIngressCharm(CharmBase):
         unit and IPA may be more than one).
         """
         host = self.external_host
-        scheme = data.get("scheme", Scheme.HTTP).value
+        scheme = data.get("scheme", "http")
 
         if self._routing_mode is _RoutingMode.path:
             route_rule = f"PathPrefix(`/{prefix}`)"
@@ -852,7 +852,7 @@ class TraefikIngressCharm(CharmBase):
         data: "IngressRequirerData",
     ) -> Tuple[dict, str]:
         prefix = self._get_prefix(data.app)
-        scheme = data.app["scheme"].value
+        scheme = data.app["scheme"]
         lb_servers = [
             {"url": f"{scheme}://{unit_data['host']}:{unit_data['port']}"}
             for unit_data in data.units

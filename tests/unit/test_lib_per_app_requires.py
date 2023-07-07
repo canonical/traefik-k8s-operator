@@ -11,7 +11,6 @@ from charms.traefik_k8s.v2.ingress import (
     IngressPerAppReadyEvent,
     IngressPerAppRequirer,
     IngressPerAppRevokedEvent,
-    Scheme,
 )
 from ops.charm import CharmBase
 from ops.testing import Harness
@@ -87,7 +86,7 @@ def test_ingress_app_requirer_related(requirer: IngressPerAppRequirer, harness, 
     ),
 )
 @pytest.mark.parametrize("strip_prefix", (True, False))
-@pytest.mark.parametrize("scheme", Scheme)
+@pytest.mark.parametrize("scheme", ("http", "https"))
 def test_validator(requirer: IngressPerAppRequirer, harness, auto_data, ok, strip_prefix, scheme):
     harness.set_leader(True)
     harness.add_relation("ingress", "remote")

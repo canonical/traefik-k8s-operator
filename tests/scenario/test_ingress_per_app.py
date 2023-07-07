@@ -7,7 +7,6 @@
 
 import pytest
 import yaml
-from charms.traefik_k8s.v2.ingress import Scheme
 from ops import pebble
 from scenario import Container, Model, Mount, Relation, State
 
@@ -47,7 +46,7 @@ def traefik_container(tmp_path):
 
 @pytest.mark.parametrize("port, host", ((80, "1.1.1.1"), (81, "10.1.10.1")))
 @pytest.mark.parametrize("event_name", ("joined", "changed", "created"))
-@pytest.mark.parametrize("scheme", Scheme)
+@pytest.mark.parametrize("scheme", ("http", "https"))
 def test_ingress_per_app_created(
     traefik_ctx, port, host, model, traefik_container, event_name, tmp_path, scheme
 ):
@@ -58,7 +57,7 @@ def test_ingress_per_app_created(
             "model": "test-model",
             "name": "remote/0",
             "mode": "http",
-            "scheme": scheme.value,
+            "scheme": scheme,
         },
         remote_units_data={0: {"port": str(port), "host": host}},
         relation_id=1,
@@ -81,13 +80,13 @@ def test_ingress_per_app_created(
     )
 
     assert generated_config["http"]["services"]["juju-test-model-remote-0-service"] == {
-        "loadBalancer": {"servers": [{"url": f"{scheme.value}://{host}:{port}"}]}
+        "loadBalancer": {"servers": [{"url": f"{scheme}://{host}:{port}"}]}
     }
 
 
 @pytest.mark.parametrize("port, host", ((80, "1.1.1.{}"), (81, "10.1.10.{}")))
 @pytest.mark.parametrize("n_units", (2, 3, 10))
-@pytest.mark.parametrize("scheme", Scheme)
+@pytest.mark.parametrize("scheme", ("http", "https"))
 def test_ingress_per_app_scale(
     traefik_ctx, host, port, model, traefik_container, tmp_path, n_units, scheme
 ):
@@ -129,7 +128,7 @@ def test_ingress_per_app_scale(
 
     ipa = Relation(
         "ingress",
-        remote_app_data={"model": "test-model", "name": "remote/0", "scheme": scheme.value},
+        remote_app_data={"model": "test-model", "name": "remote/0", "scheme": scheme},
         remote_units_data={n: _get_mock_data(n) for n in range(n_units)},
         relation_id=1,
     )
@@ -150,7 +149,7 @@ def test_ingress_per_app_scale(
 
     assert len(new_lbs) == n_units
     for n in range(n_units):
-        assert {"url": f"{scheme.value}://{host.format(n)}:{port+n}"} in new_lbs
+        assert {"url": f"{scheme}://{host.format(n)}:{port+n}"} in new_lbs
 
         # expected config:
 

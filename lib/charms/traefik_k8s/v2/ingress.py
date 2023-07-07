@@ -55,7 +55,6 @@ import logging
 import socket
 import typing
 from dataclasses import dataclass
-from enum import Enum
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 import yaml
@@ -99,7 +98,7 @@ INGRESS_REQUIRES_APP_SCHEMA = {
         "name": {"type": "string"},
         "strip-prefix": {"type": "string"},
         "redirect-https": {"type": "string"},
-        "scheme": {"type": "string"},
+        "scheme": {"type": "string", "pattern": "(http)|(https)"},
     },
     "required": ["model", "name"],
 }
@@ -127,13 +126,6 @@ except ImportError:
     from typing_extensions import Literal, TypedDict  # py35 compat
 
 
-class Scheme(Enum):
-    """Url scheme."""
-
-    HTTP = "http"
-    HTTPS = "https"
-
-
 SchemeLiteral = Literal["http", "https"]
 
 # Model of the application data the requirer will need to provide.
@@ -144,7 +136,7 @@ RequirerAppData = TypedDict(
         "name": str,
         "strip-prefix": bool,
         "redirect-https": bool,
-        "scheme": Scheme,
+        "scheme": SchemeLiteral,
     },
     total=False,
 )
@@ -373,19 +365,10 @@ class IngressPerAppProvider(_IngressPerAppBase):
 
         _validate_data(remote_app_data, INGRESS_REQUIRES_APP_SCHEMA)
 
-        def _bool(val):
-            return val == "true"
-
-        def _cast(key, type_, default):
-            raw = remote_app_data.get(key)
-            if not raw:
-                return default
-            return type_(raw)
-
         # deserialize some strings to more pythonic types
-        remote_app_data["scheme"] = _cast("scheme", Scheme, Scheme.HTTP)
-        remote_app_data["strip-prefix"] = _cast("strip-prefix", _bool, False)
-        remote_app_data["redirect-https"] = _cast("redirect-https", _bool, "false")
+        remote_app_data["scheme"] = remote_app_data.get("scheme", "http")
+        for key in ["strip-prefix", "redirect-https"]:
+            remote_app_data[key] = bool(remote_app_data.get(key, "false") == "true")
         return typing.cast(RequirerAppData, remote_app_data)
 
     def get_data(self, relation: Relation) -> IngressRequirerData:
@@ -495,7 +478,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         port: Optional[int] = None,
         strip_prefix: bool = False,
         redirect_https: bool = False,
-        scheme: Union[Scheme, SchemeLiteral] = Scheme.HTTP,
+        scheme: SchemeLiteral = "http",
     ):
         """Constructor for IngressRequirer.
 
@@ -522,7 +505,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         self.relation_name = relation_name
         self._strip_prefix = strip_prefix
         self._redirect_https = redirect_https
-        self._scheme = Scheme(scheme)
+        self._scheme = scheme
 
         self._stored.set_default(current_url=None)  # type: ignore
 
@@ -596,7 +579,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
                 app_data["redirect-https"] = "true"
 
             if self._scheme:
-                app_data["scheme"] = self._scheme.value
+                app_data["scheme"] = self._scheme
 
             _validate_data(app_data, INGRESS_REQUIRES_APP_SCHEMA)
             self.relation.data[self.app].update(app_data)
