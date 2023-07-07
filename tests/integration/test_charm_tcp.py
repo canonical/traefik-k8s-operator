@@ -22,13 +22,6 @@ tcp_charm_resources = {
 
 
 @pytest.mark.abort_on_fail
-async def test_setup_env(ops_test: OpsTest):
-    await ops_test.model.set_config(
-        {"update-status-hook-interval": "60m", "logging-config": "<root>=WARNING; unit=DEBUG"}
-    )
-
-
-@pytest.mark.abort_on_fail
 async def test_deployment(ops_test: OpsTest, traefik_charm, tcp_tester_charm):
     await deploy_traefik_if_not_deployed(ops_test, traefik_charm)
     await ops_test.model.deploy(tcp_tester_charm, "tcp-tester", resources=tcp_charm_resources)

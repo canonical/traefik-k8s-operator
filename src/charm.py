@@ -634,7 +634,7 @@ class TraefikIngressCharm(CharmBase):
     def _provide_ingress(
         self,
         relation: Relation,
-        provider: Union[IngressPerAppProvider, IngressPerAppProvider],
+        provider: IngressPerAppProvider,
     ):
         # to avoid long-gone units from lingering in the databag, we wipe it
         if self.unit.is_leader():
@@ -682,7 +682,7 @@ class TraefikIngressCharm(CharmBase):
             # if the unit is ready, it's implied that the data is there.
             # but we should still ensure it's valid, hence...
             try:
-                data: "RequirerData_IPU" = provider.get_data(relation, unit)
+                data = provider.get_data(relation, unit)
             except DataValidationError as e:
                 # is_unit_ready should guard against no data being there yet,
                 # but if the data is invalid...

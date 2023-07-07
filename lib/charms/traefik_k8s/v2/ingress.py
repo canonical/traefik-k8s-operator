@@ -60,7 +60,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 import yaml
 from ops.charm import CharmBase, RelationBrokenEvent, RelationEvent
 from ops.framework import EventSource, Object, ObjectEvents, StoredState
-from ops.model import Application, ModelError, Relation, Unit
+from ops.model import ModelError, Relation, Unit
 
 # The unique Charmhub library identifier, never change it
 LIBID = "e6de2a5cd5b34422a204668f3b8f90d2"
@@ -346,21 +346,21 @@ class IngressPerAppProvider(_IngressPerAppBase):
 
     def _get_requirer_app_data(self, relation: Relation) -> RequirerAppData:
         """Fetch and validate the requirer's app databag."""
-        app: Optional[Application] = relation.app
+        app = relation.app
         if app is None:
             raise NotReadyError(relation)
 
         databag = relation.data[app]
         remote_app_data: Dict[str, Union[int, str]] = {}
 
-        for k in ("model", "name", "mode", "strip-prefix"):
+        for k in ("model", "name", "mode", "strip-prefix", "redirect-https"):
             v = databag.get(k)
             if v is not None:
                 remote_app_data[k] = v
 
         _validate_data(remote_app_data, INGRESS_REQUIRES_APP_SCHEMA)
 
-        remote_app_data["strip-prefix"] = bool(remote_app_data.get("strip-prefix", False))
+        remote_app_data["strip-prefix"] = bool(remote_app_data.get("strip-prefix", 'false') == 'true')
         remote_app_data["redirect-https"] = bool(
             remote_app_data.get("redirect-https", "false") == "true"
         )
@@ -380,7 +380,7 @@ class IngressPerAppProvider(_IngressPerAppBase):
         try:
             self.get_data(relation)
         except DataValidationError as e:
-            log.warning("Requirer not ready; validation error encountered: %s" % str(e))
+            log.error("Provider not ready; validation error encountered: %s" % str(e))
             return False
         return True
 
@@ -537,7 +537,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         try:
             return bool(self._get_url_from_relation_data())
         except DataValidationError as e:
-            log.warning("Requirer not ready; validation error encountered: %s" % str(e))
+            log.error("Requirer not ready; validation error encountered: %s" % str(e))
             return False
 
     def _publish_auto_data(self, relation: Relation):

@@ -64,7 +64,7 @@ def timed_memoizer(func):
     return wrapper
 
 
-@pytest.fixture(scope="module", autouse="True")
+@pytest.fixture(scope="module", autouse=True)
 def copy_traefik_library_into_tester_charms(ops_test):
     """Ensure the tester charms have the requisite libraries."""
     libraries = [
