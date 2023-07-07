@@ -360,7 +360,9 @@ class IngressPerAppProvider(_IngressPerAppBase):
 
         _validate_data(remote_app_data, INGRESS_REQUIRES_APP_SCHEMA)
 
-        remote_app_data["strip-prefix"] = bool(remote_app_data.get("strip-prefix", 'false') == 'true')
+        remote_app_data["strip-prefix"] = bool(
+            remote_app_data.get("strip-prefix", "false") == "true"
+        )
         remote_app_data["redirect-https"] = bool(
             remote_app_data.get("redirect-https", "false") == "true"
         )
