@@ -28,7 +28,7 @@ requires:
 Then, to initialise the library:
 
 ```python
-from charms.traefik_k8s.v1.ingress import (IngressPerAppRequirer,
+from charms.traefik_k8s.v2.ingress import (IngressPerAppRequirer,
   IngressPerAppReadyEvent, IngressPerAppRevokedEvent)
 
 class SomeCharm(CharmBase):

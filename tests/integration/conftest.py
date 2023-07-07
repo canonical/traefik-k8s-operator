@@ -68,7 +68,7 @@ def timed_memoizer(func):
 def copy_traefik_library_into_tester_charms(ops_test):
     """Ensure the tester charms have the requisite libraries."""
     libraries = [
-        "traefik_k8s/v1/ingress.py",
+        "traefik_k8s/v2/ingress.py",
         "traefik_k8s/v1/ingress_per_unit.py",
         "observability_libs/v1/kubernetes_service_patch.py",
         "traefik_route_k8s/v0/traefik_route.py",
