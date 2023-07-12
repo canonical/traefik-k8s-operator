@@ -276,9 +276,10 @@ import copy
 import json
 import logging
 import uuid
+from contextlib import suppress
 from datetime import datetime, timedelta
 from ipaddress import IPv4Address
-from typing import Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from cryptography import x509
 from cryptography.hazmat._oid import ExtensionOID
@@ -292,9 +293,12 @@ from ops.charm import (
     CharmEvents,
     RelationBrokenEvent,
     RelationChangedEvent,
+    SecretExpiredEvent,
     UpdateStatusEvent,
 )
 from ops.framework import EventBase, EventSource, Handle, Object
+from ops.jujuversion import JujuVersion
+from ops.model import SecretNotFoundError
 
 # The unique Charmhub library identifier, never change it
 LIBID = "afd8c2bccf834997afce12c2706d2ede"
@@ -304,7 +308,7 @@ LIBAPI = 2
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 5
+LIBPATCH = 6
 
 REQUIRER_JSON_SCHEMA = {
     "$schema": "http://json-schema.org/draft-04/schema#",
@@ -1156,7 +1160,10 @@ class TLSCertificatesRequiresV2(Object):
         self.framework.observe(
             charm.on[relationship_name].relation_broken, self._on_relation_broken
         )
-        self.framework.observe(charm.on.update_status, self._on_update_status)
+        if JujuVersion.from_environ().has_secrets:
+            self.framework.observe(charm.on.secret_expired, self._on_secret_expired)
+        else:
+            self.framework.observe(charm.on.update_status, self._on_update_status)
 
     @property
     def _requirer_csrs(self) -> List[Dict[str, str]]:
@@ -1172,10 +1179,15 @@ class TLSCertificatesRequiresV2(Object):
         """Returns list of provider CSRs from relation data."""
         relation = self.model.get_relation(self.relationship_name)
         if not relation:
-            raise RuntimeError(f"Relation {self.relationship_name} does not exist")
+            logger.debug("No relation: %s", self.relationship_name)
+            return []
         if not relation.app:
-            raise RuntimeError(f"Remote app for relation {self.relationship_name} does not exist")
+            logger.debug("No remote app in relation: %s", self.relationship_name)
+            return []
         provider_relation_data = _load_relation_data(relation.data[relation.app])
+        if not self._relation_data_is_valid(provider_relation_data):
+            logger.warning("Provider relation data did not pass JSON Schema validation")
+            return []
         return provider_relation_data.get("certificates", [])
 
     def _add_requirer_csr(self, csr: str) -> None:
@@ -1302,23 +1314,21 @@ class TLSCertificatesRequiresV2(Object):
     def _on_relation_changed(self, event: RelationChangedEvent) -> None:
         """Handler triggered on relation changed events.
 
+        Goes through all providers certificates that match a requested CSR.
+
+        If the provider certificate is revoked, emit a CertificateInvalidateEvent,
+        otherwise emit a CertificateAvailableEvent.
+
+        When Juju secrets are available, remove the secret for revoked certificate,
+        or add a secret with the correct expiry time for new certificates.
+
+
         Args:
             event: Juju event
 
         Returns:
             None
         """
-        relation = self.model.get_relation(self.relationship_name)
-        if not relation:
-            logger.warning("No relation: %s", self.relationship_name)
-            return
-        if not relation.app:
-            logger.warning("No remote app in relation: %s", self.relationship_name)
-            return
-        provider_relation_data = _load_relation_data(relation.data[relation.app])
-        if not self._relation_data_is_valid(provider_relation_data):
-            logger.debug("Provider relation data did not pass JSON Schema validation")
-            return
         requirer_csrs = [
             certificate_creation_request["certificate_signing_request"]
             for certificate_creation_request in self._requirer_csrs
@@ -1326,6 +1336,12 @@ class TLSCertificatesRequiresV2(Object):
         for certificate in self._provider_certificates:
             if certificate["certificate_signing_request"] in requirer_csrs:
                 if certificate.get("revoked", False):
+                    if JujuVersion.from_environ().has_secrets:
+                        with suppress(SecretNotFoundError):
+                            secret = self.model.get_secret(
+                                label=f"{LIBID}-{certificate['certificate_signing_request']}"
+                            )
+                            secret.remove_all_revisions()
                     self.on.certificate_invalidated.emit(
                         reason="revoked",
                         certificate=certificate["certificate"],
@@ -1334,12 +1350,51 @@ class TLSCertificatesRequiresV2(Object):
                         chain=certificate["chain"],
                     )
                 else:
+                    if JujuVersion.from_environ().has_secrets:
+                        try:
+                            secret = self.model.get_secret(
+                                label=f"{LIBID}-{certificate['certificate_signing_request']}"
+                            )
+                            secret.set_content({"certificate": certificate["certificate"]})
+                            secret.set_info(
+                                expire=self._get_next_secret_expiry_time(
+                                    certificate["certificate"]
+                                ),
+                            )
+                        except SecretNotFoundError:
+                            secret = self.charm.app.add_secret(
+                                {"certificate": certificate["certificate"]},
+                                label=f"{LIBID}-{certificate['certificate_signing_request']}",
+                                expire=self._get_next_secret_expiry_time(
+                                    certificate["certificate"]
+                                ),
+                            )
                     self.on.certificate_available.emit(
                         certificate_signing_request=certificate["certificate_signing_request"],
                         certificate=certificate["certificate"],
                         ca=certificate["ca"],
                         chain=certificate["chain"],
                     )
+
+    def _get_next_secret_expiry_time(self, certificate: str) -> Optional[datetime]:
+        """Return the expiry time or expiry notification time.
+
+        Extracts the expiry time from the provided certificate, calculates the
+        expiry notification time and return the closest of the two, that is in
+        the future.
+
+        Args:
+            certificate: x509 certificate
+
+        Returns:
+            Optional[datetime]: None if the certificate expiry time cannot be read,
+                                next expiry time otherwise.
+        """
+        expiry_time = _get_certificate_expiry_time(certificate)
+        if not expiry_time:
+            return None
+        expiry_notification_time = expiry_time - timedelta(hours=self.expiry_notification_time)
+        return _get_closest_future_time(expiry_notification_time, expiry_time)
 
     def _on_relation_broken(self, event: RelationBrokenEvent) -> None:
         """Handler triggered on relation broken event.
@@ -1353,12 +1408,66 @@ class TLSCertificatesRequiresV2(Object):
         Returns:
             None
         """
-        relation = self.model.get_relation(self.relationship_name)
-        if not relation:
-            return
-        if not relation.app or not relation.app.name:
-            return
         self.on.all_certificates_invalidated.emit()
+
+    def _on_secret_expired(self, event: SecretExpiredEvent) -> None:
+        """Triggered when a certificate is set to expire.
+
+        Loads the certificate from the secret, and will emit 1 of 2
+        events.
+
+        If the certificate is not yet expired, emits CertificateExpiringEvent
+        and updates the expiry time of the secret to the exact expiry time on
+        the certificate.
+
+        If the certificate is expired, emits CertificateInvalidedEvent and
+        deletes the secret.
+
+        Args:
+            event (SecretExpiredEvent): Juju event
+        """
+        if not event.secret.label or not event.secret.label.startswith(f"{LIBID}-"):
+            return
+        csr = event.secret.label[len(f"{LIBID}-") :]
+        certificate_dict = self._find_certificate_in_relation_data(csr)
+        if not certificate_dict:
+            # A secret expired but we did not find matching certificate. Cleaning up
+            event.secret.remove_all_revisions()
+            return
+
+        expiry_time = _get_certificate_expiry_time(certificate_dict["certificate"])
+        if not expiry_time:
+            # A secret expired but matching certificate is invalid. Cleaning up
+            event.secret.remove_all_revisions()
+            return
+
+        if datetime.utcnow() < expiry_time:
+            logger.warning("Certificate almost expired")
+            self.on.certificate_expiring.emit(
+                certificate=certificate_dict["certificate"],
+                expiry=expiry_time.isoformat(),
+            )
+            event.secret.set_info(
+                expire=_get_certificate_expiry_time(certificate_dict["certificate"]),
+            )
+        else:
+            logger.warning("Certificate is expired")
+            self.on.certificate_invalidated.emit(
+                reason="expired",
+                certificate=certificate_dict["certificate"],
+                certificate_signing_request=certificate_dict["certificate_signing_request"],
+                ca=certificate_dict["ca"],
+                chain=certificate_dict["chain"],
+            )
+            self.request_certificate_revocation(certificate_dict["certificate"].encode())
+            event.secret.remove_all_revisions()
+
+    def _find_certificate_in_relation_data(self, csr: str) -> Optional[Dict[str, Any]]:
+        for certificate_dict in self._provider_certificates:
+            if certificate_dict["certificate_signing_request"] != csr:
+                continue
+            return certificate_dict
+        return None
 
     def _on_update_status(self, event: UpdateStatusEvent) -> None:
         """Triggered on update status event.
@@ -1373,26 +1482,11 @@ class TLSCertificatesRequiresV2(Object):
         Returns:
             None
         """
-        relation = self.model.get_relation(self.relationship_name)
-        if not relation:
-            logger.debug("No relation: %s", self.relationship_name)
-            return
-        if not relation.app:
-            logger.debug("No remote app in relation: %s", self.relationship_name)
-            return
-        provider_relation_data = _load_relation_data(relation.data[relation.app])
-        if not self._relation_data_is_valid(provider_relation_data):
-            logger.debug("Provider relation data did not pass JSON Schema validation")
-            return
         for certificate_dict in self._provider_certificates:
-            try:
-                certificate_object = x509.load_pem_x509_certificate(
-                    data=certificate_dict["certificate"].encode()
-                )
-            except ValueError:
-                logger.warning("Could not load certificate.")
+            expiry_time = _get_certificate_expiry_time(certificate_dict["certificate"])
+            if not expiry_time:
                 continue
-            time_difference = certificate_object.not_valid_after - datetime.utcnow()
+            time_difference = expiry_time - datetime.utcnow()
             if time_difference.total_seconds() < 0:
                 logger.warning("Certificate is expired")
                 self.on.certificate_invalidated.emit(
@@ -1408,5 +1502,39 @@ class TLSCertificatesRequiresV2(Object):
                 logger.warning("Certificate almost expired")
                 self.on.certificate_expiring.emit(
                     certificate=certificate_dict["certificate"],
-                    expiry=certificate_object.not_valid_after.isoformat(),
+                    expiry=expiry_time.isoformat(),
                 )
+
+
+def _get_closest_future_time(
+    expiry_notification_time: datetime, expiry_time: datetime
+) -> datetime:
+    """Return expiry_notification_time if not in the past, otherwise return expiry_time.
+
+    Args:
+        expiry_notification_time (datetime): Notification time of impending expiration
+        expiry_time (datetime): Expiration time
+
+    Returns:
+        datetime: expiry_notification_time if not in the past, expiry_time otherwise
+    """
+    return (
+        expiry_notification_time if datetime.utcnow() < expiry_notification_time else expiry_time
+    )
+
+
+def _get_certificate_expiry_time(certificate: str) -> Optional[datetime]:
+    """Extract expiry time from a certificate string.
+
+    Args:
+        certificate (str): x509 certificate as a string
+
+    Returns:
+        Optional[datetime]: Expiry datetime or None
+    """
+    try:
+        certificate_object = x509.load_pem_x509_certificate(data=certificate.encode())
+        return certificate_object.not_valid_after
+    except ValueError:
+        logger.warning("Could not load certificate.")
+        return None
