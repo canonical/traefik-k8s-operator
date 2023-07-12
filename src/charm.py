@@ -5,6 +5,7 @@
 """Charm Traefik."""
 import contextlib
 import enum
+import functools
 import ipaddress
 import json
 import logging
@@ -1271,6 +1272,7 @@ class TraefikIngressCharm(CharmBase):
         ]
 
 
+@functools.lru_cache
 def _get_loadbalancer_status(namespace: str, service_name: str):
     client = Client()  # type: ignore
     traefik_service = client.get(Service, name=service_name, namespace=namespace)
