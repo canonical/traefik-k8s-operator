@@ -127,7 +127,7 @@ def test_ingress_per_app_scale(
         "ingress",
         remote_app_data={
             "model": "test-model",
-            "name": "remote/0",
+            "name": "remote",
         },
         remote_units_data={n: _get_mock_data(n) for n in range(n_units)},
         relation_id=1,
@@ -143,7 +143,7 @@ def test_ingress_per_app_scale(
 
     new_config = yaml.safe_load(cfg_file.read_text())
     # verify that the config has changed!
-    new_lbs = new_config["http"]["services"]["juju-test-model-remote-0-service"]["loadBalancer"][
+    new_lbs = new_config["http"]["services"]["juju-test-model-remote-service"]["loadBalancer"][
         "servers"
     ]
 

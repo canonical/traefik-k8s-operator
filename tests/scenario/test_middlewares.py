@@ -176,7 +176,7 @@ def test_middleware_config(traefik_ctx, rel_name, routing_mode, strip_prefix, re
         redirect_https=redirect_https,
     )
 
-    assert expected == yaml.safe_load(config_file)
+    assert yaml.safe_load(config_file) == expected
 
 
 if __name__ == "__main__":

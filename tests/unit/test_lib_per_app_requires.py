@@ -1,10 +1,10 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
+import json
 import unittest
 from textwrap import dedent
 
 import pytest
-import yaml
 from charms.harness_extensions.v0.capture_events import capture
 from charms.traefik_k8s.v2.ingress import (
     DataValidationError,
@@ -53,7 +53,7 @@ def test_ingress_app_requirer_uninitialized(requirer: IngressPerAppRequirer, har
 @pytest.mark.parametrize("strip_prefix", (True, False))
 def test_ingress_app_requirer_related(requirer: IngressPerAppRequirer, harness, strip_prefix):
     harness.set_leader(True)
-    url = "foo.bar"
+    url = "http://foo.bar"
 
     assert not requirer.is_ready()
     # provider goes to ready immediately because we inited ipa with port=80.
@@ -67,9 +67,7 @@ def test_ingress_app_requirer_related(requirer: IngressPerAppRequirer, harness, 
     assert not requirer.is_ready()
 
     with capture(harness.charm, IngressPerAppReadyEvent) as captured:
-        harness.update_relation_data(
-            relation_id, "remote", {"ingress": yaml.safe_dump({"url": url})}
-        )
+        harness.update_relation_data(relation_id, "remote", {"ingress": json.dumps({"url": url})})
     event = captured.event
     assert event.url == url
     assert requirer.url == url
@@ -133,7 +131,7 @@ class TestIPAEventsEmission(unittest.TestCase):
             # AND an ingress is in effect
             data = {"url": "http://a.b/c"}
             self.harness.update_relation_data(
-                self.rel_id, "traefik-app", {"ingress": yaml.safe_dump(data)}
+                self.rel_id, "traefik-app", {"ingress": json.dumps(data)}
             )
             self.assertEqual(self.harness.charm.ipa.url, "http://a.b/c")
 
