@@ -653,17 +653,17 @@ class TraefikIngressCharm(CharmBase):
         self._push_configurations(relation, configs)
 
     def _get_configs_per_app(self, relation: Relation):
-        provider = self.ingress_per_app
+        ipa = self.ingress_per_app
 
         try:
-            data = provider.get_data(relation)
+            data = ipa.get_data(relation)
         except DataValidationError as e:
             logger.error(f"invalid data shared through {relation}... Error: {e}.")
             return None
 
         config, app_url = self._generate_per_app_config(data)
         if self.unit.is_leader():
-            provider.publish_url(relation, app_url)
+            ipa.publish_url(relation, app_url)
 
         return config
 
@@ -673,16 +673,16 @@ class TraefikIngressCharm(CharmBase):
         # the application data bag on their side of the relation, so we may start
         # routing for a remote unit before the leader unit of ingress has
         # communicated the url.
-        provider = self.ingress_per_unit
+        ipu = self.ingress_per_unit
 
         config = {}
         for unit in relation.units:
-            if not provider.is_unit_ready(relation, unit):
+            if not ipu.is_unit_ready(relation, unit):
                 continue
             # if the unit is ready, it's implied that the data is there.
             # but we should still ensure it's valid, hence...
             try:
-                data = provider.get_data(relation, unit)
+                data = ipu.get_data(relation, unit)
             except DataValidationError as e:
                 # is_unit_ready should guard against no data being there yet,
                 # but if the data is invalid...
@@ -693,7 +693,7 @@ class TraefikIngressCharm(CharmBase):
 
             unit_config, unit_url = self._generate_per_unit_config(data)
             if self.unit.is_leader():
-                provider.publish_url(relation, data["name"], unit_url)
+                ipu.publish_url(relation, data["name"], unit_url)
             always_merger.merge(config, unit_config)
 
         # Note: We might be pushing an empty configuration if, for example,
@@ -851,13 +851,16 @@ class TraefikIngressCharm(CharmBase):
         self,
         data: "IngressRequirerData",
     ) -> Tuple[dict, str]:
-        prefix = self._get_prefix(data.app)
-        scheme = data.app["scheme"]
+        # todo: IPA>=v2 uses pydantic models, the other providers use raw dicts.
+        #  eventually switch all over to pydantic and handle this uniformly
+
+        app_dict = data.app.dict(by_alias=True)
+        prefix = self._get_prefix(app_dict)
         lb_servers = [
-            {"url": f"{scheme}://{unit_data['host']}:{unit_data['port']}"}
+            {"url": f"{data.app.scheme}://{unit_data.host}:{unit_data.port}"}
             for unit_data in data.units
         ]
-        return self._generate_config_block(prefix, lb_servers, data.app)
+        return self._generate_config_block(prefix, lb_servers, app_dict)
 
     def _wipe_ingress_for_all_relations(self):
         for relation in self.model.relations["ingress"] + self.model.relations["ingress-per-unit"]:

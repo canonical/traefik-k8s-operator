@@ -74,7 +74,7 @@ def test_ingress_app_provider_relate_provide(
     relation = harness.model.get_relation("ingress", relation_id)
     assert provider.is_ready(relation)
 
-    provider.publish_url(relation, "baz://foo.com")
+    provider.publish_url(relation, "https://foo.com")
 
     ingress = harness.get_relation_data(relation_id, "test-provider")["ingress"]
-    assert yaml.safe_load(ingress) == {"url": "baz://foo.com"}
+    assert yaml.safe_load(ingress) == {"url": "https://foo.com"}

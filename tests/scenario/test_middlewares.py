@@ -196,7 +196,7 @@ def test_middleware_config(
         scheme=scheme,
     )
 
-    assert expected == yaml.safe_load(config_file)
+    assert yaml.safe_load(config_file) == expected
 
 
 if __name__ == "__main__":
