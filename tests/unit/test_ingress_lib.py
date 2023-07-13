@@ -9,11 +9,10 @@ from charms.traefik_k8s.v2.ingress import (
 
 def test_io_ingress_requirer_unit_data():
     databag = {}
-    unit_data = IngressRequirerUnitData(port=10, host="foo.com")
+    unit_data = IngressRequirerUnitData(host="foo.com")
 
     unit_data.dump(databag)
     assert databag == {
-        "port": "10",
         "host": "foo.com",
     }
 
@@ -22,23 +21,29 @@ def test_io_ingress_requirer_unit_data():
 
 def test_io_ingress_requirer_app_data():
     databag = {}
-    app_data = IngressRequirerAppData(name="foo", model="coslite", strip_prefix=True)
+    app_data = IngressRequirerAppData(port=10, name="foo", model="coslite", strip_prefix=True)
 
     app_data.dump(databag)
-    assert databag == {"model": "coslite", "name": "foo", "strip-prefix": "true"}
+    assert databag == {"model": "coslite", "port": "10", "name": "foo", "strip-prefix": "true"}
     assert IngressRequirerAppData.load(databag) == app_data
 
 
 def test_aliases():
     databag = {}
     app_data = IngressRequirerAppData(
-        name="foo", model="coslite", strip_prefix=True, redirect_https=True, by_alias=False
+        port=10,
+        name="foo",
+        model="coslite",
+        strip_prefix=True,
+        redirect_https=True,
+        by_alias=False,
     )
 
     app_data.dump(databag)
     assert databag == {
         "model": "coslite",
         "name": "foo",
+        "port": "10",
         "strip-prefix": "true",
         "redirect-https": "true",
     }

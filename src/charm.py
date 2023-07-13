@@ -848,11 +848,10 @@ class TraefikIngressCharm(CharmBase):
     ) -> Tuple[dict, str]:
         # todo: IPA>=v2 uses pydantic models, the other providers use raw dicts.
         #  eventually switch all over to pydantic and handle this uniformly
-
         app_dict = data.app.dict(by_alias=True)
         prefix = self._get_prefix(app_dict)
         lb_servers = [
-            {"url": f"http://{unit_data.host}:{unit_data.port}"} for unit_data in data.units
+            {"url": f"http://{unit_data.host}:{data.app.port}"} for unit_data in data.units
         ]
         return self._generate_config_block(prefix, lb_servers, app_dict)
 

@@ -55,6 +55,7 @@ def test_ingress_per_app_created(
         remote_app_data={
             "model": "test-model",
             "name": "remote/0",
+            "port": str(port),
             "mode": "http",
         },
         remote_units_data={0: {"port": str(port), "host": host}},
@@ -119,7 +120,6 @@ def test_ingress_per_app_scale(
 
     def _get_mock_data(n: int):
         return {
-            "port": str(port + n),
             "host": host.format(n),
         }
 
@@ -128,6 +128,7 @@ def test_ingress_per_app_scale(
         remote_app_data={
             "model": "test-model",
             "name": "remote",
+            "port": str(port),
         },
         remote_units_data={n: _get_mock_data(n) for n in range(n_units)},
         relation_id=1,
@@ -149,7 +150,7 @@ def test_ingress_per_app_scale(
 
     assert len(new_lbs) == n_units
     for n in range(n_units):
-        assert {"url": f"http://{host.format(n)}:{port+n}"} in new_lbs
+        assert {"url": f"http://{host.format(n)}:{port}"} in new_lbs
 
         # expected config:
 
