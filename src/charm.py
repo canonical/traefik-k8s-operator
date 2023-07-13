@@ -177,7 +177,7 @@ class TraefikIngressCharm(CharmBase):
         # TODO update init params once auto-renew is implemented
         # https://github.com/canonical/tls-certificates-interface/issues/24
         
-        self.mutual_tls = MutualTLSProvides(self, "mutual-tls")
+        self.mutual_tls = MutualTLSProvides(self, "cert-transfer")
 
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(
@@ -197,8 +197,8 @@ class TraefikIngressCharm(CharmBase):
             self._on_all_certificates_invalidated,
         )
         self.framework.observe(
-            self.on.mutual_tls_relation_joined,
-            self._on_mutual_tls_relation_joined
+            self.on.cert_transfer_relation_joined,
+            self._on_cert_transfer_relation_joined
         )
 
         observe = self.framework.observe
@@ -311,7 +311,7 @@ class TraefikIngressCharm(CharmBase):
         )
         self._stored.csr = new_csr.decode()
 
-    def _on_mutual_tls_relation_joined(self, event: RelationJoinedEvent):
+    def _on_cert_transfer_relation_joined(self, event: RelationJoinedEvent):
         if self.certificates.cert:
             certificate = self.certificates.cert
             ca = self.certificates._ca_cert
