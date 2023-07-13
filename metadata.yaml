@@ -63,7 +63,10 @@ provides:
     description: |
       Forwards the built-in grafana dashboard(s) for monitoring traefik.
     interface: grafana_dashboard
-
+  mutual-tls:
+    interface: mutual_tls
+    description: |
+      Sends the TLS information (certificate, ca, chain) over relation data.
 
 requires:
   certificates:

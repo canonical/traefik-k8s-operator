@@ -17,6 +17,7 @@ from urllib.parse import urlparse
 import yaml
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from charms.loki_k8s.v0.loki_push_api import LogProxyConsumer
+from charms.mutual_tls_interface.v0.mutual_tls import MutualTLSProvides
 from charms.observability_libs.v1.kubernetes_service_patch import (
     KubernetesServicePatch,
     ServicePort,
@@ -175,6 +176,9 @@ class TraefikIngressCharm(CharmBase):
         self.certificates = TLSCertificatesRequiresV2(self, "certificates")
         # TODO update init params once auto-renew is implemented
         # https://github.com/canonical/tls-certificates-interface/issues/24
+        
+        self.mutual_tls = MutualTLSProvides(self, "mutual-tls")
+
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(
             self.on.certificates_relation_joined, self._on_certificates_relation_joined
@@ -191,6 +195,10 @@ class TraefikIngressCharm(CharmBase):
         self.framework.observe(
             self.certificates.on.all_certificates_invalidated,
             self._on_all_certificates_invalidated,
+        )
+        self.framework.observe(
+            self.on.mutual_tls_relation_joined,
+            self._on_mutual_tls_relation_joined
         )
 
         observe = self.framework.observe
@@ -302,6 +310,13 @@ class TraefikIngressCharm(CharmBase):
             new_certificate_signing_request=new_csr,
         )
         self._stored.csr = new_csr.decode()
+
+    def _on_mutual_tls_relation_joined(self, event: RelationJoinedEvent):
+        if self.certificates.cert:
+            certificate = self.certificates.cert
+            ca = self.certificates._ca_cert
+            chain = self.certificates._chain
+            self.mutual_tls.set_certificate(certificate=certificate, ca=ca, chain=chain)
 
     def _on_show_proxied_endpoints(self, event: ActionEvent):
         if not self.ready:
