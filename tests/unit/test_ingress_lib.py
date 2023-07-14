@@ -24,7 +24,13 @@ def test_io_ingress_requirer_app_data():
     app_data = IngressRequirerAppData(port=10, name="foo", model="coslite", strip_prefix=True)
 
     app_data.dump(databag)
-    assert databag == {"model": "coslite", "port": "10", "name": "foo", "strip-prefix": "true", "scheme": "http"}
+    assert databag == {
+        "model": "coslite",
+        "port": "10",
+        "name": "foo",
+        "strip-prefix": "true",
+        "scheme": "http",
+    }
     assert IngressRequirerAppData.load(databag) == app_data
 
 

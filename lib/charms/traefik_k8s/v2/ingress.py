@@ -71,7 +71,7 @@ LIBAPI = 2
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 1
+LIBPATCH = 2
 
 PYDEPS = ["pydantic<2.0"]
 
@@ -181,13 +181,6 @@ class IngressRequirerAppData(BaseModel, DatabagIOMixin):
         if scheme not in {"http", "https"}:
             raise ValueError("invalid scheme: should be one of `http|https`")
         return scheme
-
-
-class IngressRequirerUnitData(BaseModel, DatabagIOMixin):
-    """Ingress requirer unit databag model."""
-
-    port: int = Field(description="The port the unit wishes to be exposed.")
-    host: str = Field(description="Hostname the unit wishes to be exposed.")
 
     @validator("port", pre=True)
     def validate_port(cls, port):  # noqa: N805  # pydantic wants 'cls' as first arg

@@ -887,7 +887,8 @@ class TraefikIngressCharm(CharmBase):
         app_dict = data.app.dict(by_alias=True)
         prefix = self._get_prefix(app_dict)
         lb_servers = [
-            {"url": f"{data.app.scheme}://{unit_data.host}:{data.app.port}"} for unit_data in data.units
+            {"url": f"{data.app.scheme}://{unit_data.host}:{data.app.port}"}
+            for unit_data in data.units
         ]
         return self._generate_config_block(prefix, lb_servers, app_dict)
 
