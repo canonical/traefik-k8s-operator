@@ -61,14 +61,15 @@ async def test_relation_data_shape(ops_test: OpsTest):
 
     requirer_app_data = data.requirer.application_data
     # example:
-    # host: foo.bar
     # model: foo
     # name: ipa-tester/0
     # port: 8080
     model = requirer_app_data["model"]
-    assert requirer_app_data["host"] == "foo.bar"
     assert requirer_app_data["name"] == "ipa-tester"
     assert requirer_app_data["port"] == "80"
+
+    for unit_databag in data.requirer.unit_data.values():
+        assert unit_databag["host"]  # e.g. the fqdn or lb address of the unit?
 
     # example:
     #  ingress:
