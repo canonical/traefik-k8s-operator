@@ -95,9 +95,6 @@ async def test_ingressed_endpoints_reachable_after_metallb_enabled(ops_test: Ops
     for ep in get_endpoints(ops_test, scheme="http", netloc=ip):
         logger.debug("Attempting to reach %s", ep)  # Traceback doesn't spell out the endpoint
         urlopen(ep)
-        # A 404 would result in an exception:
-        #   urllib.error.HTTPError: HTTP Error 404: Not Found
-        # so just `urlopen` on its own should suffice for the test.
 
 
 async def curl_endpoints(ops_test: OpsTest, certs_dir, cert_path, traefik_app_ip):
@@ -123,6 +120,14 @@ async def curl_endpoints(ops_test: OpsTest, certs_dir, cert_path, traefik_app_ip
             f"curl exited with rc={rc} for {endpoint}; "
             "non-zero return code means curl encountered a >= 400 HTTP code"
         )
+
+        # fixme:
+        #          sans:
+        #          - '*.juju.local'
+        #  services:
+        #    juju-test-tls-yuh5-alertmanager-service:
+        #      loadBalancer:
+        #        servers: []  # should not be empty!
 
 
 @pytest.mark.abort_on_fail

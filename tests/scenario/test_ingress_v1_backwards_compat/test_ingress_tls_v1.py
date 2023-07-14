@@ -1,8 +1,4 @@
-# Copyright 2023 Canonical Ltd.
-# See LICENSE file for licensing details.
-
 import tempfile
-import unittest
 from unittest.mock import MagicMock, PropertyMock, patch
 
 import pytest
@@ -80,52 +76,37 @@ def _render_config(*, routing_mode: str, strip_prefix: bool, redirect_https: boo
     return expected
 
 
-def _create_relation(
-    *, rel_id: int, rel_name: str, app_name: str, strip_prefix: bool, redirect_https: bool
+def _create_ingress_relation(
+    *, rel_id: int, app_name: str, strip_prefix: bool, redirect_https: bool
 ):
-    if rel_name == "ingress":
-        app_data = {
-            "model": "test-model",
-            "name": "remote/0",
-            "mode": "http",
-            "strip-prefix": "true" if strip_prefix else "false",
-            "redirect-https": "true" if redirect_https else "false",
-            "port": str(9000),
-        }
-        unit_data = {
-            "host": "10.1.10.1",
-        }
-
-        return Relation(
-            endpoint=rel_name,
-            remote_app_name=app_name,
-            relation_id=rel_id,
-            remote_app_data=app_data,
-            remote_units_data={0: unit_data},
-        )
-
-    if rel_name == "ingress-per-unit":
-        unit_data = {
-            "port": str(9000),
-            "host": "10.1.10.1",
-            "model": "test-model",
-            "name": "remote/0",
-            "mode": "http",
-            "strip-prefix": "true" if strip_prefix else "false",
-            "redirect-https": "true" if redirect_https else "false",
-        }
-        return Relation(
-            endpoint=rel_name,
-            remote_app_name=app_name,
-            relation_id=rel_id,
-            remote_units_data={0: unit_data},
-        )
-
-    RuntimeError(f"Unexpected relation name: '{rel_name}'")
-    return None
+    app_data = {
+        "model": "test-model",
+        "name": "remote/0",
+        "mode": "http",
+        "strip-prefix": "true" if strip_prefix else "false",
+        "redirect-https": "true" if redirect_https else "false",
+        "port": str(9000),
+        "host": "10.1.10.1",
+    }
+    return Relation(
+        endpoint="ingress",
+        remote_app_name=app_name,
+        relation_id=rel_id,
+        remote_app_data=app_data,
+    )
 
 
-@pytest.mark.parametrize("rel_name", ("ingress", "ingress-per-unit"))
+def _create_tls_relation(*, app_name: str, strip_prefix: bool, redirect_https: bool):
+    app_data = {
+        "certificates": "{CERTS}",
+    }
+    return Relation(
+        endpoint="certificates",
+        remote_app_name=app_name,
+        remote_app_data=app_data,
+    )
+
+
 @pytest.mark.parametrize("routing_mode", ("path", "subdomain"))
 @pytest.mark.parametrize("strip_prefix", (False, True))
 @pytest.mark.parametrize("redirect_https", (False, True))
@@ -133,7 +114,7 @@ def _create_relation(
 @patch("charm.TraefikIngressCharm._traefik_service_running", PropertyMock(return_value=True))
 @patch("charm.TraefikIngressCharm._tcp_entrypoints_changed", MagicMock(return_value=False))
 @patch("charm.TraefikIngressCharm.version", PropertyMock(return_value="0.0.0"))
-def test_middleware_config(traefik_ctx, rel_name, routing_mode, strip_prefix, redirect_https):
+def test_middleware_config(traefik_ctx, routing_mode, strip_prefix, redirect_https, caplog):
     td = tempfile.TemporaryDirectory()
     containers = [
         Container(
@@ -146,9 +127,14 @@ def test_middleware_config(traefik_ctx, rel_name, routing_mode, strip_prefix, re
     # GIVEN a relation is requesting some middlewares
     rel_id = 0
     app_name = "remote"
-    relation = _create_relation(
+    ipa = _create_ingress_relation(
         rel_id=rel_id,
-        rel_name=rel_name,
+        app_name=app_name,
+        strip_prefix=strip_prefix,
+        redirect_https=redirect_https,
+    )
+
+    tls = _create_tls_relation(
         app_name=app_name,
         strip_prefix=strip_prefix,
         redirect_https=redirect_https,
@@ -159,15 +145,17 @@ def test_middleware_config(traefik_ctx, rel_name, routing_mode, strip_prefix, re
         leader=True,
         config={"routing_mode": routing_mode, "external_hostname": "testhostname"},
         containers=containers,
-        relations=[relation],
+        relations=[ipa, tls],
     )
 
     # WHEN a `relation-changed` hook fires
-    out = traefik_ctx.run(relation.changed_event, state)
+    with caplog.at_level("WARNING"):
+        out = traefik_ctx.run(ipa.changed_event, state)
+    assert "is using a deprecated ingress v1 protocol to talk to Traefik." in caplog.text
 
     # THEN the rendered config file contains middlewares
     with out.get_container("traefik").filesystem.open(
-        f"/opt/traefik/juju/juju_ingress_{rel_name}_{rel_id}_{app_name}.yaml",
+        f"/opt/traefik/juju/juju_ingress_ingress_{rel_id}_{app_name}.yaml",
     ) as f:
         config_file = f.read()
     expected = _render_config(
@@ -177,7 +165,3 @@ def test_middleware_config(traefik_ctx, rel_name, routing_mode, strip_prefix, re
     )
 
     assert yaml.safe_load(config_file) == expected
-
-
-if __name__ == "__main__":
-    unittest.main()

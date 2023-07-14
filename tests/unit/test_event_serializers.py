@@ -3,8 +3,8 @@
 
 import pytest
 import yaml
-from charms.traefik_k8s.v1.ingress import _IPAEvent
 from charms.traefik_k8s.v1.ingress_per_unit import _IPUEvent
+from charms.traefik_k8s.v2.ingress import _IPAEvent
 from ops.charm import CharmBase
 from ops.framework import EventSource, ObjectEvents
 from ops.testing import Harness

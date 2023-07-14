@@ -103,8 +103,6 @@ def test_ingress_unit_provider_request_response(port, host, leader, url, ipu_emp
             with pytest.raises(AssertionError):
                 charm.ipu.publish_url(ingress, remote_unit.name, test_url)
 
-        print(data)
-
     ipu_remote_provided = ipu_empty.replace(remote_units_data={0: mock_data})
     state = State(model=model, relations=[ipu_remote_provided], leader=leader)
 

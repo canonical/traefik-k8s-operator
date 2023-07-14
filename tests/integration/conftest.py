@@ -10,6 +10,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+from typing import Dict
 
 import juju
 import pytest
@@ -64,11 +65,11 @@ def timed_memoizer(func):
     return wrapper
 
 
-@pytest.fixture(scope="module", autouse="True")
+@pytest.fixture(scope="module", autouse=True)
 def copy_traefik_library_into_tester_charms(ops_test):
     """Ensure the tester charms have the requisite libraries."""
     libraries = [
-        "traefik_k8s/v1/ingress.py",
+        "traefik_k8s/v2/ingress.py",
         "traefik_k8s/v1/ingress_per_unit.py",
         "observability_libs/v1/kubernetes_service_patch.py",
         "traefik_route_k8s/v0/traefik_route.py",
@@ -218,8 +219,8 @@ class UnitRelationData:
     unit_name: str
     endpoint: str
     leader: bool
-    application_data: dict
-    unit_data: dict
+    application_data: Dict[str, str]
+    unit_data: Dict[str, str]
 
 
 def get_content(

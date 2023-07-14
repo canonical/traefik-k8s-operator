@@ -38,26 +38,50 @@ def _requirer_provide_ingress_requirements(
     per_app_relation: bool = False,
 ):
     # same as requirer.provide_ingress_requirements(port=port, host=host)s
-    data = {
-        "port": str(port),
-        "host": host,
-        "model": "test-model",
-        "name": "remote/0",
-        "mode": mode,
-    }
+    app_data = {"model": "test-model", "name": "remote/0", "mode": mode, "port": str(port)}
 
     # Must set these to something, because when used with subTest, the previous relation data
     # must be overwritten: if a key is omitted, then a plain `update` would keep existing keys.
     # TODO also need to test what happens when any of these is not specified at all
-    data["strip-prefix"] = "true" if strip_prefix else "false"
-    data["redirect-https"] = "true" if redirect_https else "false"
+    app_data["strip-prefix"] = "true" if strip_prefix else "false"
+    app_data["redirect-https"] = "true" if redirect_https else "false"
+
+    unit_data = {"host": host}
+
+    if not per_app_relation:
+        app_data.update(unit_data)
+    else:
+        # do not emit this event, as we need to 'simultaneously'
+        # update the remote unit and app databags
+        with harness.hooks_disabled():
+            harness.update_relation_data(relation.id, "remote/0", unit_data)
 
     harness.update_relation_data(
         relation.id,
         "remote" if per_app_relation else "remote/0",
-        data,
+        app_data,
     )
-    return data
+    return app_data
+
+
+def _render_middlewares(*, strip_prefix: bool = False, redirect_https: bool = False) -> dict:
+    middlewares = {}
+    if redirect_https:
+        middlewares.update({"redirectScheme": {"scheme": "https", "port": 443, "permanent": True}})
+    if strip_prefix:
+        middlewares.update(
+            {
+                "stripPrefix": {
+                    "prefixes": ["/test-model-remote-0"],
+                    "forceSlash": False,
+                }
+            }
+        )
+    return (
+        {"middlewares": {"juju-sidecar-noprefix-test-model-remote-0": middlewares}}
+        if middlewares
+        else {}
+    )
 
 
 def _render_middlewares(*, strip_prefix: bool = False, redirect_https: bool = False) -> dict:

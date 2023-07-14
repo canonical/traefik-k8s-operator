@@ -5,7 +5,7 @@ from textwrap import dedent
 
 import pytest
 import yaml
-from charms.traefik_k8s.v1.ingress import IngressPerAppProvider
+from charms.traefik_k8s.v2.ingress import IngressPerAppProvider
 from ops.charm import CharmBase
 from ops.testing import Harness
 
@@ -56,19 +56,23 @@ def test_ingress_app_provider_relate_provide(
 ):
     harness.set_leader(True)
     relation_id = harness.add_relation("ingress", "remote")
-    remote_data = {
-        "host": "host",
-        "port": "42",
+    harness.add_relation_unit(relation_id, "remote/0")
+    remote_app_data = {
         "name": "foo",
         "model": "bar",
+        "port": "42",
         "strip_prefix": strip_prefix,
     }
-    harness.update_relation_data(relation_id, "remote", remote_data)
+    remote_unit_data = {
+        "host": "host",
+    }
+    harness.update_relation_data(relation_id, "remote", remote_app_data)
+    harness.update_relation_data(relation_id, "remote/0", remote_unit_data)
 
     relation = harness.model.get_relation("ingress", relation_id)
     assert provider.is_ready(relation)
 
-    provider.publish_url(relation, "foo.com")
+    provider.publish_url(relation, "https://foo.com")
 
     ingress = harness.get_relation_data(relation_id, "test-provider")["ingress"]
-    assert yaml.safe_load(ingress) == {"url": "foo.com"}
+    assert yaml.safe_load(ingress) == {"url": "https://foo.com"}

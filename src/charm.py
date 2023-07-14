@@ -30,8 +30,11 @@ from charms.tls_certificates_interface.v2.tls_certificates import (
     generate_csr,
     generate_private_key,
 )
-from charms.traefik_k8s.v1.ingress import IngressPerAppProvider
+from charms.traefik_k8s.v1.ingress import IngressPerAppProvider as IPAv1
+from charms.traefik_k8s.v1.ingress import RequirerData as IPADatav1
 from charms.traefik_k8s.v1.ingress_per_unit import DataValidationError, IngressPerUnitProvider
+from charms.traefik_k8s.v2.ingress import IngressPerAppProvider as IPAv2
+from charms.traefik_k8s.v2.ingress import IngressRequirerData as IPADatav2
 from charms.traefik_route_k8s.v0.traefik_route import (
     TraefikRouteProvider,
     TraefikRouteRequirerReadyEvent,
@@ -56,8 +59,8 @@ from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, Relation, 
 from ops.pebble import APIError, PathError
 
 if typing.TYPE_CHECKING:
-    from charms.traefik_k8s.v1.ingress import RequirerData as RequirerData_IPA
     from charms.traefik_k8s.v1.ingress_per_unit import RequirerData as RequirerData_IPU
+    from charms.traefik_k8s.v2.ingress import RequirerAppData as RequirerAppData_IPA
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +74,7 @@ _DYNAMIC_CERTS_PATH = _DYNAMIC_CONFIG_DIR + "/certificates.yaml"
 _CERTIFICATE_PATH = _DYNAMIC_CONFIG_DIR + "/certificate.cert"
 _CERTIFICATE_KEY_PATH = _DYNAMIC_CONFIG_DIR + "/certificate.key"
 BIN_PATH = "/usr/bin/traefik"
+
 
 # pyright: reportGeneralTypeIssues=false
 
@@ -123,7 +127,9 @@ class TraefikIngressCharm(CharmBase):
         # FIXME
         # stored.tcp_entrypoints would be used for this list instead, but it's never accessed.
         # intentional or can it be used so we don't need to worry about ordering?
-        self.ingress_per_app = IngressPerAppProvider(charm=self)
+        self.ingress_per_appv1 = ipa_v1 = IPAv1(charm=self)
+        self.ingress_per_appv2 = ipa_v2 = IPAv2(charm=self)
+
         self.ingress_per_unit = IngressPerUnitProvider(charm=self)
         self.traefik_route = TraefikRouteProvider(charm=self, external_host=self.external_host)
 
@@ -135,8 +141,10 @@ class TraefikIngressCharm(CharmBase):
             service_type="LoadBalancer",
             ports=[web, websecure] + tcp_ports,
             refresh_event=[
-                self.ingress_per_app.on.data_provided,
-                self.ingress_per_app.on.data_removed,
+                ipa_v1.on.data_provided,
+                ipa_v2.on.data_provided,
+                ipa_v1.on.data_removed,
+                ipa_v2.on.data_removed,
                 self.ingress_per_unit.on.data_provided,
                 self.ingress_per_unit.on.data_removed,
                 self.traefik_route.on.ready,
@@ -192,13 +200,10 @@ class TraefikIngressCharm(CharmBase):
         observe(self.on.update_status, self._on_update_status)
         observe(self.on.config_changed, self._on_config_changed)
 
-        ipa_events = self.ingress_per_app.on
-        observe(ipa_events.data_provided, self._handle_ingress_data_provided)
-        observe(ipa_events.data_removed, self._handle_ingress_data_removed)
-
-        ipu_events = self.ingress_per_unit.on
-        observe(ipu_events.data_provided, self._handle_ingress_data_provided)
-        observe(ipu_events.data_removed, self._handle_ingress_data_removed)
+        # observe data_provided and data_removed events for all types of ingress we offer:
+        for ingress in (self.ingress_per_unit, self.ingress_per_appv1, self.ingress_per_appv2):
+            observe(ingress.on.data_provided, self._handle_ingress_data_provided)
+            observe(ingress.on.data_removed, self._handle_ingress_data_removed)
 
         route_events = self.traefik_route.on
         observe(route_events.ready, self._handle_traefik_route_ready)
@@ -305,7 +310,8 @@ class TraefikIngressCharm(CharmBase):
         try:
             result = {}
             result.update(self.ingress_per_unit.proxied_endpoints)
-            result.update(self.ingress_per_app.proxied_endpoints)
+            result.update(self.ingress_per_appv1.proxied_endpoints)
+            result.update(self.ingress_per_appv2.proxied_endpoints)
 
             event.set_results({"proxied-endpoints": json.dumps(result)})
         except Exception as e:
@@ -513,7 +519,8 @@ class TraefikIngressCharm(CharmBase):
             # we do this BEFORE processing the relations.
 
         for ingress_relation in (
-            self.ingress_per_app.relations
+            self.ingress_per_appv1.relations
+            + self.ingress_per_appv2.relations
             + self.ingress_per_unit.relations
             + self.traefik_route.relations
         ):
@@ -634,7 +641,9 @@ class TraefikIngressCharm(CharmBase):
         self._push_configurations(relation, config)
 
     def _provide_ingress(
-        self, relation: Relation, provider: Union[IngressPerAppProvider, IngressPerAppProvider]
+        self,
+        relation: Relation,
+        provider: Union[IPAv1, IPAv2],
     ):
         # to avoid long-gone units from lingering in the databag, we wipe it
         if self.unit.is_leader():
@@ -642,27 +651,50 @@ class TraefikIngressCharm(CharmBase):
 
         # generate configs based on ingress type
         # this will also populate our databags with the urls
-        # fixme no side-effects in _get_ method.
         if provider is self.ingress_per_unit:
             config_getter = self._get_configs_per_unit
-        else:  # self.ingress_per_app
+        elif provider is self.ingress_per_appv2:
             config_getter = self._get_configs_per_app
+        elif provider is self.ingress_per_appv1:
+            logger.warning(
+                "providing ingress over ingress v1: " "handling it as ingress per leader (legacy)"
+            )
+            config_getter = self._get_configs_per_leader
+        else:
+            raise ValueError(f"unknown provider: {provider}")
 
         configs = config_getter(relation)
         self._push_configurations(relation, configs)
 
-    def _get_configs_per_app(self, relation: Relation):
-        provider = self.ingress_per_app
+    def _get_configs_per_leader(self, relation: Relation):
+        """Generates ingress per leader config."""
+        # this happens to be the same behaviour as ingress v1 (legacy) provided.
+        ipa = self.ingress_per_appv1
 
         try:
-            data: "RequirerData_IPA" = provider.get_data(relation)
+            data = ipa.get_data(relation)
+        except DataValidationError as e:
+            logger.error(f"invalid data shared through {relation}... Error: {e}.")
+            return None
+
+        config, app_url = self._generate_per_leader_config(data)
+        if self.unit.is_leader():
+            ipa.publish_url(relation, app_url)
+
+        return config
+
+    def _get_configs_per_app(self, relation: Relation):
+        ipa = self.ingress_per_appv2
+
+        try:
+            data = ipa.get_data(relation)
         except DataValidationError as e:
             logger.error(f"invalid data shared through {relation}... Error: {e}.")
             return None
 
         config, app_url = self._generate_per_app_config(data)
         if self.unit.is_leader():
-            provider.publish_url(relation, app_url)
+            ipa.publish_url(relation, app_url)
 
         return config
 
@@ -672,16 +704,16 @@ class TraefikIngressCharm(CharmBase):
         # the application data bag on their side of the relation, so we may start
         # routing for a remote unit before the leader unit of ingress has
         # communicated the url.
-        provider = self.ingress_per_unit
+        ipu = self.ingress_per_unit
 
         config = {}
         for unit in relation.units:
-            if not provider.is_unit_ready(relation, unit):
+            if not ipu.is_unit_ready(relation, unit):
                 continue
             # if the unit is ready, it's implied that the data is there.
             # but we should still ensure it's valid, hence...
             try:
-                data: "RequirerData_IPU" = provider.get_data(relation, unit)
+                data = ipu.get_data(relation, unit)
             except DataValidationError as e:
                 # is_unit_ready should guard against no data being there yet,
                 # but if the data is invalid...
@@ -692,7 +724,7 @@ class TraefikIngressCharm(CharmBase):
 
             unit_config, unit_url = self._generate_per_unit_config(data)
             if self.unit.is_leader():
-                provider.publish_url(relation, data["name"], unit_url)
+                ipu.publish_url(relation, data["name"], unit_url)
             always_merger.merge(config, unit_config)
 
         # Note: We might be pushing an empty configuration if, for example,
@@ -710,12 +742,14 @@ class TraefikIngressCharm(CharmBase):
             self._wipe_ingress_for_relation(relation)
 
     @staticmethod
-    def _get_prefix(data: Union["RequirerData_IPU", "RequirerData_IPA"]):
+    def _get_prefix(data: Union["RequirerData_IPU", "RequirerAppData_IPA"]):
         name = data["name"].replace("/", "-")
         return f"{data['model']}-{name}"
 
     def _generate_middleware_config(
-        self, data: Union["RequirerData_IPA", "RequirerData_IPU"], prefix: str
+        self,
+        data: Union["RequirerData_IPU", "RequirerAppData_IPA"],
+        prefix: str,
     ) -> dict:
         """Generate a middleware config."""
         config = {}  # type: Dict[str, Dict[str, Any]]
@@ -839,9 +873,24 @@ class TraefikIngressCharm(CharmBase):
             }
         }
 
-    def _generate_per_app_config(self, data: "RequirerData_IPA") -> Tuple[dict, str]:
-        prefix = self._get_prefix(data)
+    def _generate_per_app_config(
+        self,
+        data: "IPADatav2",
+    ) -> Tuple[dict, str]:
+        # todo: IPA>=v2 uses pydantic models, the other providers use raw dicts.
+        #  eventually switch all over to pydantic and handle this uniformly
+        app_dict = data.app.dict(by_alias=True)
+        prefix = self._get_prefix(app_dict)
+        lb_servers = [
+            {"url": f"http://{unit_data.host}:{data.app.port}"} for unit_data in data.units
+        ]
+        return self._generate_config_block(prefix, lb_servers, app_dict)
 
+    def _generate_per_leader_config(
+        self,
+        data: "IPADatav1",
+    ) -> Tuple[dict, str]:
+        prefix = self._get_prefix(data)
         lb_servers = [{"url": f"http://{data['host']}:{data['port']}"}]
         return self._generate_config_block(prefix, lb_servers, data)
 
@@ -872,7 +921,8 @@ class TraefikIngressCharm(CharmBase):
         if wipe_rel_data and self.unit.is_leader() and provider != self.traefik_route:
             provider.wipe_ingress_data(relation)
 
-    def _relation_config_file(self, relation: Relation):
+    @staticmethod
+    def _relation_config_file(relation: Relation):
         # Using both the relation id and the app name in the file to facilitate
         # the debugging experience somewhat when snooping into the container at runtime:
         # Apps not in the same model as Traefik (i.e., if `relation` is a CRM) will have
@@ -917,12 +967,26 @@ class TraefikIngressCharm(CharmBase):
         """Returns the correct IngressProvider based on a relation."""
         relation_type = _get_relation_type(relation)
         if relation_type is _IngressRelationType.per_app:
-            return self.ingress_per_app
+            # first try to tell if remote is speaking v2
+            if self.ingress_per_appv2.is_ready(relation):
+                return self.ingress_per_appv2
+            # if not: are we speaking v1?
+            if self.ingress_per_appv1.is_ready(relation):
+                # todo: only warn once per relation
+                logger.warning(
+                    f"{relation} is using a deprecated ingress v1 protocol to talk to Traefik. "
+                    f"Please inform the maintainers of "
+                    f"{getattr(relation.app, 'name', '<unknown remote>')!r} that they "
+                    f"should bump to v2."
+                )
+            # if neither ingress v1 nor v2 are ready, the relation is simply still empty and we
+            # don't know yet what protocol we're speaking
+            return self.ingress_per_appv1
         if relation_type is _IngressRelationType.per_unit:
             return self.ingress_per_unit
         if relation_type is _IngressRelationType.routed:
             return self.traefik_route
-        raise RuntimeError("Invalid relation type (shouldn't happen)")
+        raise RuntimeError(f"Invalid relation type: {relation_type} ({relation.name})")
 
     @property
     def external_host(self):

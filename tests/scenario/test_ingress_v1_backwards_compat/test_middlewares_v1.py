@@ -91,8 +91,6 @@ def _create_relation(
             "strip-prefix": "true" if strip_prefix else "false",
             "redirect-https": "true" if redirect_https else "false",
             "port": str(9000),
-        }
-        unit_data = {
             "host": "10.1.10.1",
         }
 
@@ -101,7 +99,6 @@ def _create_relation(
             remote_app_name=app_name,
             relation_id=rel_id,
             remote_app_data=app_data,
-            remote_units_data={0: unit_data},
         )
 
     if rel_name == "ingress-per-unit":
@@ -121,8 +118,7 @@ def _create_relation(
             remote_units_data={0: unit_data},
         )
 
-    RuntimeError(f"Unexpected relation name: '{rel_name}'")
-    return None
+    raise RuntimeError(f"Unexpected relation name: '{rel_name}'")
 
 
 @pytest.mark.parametrize("rel_name", ("ingress", "ingress-per-unit"))
@@ -133,7 +129,9 @@ def _create_relation(
 @patch("charm.TraefikIngressCharm._traefik_service_running", PropertyMock(return_value=True))
 @patch("charm.TraefikIngressCharm._tcp_entrypoints_changed", MagicMock(return_value=False))
 @patch("charm.TraefikIngressCharm.version", PropertyMock(return_value="0.0.0"))
-def test_middleware_config(traefik_ctx, rel_name, routing_mode, strip_prefix, redirect_https):
+def test_middleware_config(
+    traefik_ctx, rel_name, routing_mode, strip_prefix, redirect_https, caplog
+):
     td = tempfile.TemporaryDirectory()
     containers = [
         Container(
@@ -163,7 +161,11 @@ def test_middleware_config(traefik_ctx, rel_name, routing_mode, strip_prefix, re
     )
 
     # WHEN a `relation-changed` hook fires
-    out = traefik_ctx.run(relation.changed_event, state)
+    with caplog.at_level("WARNING"):
+        out = traefik_ctx.run(relation.changed_event, state)
+
+    if rel_name == "ingress":
+        assert "is using a deprecated ingress v1 protocol to talk to Traefik." in caplog.text
 
     # THEN the rendered config file contains middlewares
     with out.get_container("traefik").filesystem.open(

@@ -45,6 +45,7 @@ async def tcp_ipu_deployment(
     )
 
     yield
+
     await ops_test.model.applications["tcp-tester"].remove()
     await ops_test.model.applications["ipu-tester"].remove()
 
