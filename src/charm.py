@@ -975,7 +975,8 @@ class TraefikIngressCharm(CharmBase):
                 # todo: only warn once per relation
                 logger.warning(
                     f"{relation} is using a deprecated ingress v1 protocol to talk to Traefik. "
-                    f"Please inform the maintainers of {relation.app.name!r} that they "
+                    f"Please inform the maintainers of "
+                    f"{getattr(relation.app, 'name', '<unknown remote>')!r} that they "
                     f"should bump to v2."
                 )
             # if neither ingress v1 nor v2 are ready, the relation is simply still empty and we
