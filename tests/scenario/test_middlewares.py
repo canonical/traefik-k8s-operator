@@ -66,7 +66,8 @@ def _render_config(
             },
             "services": {
                 "juju-test-model-remote-0-service": {
-                    "loadBalancer": {"servers": [{"url": f"{scheme}://10.1.10.1:9000"}]}
+                    "loadBalancer": {"servers": [{"url": f"{scheme}://10.1.10.1:9000"}]},
+                    "rootCAs": ["/opt/traefik/juju/certificate.cert"],
                 }
             },
         }
