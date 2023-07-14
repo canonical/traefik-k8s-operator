@@ -649,7 +649,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         if not databag:  # not ready yet
             return None
 
-        return IngressProviderAppData.load(databag).ingress.url
+        return str(IngressProviderAppData.load(databag).ingress.url)
 
     @property
     def url(self) -> Optional[str]:
