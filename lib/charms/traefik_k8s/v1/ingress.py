@@ -114,7 +114,7 @@ INGRESS_PROVIDES_APP_SCHEMA = {
 try:
     from typing import TypedDict
 except ImportError:
-    from typing_extensions import TypedDict  # py35 compat
+    from typing_extensions import TypedDict  # py35 compatibility
 
 # Model of the data a unit implementing the requirer will need to provide.
 RequirerData = TypedDict(
