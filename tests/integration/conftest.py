@@ -10,6 +10,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+from typing import Dict
 
 import juju
 import pytest
@@ -218,8 +219,8 @@ class UnitRelationData:
     unit_name: str
     endpoint: str
     leader: bool
-    application_data: dict
-    unit_data: dict
+    application_data: Dict[str, str]
+    unit_data: Dict[str, str]
 
 
 def get_content(

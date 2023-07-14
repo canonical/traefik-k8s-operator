@@ -161,6 +161,7 @@ class IngressRequirerAppData(BaseModel, DatabagIOMixin):
 
     model: str = Field(description="The model the application is in.")
     name: str = Field(description="the name of the app requesting ingress.")
+    port: int = Field(description="The port the app wishes to be exposed.")
 
     # fields on top of vanilla 'ingress' interface:
     strip_prefix: Optional[bool] = Field(
@@ -194,6 +195,12 @@ class IngressRequirerUnitData(BaseModel, DatabagIOMixin):
         assert isinstance(port, int), type(port)
         assert 0 < port < 65535, "port out of TCP range"
         return port
+
+
+class IngressRequirerUnitData(BaseModel, DatabagIOMixin):
+    """Ingress requirer unit databag model."""
+
+    host: str = Field(description="Hostname the unit wishes to be exposed.")
 
     @validator("host", pre=True)
     def validate_host(cls, host):  # noqa: N805  # pydantic wants 'cls' as first arg
@@ -389,14 +396,12 @@ class IngressPerAppProvider(_IngressPerAppBase):
             remote_unit_data: Dict[str, Optional[Union[int, str]]] = {}
             for key in ("host", "port"):
                 remote_unit_data[key] = databag.get(key)
-            remote_unit_data["port"] = (
-                int(remote_unit_data["port"]) if remote_unit_data["port"] else None
-            )
             try:
                 data = IngressRequirerUnitData.parse_obj(remote_unit_data)
                 out.append(data)
             except pydantic.ValidationError:
-                log.error(f"failed to validate remote unit data for {unit}", exc_info=True)
+                log.info(f"failed to validate remote unit data for {unit}")
+                raise
         return out
 
     @staticmethod
@@ -410,7 +415,7 @@ class IngressPerAppProvider(_IngressPerAppBase):
         try:
             return IngressRequirerAppData.load(databag)
         except pydantic.ValidationError:
-            log.error(f"failed to validate remote app data for {app}", exc_info=True)
+            log.info(f"failed to validate remote app data for {app}", exc_info=True)
             raise
 
     def get_data(self, relation: Relation) -> IngressRequirerData:
@@ -483,7 +488,6 @@ class IngressPerAppProvider(_IngressPerAppBase):
                 continue
 
             results[ingress_relation.app.name] = ingress_data.ingress.dict()
-
         return results
 
 
@@ -620,6 +624,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
                         "model": self.model.name,
                         "name": self.app.name,
                         "scheme": self._scheme,
+                        "port": port,
                         "strip_prefix": True if self._strip_prefix else None,
                         "redirect_https": True if self._redirect_https else None,
                     }
@@ -627,7 +632,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
 
             except pydantic.ValidationError as e:
                 msg = "failed to validate app data"
-                log.error(msg, exc_info=True)
+                log.info(msg, exc_info=True)  # log to INFO because this might be expected
                 raise DataValidationError(msg) from e
 
         if not host:
@@ -635,10 +640,10 @@ class IngressPerAppRequirer(_IngressPerAppBase):
 
         unit_databag = self.relation.data[self.unit]
         try:
-            IngressRequirerUnitData(host=host, port=port).dump(unit_databag)
+            IngressRequirerUnitData(host=host).dump(unit_databag)
         except pydantic.ValidationError as e:
             msg = "failed to validate unit data"
-            log.error(msg, exc_info=True)
+            log.info(msg, exc_info=True)  # log to INFO because this might be expected
             raise DataValidationError(msg) from e
 
     @property
@@ -668,7 +673,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         if not databag:  # not ready yet
             return None
 
-        return IngressProviderAppData.load(databag).ingress.url
+        return str(IngressProviderAppData.load(databag).ingress.url)
 
     @property
     def url(self) -> Optional[str]:

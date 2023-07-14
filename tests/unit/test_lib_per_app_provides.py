@@ -61,12 +61,12 @@ def test_ingress_app_provider_relate_provide(
     remote_app_data = {
         "name": "foo",
         "model": "bar",
+        "port": "42",
         "strip_prefix": strip_prefix,
         "scheme": scheme,
     }
     remote_unit_data = {
         "host": "host",
-        "port": "42",
     }
     harness.update_relation_data(relation_id, "remote", remote_app_data)
     harness.update_relation_data(relation_id, "remote/0", remote_unit_data)

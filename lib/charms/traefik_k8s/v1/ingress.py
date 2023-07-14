@@ -69,7 +69,7 @@ LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 14
+LIBPATCH = 15
 
 DEFAULT_RELATION_NAME = "ingress"
 RELATION_INTERFACE = "ingress"
@@ -114,7 +114,7 @@ INGRESS_PROVIDES_APP_SCHEMA = {
 try:
     from typing import TypedDict
 except ImportError:
-    from typing_extensions import TypedDict  # py35 compat
+    from typing_extensions import TypedDict  # py35 compatibility
 
 # Model of the data a unit implementing the requirer will need to provide.
 RequirerData = TypedDict(
@@ -156,7 +156,7 @@ class _IngressPerAppBase(Object):
     """Base class for IngressPerUnit interface classes."""
 
     def __init__(self, charm: CharmBase, relation_name: str = DEFAULT_RELATION_NAME):
-        super().__init__(charm, relation_name)
+        super().__init__(charm, relation_name + "_V1")
 
         self.charm: CharmBase = charm
         self.relation_name = relation_name

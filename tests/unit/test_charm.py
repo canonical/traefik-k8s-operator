@@ -38,11 +38,7 @@ def _requirer_provide_ingress_requirements(
     per_app_relation: bool = False,
 ):
     # same as requirer.provide_ingress_requirements(port=port, host=host)s
-    app_data = {
-        "model": "test-model",
-        "name": "remote/0",
-        "mode": mode,
-    }
+    app_data = {"model": "test-model", "name": "remote/0", "mode": mode, "port": str(port)}
 
     # Must set these to something, because when used with subTest, the previous relation data
     # must be overwritten: if a key is omitted, then a plain `update` would keep existing keys.
@@ -50,7 +46,7 @@ def _requirer_provide_ingress_requirements(
     app_data["strip-prefix"] = "true" if strip_prefix else "false"
     app_data["redirect-https"] = "true" if redirect_https else "false"
 
-    unit_data = {"port": str(port), "host": host}
+    unit_data = {"host": host}
 
     if not per_app_relation:
         app_data.update(unit_data)

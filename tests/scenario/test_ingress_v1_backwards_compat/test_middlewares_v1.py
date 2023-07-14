@@ -30,17 +30,11 @@ def _render_middlewares(*, strip_prefix: bool = False, redirect_https: bool = Fa
     )
 
 
-def _render_config(
-    *, rel_name: str, routing_mode: str, strip_prefix: bool, redirect_https: bool, scheme: str
-):
+def _render_config(*, routing_mode: str, strip_prefix: bool, redirect_https: bool):
     routing_rule = {
         "path": "PathPrefix(`/test-model-remote-0`)",
         "subdomain": "Host(`test-model-remote-0.testhostname`)",
     }
-
-    if rel_name != "ingress":
-        scheme = "http"
-        # ipu does not do https for now
 
     expected = {
         "http": {
@@ -66,7 +60,7 @@ def _render_config(
             },
             "services": {
                 "juju-test-model-remote-0-service": {
-                    "loadBalancer": {"servers": [{"url": f"{scheme}://10.1.10.1:9000"}]}
+                    "loadBalancer": {"servers": [{"url": "http://10.1.10.1:9000"}]}
                 }
             },
         }
@@ -87,13 +81,7 @@ def _render_config(
 
 
 def _create_relation(
-    *,
-    rel_id: int,
-    rel_name: str,
-    app_name: str,
-    strip_prefix: bool,
-    redirect_https: bool,
-    scheme: str,
+    *, rel_id: int, rel_name: str, app_name: str, strip_prefix: bool, redirect_https: bool
 ):
     if rel_name == "ingress":
         app_data = {
@@ -103,9 +91,6 @@ def _create_relation(
             "strip-prefix": "true" if strip_prefix else "false",
             "redirect-https": "true" if redirect_https else "false",
             "port": str(9000),
-            "scheme": scheme,
-        }
-        unit_data = {
             "host": "10.1.10.1",
         }
 
@@ -114,7 +99,6 @@ def _create_relation(
             remote_app_name=app_name,
             relation_id=rel_id,
             remote_app_data=app_data,
-            remote_units_data={0: unit_data},
         )
 
     if rel_name == "ingress-per-unit":
@@ -124,7 +108,6 @@ def _create_relation(
             "model": "test-model",
             "name": "remote/0",
             "mode": "http",
-            "scheme": scheme,
             "strip-prefix": "true" if strip_prefix else "false",
             "redirect-https": "true" if redirect_https else "false",
         }
@@ -135,21 +118,19 @@ def _create_relation(
             remote_units_data={0: unit_data},
         )
 
-    RuntimeError(f"Unexpected relation name: '{rel_name}'")
-    return None
+    raise RuntimeError(f"Unexpected relation name: '{rel_name}'")
 
 
 @pytest.mark.parametrize("rel_name", ("ingress", "ingress-per-unit"))
 @pytest.mark.parametrize("routing_mode", ("path", "subdomain"))
 @pytest.mark.parametrize("strip_prefix", (False, True))
 @pytest.mark.parametrize("redirect_https", (False, True))
-@pytest.mark.parametrize("scheme", ("http", "https"))
 @patch("charm.TraefikIngressCharm.external_host", PropertyMock(return_value="testhostname"))
 @patch("charm.TraefikIngressCharm._traefik_service_running", PropertyMock(return_value=True))
 @patch("charm.TraefikIngressCharm._tcp_entrypoints_changed", MagicMock(return_value=False))
 @patch("charm.TraefikIngressCharm.version", PropertyMock(return_value="0.0.0"))
 def test_middleware_config(
-    traefik_ctx, rel_name, routing_mode, strip_prefix, redirect_https, scheme
+    traefik_ctx, rel_name, routing_mode, strip_prefix, redirect_https, caplog
 ):
     td = tempfile.TemporaryDirectory()
     containers = [
@@ -169,7 +150,6 @@ def test_middleware_config(
         app_name=app_name,
         strip_prefix=strip_prefix,
         redirect_https=redirect_https,
-        scheme=scheme,
     )
 
     # AND GIVEN external host is set (see also decorator)
@@ -181,7 +161,11 @@ def test_middleware_config(
     )
 
     # WHEN a `relation-changed` hook fires
-    out = traefik_ctx.run(relation.changed_event, state)
+    with caplog.at_level("WARNING"):
+        out = traefik_ctx.run(relation.changed_event, state)
+
+    if rel_name == "ingress":
+        assert "is using a deprecated ingress v1 protocol to talk to Traefik." in caplog.text
 
     # THEN the rendered config file contains middlewares
     with out.get_container("traefik").filesystem.open(
@@ -189,11 +173,9 @@ def test_middleware_config(
     ) as f:
         config_file = f.read()
     expected = _render_config(
-        rel_name=rel_name,
         routing_mode=routing_mode,
         strip_prefix=strip_prefix,
         redirect_https=redirect_https,
-        scheme=scheme,
     )
 
     assert yaml.safe_load(config_file) == expected
