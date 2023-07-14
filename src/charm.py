@@ -220,6 +220,16 @@ class TraefikIngressCharm(CharmBase):
 
     def _on_certificates_relation_joined(self, event: RelationJoinedEvent) -> None:
         # Assuming there can be only one (metadata also has `limit: 1` on the relation).
+
+        # FIXME occasionally, relation join results in:
+        #  Uncaught exception while in charm code:
+        #     File "./src/charm.py", line 243, in refresh_csr
+        #     private_key=private_key.encode("utf-8"),
+        #  AttributeError: 'NoneType' object has no attribute 'encode'
+        #  Stopgap solution: regen the private_key. Should switch from stored to secrets.
+        if self._stored.private_key is None:
+            logger.warning("For some reason, private_key is None on certificates-relation-joined")
+            self._stored.private_key = generate_private_key().decode()
         self.refresh_csr()
 
     def refresh_csr(self):
@@ -264,6 +274,10 @@ class TraefikIngressCharm(CharmBase):
         self._stored.csr = None
         self.container.remove_path(_CERTIFICATE_PATH, recursive=True)
         self.container.remove_path(_CERTIFICATE_KEY_PATH, recursive=True)
+
+    def _is_tls_enbabled(self) -> bool:
+        """Return True if TLS is enabled, i.e. we wrote our cert to disk."""
+        return self._stored.certificate is not None
 
     def _on_certificate_available(self, event: CertificateAvailableEvent) -> None:
         # On slow machines, this event may come up before pebble is ready
@@ -836,14 +850,20 @@ class TraefikIngressCharm(CharmBase):
             self._generate_tls_block(traefik_router_name, route_rule, traefik_service_name)
         )
 
+        # Add the "rootsCAs" section only if TLS is enabled. If the rootCA section
+        # is empty or the file does not exist, HTTP requests will fail with
+        # "404 page not found".
+        # Note: we're assuming here that the CA that signed traefik's own CSR is
+        # the same CA that signed the service's servers CSRs.
+        root_cas = {"rootCAs": [_CERTIFICATE_PATH]} if self._is_tls_enbabled() else {}
+
         config = {
             "http": {
                 "routers": router_cfg,
                 "services": {
                     traefik_service_name: {
                         "loadBalancer": {"servers": lb_servers},
-                        # TODO: test that this works
-                        "rootCAs": [_CERTIFICATE_PATH],
+                        **root_cas,
                     }
                 },
             }

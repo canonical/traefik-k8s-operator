@@ -55,7 +55,18 @@ import logging
 import socket
 import typing
 from dataclasses import dataclass
-from typing import Any, Dict, List, Literal, MutableMapping, Optional, Sequence, Tuple, Union
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Literal,
+    MutableMapping,
+    Optional,
+    Sequence,
+    Tuple,
+    Union,
+)
 
 import pydantic
 from ops.charm import CharmBase, RelationBrokenEvent, RelationEvent
@@ -521,7 +532,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         port: Optional[int] = None,
         strip_prefix: bool = False,
         redirect_https: bool = False,
-        scheme: SchemeLiteral = "http",
+        scheme: Union[SchemeLiteral, Callable[[], str]] = lambda: "http",
     ):
         """Constructor for IngressRequirer.
 
@@ -548,7 +559,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         self.relation_name = relation_name
         self._strip_prefix = strip_prefix
         self._redirect_https = redirect_https
-        self._scheme = scheme
+        self._scheme = scheme if callable(scheme) else lambda: scheme
 
         self._stored.set_default(current_url=None)  # type: ignore
 
@@ -616,7 +627,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
                     {
                         "model": self.model.name,
                         "name": self.app.name,
-                        "scheme": self._scheme,
+                        "scheme": self._scheme(),
                         "port": port,
                         "strip_prefix": True if self._strip_prefix else None,
                         "redirect_https": True if self._redirect_https else None,
