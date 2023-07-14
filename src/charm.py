@@ -310,7 +310,8 @@ class TraefikIngressCharm(CharmBase):
         try:
             result = {}
             result.update(self.ingress_per_unit.proxied_endpoints)
-            result.update(self.ingress_per_app.proxied_endpoints)
+            result.update(self.ingress_per_appv1.proxied_endpoints)
+            result.update(self.ingress_per_appv2.proxied_endpoints)
 
             event.set_results({"proxied-endpoints": json.dumps(result)})
         except Exception as e:
