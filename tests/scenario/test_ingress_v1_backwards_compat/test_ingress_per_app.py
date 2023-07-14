@@ -47,7 +47,7 @@ def traefik_container(tmp_path):
 @pytest.mark.parametrize("port, host", ((80, "1.1.1.1"), (81, "10.1.10.1")))
 @pytest.mark.parametrize("event_name", ("joined", "changed", "created"))
 def test_ingress_per_app_created(
-    traefik_ctx, port, host, model, traefik_container, event_name, tmp_path
+    traefik_ctx, port, host, model, traefik_container, event_name, tmp_path, caplog
 ):
     """Check the config when a new ingress per leader is created or changes (single remote unit)."""
     ipa = Relation(
@@ -57,8 +57,8 @@ def test_ingress_per_app_created(
             "name": "remote/0",
             "port": str(port),
             "mode": "http",
+            "host": host,
         },
-        remote_units_data={0: {"host": host}},
         relation_id=1,
     )
     state = State(
@@ -70,7 +70,10 @@ def test_ingress_per_app_created(
 
     # WHEN any relevant event fires
     event = getattr(ipa, f"{event_name}_event")
-    traefik_ctx.run(event, state)
+
+    with caplog.at_level("WARNING"):
+        traefik_ctx.run(event, state)
+    assert "is using a deprecated ingress v1 protocol to talk to Traefik." in caplog.text
 
     generated_config = yaml.safe_load(
         traefik_container.filesystem.open(
@@ -83,10 +86,10 @@ def test_ingress_per_app_created(
     }
 
 
-@pytest.mark.parametrize("port, host", ((80, "1.1.1.{}"), (81, "10.1.10.{}")))
+@pytest.mark.parametrize("port, host", ((80, "1.1.1.2"), (81, "10.1.10.2")))
 @pytest.mark.parametrize("n_units", (2, 3, 10))
 def test_ingress_per_app_scale(
-    traefik_ctx, host, port, model, traefik_container, tmp_path, n_units
+    traefik_ctx, host, port, model, traefik_container, tmp_path, n_units, caplog
 ):
     """Check the config when a new ingress per leader unit joins."""
     cfg_file = tmp_path.joinpath("traefik", "juju", "juju_ingress_ingress_1_remote.yaml")
@@ -117,20 +120,14 @@ def test_ingress_per_app_scale(
         }
     }
     cfg_file.write_text(yaml.safe_dump(initial_cfg))
-
-    def _get_mock_data(n: int):
-        return {
-            "host": host.format(n),
-        }
-
     ipa = Relation(
         "ingress",
         remote_app_data={
             "model": "test-model",
             "name": "remote",
             "port": str(port),
+            "host": host,
         },
-        remote_units_data={n: _get_mock_data(n) for n in range(n_units)},
         relation_id=1,
     )
     state = State(
@@ -140,7 +137,9 @@ def test_ingress_per_app_scale(
         relations=[ipa],
     )
 
-    traefik_ctx.run(ipa.changed_event, state)
+    with caplog.at_level("WARNING"):
+        traefik_ctx.run(ipa.changed_event, state)
+    assert "is using a deprecated ingress v1 protocol to talk to Traefik." in caplog.text
 
     new_config = yaml.safe_load(cfg_file.read_text())
     # verify that the config has changed!
@@ -148,16 +147,5 @@ def test_ingress_per_app_scale(
         "servers"
     ]
 
-    assert len(new_lbs) == n_units
-    for n in range(n_units):
-        assert {"url": f"http://{host.format(n)}:{port}"} in new_lbs
-
-        # expected config:
-
-        # IPA:
-        # len(d["service"][svc_name]["loadBalancer"]["servers"]) == num_units
-        # [x["url"] for x in d["service"][svc_name]["loadBalancer"]["servers"]] == all_units_urls
-
-        # IPL:
-        # len(d["service"][svc_name]["loadBalancer"]["servers"]) == 1
-        # d["service"][svc_name]["loadBalancer"]["servers"][0]["url"] == leader_url
+    assert len(new_lbs) == 1
+    assert {"url": f"http://{host}:{port}"} in new_lbs

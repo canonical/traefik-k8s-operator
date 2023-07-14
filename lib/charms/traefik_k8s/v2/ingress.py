@@ -380,7 +380,8 @@ class IngressPerAppProvider(_IngressPerAppBase):
                 data = IngressRequirerUnitData.parse_obj(remote_unit_data)
                 out.append(data)
             except pydantic.ValidationError:
-                log.info(f"failed to validate remote unit data for {unit}", exc_info=True)
+                log.info(f"failed to validate remote unit data for {unit}")
+                raise
         return out
 
     @staticmethod

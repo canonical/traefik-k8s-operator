@@ -30,9 +30,11 @@ from charms.tls_certificates_interface.v2.tls_certificates import (
     generate_csr,
     generate_private_key,
 )
+from charms.traefik_k8s.v1.ingress import IngressPerAppProvider as IPAv1
+from charms.traefik_k8s.v1.ingress import RequirerData as IPADatav1
 from charms.traefik_k8s.v1.ingress_per_unit import DataValidationError, IngressPerUnitProvider
-from charms.traefik_k8s.v1.ingress import IngressPerAppProvider as IPAv1, RequirerData as IPADatav1
-from charms.traefik_k8s.v2.ingress import IngressPerAppProvider as IPAv2, IngressRequirerData as IPADatav2
+from charms.traefik_k8s.v2.ingress import IngressPerAppProvider as IPAv2
+from charms.traefik_k8s.v2.ingress import IngressRequirerData as IPADatav2
 from charms.traefik_route_k8s.v0.traefik_route import (
     TraefikRouteProvider,
     TraefikRouteRequirerReadyEvent,
@@ -456,8 +458,8 @@ class TraefikIngressCharm(CharmBase):
             self.refresh_csr()
 
         if (
-                self._stored.current_external_host != new_external_host
-                or self._stored.current_routing_mode != new_routing_mode
+            self._stored.current_external_host != new_external_host
+            or self._stored.current_routing_mode != new_routing_mode
         ):
             self._stored.current_external_host = new_external_host
             self._stored.current_routing_mode = new_routing_mode
@@ -516,10 +518,10 @@ class TraefikIngressCharm(CharmBase):
             # we do this BEFORE processing the relations.
 
         for ingress_relation in (
-                self.ingress_per_appv1.relations
-                + self.ingress_per_appv2.relations
-                + self.ingress_per_unit.relations
-                + self.traefik_route.relations
+            self.ingress_per_appv1.relations
+            + self.ingress_per_appv2.relations
+            + self.ingress_per_unit.relations
+            + self.traefik_route.relations
         ):
             self._process_ingress_relation(ingress_relation)
 
@@ -638,9 +640,9 @@ class TraefikIngressCharm(CharmBase):
         self._push_configurations(relation, config)
 
     def _provide_ingress(
-            self,
-            relation: Relation,
-            provider: Union[IPAv1, IPAv2],
+        self,
+        relation: Relation,
+        provider: Union[IPAv1, IPAv2],
     ):
         # to avoid long-gone units from lingering in the databag, we wipe it
         if self.unit.is_leader():
@@ -654,8 +656,7 @@ class TraefikIngressCharm(CharmBase):
             config_getter = self._get_configs_per_app
         elif provider is self.ingress_per_appv1:
             logger.warning(
-                "providing ingress over ingress v1: "
-                "handling it as ingress per leader (legacy)"
+                "providing ingress over ingress v1: " "handling it as ingress per leader (legacy)"
             )
             config_getter = self._get_configs_per_leader
         else:
@@ -745,9 +746,9 @@ class TraefikIngressCharm(CharmBase):
         return f"{data['model']}-{name}"
 
     def _generate_middleware_config(
-            self,
-            data: Union["RequirerData_IPU", "RequirerAppData_IPA"],
-            prefix: str,
+        self,
+        data: Union["RequirerData_IPU", "RequirerAppData_IPA"],
+        prefix: str,
     ) -> dict:
         """Generate a middleware config."""
         config = {}  # type: Dict[str, Dict[str, Any]]
@@ -799,7 +800,7 @@ class TraefikIngressCharm(CharmBase):
         return self._generate_config_block(prefix, lb_servers, data)
 
     def _generate_config_block(
-            self, prefix: str, lb_servers: List[Dict[str, str]], data: Dict[str, Any]
+        self, prefix: str, lb_servers: List[Dict[str, str]], data: Dict[str, Any]
     ) -> Tuple[Dict[str, Any], str]:
         """Generate a configuration segment.
 
@@ -849,10 +850,10 @@ class TraefikIngressCharm(CharmBase):
         return config, url
 
     def _generate_tls_block(
-            self,
-            router_name: str,
-            route_rule: str,
-            service_name: str,
+        self,
+        router_name: str,
+        route_rule: str,
+        service_name: str,
     ) -> Dict[str, Any]:
         """Generate a TLS configuration segment."""
         return {
@@ -872,8 +873,8 @@ class TraefikIngressCharm(CharmBase):
         }
 
     def _generate_per_app_config(
-            self,
-            data: "IPADatav2",
+        self,
+        data: "IPADatav2",
     ) -> Tuple[dict, str]:
         # todo: IPA>=v2 uses pydantic models, the other providers use raw dicts.
         #  eventually switch all over to pydantic and handle this uniformly
@@ -885,13 +886,11 @@ class TraefikIngressCharm(CharmBase):
         return self._generate_config_block(prefix, lb_servers, app_dict)
 
     def _generate_per_leader_config(
-            self,
-            data: "IPADatav1",
+        self,
+        data: "IPADatav1",
     ) -> Tuple[dict, str]:
         prefix = self._get_prefix(data)
-        lb_servers = [
-            {"url": f"http://{data['host']}:{data['port']}"}
-        ]
+        lb_servers = [{"url": f"http://{data['host']}:{data['port']}"}]
         return self._generate_config_block(prefix, lb_servers, data)
 
     def _wipe_ingress_for_all_relations(self):
@@ -967,14 +966,19 @@ class TraefikIngressCharm(CharmBase):
         """Returns the correct IngressProvider based on a relation."""
         relation_type = _get_relation_type(relation)
         if relation_type is _IngressRelationType.per_app:
+            # first try to tell if remote is speaking v2
             if self.ingress_per_appv2.is_ready(relation):
                 return self.ingress_per_appv2
+            # if not: are we speaking v1?
             if self.ingress_per_appv1.is_ready(relation):
+                # todo: only warn once per relation
                 logger.warning(
-                    f"{relation} is using a deprecated ingress v1 protocol to talk to Traefik."
-                    f" Please inform the maintainers of {relation.app.name!r} that they "
+                    f"{relation} is using a deprecated ingress v1 protocol to talk to Traefik. "
+                    f"Please inform the maintainers of {relation.app.name!r} that they "
                     f"should bump to v2."
                 )
+            # if neither ingress v1 nor v2 are ready, the relation is simply still empty and we
+            # don't know yet what protocol we're speaking
             return self.ingress_per_appv1
         if relation_type is _IngressRelationType.per_unit:
             return self.ingress_per_unit

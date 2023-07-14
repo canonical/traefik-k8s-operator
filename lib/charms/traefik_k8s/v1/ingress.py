@@ -156,7 +156,7 @@ class _IngressPerAppBase(Object):
     """Base class for IngressPerUnit interface classes."""
 
     def __init__(self, charm: CharmBase, relation_name: str = DEFAULT_RELATION_NAME):
-        super().__init__(charm, relation_name)
+        super().__init__(charm, relation_name + "_V1")
 
         self.charm: CharmBase = charm
         self.relation_name = relation_name
