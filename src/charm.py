@@ -836,11 +836,16 @@ class TraefikIngressCharm(CharmBase):
             self._generate_tls_block(traefik_router_name, route_rule, traefik_service_name)
         )
 
-        # todo: should we use the scheme here too?
         config = {
             "http": {
                 "routers": router_cfg,
-                "services": {traefik_service_name: {"loadBalancer": {"servers": lb_servers}}},
+                "services": {
+                    traefik_service_name: {
+                        "loadBalancer": {"servers": lb_servers},
+                        # TODO: test that this works
+                        "rootCAs": [_CERTIFICATE_PATH],
+                    }
+                },
             }
         }
 
