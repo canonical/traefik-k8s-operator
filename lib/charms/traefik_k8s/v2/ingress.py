@@ -117,7 +117,7 @@ class DatabagIOMixin:
             return cls(**data)  # type: ignore
         except pydantic.ValidationError as e:
             msg = f"failed to validate remote unit databag: {databag}"
-            log.error(msg, exc_info=True)
+            log.info(msg, exc_info=True)
             raise DataValidationError(msg) from e
 
     def dump(self, databag: MutableMapping):
@@ -437,7 +437,7 @@ class IngressPerAppProvider(_IngressPerAppBase):
         try:
             self.get_data(relation)
         except DataValidationError as e:
-            log.error("Provider not ready; validation error encountered: %s" % str(e))
+            log.debug("Provider not ready; validation error encountered: %s" % str(e))
             return False
         return True
 
@@ -597,7 +597,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         try:
             return bool(self._get_url_from_relation_data())
         except DataValidationError as e:
-            log.error("Requirer not ready; validation error encountered: %s" % str(e))
+            log.debug("Requirer not ready; validation error encountered: %s" % str(e))
             return False
 
     def _publish_auto_data(self, relation: Relation):
