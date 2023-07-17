@@ -109,7 +109,7 @@ def test_middleware_config(
         routing_mode=routing_mode,
         strip_prefix=strip_prefix,
         redirect_https=redirect_https,
-        scheme="http"
+        scheme="http",
     )
 
     assert yaml.safe_load(config_file) == expected

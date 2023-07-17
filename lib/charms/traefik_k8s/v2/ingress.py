@@ -522,15 +522,15 @@ class IngressPerAppRequirer(_IngressPerAppBase):
     _stored = StoredState()
 
     def __init__(
-            self,
-            charm: CharmBase,
-            relation_name: str = DEFAULT_RELATION_NAME,
-            *,
-            host: Optional[str] = None,
-            port: Optional[int] = None,
-            strip_prefix: bool = False,
-            redirect_https: bool = False,
-            use_https_scheme: bool = False,
+        self,
+        charm: CharmBase,
+        relation_name: str = DEFAULT_RELATION_NAME,
+        *,
+        host: Optional[str] = None,
+        port: Optional[int] = None,
+        strip_prefix: bool = False,
+        redirect_https: bool = False,
+        use_https_scheme: bool = False,
     ):
         """Constructor for IngressRequirer.
 
@@ -684,7 +684,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         Returns None if the URL isn't available yet.
         """
         data = (
-                typing.cast(Optional[str], self._stored.current_url)  # type: ignore
-                or self._get_url_from_relation_data()
+            typing.cast(Optional[str], self._stored.current_url)  # type: ignore
+            or self._get_url_from_relation_data()
         )
         return data

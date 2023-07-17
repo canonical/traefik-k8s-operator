@@ -19,8 +19,13 @@ def _render_middlewares(*, strip_prefix: bool = False, redirect_https: bool = Fa
 
 
 def _render_config(
-        *, rel_name: str, routing_mode: str, strip_prefix: bool, redirect_https: bool, scheme: str = 'http',
-        tls_enabled: bool = True
+    *,
+    rel_name: str,
+    routing_mode: str,
+    strip_prefix: bool,
+    redirect_https: bool,
+    scheme: str = "http",
+    tls_enabled: bool = True,
 ):
     routing_rule = {
         "path": "PathPrefix(`/test-model-remote-0`)",
@@ -34,7 +39,7 @@ def _render_config(
     service_spec = {
         "loadBalancer": {"servers": [{"url": f"{scheme}://10.1.10.1:9000"}]},
     }
-    if scheme == 'https' and tls_enabled:
+    if scheme == "https" and tls_enabled:
         service_spec["rootCAs"] = ["/opt/traefik/juju/certificate.cert"]
 
     expected = {
@@ -59,14 +64,12 @@ def _render_config(
                     },
                 },
             },
-            "services": {
-                "juju-test-model-remote-0-service": service_spec
-            },
+            "services": {"juju-test-model-remote-0-service": service_spec},
         }
     }
 
     if middlewares := _render_middlewares(
-            strip_prefix=strip_prefix and routing_mode == "path", redirect_https=redirect_https
+        strip_prefix=strip_prefix and routing_mode == "path", redirect_https=redirect_https
     ):
         expected["http"].update(middlewares)
         expected["http"]["routers"]["juju-test-model-remote-0-router"].update(

@@ -9,3 +9,13 @@ def test_ingress_v1_interface(interface_tester: InterfaceTester):
         interface_version=1,
     )
     interface_tester.run()
+
+
+def test_ingress_v2_interface(interface_tester: InterfaceTester):
+    interface_tester.configure(
+        repo="https://github.com/PietroPasotti/charm-relation-interfaces",
+        branch="ingress-v2",
+        interface_name="ingress",
+        interface_version=2,
+    )
+    interface_tester.run()

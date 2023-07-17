@@ -95,7 +95,7 @@ def test_middleware_config(traefik_ctx, routing_mode, strip_prefix, redirect_htt
         strip_prefix=strip_prefix,
         redirect_https=redirect_https,
         rel_name="ingress",
-        scheme='http'
+        scheme="http",
     )
 
     assert yaml.safe_load(config_file) == expected

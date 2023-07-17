@@ -13,13 +13,13 @@ from tests.scenario.utils import _render_config
 
 
 def _create_relation(
-        *,
-        rel_id: int,
-        rel_name: str,
-        app_name: str,
-        strip_prefix: bool,
-        redirect_https: bool,
-        scheme: str,
+    *,
+    rel_id: int,
+    rel_name: str,
+    app_name: str,
+    strip_prefix: bool,
+    redirect_https: bool,
+    scheme: str,
 ):
     if rel_name == "ingress":
         app_data = {
@@ -75,7 +75,7 @@ def _create_relation(
 @patch("charm.TraefikIngressCharm._tcp_entrypoints_changed", MagicMock(return_value=False))
 @patch("charm.TraefikIngressCharm.version", PropertyMock(return_value="0.0.0"))
 def test_middleware_config(
-        traefik_ctx, rel_name, routing_mode, strip_prefix, redirect_https, scheme
+    traefik_ctx, rel_name, routing_mode, strip_prefix, redirect_https, scheme
 ):
     td = tempfile.TemporaryDirectory()
     containers = [
@@ -111,7 +111,7 @@ def test_middleware_config(
 
     # THEN the rendered config file contains middlewares
     with out.get_container("traefik").filesystem.open(
-            f"/opt/traefik/juju/juju_ingress_{rel_name}_{rel_id}_{app_name}.yaml",
+        f"/opt/traefik/juju/juju_ingress_{rel_name}_{rel_id}_{app_name}.yaml",
     ) as f:
         config_file = f.read()
     expected = _render_config(
@@ -120,7 +120,7 @@ def test_middleware_config(
         strip_prefix=strip_prefix,
         redirect_https=redirect_https,
         scheme=scheme,
-        tls_enabled=False
+        tls_enabled=False,
     )
 
     assert yaml.safe_load(config_file) == expected
