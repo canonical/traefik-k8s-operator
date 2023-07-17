@@ -844,6 +844,7 @@ class TraefikIngressCharm(CharmBase):
         host = self.external_host
         scheme = data.get("scheme", "http")
 
+        # FIXME remove _port to avoid https/80?
         if self._routing_mode is _RoutingMode.path:
             route_rule = f"PathPrefix(`/{prefix}`)"
             url = f"{scheme}://{host}:{self._port}/{prefix}"
@@ -870,6 +871,8 @@ class TraefikIngressCharm(CharmBase):
         # "404 page not found".
         # Note: we're assuming here that the CA that signed traefik's own CSR is
         # the same CA that signed the service's servers CSRs.
+        # FIXME rootCAs should be added only if the server url is https, not traefik itself.
+        #  Otherwise we'd get a 404.
         root_cas = {"rootCAs": [_CERTIFICATE_PATH]} if self._is_tls_enabled() else {}
 
         config = {

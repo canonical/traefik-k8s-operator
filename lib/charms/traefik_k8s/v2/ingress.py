@@ -459,8 +459,43 @@ class IngressPerAppProvider(_IngressPerAppBase):
 
     def publish_url(self, relation: Relation, url: str):
         """Publish to the app databag the ingress url."""
+        # FIXME
+        #  The URL we render in the config file is not necessarily the same URL we need to publish
+        #  in relation data. Specifically, if we have TLS inside the cluster but traefik itself is
+        #  not related to a CA, then external users expect to communicate via traefik over HTTP
+        #  and traefik needs to "convert" the internal HTTPS to HTTP ("inverse termination"?).
+        #  Currently, if we relate ca - alertmanager - traefik, (traefik is not behind TLS, but
+        #  alertmanager is), then the procied endpoint URL that traefik reports is
+        #  https://<traefik-ip>, which is wrong.
+        if url.startswith("https://") and not self._is_tls_enabled():
+            # FIXME: At the moment, curling traefik http when the cluster is https leads to
+            #  "Internal Server Error". What we need is to augment the config conditionally on if
+            #  tls for traefik itself is enabled, as follows:
+            #   services:
+            #     juju-welcome-k8s-am-service:
+            #       loadBalancer:
+            #         serversTransport: mytransport
+            #         servers:
+            #         - url: https://am-0.am-endpoints.welcome-k8s.svc.cluster.local:9093
+            #   serversTransports:
+            #     mytransport:
+            #       insecureSkipVerify: true
+            #  I.e. we need to add 'insecureSkipVerify' to all loadBalancer sections, if traefik is
+            #  not related over tls-certificates.
+
+            # Replace "https" with "http". FIXME: this should be addressed much earlier (not here).
+            url = "http://" + url[8:]
+
+        elif url.startswith("http://") and self._is_tls_enabled():
+            # Replace "http" with "https". FIXME: this should be addressed much earlier (not here).
+            url = "https://" + url[7:]
+
         ingress_url = {"url": url}
         IngressProviderAppData.parse_obj({"ingress": ingress_url}).dump(relation.data[self.app])
+
+    def _is_tls_enabled(self) -> bool:
+        # FIXME obtain actual tls status from outside
+        return True
 
     @property
     def proxied_endpoints(self) -> Dict[str, str]:
