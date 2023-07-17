@@ -48,7 +48,7 @@ def traefik_container(tmp_path):
 @pytest.mark.parametrize("event_name", ("joined", "changed", "created"))
 @pytest.mark.parametrize("scheme", ("http", "https"))
 def test_ingress_per_app_created(
-    traefik_ctx, port, host, model, traefik_container, event_name, tmp_path, scheme
+        traefik_ctx, port, host, model, traefik_container, event_name, tmp_path, scheme
 ):
     """Check the config when a new ingress per app is created or changes (single remote unit)."""
     ipa = Relation(
@@ -80,17 +80,21 @@ def test_ingress_per_app_created(
         ).read()
     )
 
-    assert generated_config["http"]["services"]["juju-test-model-remote-0-service"] == {
+    service_def = {
         "loadBalancer": {"servers": [{"url": f"{scheme}://{host}:{port}"}]},
-        "rootCAs": ["/opt/traefik/juju/certificate.cert"],
     }
+    # no tls relation = no rootCAs section
+    # if scheme == 'https':
+    #     service_def["rootCAs"] = ["/opt/traefik/juju/certificate.cert"]
+
+    assert generated_config["http"]["services"]["juju-test-model-remote-0-service"] == service_def
 
 
 @pytest.mark.parametrize("port, host", ((80, "1.1.1.{}"), (81, "10.1.10.{}")))
 @pytest.mark.parametrize("n_units", (2, 3, 10))
 @pytest.mark.parametrize("scheme", ("http", "https"))
 def test_ingress_per_app_scale(
-    traefik_ctx, host, port, model, traefik_container, tmp_path, n_units, scheme
+        traefik_ctx, host, port, model, traefik_container, tmp_path, n_units, scheme
 ):
     """Check the config when a new ingress per app unit joins."""
     cfg_file = tmp_path.joinpath("traefik", "juju", "juju_ingress_ingress_1_remote.yaml")

@@ -108,7 +108,6 @@ class TraefikIngressCharm(CharmBase):
             tcp_entrypoints=None,
             private_key=None,
             csr=None,
-            certificate=None,
             ca=None,
             chain=None,
         )
@@ -269,15 +268,32 @@ class TraefikIngressCharm(CharmBase):
             event.defer()
             return
 
-        self._stored.certificate = None
         self._stored.private_key = None
         self._stored.csr = None
         self.container.remove_path(_CERTIFICATE_PATH, recursive=True)
         self.container.remove_path(_CERTIFICATE_KEY_PATH, recursive=True)
 
-    def _is_tls_enbabled(self) -> bool:
+    def _pull_certificate(self):
+        """Retrieve certificate from container, if present.
+
+        May raise pebble.PathError if the cert is not there.
+        """
+        cert = self.container.pull(_CERTIFICATE_PATH)
+        return cert.read()
+
+    def _is_tls_enabled(self) -> bool:
         """Return True if TLS is enabled, i.e. we wrote our cert to disk."""
-        return self._stored.certificate is not None
+        try:
+            return bool(self._pull_certificate())
+        except PathError:
+            return False
+        except FileNotFoundError:  # testing.Harness raises this instead of pebble.PathError
+            return False
+        except Exception as e:
+            logger.debug(
+                f"failed pulling {_CERTIFICATE_PATH} with unexpected exception {e}", exc_info=True
+            )
+            return False
 
     def _on_certificate_available(self, event: CertificateAvailableEvent) -> None:
         # On slow machines, this event may come up before pebble is ready
@@ -285,11 +301,10 @@ class TraefikIngressCharm(CharmBase):
             event.defer()
             return
 
-        self._stored.certificate = event.certificate
         self._stored.ca = event.ca
         self._stored.chain = event.chain
         # TODO: Store files in container and modify config file
-        self.container.push(_CERTIFICATE_PATH, self._stored.certificate, make_dirs=True)
+        self.container.push(_CERTIFICATE_PATH, event.certificate, make_dirs=True)
         self.container.push(_CERTIFICATE_KEY_PATH, self._stored.private_key, make_dirs=True)
         self._push_config()
         self._process_status_and_configurations()
@@ -419,7 +434,7 @@ class TraefikIngressCharm(CharmBase):
 
     def _get_tls_config(self) -> dict:
         """Return dictionary with TLS traefik configuration if it exists."""
-        if not self._stored.certificate:
+        if not self._is_tls_enabled():
             return {}
         return {
             "tls": {
@@ -855,7 +870,7 @@ class TraefikIngressCharm(CharmBase):
         # "404 page not found".
         # Note: we're assuming here that the CA that signed traefik's own CSR is
         # the same CA that signed the service's servers CSRs.
-        root_cas = {"rootCAs": [_CERTIFICATE_PATH]} if self._is_tls_enbabled() else {}
+        root_cas = {"rootCAs": [_CERTIFICATE_PATH]} if self._is_tls_enabled() else {}
 
         config = {
             "http": {

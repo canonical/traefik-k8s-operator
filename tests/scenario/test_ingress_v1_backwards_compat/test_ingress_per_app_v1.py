@@ -83,7 +83,6 @@ def test_ingress_per_app_created(
 
     assert generated_config["http"]["services"]["juju-test-model-remote-0-service"] == {
         "loadBalancer": {"servers": [{"url": f"http://{host}:{port}"}]},
-        "rootCAs": ["/opt/traefik/juju/certificate.cert"],
     }
 
 

@@ -57,7 +57,6 @@ import typing
 from dataclasses import dataclass
 from typing import (
     Any,
-    Callable,
     Dict,
     List,
     Literal,
@@ -89,7 +88,6 @@ PYDEPS = ["pydantic<2.0"]
 DEFAULT_RELATION_NAME = "ingress"
 RELATION_INTERFACE = "ingress"
 SchemeLiteral = Literal["http", "https"]
-
 
 log = logging.getLogger(__name__)
 
@@ -524,15 +522,15 @@ class IngressPerAppRequirer(_IngressPerAppBase):
     _stored = StoredState()
 
     def __init__(
-        self,
-        charm: CharmBase,
-        relation_name: str = DEFAULT_RELATION_NAME,
-        *,
-        host: Optional[str] = None,
-        port: Optional[int] = None,
-        strip_prefix: bool = False,
-        redirect_https: bool = False,
-        scheme: Union[SchemeLiteral, Callable[[], str]] = lambda: "http",
+            self,
+            charm: CharmBase,
+            relation_name: str = DEFAULT_RELATION_NAME,
+            *,
+            host: Optional[str] = None,
+            port: Optional[int] = None,
+            strip_prefix: bool = False,
+            redirect_https: bool = False,
+            use_https_scheme: bool = False,
     ):
         """Constructor for IngressRequirer.
 
@@ -549,7 +547,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
                 application; if unspecified, the default Kubernetes service name will be used.
             strip_prefix: configure Traefik to strip the path prefix.
             redirect_https: redirect incoming requests to HTTPS.
-            scheme: scheme to use when constructing the ingress url.
+            use_https_scheme: use https as scheme when constructing the ingress url.
 
         Request Args:
             port: the port of the service
@@ -559,7 +557,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         self.relation_name = relation_name
         self._strip_prefix = strip_prefix
         self._redirect_https = redirect_https
-        self._scheme = scheme if callable(scheme) else lambda: scheme
+        self._scheme = typing.cast(SchemeLiteral, "https" if use_https_scheme else "http")
 
         self._stored.set_default(current_url=None)  # type: ignore
 
@@ -627,7 +625,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
                     {
                         "model": self.model.name,
                         "name": self.app.name,
-                        "scheme": self._scheme(),
+                        "scheme": self._scheme,
                         "port": port,
                         "strip_prefix": True if self._strip_prefix else None,
                         "redirect_https": True if self._redirect_https else None,
@@ -686,7 +684,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         Returns None if the URL isn't available yet.
         """
         data = (
-            typing.cast(Optional[str], self._stored.current_url)  # type: ignore
-            or self._get_url_from_relation_data()
+                typing.cast(Optional[str], self._stored.current_url)  # type: ignore
+                or self._get_url_from_relation_data()
         )
         return data

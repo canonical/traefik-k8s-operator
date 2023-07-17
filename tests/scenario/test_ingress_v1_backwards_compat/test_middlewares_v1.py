@@ -9,76 +9,7 @@ import pytest
 import yaml
 from scenario import Container, Mount, Relation, State
 
-
-def _render_middlewares(*, strip_prefix: bool = False, redirect_https: bool = False) -> dict:
-    middlewares = {}
-    if redirect_https:
-        middlewares.update({"redirectScheme": {"scheme": "https", "port": 443, "permanent": True}})
-    if strip_prefix:
-        middlewares.update(
-            {
-                "stripPrefix": {
-                    "prefixes": ["/test-model-remote-0"],
-                    "forceSlash": False,
-                }
-            }
-        )
-    return (
-        {"middlewares": {"juju-sidecar-noprefix-test-model-remote-0": middlewares}}
-        if middlewares
-        else {}
-    )
-
-
-def _render_config(*, routing_mode: str, strip_prefix: bool, redirect_https: bool):
-    routing_rule = {
-        "path": "PathPrefix(`/test-model-remote-0`)",
-        "subdomain": "Host(`test-model-remote-0.testhostname`)",
-    }
-
-    expected = {
-        "http": {
-            "routers": {
-                "juju-test-model-remote-0-router": {
-                    "entryPoints": ["web"],
-                    "rule": routing_rule[routing_mode],
-                    "service": "juju-test-model-remote-0-service",
-                },
-                "juju-test-model-remote-0-router-tls": {
-                    "entryPoints": ["websecure"],
-                    "rule": routing_rule[routing_mode],
-                    "service": "juju-test-model-remote-0-service",
-                    "tls": {
-                        "domains": [
-                            {
-                                "main": "testhostname",
-                                "sans": ["*.testhostname"],
-                            },
-                        ],
-                    },
-                },
-            },
-            "services": {
-                "juju-test-model-remote-0-service": {
-                    "loadBalancer": {"servers": [{"url": "http://10.1.10.1:9000"}]},
-                    "rootCAs": ["/opt/traefik/juju/certificate.cert"],
-                }
-            },
-        }
-    }
-
-    if middlewares := _render_middlewares(
-        strip_prefix=strip_prefix and routing_mode == "path", redirect_https=redirect_https
-    ):
-        expected["http"].update(middlewares)
-        expected["http"]["routers"]["juju-test-model-remote-0-router"].update(
-            {"middlewares": ["juju-sidecar-noprefix-test-model-remote-0"]},
-        )
-        expected["http"]["routers"]["juju-test-model-remote-0-router-tls"].update(
-            {"middlewares": ["juju-sidecar-noprefix-test-model-remote-0"]},
-        )
-
-    return expected
+from tests.scenario.utils import _render_config
 
 
 def _create_relation(
@@ -174,9 +105,11 @@ def test_middleware_config(
     ) as f:
         config_file = f.read()
     expected = _render_config(
+        rel_name="ingress",
         routing_mode=routing_mode,
         strip_prefix=strip_prefix,
         redirect_https=redirect_https,
+        scheme="http"
     )
 
     assert yaml.safe_load(config_file) == expected
