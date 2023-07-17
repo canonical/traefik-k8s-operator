@@ -57,6 +57,7 @@ class Passthrough(Object):
     def copy(self, r_in: Relation, r_out: Relation):
         r_out.data[self.charm.app].clear()
         r_out.data[self.charm.app].update(r_in.data[r_in.app])
+        # Fixme: how to map units?
 
     def _update(self):
         for r_in, r_out in self.relation_pairs:
