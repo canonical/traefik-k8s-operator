@@ -17,18 +17,14 @@ from urllib.parse import urlparse
 import yaml
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from charms.loki_k8s.v0.loki_push_api import LogProxyConsumer
+from charms.observability_libs.v0.cert_handler import CertHandler
 from charms.observability_libs.v1.kubernetes_service_patch import (
     KubernetesServicePatch,
     ServicePort,
 )
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 from charms.tls_certificates_interface.v2.tls_certificates import (
-    CertificateAvailableEvent,
-    CertificateExpiringEvent,
     CertificateInvalidatedEvent,
-    TLSCertificatesRequiresV2,
-    generate_csr,
-    generate_private_key,
 )
 from charms.traefik_k8s.v1.ingress import IngressPerAppProvider as IPAv1
 from charms.traefik_k8s.v1.ingress import RequirerData as IPADatav1
@@ -49,7 +45,6 @@ from ops.charm import (
     PebbleReadyEvent,
     RelationBrokenEvent,
     RelationEvent,
-    RelationJoinedEvent,
     StartEvent,
     UpdateStatusEvent,
 )
@@ -105,11 +100,6 @@ class TraefikIngressCharm(CharmBase):
         self._stored.set_default(
             current_external_host=None,
             current_routing_mode=None,
-            tcp_entrypoints=None,
-            private_key=None,
-            csr=None,
-            ca=None,
-            chain=None,
         )
 
         self.container = self.unit.get_container(_TRAEFIK_CONTAINER_NAME)
@@ -171,28 +161,18 @@ class TraefikIngressCharm(CharmBase):
                 self.on.update_status,
             ],
         )
-        self.certificates = TLSCertificatesRequiresV2(self, "certificates")
+        self.cert = CertHandler(
+            self, key="cert_handler", peer_relation_name="peers", cert_subject=self.cert_subject
+        )
+        observe = self.framework.observe
+
         # TODO update init params once auto-renew is implemented
         # https://github.com/canonical/tls-certificates-interface/issues/24
-        self.framework.observe(self.on.install, self._on_install)
-        self.framework.observe(
-            self.on.certificates_relation_joined, self._on_certificates_relation_joined
-        )
-        self.framework.observe(
-            self.certificates.on.certificate_available, self._on_certificate_available
-        )
-        self.framework.observe(
-            self.certificates.on.certificate_expiring, self._on_certificate_expiring
-        )
-        self.framework.observe(
-            self.certificates.on.certificate_invalidated, self._on_certificate_invalidated
-        )
-        self.framework.observe(
-            self.certificates.on.all_certificates_invalidated,
-            self._on_all_certificates_invalidated,
+        observe(
+            self.cert.on.cert_changed,
+            self._on_cert_changed,
         )
 
-        observe = self.framework.observe
         observe(self.on.traefik_pebble_ready, self._on_traefik_pebble_ready)
         observe(self.on.start, self._on_start)
         observe(self.on.stop, self._on_stop)
@@ -211,51 +191,6 @@ class TraefikIngressCharm(CharmBase):
         # Action handlers
         observe(self.on.show_proxied_endpoints_action, self._on_show_proxied_endpoints)
 
-    def _on_install(self, event) -> None:
-        # Generate key without a passphrase as traefik does not support it
-        # https://github.com/traefik/traefik/pull/6518
-        private_key = generate_private_key()
-        self._stored.private_key = private_key.decode()
-
-    def _on_certificates_relation_joined(self, event: RelationJoinedEvent) -> None:
-        # Assuming there can be only one (metadata also has `limit: 1` on the relation).
-
-        # FIXME occasionally, relation join results in:
-        #  Uncaught exception while in charm code:
-        #     File "./src/charm.py", line 243, in refresh_csr
-        #     private_key=private_key.encode("utf-8"),
-        #  AttributeError: 'NoneType' object has no attribute 'encode'
-        #  Stopgap solution: regen the private_key. Should switch from stored to secrets.
-        if self._stored.private_key is None:
-            logger.warning("For some reason, private_key is None on certificates-relation-joined")
-            self._stored.private_key = generate_private_key().decode()
-        self.refresh_csr()
-
-    def refresh_csr(self):
-        """Refresh the CSR, overwriting any existing."""
-        if not list(self.model.relations["certificates"]):
-            # Relation "certificates" does not exist
-            return
-
-        private_key = self._stored.private_key
-        if not (subject := self.cert_subject):
-            logger.debug(
-                "Cannot generate CSR: subject is invalid "
-                "(hostname is '%s', which is probably invalid)",
-                self.external_host,
-            )
-            # TODO set BlockedStatus here when compound_status is introduced
-            #  https://github.com/canonical/operator/issues/665
-            return
-
-        csr = generate_csr(
-            private_key=private_key.encode("utf-8"),
-            subject=subject,
-        )
-        self._stored.csr = csr.decode()
-        self.certificates.request_certificate_creation(certificate_signing_request=csr)
-        logger.debug("CSR sent")
-
     def _on_certificate_invalidated(self, event: CertificateInvalidatedEvent):
         # Assuming there can be only one cert (metadata also has `limit: 1` on the relation).
         # Assuming the `on-expiring` handle successfully takes care of renewal.
@@ -268,69 +203,32 @@ class TraefikIngressCharm(CharmBase):
             event.defer()
             return
 
-        self._stored.private_key = None
-        self._stored.csr = None
         self.container.remove_path(_CERTIFICATE_PATH, recursive=True)
         self.container.remove_path(_CERTIFICATE_KEY_PATH, recursive=True)
 
-    def _pull_certificate(self):
-        """Retrieve certificate from container, if present.
-
-        May raise pebble.PathError if the cert is not there.
-        """
-        cert = self.container.pull(_CERTIFICATE_PATH)
-        return cert.read()
-
     def _is_tls_enabled(self) -> bool:
-        """Return True if TLS is enabled, i.e. we wrote our cert to disk."""
-        try:
-            return bool(self._pull_certificate())
-        except PathError:
-            return False
-        except FileNotFoundError:  # testing.Harness raises this instead of pebble.PathError
-            return False
-        except Exception as e:
-            logger.debug(
-                f"failed pulling {_CERTIFICATE_PATH} with unexpected exception {e}", exc_info=True
-            )
-            return False
+        """Return True if TLS is enabled."""
+        return self.cert.enabled
 
-    def _on_certificate_available(self, event: CertificateAvailableEvent) -> None:
+    def _on_cert_changed(self, event) -> None:
         # On slow machines, this event may come up before pebble is ready
         if not self.container.can_connect():
             event.defer()
             return
 
-        self._stored.ca = event.ca
-        self._stored.chain = event.chain
-        # TODO: Store files in container and modify config file
-        self.container.push(_CERTIFICATE_PATH, event.certificate, make_dirs=True)
-        self.container.push(_CERTIFICATE_KEY_PATH, self._stored.private_key, make_dirs=True)
+        cert_handler = self.cert
+        if cert_handler.cert:
+            self.container.push(_CERTIFICATE_PATH, cert_handler.cert, make_dirs=True)
+        else:
+            self.container.remove_path(_CERTIFICATE_PATH)
+
+        if cert_handler.key:
+            self.container.push(_CERTIFICATE_KEY_PATH, cert_handler.key, make_dirs=True)
+        else:
+            self.container.remove_path(_CERTIFICATE_KEY_PATH)
+
         self._push_config()
         self._process_status_and_configurations()
-
-    def _on_certificate_expiring(self, event: CertificateExpiringEvent) -> None:
-        old_csr = self._stored.csr
-        private_key = self._stored.private_key
-
-        if not (subject := self.cert_subject):
-            # TODO: use compound status
-            logging.error(
-                "Cannot generate CSR: invalid cert subject '%s' (is external hostname defined?)",
-                subject,
-            )
-            event.defer()
-            return
-
-        new_csr = generate_csr(
-            private_key=private_key.encode(),
-            subject=subject,
-        )
-        self.certificates.request_certificate_renewal(
-            old_certificate_signing_request=old_csr,
-            new_certificate_signing_request=new_csr,
-        )
-        self._stored.csr = new_csr.decode()
 
     def _on_show_proxied_endpoints(self, event: ActionEvent):
         if not self.ready:
@@ -483,9 +381,8 @@ class TraefikIngressCharm(CharmBase):
         # reconsider all data sent over the relations and all configs
         new_external_host = self.external_host
         new_routing_mode = self.config["routing_mode"]
-
-        if self._stored.current_external_host != new_external_host or not self._stored.csr:
-            self.refresh_csr()
+        # TODO set BlockedStatus here when compound_status is introduced
+        #  https://github.com/canonical/operator/issues/665
 
         if (
             self._stored.current_external_host != new_external_host

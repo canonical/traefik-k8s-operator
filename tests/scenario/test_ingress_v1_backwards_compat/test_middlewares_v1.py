@@ -110,6 +110,7 @@ def test_middleware_config(
         strip_prefix=strip_prefix,
         redirect_https=redirect_https,
         scheme="http",
+        tls_enabled=False,
     )
 
     assert yaml.safe_load(config_file) == expected

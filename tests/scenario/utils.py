@@ -39,7 +39,7 @@ def _render_config(
     service_spec = {
         "loadBalancer": {"servers": [{"url": f"{scheme}://10.1.10.1:9000"}]},
     }
-    if scheme == "https" and tls_enabled:
+    if tls_enabled:
         service_spec["rootCAs"] = ["/opt/traefik/juju/certificate.cert"]
 
     expected = {
