@@ -606,7 +606,7 @@ class TraefikIngressCharm(CharmBase):
         prefix = self._get_prefix(data)
         config = self._generate_per_leader_config(prefix, data)
         if self.unit.is_leader():
-            ipa.publish_url(relation, self._generate_external_url(prefix))
+            ipa.publish_url(relation, self._get_external_url(prefix))
 
         return config
 
@@ -622,7 +622,7 @@ class TraefikIngressCharm(CharmBase):
         prefix = self._get_prefix(data.app.dict(by_alias=True))
         config = self._generate_per_app_config(prefix, data)
         if self.unit.is_leader():
-            ipa.publish_url(relation, self._generate_external_url(prefix))
+            ipa.publish_url(relation, self._get_external_url(prefix))
 
         return config
 
@@ -653,7 +653,7 @@ class TraefikIngressCharm(CharmBase):
             prefix = self._get_prefix(data)
             unit_config = self._generate_per_unit_config(prefix, data)
             if self.unit.is_leader():
-                ipu.publish_url(relation, data["name"], self._generate_external_url(prefix))
+                ipu.publish_url(relation, data["name"], self._get_external_url(prefix))
             always_merger.merge(config, unit_config)
 
         # Note: We might be pushing an empty configuration if, for example,
@@ -695,7 +695,6 @@ class TraefikIngressCharm(CharmBase):
 
     def _generate_per_unit_config(self, prefix: str, data: "RequirerData_IPU") -> dict:
         """Generate a config dict for a given unit for IngressPerUnit."""
-        host = self.external_host
         if data["mode"] == "tcp":
             # TODO: is there a reason why SNI-based routing (from TLS certs) is per-unit only?
             # This is not a technical limitation in any way. It's meaningful/useful for
@@ -705,7 +704,6 @@ class TraefikIngressCharm(CharmBase):
             # scale-out services which may only have frontends dedicated, but which do not "speak"
             # HTTP(S). Such as any of the "cloud-native" SQL implementations (TiDB, Cockroach, etc)
             port = data["port"]
-            unit_url = f"{host}:{port}"
             config = {
                 "tcp": {
                     "routers": {
@@ -723,7 +721,7 @@ class TraefikIngressCharm(CharmBase):
                     },
                 }
             }
-            return config, unit_url
+            return config
 
         lb_servers = [{"url": f"http://{data['host']}:{data['port']}"}]
         return self._generate_config_block(prefix, lb_servers, data)
@@ -741,17 +739,10 @@ class TraefikIngressCharm(CharmBase):
         unit and IPA may be more than one).
         """
         host = self.external_host
-        scheme = data.get("scheme", "http")
-
-        # remove _port to avoid https/80
-        port = "" if scheme == "https" else f":{self._port}"
-
         if self._routing_mode is _RoutingMode.path:
             route_rule = f"PathPrefix(`/{prefix}`)"
-            url = f"{scheme}://{host}{port}/{prefix}"
         else:  # _RoutingMode.subdomain
             route_rule = f"Host(`{prefix}.{host}`)"
-            url = f"{scheme}://{prefix}.{host}{port}/"
 
         traefik_router_name = f"juju-{prefix}-router"
         traefik_service_name = f"juju-{prefix}-service"
@@ -772,33 +763,43 @@ class TraefikIngressCharm(CharmBase):
         # "404 page not found".
         # Note: we're assuming here that the CA that signed traefik's own CSR is
         # the same CA that signed the service's servers CSRs.
-        # FIXME rootCAs should be added only if the server url is https, not traefik itself.
-        #  Otherwise we'd get a 404.
-        root_cas = {"rootCAs": [_CERTIFICATE_PATH]} if self._is_tls_enabled() else {}
+        external_tls = self._is_tls_enabled()
 
-        # FIXME: At the moment, curling traefik http when the cluster is https leads to
-        #  "Internal Server Error". What we need is to augment the config conditionally on if
-        #  tls for traefik itself is enabled, as follows:
-        #   services:
-        #     juju-welcome-k8s-am-service:
-        #       loadBalancer:
-        #         serversTransport: mytransport
-        #         servers:
-        #         - url: https://am-0.am-endpoints.welcome-k8s.svc.cluster.local:9093
-        #   serversTransports:
-        #     mytransport:
-        #       insecureSkipVerify: true
-        #  I.e. we need to add 'insecureSkipVerify' to all loadBalancer sections, if traefik is
-        #  not related over tls-certificates.
+        # REVERSE TERMINATION: we are providing ingress for a unit who is itself behind https,
+        # but traefik is not.
+        internal_tls = data.get('scheme') == 'https'
+
+        is_reverse_termination = not external_tls and internal_tls
+        is_termination = external_tls and not internal_tls
+        is_end_to_end = external_tls and internal_tls
+
+        lb_def = {"servers": lb_servers}
+        service_def = {
+            "loadBalancer": lb_def,
+        }
+
+        if is_reverse_termination:
+            # i.e. traefik itself is not related to tls certificates, but the ingress requirer is
+            service_def["rootCAs"] = [_CERTIFICATE_PATH]
+            transport_name = "reverseTerminationTransport"
+            lb_def["serversTransport"] = transport_name
+            service_def["serversTransports"] = {
+                transport_name: {
+                    "insecureSkipVerify": True
+                }
+            }
+
+        elif is_termination:
+            # i.e. traefik itself is related to tls certificates, but the ingress requirer is not
+            pass
+
+        # if is_end_to_end:
 
         config = {
             "http": {
                 "routers": router_cfg,
                 "services": {
-                    traefik_service_name: {
-                        "loadBalancer": {"servers": lb_servers},
-                        **root_cas,
-                    }
+                    traefik_service_name: service_def
                 },
             }
         }
@@ -861,16 +862,12 @@ class TraefikIngressCharm(CharmBase):
         lb_servers = [{"url": f"http://{data['host']}:{data['port']}"}]
         return self._generate_config_block(prefix, lb_servers, data)
 
-    def _generate_external_url(self, prefix):
+    def _get_external_url(self, prefix):
         scheme = "https" if self.cert.enabled else "http"
-        # to avoid https/80
-        port = "" if self.cert.enabled else f":{self._port}"
-
         if self._routing_mode is _RoutingMode.path:
-            url = f"{scheme}://{self.external_host}{port}/{prefix}"
+            url = f"{scheme}://{self.external_host}/{prefix}"
         else:  # _RoutingMode.subdomain
-            url = f"{scheme}://{prefix}.{self.external_host}{port}/"
-
+            url = f"{scheme}://{prefix}.{self.external_host}/"
         return url
 
     def _wipe_ingress_for_all_relations(self):

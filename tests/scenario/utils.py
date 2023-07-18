@@ -40,8 +40,10 @@ def _render_config(
     service_spec = {
         "loadBalancer": {"servers": [{"url": f"{scheme}://10.1.10.1{port}"}]},
     }
-    if tls_enabled:
+    if scheme == 'https':
         service_spec["rootCAs"] = ["/opt/traefik/juju/certificate.cert"]
+        service_spec["loadBalancer"]["serversTransport"] = "reverseTerminationTransport"
+        service_spec["serversTransports"] = {"reverseTerminationTransport": {"insecureSkipVerify": True}}
 
     expected = {
         "http": {

@@ -85,9 +85,12 @@ def test_ingress_per_app_created(
     service_def = {
         "loadBalancer": {"servers": [{"url": f"{scheme}://{host}{port}"}]},
     }
-    # no tls relation = no rootCAs section
-    # if scheme == 'https':
-    #     service_def["rootCAs"] = ["/opt/traefik/juju/certificate.cert"]
+
+    if scheme == 'https':
+        # traefik has no tls relation, but the requirer does: reverse termination case
+        service_def["rootCAs"] = ["/opt/traefik/juju/certificate.cert"]
+        service_def["loadBalancer"]["serversTransport"] = "reverseTerminationTransport"
+        service_def["serversTransports"] = {"reverseTerminationTransport": {"insecureSkipVerify": True}}
 
     assert generated_config["http"]["services"]["juju-test-model-remote-0-service"] == service_def
 
