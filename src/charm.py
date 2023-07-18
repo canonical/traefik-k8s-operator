@@ -103,6 +103,9 @@ class TraefikIngressCharm(CharmBase):
         )
 
         self.container = self.unit.get_container(_TRAEFIK_CONTAINER_NAME)
+        self.cert = CertHandler(
+            self, key="cert_handler", peer_relation_name="peers", cert_subject=self.cert_subject
+        )
 
         # FIXME: Do not move these lower. They must exist before `_tcp_ports` is called. The
         # better long-term solution is to allow dynamic modification of the object, and to try
@@ -117,7 +120,7 @@ class TraefikIngressCharm(CharmBase):
         # stored.tcp_entrypoints would be used for this list instead, but it's never accessed.
         # intentional or can it be used so we don't need to worry about ordering?
         self.ingress_per_appv1 = ipa_v1 = IPAv1(charm=self)
-        self.ingress_per_appv2 = ipa_v2 = IPAv2(charm=self)
+        self.ingress_per_appv2 = ipa_v2 = IPAv2(charm=self, tls=self.cert)
 
         self.ingress_per_unit = IngressPerUnitProvider(charm=self)
         self.traefik_route = TraefikRouteProvider(charm=self, external_host=self.external_host)
@@ -160,9 +163,6 @@ class TraefikIngressCharm(CharmBase):
                 self.on.traefik_pebble_ready,
                 self.on.update_status,
             ],
-        )
-        self.cert = CertHandler(
-            self, key="cert_handler", peer_relation_name="peers", cert_subject=self.cert_subject
         )
         observe = self.framework.observe
 
@@ -385,8 +385,8 @@ class TraefikIngressCharm(CharmBase):
         #  https://github.com/canonical/operator/issues/665
 
         if (
-            self._stored.current_external_host != new_external_host
-            or self._stored.current_routing_mode != new_routing_mode
+                self._stored.current_external_host != new_external_host
+                or self._stored.current_routing_mode != new_routing_mode
         ):
             self._stored.current_external_host = new_external_host
             self._stored.current_routing_mode = new_routing_mode
@@ -445,10 +445,10 @@ class TraefikIngressCharm(CharmBase):
             # we do this BEFORE processing the relations.
 
         for ingress_relation in (
-            self.ingress_per_appv1.relations
-            + self.ingress_per_appv2.relations
-            + self.ingress_per_unit.relations
-            + self.traefik_route.relations
+                self.ingress_per_appv1.relations
+                + self.ingress_per_appv2.relations
+                + self.ingress_per_unit.relations
+                + self.traefik_route.relations
         ):
             self._process_ingress_relation(ingress_relation)
 
@@ -567,9 +567,9 @@ class TraefikIngressCharm(CharmBase):
         self._push_configurations(relation, config)
 
     def _provide_ingress(
-        self,
-        relation: Relation,
-        provider: Union[IPAv1, IPAv2],
+            self,
+            relation: Relation,
+            provider: Union[IPAv1, IPAv2],
     ):
         # to avoid long-gone units from lingering in the databag, we wipe it
         if self.unit.is_leader():
@@ -603,9 +603,10 @@ class TraefikIngressCharm(CharmBase):
             logger.error(f"invalid data shared through {relation}... Error: {e}.")
             return None
 
-        config, app_url = self._generate_per_leader_config(data)
+        prefix = self._get_prefix(data)
+        config = self._generate_per_leader_config(prefix, data)
         if self.unit.is_leader():
-            ipa.publish_url(relation, app_url)
+            ipa.publish_url(relation, self._generate_external_url(prefix))
 
         return config
 
@@ -618,9 +619,10 @@ class TraefikIngressCharm(CharmBase):
             logger.error(f"invalid data shared through {relation}... Error: {e}.")
             return None
 
-        config, app_url = self._generate_per_app_config(data)
+        prefix = self._get_prefix(data.app.dict(by_alias=True))
+        config = self._generate_per_app_config(prefix, data)
         if self.unit.is_leader():
-            ipa.publish_url(relation, app_url)
+            ipa.publish_url(relation, self._generate_external_url(prefix))
 
         return config
 
@@ -648,9 +650,10 @@ class TraefikIngressCharm(CharmBase):
                 )
                 continue
 
-            unit_config, unit_url = self._generate_per_unit_config(data)
+            prefix = self._get_prefix(data)
+            unit_config = self._generate_per_unit_config(prefix, data)
             if self.unit.is_leader():
-                ipu.publish_url(relation, data["name"], unit_url)
+                ipu.publish_url(relation, data["name"], self._generate_external_url(prefix))
             always_merger.merge(config, unit_config)
 
         # Note: We might be pushing an empty configuration if, for example,
@@ -673,9 +676,9 @@ class TraefikIngressCharm(CharmBase):
         return f"{data['model']}-{name}"
 
     def _generate_middleware_config(
-        self,
-        data: Union["RequirerData_IPU", "RequirerAppData_IPA"],
-        prefix: str,
+            self,
+            data: Union["RequirerData_IPU", "RequirerAppData_IPA"],
+            prefix: str,
     ) -> dict:
         """Generate a middleware config."""
         config = {}  # type: Dict[str, Dict[str, Any]]
@@ -690,9 +693,8 @@ class TraefikIngressCharm(CharmBase):
             return {f"juju-sidecar-noprefix-{prefix}": config}
         return {}
 
-    def _generate_per_unit_config(self, data: "RequirerData_IPU") -> Tuple[dict, str]:
+    def _generate_per_unit_config(self, prefix: str, data: "RequirerData_IPU") -> dict:
         """Generate a config dict for a given unit for IngressPerUnit."""
-        prefix = self._get_prefix(data)
         host = self.external_host
         if data["mode"] == "tcp":
             # TODO: is there a reason why SNI-based routing (from TLS certs) is per-unit only?
@@ -727,11 +729,11 @@ class TraefikIngressCharm(CharmBase):
         return self._generate_config_block(prefix, lb_servers, data)
 
     def _generate_config_block(
-        self,
-        prefix: str,
-        lb_servers: List[Dict[str, str]],
-        data: Union["RequirerData_IPU", "RequirerAppData_IPA"],
-    ) -> Tuple[Dict[str, Any], str]:
+            self,
+            prefix: str,
+            lb_servers: List[Dict[str, str]],
+            data: Union["RequirerData_IPU", "RequirerAppData_IPA"],
+    ) -> Dict[str, Any]:
         """Generate a configuration segment.
 
         Per-unit and per-app configuration blocks are mostly similar, with the principal
@@ -741,13 +743,15 @@ class TraefikIngressCharm(CharmBase):
         host = self.external_host
         scheme = data.get("scheme", "http")
 
-        # FIXME remove _port to avoid https/80?
+        # remove _port to avoid https/80
+        port = "" if scheme == "https" else f":{self._port}"
+
         if self._routing_mode is _RoutingMode.path:
             route_rule = f"PathPrefix(`/{prefix}`)"
-            url = f"{scheme}://{host}:{self._port}/{prefix}"
+            url = f"{scheme}://{host}{port}/{prefix}"
         else:  # _RoutingMode.subdomain
             route_rule = f"Host(`{prefix}.{host}`)"
-            url = f"{scheme}://{prefix}.{host}:{self._port}/"
+            url = f"{scheme}://{prefix}.{host}{port}/"
 
         traefik_router_name = f"juju-{prefix}-router"
         traefik_service_name = f"juju-{prefix}-service"
@@ -772,6 +776,21 @@ class TraefikIngressCharm(CharmBase):
         #  Otherwise we'd get a 404.
         root_cas = {"rootCAs": [_CERTIFICATE_PATH]} if self._is_tls_enabled() else {}
 
+        # FIXME: At the moment, curling traefik http when the cluster is https leads to
+        #  "Internal Server Error". What we need is to augment the config conditionally on if
+        #  tls for traefik itself is enabled, as follows:
+        #   services:
+        #     juju-welcome-k8s-am-service:
+        #       loadBalancer:
+        #         serversTransport: mytransport
+        #         servers:
+        #         - url: https://am-0.am-endpoints.welcome-k8s.svc.cluster.local:9093
+        #   serversTransports:
+        #     mytransport:
+        #       insecureSkipVerify: true
+        #  I.e. we need to add 'insecureSkipVerify' to all loadBalancer sections, if traefik is
+        #  not related over tls-certificates.
+
         config = {
             "http": {
                 "routers": router_cfg,
@@ -793,13 +812,13 @@ class TraefikIngressCharm(CharmBase):
             if f"{traefik_router_name}-tls" in router_cfg:
                 router_cfg[f"{traefik_router_name}-tls"]["middlewares"] = list(middlewares.keys())
 
-        return config, url
+        return config
 
     def _generate_tls_block(
-        self,
-        router_name: str,
-        route_rule: str,
-        service_name: str,
+            self,
+            router_name: str,
+            route_rule: str,
+            service_name: str,
     ) -> Dict[str, Any]:
         """Generate a TLS configuration segment."""
         return {
@@ -819,26 +838,40 @@ class TraefikIngressCharm(CharmBase):
         }
 
     def _generate_per_app_config(
-        self,
-        data: "IPADatav2",
-    ) -> Tuple[dict, str]:
+            self,
+            prefix: str,
+            data: "IPADatav2",
+    ) -> dict:
         # todo: IPA>=v2 uses pydantic models, the other providers use raw dicts.
         #  eventually switch all over to pydantic and handle this uniformly
         app_dict = data.app.dict(by_alias=True)
-        prefix = self._get_prefix(app_dict)
+        port = "" if data.app.scheme == "https" else f":{data.app.port}"
+
         lb_servers = [
-            {"url": f"{data.app.scheme}://{unit_data.host}:{data.app.port}"}
+            {"url": f"{data.app.scheme}://{unit_data.host}{port}"}
             for unit_data in data.units
         ]
         return self._generate_config_block(prefix, lb_servers, app_dict)
 
     def _generate_per_leader_config(
-        self,
-        data: "IPADatav1",
-    ) -> Tuple[dict, str]:
-        prefix = self._get_prefix(data)
+            self,
+            prefix: str,
+            data: "IPADatav1",
+    ) -> dict:
         lb_servers = [{"url": f"http://{data['host']}:{data['port']}"}]
         return self._generate_config_block(prefix, lb_servers, data)
+
+    def _generate_external_url(self, prefix):
+        scheme = "https" if self.cert.enabled else "http"
+        # to avoid https/80
+        port = "" if self.cert.enabled else f":{self._port}"
+
+        if self._routing_mode is _RoutingMode.path:
+            url = f"{scheme}://{self.external_host}{port}/{prefix}"
+        else:  # _RoutingMode.subdomain
+            url = f"{scheme}://{prefix}.{self.external_host}{port}/"
+
+        return url
 
     def _wipe_ingress_for_all_relations(self):
         for relation in self.model.relations["ingress"] + self.model.relations["ingress-per-unit"]:

@@ -48,7 +48,7 @@ def traefik_container(tmp_path):
 @pytest.mark.parametrize("event_name", ("joined", "changed", "created"))
 @pytest.mark.parametrize("scheme", ("http", "https"))
 def test_ingress_per_app_created(
-    traefik_ctx, port, host, model, traefik_container, event_name, tmp_path, scheme
+        traefik_ctx, port, host, model, traefik_container, event_name, tmp_path, scheme
 ):
     """Check the config when a new ingress per app is created or changes (single remote unit)."""
     ipa = Relation(
@@ -80,8 +80,10 @@ def test_ingress_per_app_created(
         ).read()
     )
 
+    port = "" if scheme == "https" else f":{port}"
+
     service_def = {
-        "loadBalancer": {"servers": [{"url": f"{scheme}://{host}:{port}"}]},
+        "loadBalancer": {"servers": [{"url": f"{scheme}://{host}{port}"}]},
     }
     # no tls relation = no rootCAs section
     # if scheme == 'https':
@@ -94,11 +96,12 @@ def test_ingress_per_app_created(
 @pytest.mark.parametrize("n_units", (2, 3, 10))
 @pytest.mark.parametrize("scheme", ("http", "https"))
 def test_ingress_per_app_scale(
-    traefik_ctx, host, port, model, traefik_container, tmp_path, n_units, scheme
+        traefik_ctx, host, port, model, traefik_container, tmp_path, n_units, scheme
 ):
     """Check the config when a new ingress per app unit joins."""
     cfg_file = tmp_path.joinpath("traefik", "juju", "juju_ingress_ingress_1_remote.yaml")
     cfg_file.parent.mkdir(parents=True)
+    cfg_port = "" if scheme == "https" else f":{port}"
 
     # config that would have been generated from mock_data_0
     # same as config output of the previous test
@@ -119,7 +122,7 @@ def test_ingress_per_app_scale(
             },
             "services": {
                 "juju-test-model-remote-0-service": {
-                    "loadBalancer": {"servers": [{"url": f"http://{host}:{port}"}]}
+                    "loadBalancer": {"servers": [{"url": f"{scheme}://{host}{cfg_port}"}]}
                 }
             },
         }
@@ -159,7 +162,7 @@ def test_ingress_per_app_scale(
 
     assert len(new_lbs) == n_units
     for n in range(n_units):
-        assert {"url": f"{scheme}://{host.format(n)}:{port}"} in new_lbs
+        assert {"url": f"{scheme}://{host.format(n)}{cfg_port}"} in new_lbs
 
         # expected config:
 

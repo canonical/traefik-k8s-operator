@@ -101,3 +101,12 @@ def test_middleware_config(traefik_ctx, routing_mode, strip_prefix, redirect_htt
     )
 
     assert yaml.safe_load(config_file) == expected
+
+    ipa_out = out.get_relations('ingress')[0]
+
+    if routing_mode == 'path':
+        url = f"https://testhostname/test-model-remote-0"
+    else:
+        url = f"https://test-model-remote-0.testhostname/"
+
+    assert ipa_out.local_app_data == {'ingress': f'{{"url": "{url}"}}'}

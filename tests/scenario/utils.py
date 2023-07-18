@@ -36,8 +36,9 @@ def _render_config(
         scheme = "http"
         # ipu does not do https for now
 
+    port = ":9000" if scheme == 'http' else ""
     service_spec = {
-        "loadBalancer": {"servers": [{"url": f"{scheme}://10.1.10.1:9000"}]},
+        "loadBalancer": {"servers": [{"url": f"{scheme}://10.1.10.1{port}"}]},
     }
     if tls_enabled:
         service_spec["rootCAs"] = ["/opt/traefik/juju/certificate.cert"]
