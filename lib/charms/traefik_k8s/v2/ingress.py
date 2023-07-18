@@ -71,7 +71,7 @@ LIBAPI = 2
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 1
+LIBPATCH = 2
 
 PYDEPS = ["pydantic<2.0"]
 
@@ -576,7 +576,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
             return False
 
     def _publish_auto_data(self, relation: Relation):
-        if self._auto_data and self.unit.is_leader():
+        if self._auto_data:
             host, port = self._auto_data
             self.provide_ingress_requirements(host=host, port=port)
 
