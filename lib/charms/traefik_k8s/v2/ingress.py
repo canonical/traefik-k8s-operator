@@ -109,14 +109,7 @@ class DatabagModel(BaseModel):
         if cls._NEST_UNDER:
             return cls.parse_obj(json.loads(databag[cls._NEST_UNDER]))
 
-        def _unparse(k, v):
-            field = cls.__fields__.get(k)
-            if not field:
-                log.debug(f"unknown field in databag: {k}")
-                return v  # not declared in databag: leave raw. pydantic will validate later.
-            return json.loads(v) if field.type_ is not str else v
-
-        data = {k: _unparse(k, v) for k, v in databag.items()}
+        data = {k: json.loads(v) for k, v in databag.items()}
 
         try:
             return cls.parse_raw(json.dumps(data))  # type: ignore
@@ -130,13 +123,10 @@ class DatabagModel(BaseModel):
         if self._NEST_UNDER:
             databag[self._NEST_UNDER] = self.json()
 
-        def _parse(k, v, field):
-            return json.dumps(v) if field.type_ is not str else v
-
         dct = self.dict()
         for key, field in self.__fields__.items():  # type: ignore
             value = dct[key]
-            databag[field.alias or key] = _parse(key, value, field)
+            databag[field.alias or key] = json.dumps(value)
 
 
 # todo: import these models from charm-relation-interfaces/ingress/v2 instead of redeclaring them
@@ -599,7 +589,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
             return False
 
     def _publish_auto_data(self, relation: Relation):
-        if self._auto_data and self.unit.is_leader():
+        if self._auto_data:
             host, port = self._auto_data
             self.provide_ingress_requirements(host=host, port=port)
 

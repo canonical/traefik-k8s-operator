@@ -528,9 +528,12 @@ class TraefikIngressCharm(CharmBase):
         # other side, which is the case for the RelationDeparted for the last unit (i.e., the
         # proxied application scales to zero).
         if not self.ready:
+            logger.warning('not ready: early exit')
             return
 
         provider = self._provider_from_relation(relation)
+        logger.warning(f'provider: {provider}')
+
         if not provider.is_ready(relation):
             logger.debug(f"Provider {provider} not ready; resetting ingress configurations.")
             self._wipe_ingress_for_relation(relation)
@@ -878,7 +881,7 @@ class TraefikIngressCharm(CharmBase):
             self._wipe_ingress_for_relation(relation)
 
     def _wipe_ingress_for_relation(self, relation: Relation, *, wipe_rel_data=True):
-        logger.debug(f"Wiping the ingress setup for the '{relation.name}:{relation.id}' relation")
+        logger.debug(f"Wiping ingress for the '{relation.name}:{relation.id}' relation")
 
         # Delete configuration files for the relation. In case of Traefik pod
         # churns, and depending on the event ordering, we might be executing this
