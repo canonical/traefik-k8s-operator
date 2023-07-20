@@ -1,7 +1,9 @@
+import json
+
 import pydantic
 import pytest
 
-from charms.traefik_k8s.v2.ingress import IngressRequirerAppData
+from charms.traefik_k8s.v2.ingress import IngressRequirerAppData, IngressRequirerUnitData
 
 
 def test_round_trip():
@@ -16,17 +18,27 @@ def test_round_trip():
     )
     model.dump(db)
 
-    assert db == {''
-                  'model': 'foo',
-                  'name': 'bar',
-                  'port': '10',
-                  'redirect-https': 'false',
-                  'scheme': 'https',
-                  'strip-prefix': 'true'
-                  }
+    assert db == {
+        'model': json.dumps('foo'),
+        'name': json.dumps('bar'),
+        'port': json.dumps(10),
+        'redirect-https': json.dumps(False),
+        'scheme': json.dumps('https'),
+        'strip-prefix': json.dumps(True)
+    }
 
     res = IngressRequirerAppData.load(db)
     assert res == model
+
+    assert res.model == "foo"
+    assert res.port == 10
+    assert res.strip_prefix is True
+
+
+def test_deserialize_raw():
+    remote_unit_data = {"host": '"foo"'}
+    data = IngressRequirerUnitData.load(remote_unit_data)
+    assert data.host == "foo"
 
 
 def test_invalid_model():

@@ -111,6 +111,7 @@ def test_middleware_config(
         redirect_https=redirect_https,
         scheme="http",
         tls_enabled=False,
+        port=9000,
     )
 
     assert yaml.safe_load(config_file) == expected

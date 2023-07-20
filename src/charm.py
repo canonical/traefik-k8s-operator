@@ -120,7 +120,7 @@ class TraefikIngressCharm(CharmBase):
         # stored.tcp_entrypoints would be used for this list instead, but it's never accessed.
         # intentional or can it be used so we don't need to worry about ordering?
         self.ingress_per_appv1 = ipa_v1 = IPAv1(charm=self)
-        self.ingress_per_appv2 = ipa_v2 = IPAv2(charm=self, tls=self.cert)
+        self.ingress_per_appv2 = ipa_v2 = IPAv2(charm=self)
 
         self.ingress_per_unit = IngressPerUnitProvider(charm=self)
         self.traefik_route = TraefikRouteProvider(charm=self, external_host=self.external_host)

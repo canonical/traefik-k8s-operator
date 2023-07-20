@@ -9,45 +9,38 @@ import pytest
 import yaml
 from scenario import Container, Mount, Relation, State
 
-from tests.scenario.utils import _render_config
+from tests.scenario.utils import _render_config, create_ingress_relation
 
 
 def _create_relation(
-    *,
-    rel_id: int,
-    rel_name: str,
-    app_name: str,
-    strip_prefix: bool,
-    redirect_https: bool,
-    scheme: str,
+        *,
+        rel_id: int,
+        rel_name: str,
+        app_name: str,
+        strip_prefix: bool,
+        redirect_https: bool,
+        scheme: str,
+        port:int,
+        unit_name: str = "remote/0",
 ):
     if rel_name == "ingress":
-        app_data = {
-            "model": "test-model",
-            "name": "remote/0",
-            "strip-prefix": "true" if strip_prefix else "false",
-            "redirect-https": "true" if redirect_https else "false",
-            "port": str(9000),
-            "scheme": scheme,
-        }
-        unit_data = {
-            "host": "10.1.10.1",
-        }
-
-        return Relation(
-            endpoint=rel_name,
-            remote_app_name=app_name,
-            relation_id=rel_id,
-            remote_app_data=app_data,
-            remote_units_data={0: unit_data},
+        return create_ingress_relation(
+            app_name=app_name,
+            rel_id=rel_id,
+            unit_name=unit_name,
+            strip_prefix=strip_prefix,
+            redirect_https=redirect_https,
+            port=port,
+            scheme=scheme,
+            hosts=["10.1.10.1"],
         )
 
     if rel_name == "ingress-per-unit":
         unit_data = {
-            "port": str(9000),
+            "port": str(port),
             "host": "10.1.10.1",
             "model": "test-model",
-            "name": "remote/0",
+            "name": unit_name,
             "mode": "http",
             "scheme": scheme,
             "strip-prefix": "true" if strip_prefix else "false",
@@ -74,7 +67,7 @@ def _create_relation(
 @patch("charm.TraefikIngressCharm._tcp_entrypoints_changed", MagicMock(return_value=False))
 @patch("charm.TraefikIngressCharm.version", PropertyMock(return_value="0.0.0"))
 def test_middleware_config(
-    traefik_ctx, rel_name, routing_mode, strip_prefix, redirect_https, scheme
+        traefik_ctx, rel_name, routing_mode, strip_prefix, redirect_https, scheme
 ):
     td = tempfile.TemporaryDirectory()
     containers = [
@@ -92,9 +85,11 @@ def test_middleware_config(
         rel_id=rel_id,
         rel_name=rel_name,
         app_name=app_name,
+        unit_name="remote/0",
         strip_prefix=strip_prefix,
         redirect_https=redirect_https,
         scheme=scheme,
+        port=42,
     )
 
     # AND GIVEN external host is set (see also decorator)
@@ -110,7 +105,7 @@ def test_middleware_config(
 
     # THEN the rendered config file contains middlewares
     with out.get_container("traefik").filesystem.open(
-        f"/opt/traefik/juju/juju_ingress_{rel_name}_{rel_id}_{app_name}.yaml",
+            f"/opt/traefik/juju/juju_ingress_{rel_name}_0_{app_name}.yaml",
     ) as f:
         config_file = f.read()
     expected = _render_config(
@@ -120,6 +115,7 @@ def test_middleware_config(
         redirect_https=redirect_https,
         scheme=scheme,
         tls_enabled=False,
+        port="42",
     )
 
     assert yaml.safe_load(config_file) == expected

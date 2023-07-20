@@ -59,7 +59,7 @@ def _requirer_provide_ingress_requirements(
     harness.update_relation_data(
         relation.id,
         "remote" if per_app_relation else "remote/0",
-        app_data,
+        {x:json.dumps(y) for x,y in app_data.items()},
     )
     return app_data
 
@@ -225,7 +225,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
         self.assertEqual(
             requirer.urls,
-            {"remote/0": "http://10.0.0.1:80/test-model-remote-0"},
+            {"remote/0": "http://10.0.0.1/test-model-remote-0"},
         )
         self.assertEqual(self.harness.charm.unit.status, ActiveStatus())
 
@@ -246,7 +246,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
         self.assertEqual(
             requirer.urls,
-            {"remote/0": "http://10.0.0.1:80/test-model-remote-0"},
+            {"remote/0": "http://10.0.0.1/test-model-remote-0"},
         )
         self.assertEqual(self.harness.charm.unit.status, ActiveStatus())
 
@@ -254,7 +254,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
         self.assertEqual(
             requirer.urls,
-            {"remote/0": "http://testhostname:80/test-model-remote-0"},
+            {"remote/0": "http://testhostname/test-model-remote-0"},
         )
         self.assertEqual(self.harness.charm.unit.status, ActiveStatus())
 
@@ -274,7 +274,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
         self.assertEqual(
             requirer.urls,
-            {"remote/0": "http://testhostname:80/test-model-remote-0"},
+            {"remote/0": "http://testhostname/test-model-remote-0"},
         )
         self.assertEqual(self.harness.charm.unit.status, ActiveStatus())
 
@@ -347,7 +347,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
         action_event.set_results.assert_called_once_with(
             {
                 "proxied-endpoints": json.dumps(
-                    {"remote": {"url": "http://testhostname:80/test-model-remote-0"}}
+                    {"remote": {"url": "http://testhostname/test-model-remote-0"}}
                 )
             }
         )
@@ -371,7 +371,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
         action_event.set_results.assert_called_once_with(
             {
                 "proxied-endpoints": json.dumps(
-                    {"remote/0": {"url": "http://testhostname:80/test-model-remote-0"}}
+                    {"remote/0": {"url": "http://testhostname/test-model-remote-0"}}
                 )
             }
         )
@@ -422,19 +422,19 @@ class TestConfigOptionsValidation(unittest.TestCase):
     @patch("charm._get_loadbalancer_status", lambda **_: "10.0.0.1")
     @patch("charm.KubernetesServicePatch", lambda **_: None)
     def test_when_external_hostname_not_set_use_ip_with_port_80(self):
-        self.assertEqual(requirer.urls, {"remote/0": "http://10.0.0.1:80/test-model-remote-0"})
+        self.assertEqual(requirer.urls, {"remote/0": "http://10.0.0.1/test-model-remote-0"})
 
     @patch("charm._get_loadbalancer_status", lambda **_: "10.0.0.1")
     @patch("charm.KubernetesServicePatch", lambda **_: None)
     def test_when_external_hostname_is_set_use_it_with_port_80(self):
         self.harness.update_config({"external_hostname": "testhostname"})
-        self.assertEqual(requirer.urls, {"remote/0": "http://testhostname:80/test-model-remote-0"})
+        self.assertEqual(requirer.urls, {"remote/0": "http://testhostname/test-model-remote-0"})
 
     @patch("charm._get_loadbalancer_status", lambda **_: "10.0.0.1")
     @patch("charm.KubernetesServicePatch", lambda **_: None)
     def test_when_external_hostname_is_invalid_go_into_blocked_status(self):
         for invalid_hostname in [
-            "testhostname:8080",
+            "testhostname80",
             "user:pass@testhostname",
             "testhostname/prefix",
         ]:

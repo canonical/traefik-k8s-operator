@@ -94,6 +94,7 @@ log = logging.getLogger(__name__)
 
 class DatabagModel(BaseModel):
     """Base databag model."""
+
     class Config:
         """Pydantic config."""
         allow_population_by_field_name = True
@@ -109,7 +110,11 @@ class DatabagModel(BaseModel):
         if cls._NEST_UNDER:
             return cls.parse_obj(json.loads(databag[cls._NEST_UNDER]))
 
-        data = {k: json.loads(v) for k, v in databag.items()}
+        try:
+            data = {k: json.loads(v) for k, v in databag.items()}
+        except json.JSONDecodeError:
+            log.error(f"invalid databag contents: expecting json. {databag}")
+            raise
 
         try:
             return cls.parse_raw(json.dumps(data))  # type: ignore
@@ -334,7 +339,7 @@ class IngressPerAppProvider(_IngressPerAppBase):
 
     on = IngressPerAppProviderEvents()  # type: ignore
 
-    def __init__(self, charm: CharmBase, tls: TlsProviderType, relation_name: str = DEFAULT_RELATION_NAME,):
+    def __init__(self, charm: CharmBase, relation_name: str = DEFAULT_RELATION_NAME, ):
         """Constructor for IngressPerAppProvider.
 
         Args:
@@ -342,7 +347,6 @@ class IngressPerAppProvider(_IngressPerAppBase):
             relation_name: The name of the relation endpoint to bind to
                 (defaults to "ingress").
         """
-        self.tls = tls
         super().__init__(charm, relation_name)
 
     def _handle_relation(self, event):
@@ -383,9 +387,8 @@ class IngressPerAppProvider(_IngressPerAppBase):
         unit: Unit
         for unit in relation.units:
             databag = relation.data[unit]
-            remote_unit_data = {"host": databag.get("host")}
             try:
-                data = IngressRequirerUnitData.parse_obj(remote_unit_data)
+                data = IngressRequirerUnitData.load(databag)
                 out.append(data)
             except pydantic.ValidationError:
                 log.info(f"failed to validate remote unit data for {unit}")
@@ -400,11 +403,7 @@ class IngressPerAppProvider(_IngressPerAppBase):
             raise NotReadyError(relation)
 
         databag = relation.data[app]
-        try:
-            return IngressRequirerAppData.load(databag)
-        except pydantic.ValidationError:
-            log.info(f"failed to validate remote app data for {app}", exc_info=True)
-            raise
+        return IngressRequirerAppData.load(databag)
 
     def get_data(self, relation: Relation) -> IngressRequirerData:
         """Fetch the remote (requirer) app and units' databags."""
@@ -412,7 +411,7 @@ class IngressPerAppProvider(_IngressPerAppBase):
             return IngressRequirerData(
                 self._get_requirer_app_data(relation), self._get_requirer_units_data(relation)
             )
-        except (pydantic.ValidationError, DataValidationError) as e:
+        except (pydantic.ValidationError, DataValidationError, json.JSONDecodeError) as e:
             raise DataValidationError("failed to validate ingress requirer data") from e
 
     def is_ready(self, relation: Optional[Relation] = None):
@@ -508,17 +507,17 @@ class IngressPerAppRequirer(_IngressPerAppBase):
     _stored = StoredState()
 
     def __init__(
-        self,
-        charm: CharmBase,
-        relation_name: str = DEFAULT_RELATION_NAME,
-        *,
-        host: Optional[str] = None,
-        port: Optional[int] = None,
-        strip_prefix: bool = False,
-        redirect_https: bool = False,
-        # fixme: this is horrible UX.
-        #  shall we switch to manually calling provide_ingress_requirements with all args when ready?
-        scheme: typing.Callable[[], str] = False,
+            self,
+            charm: CharmBase,
+            relation_name: str = DEFAULT_RELATION_NAME,
+            *,
+            host: Optional[str] = None,
+            port: Optional[int] = None,
+            strip_prefix: bool = False,
+            redirect_https: bool = False,
+            # fixme: this is horrible UX.
+            #  shall we switch to manually calling provide_ingress_requirements with all args when ready?
+            scheme: typing.Callable[[], str] = lambda: "http",
     ):
         """Constructor for IngressRequirer.
 
@@ -609,17 +608,16 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         if self.unit.is_leader():
             app_databag = self.relation.data[self.app]
             try:
-                IngressRequirerAppData.parse_obj(
-                    {
-                        "model": self.model.name,
-                        "name": self.app.name,
-                        "scheme": self._get_scheme(),
-                        "port": port,
-                        "strip_prefix": self._strip_prefix,
-                        "redirect_https": self._redirect_https,
-                    }
-                ).dump(app_databag)
-
+                IngressRequirerAppData(
+                    model=self.model.name,
+                    name=self.app.name,
+                    scheme=self._get_scheme(),
+                    port=port,
+                    strip_prefix=self._strip_prefix,
+                    redirect_https=self._redirect_https,
+                ).dump(
+                    app_databag
+                )
             except pydantic.ValidationError as e:
                 msg = "failed to validate app data"
                 log.info(msg, exc_info=True)  # log to INFO because this might be expected
@@ -672,7 +670,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         Returns None if the URL isn't available yet.
         """
         data = (
-            typing.cast(Optional[str], self._stored.current_url)  # type: ignore
-            or self._get_url_from_relation_data()
+                typing.cast(Optional[str], self._stored.current_url)  # type: ignore
+                or self._get_url_from_relation_data()
         )
         return data

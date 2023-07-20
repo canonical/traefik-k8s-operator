@@ -5,30 +5,7 @@ import pytest
 import yaml
 from scenario import Container, Mount, Relation, State
 
-from tests.scenario.utils import _render_config
-
-
-def _create_ingress_relation(
-    *, rel_id: int, app_name: str, strip_prefix: bool, redirect_https: bool
-):
-    app_data = {
-        "model": "test-model",
-        "name": "remote/0",
-        "strip-prefix": "true" if strip_prefix else "false",
-        "redirect-https": "true" if redirect_https else "false",
-        "port": str(9000),
-    }
-    unit_data = {
-        "host": "10.1.10.1",
-    }
-
-    return Relation(
-        endpoint="ingress",
-        remote_app_name=app_name,
-        relation_id=rel_id,
-        remote_app_data=app_data,
-        remote_units_data={0: unit_data},
-    )
+from tests.scenario.utils import _render_config, create_ingress_relation
 
 
 def _create_tls_relation(*, app_name: str, strip_prefix: bool, redirect_https: bool):
@@ -62,11 +39,13 @@ def test_middleware_config(traefik_ctx, routing_mode, strip_prefix, redirect_htt
     # GIVEN a relation is requesting some middlewares
     rel_id = 0
     app_name = "remote"
-    ipa = _create_ingress_relation(
+    ipa = create_ingress_relation(
         rel_id=rel_id,
         app_name=app_name,
+        unit_name=f"{app_name}/0",
         strip_prefix=strip_prefix,
         redirect_https=redirect_https,
+        hosts=["0.0.0.42"]
     )
 
     tls = _create_tls_relation(
@@ -97,6 +76,7 @@ def test_middleware_config(traefik_ctx, routing_mode, strip_prefix, redirect_htt
         strip_prefix=strip_prefix,
         redirect_https=redirect_https,
         scheme="http",
+        host="0.0.0.42"
     )
 
     assert yaml.safe_load(config_file) == expected

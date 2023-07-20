@@ -3,12 +3,14 @@
 # THEN traefik's config file's `server` section has all the units listed
 # AND WHEN the charm rescales
 # THEN the traefik config file is updated
-
+import json
 
 import pytest
 import yaml
 from ops import pebble
 from scenario import Container, Model, Mount, Relation, State
+
+from tests.scenario.utils import create_ingress_relation
 
 
 @pytest.fixture
@@ -51,17 +53,7 @@ def test_ingress_per_app_created(
         traefik_ctx, port, host, model, traefik_container, event_name, tmp_path, scheme
 ):
     """Check the config when a new ingress per app is created or changes (single remote unit)."""
-    ipa = Relation(
-        "ingress",
-        remote_app_data={
-            "model": "test-model",
-            "name": "remote/0",
-            "port": str(port),
-            "scheme": scheme,
-        },
-        remote_units_data={0: {"port": str(port), "host": host}},
-        relation_id=1,
-    )
+    ipa = create_ingress_relation(port=port, scheme=scheme, hosts=[host])
     state = State(
         model=model,
         config={"routing_mode": "path", "external_hostname": "foo.com"},
@@ -101,7 +93,9 @@ def test_ingress_per_app_scale(
         traefik_ctx, host, port, model, traefik_container, tmp_path, n_units, scheme
 ):
     """Check the config when a new ingress per app unit joins."""
-    cfg_file = tmp_path.joinpath("traefik", "juju", "juju_ingress_ingress_1_remote.yaml")
+    relation_id = 42
+    unit_id = 0
+    cfg_file = tmp_path.joinpath("traefik", "juju", f"juju_ingress_ingress_{relation_id}_remote.yaml")
     cfg_file.parent.mkdir(parents=True)
     cfg_port = "" if scheme == "https" else f":{port}"
 
@@ -110,43 +104,29 @@ def test_ingress_per_app_scale(
     initial_cfg = {
         "http": {
             "routers": {
-                "juju-test-model-remote-0-router": {
+                f"juju-test-model-remote-{unit_id}-router": {
                     "entryPoints": ["web"],
-                    "rule": "PathPrefix(`/test-model-remote-0`)",
-                    "service": "juju-test-model-remote-0-service",
+                    "rule": f"PathPrefix(`/test-model-remote-{unit_id}`)",
+                    "service": f"juju-test-model-remote-{unit_id}-service",
                 },
-                "juju-test-model-remote-0-router-tls": {
+                f"juju-test-model-remote-{unit_id}-router-tls": {
                     "entryPoints": ["websecure"],
-                    "rule": "PathPrefix(`/test-model-remote-0`)",
-                    "service": "juju-test-model-remote-0-service",
+                    "rule": f"PathPrefix(`/test-model-remote-{unit_id}`)",
+                    "service": f"juju-test-model-remote-{unit_id}-service",
                     "tls": {"domains": [{"main": "foo.com", "sans": ["*.foo.com"]}]},
                 },
             },
             "services": {
-                "juju-test-model-remote-0-service": {
-                    "loadBalancer": {"servers": [{"url": f"{scheme}://{host}{cfg_port}"}]}
+                f"juju-test-model-remote-{unit_id}-service": {
+                    "loadBalancer": {"servers": [{"url": f"{scheme}://{host.format(0)}{cfg_port}"}]}
                 }
             },
         }
     }
     cfg_file.write_text(yaml.safe_dump(initial_cfg))
 
-    def _get_mock_data(n: int):
-        return {
-            "host": host.format(n),
-        }
-
-    ipa = Relation(
-        "ingress",
-        remote_app_data={
-            "model": "test-model",
-            "name": "remote",
-            "port": str(port),
-            "scheme": scheme,
-        },
-        remote_units_data={n: _get_mock_data(n) for n in range(n_units)},
-        relation_id=1,
-    )
+    ipa = create_ingress_relation(port=port, scheme=scheme, rel_id=relation_id, unit_name="remote/0",
+                                  hosts=[host.format(n) for n in range(n_units)])
     state = State(
         model=model,
         config={"routing_mode": "path", "external_hostname": "foo.com"},
@@ -158,7 +138,7 @@ def test_ingress_per_app_scale(
 
     new_config = yaml.safe_load(cfg_file.read_text())
     # verify that the config has changed!
-    new_lbs = new_config["http"]["services"]["juju-test-model-remote-service"]["loadBalancer"][
+    new_lbs = new_config["http"]["services"][f"juju-test-model-remote-{unit_id}-service"]["loadBalancer"][
         "servers"
     ]
 
