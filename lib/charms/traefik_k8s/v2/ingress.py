@@ -92,52 +92,51 @@ SchemeLiteral = Literal["http", "https"]
 log = logging.getLogger(__name__)
 
 
-class DatabagIOMixin:
-    """Inherit this from pydantic.ModelBase subclasses to add load/dump functionality."""
+class DatabagModel(BaseModel):
+    """Base databag model."""
+    class Config:
+        """Pydantic config."""
+        allow_population_by_field_name = True
+        """Allow instantiating this class by field name (instead of forcing alias)."""
+        extra = "forbid"
+        """Raise if unknown fields are added to the databag."""
+
+    _NEST_UNDER = None
 
     @classmethod
     def load(cls, databag: MutableMapping):
         """Load this model from a Juju databag."""
-        data = {}
+        if cls._NEST_UNDER:
+            return cls.parse_obj(json.loads(databag[cls._NEST_UNDER]))
 
-        for key, value in cls.__fields__.items():  # type: ignore
-            raw_value = databag.get(value.alias or key)
-            if raw_value is None:
-                continue  # if this was a required field, when we call(cls**data) we will catch it
+        def _unparse(k, v):
+            field = cls.__fields__.get(k)
+            if not field:
+                log.debug(f"unknown field in databag: {k}")
+                return v  # not declared in databag: leave raw. pydantic will validate later.
+            return json.loads(v) if field.type_ is not str else v
 
-            if value.type_ is str:
-                parsed = raw_value
-            elif hasattr(value.type_, "parse_raw"):
-                parsed = value.type_.parse_raw(raw_value)
-            else:
-                parsed = json.loads(raw_value)
-            data[key] = parsed
+        data = {k: _unparse(k, v) for k, v in databag.items()}
 
         try:
-            return cls(**data)  # type: ignore
+            return cls.parse_raw(json.dumps(data))  # type: ignore
         except pydantic.ValidationError as e:
             msg = f"failed to validate remote unit databag: {databag}"
-            log.info(msg, exc_info=True)
+            log.error(msg, exc_info=True)
             raise DataValidationError(msg) from e
 
     def dump(self, databag: MutableMapping):
         """Write the contents of this model to Juju databag."""
+        if self._NEST_UNDER:
+            databag[self._NEST_UNDER] = self.json()
+
+        def _parse(k, v, field):
+            return json.dumps(v) if field.type_ is not str else v
+
+        dct = self.dict()
         for key, field in self.__fields__.items():  # type: ignore
-            value = getattr(self, key)
-
-            if value is None:
-                continue
-
-            if isinstance(value, str):
-                str_value = value
-            elif isinstance(value, BaseModel):
-                str_value = value.json(by_alias=True)
-            else:
-                try:
-                    str_value = json.dumps(value)
-                except Exception as e:
-                    raise TypeError(f"cannot convert {type(value)} to str") from e
-            databag[field.alias or key] = str_value
+            value = dct[key]
+            databag[field.alias or key] = _parse(key, value, field)
 
 
 # todo: import these models from charm-relation-interfaces/ingress/v2 instead of redeclaring them
@@ -147,7 +146,7 @@ class IngressUrl(BaseModel):
     url: AnyHttpUrl
 
 
-class IngressProviderAppData(BaseModel, DatabagIOMixin):
+class IngressProviderAppData(DatabagModel):
     """Ingress application databag schema."""
 
     ingress: IngressUrl
@@ -159,15 +158,8 @@ class ProviderSchema(BaseModel):
     app: IngressProviderAppData
 
 
-class IngressRequirerAppData(BaseModel, DatabagIOMixin):
+class IngressRequirerAppData(DatabagModel):
     """Ingress requirer application databag model."""
-
-    class Config:
-        """Pydantic config."""
-
-        allow_population_by_field_name = True
-        """Allow instantiating this class by field name (instead of forcing alias)."""
-
     model: str = Field(description="The model the application is in.")
     name: str = Field(description="the name of the app requesting ingress.")
     port: int = Field(description="The port the app wishes to be exposed.")
@@ -187,8 +179,8 @@ class IngressRequirerAppData(BaseModel, DatabagIOMixin):
     @validator("scheme", pre=True)
     def validate_scheme(cls, scheme):  # noqa: N805  # pydantic wants 'cls' as first arg
         """Validate scheme arg."""
-        if scheme not in {"http", "https"}:
-            raise ValueError("invalid scheme: should be one of `http|https`")
+        if scheme not in {"http", "https", "h2c"}:
+            raise ValueError("invalid scheme: should be one of `http|https|h2c`")
         return scheme
 
     @validator("port", pre=True)
@@ -199,7 +191,7 @@ class IngressRequirerAppData(BaseModel, DatabagIOMixin):
         return port
 
 
-class IngressRequirerUnitData(BaseModel, DatabagIOMixin):
+class IngressRequirerUnitData(DatabagModel):
     """Ingress requirer unit databag model."""
 
     host: str = Field(description="Hostname the unit wishes to be exposed.")
@@ -401,9 +393,7 @@ class IngressPerAppProvider(_IngressPerAppBase):
         unit: Unit
         for unit in relation.units:
             databag = relation.data[unit]
-            remote_unit_data: Dict[str, Optional[Union[int, str]]] = {}
-            for key in ("host", "port"):
-                remote_unit_data[key] = databag.get(key)
+            remote_unit_data = {"host": databag.get("host")}
             try:
                 data = IngressRequirerUnitData.parse_obj(remote_unit_data)
                 out.append(data)

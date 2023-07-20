@@ -56,7 +56,6 @@ def test_ingress_per_app_created(
         remote_app_data={
             "model": "test-model",
             "name": "remote/0",
-            "mode": "http",
             "port": str(port),
             "scheme": scheme,
         },

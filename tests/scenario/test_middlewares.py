@@ -25,7 +25,6 @@ def _create_relation(
         app_data = {
             "model": "test-model",
             "name": "remote/0",
-            "mode": "http",
             "strip-prefix": "true" if strip_prefix else "false",
             "redirect-https": "true" if redirect_https else "false",
             "port": str(9000),
