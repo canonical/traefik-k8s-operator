@@ -1,0 +1,28 @@
+---
+# ca - am - trfk
+
+bundle: kubernetes
+applications:
+  am:
+    charm: ./alertmanager-k8s_ubuntu-20.04-amd64.charm
+    series: focal
+    scale: 2
+    trust: true
+    resources:
+      alertmanager-image: ghcr.io/canonical/alertmanager:0.25.0
+
+  trfk:
+    charm: ./traefik-k8s_ubuntu-20.04-amd64.charm
+    series: focal
+    scale: 1
+    resources:
+      traefik-image: docker.io/jnsgruk/traefik:2.9.6
+
+  ca:
+    charm: self-signed-certificates
+    channel: edge
+    scale: 1
+
+relations:
+- [am:certificates, ca:certificates]
+- [am:ingress, trfk]
