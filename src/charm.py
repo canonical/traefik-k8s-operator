@@ -784,7 +784,6 @@ class TraefikIngressCharm(CharmBase):
         service_def = {
             "loadBalancer": lb_def,
         }
-        transports = {}
 
         if is_reverse_termination:
             # i.e. traefik itself is not related to tls certificates, but the ingress requirer is
@@ -796,13 +795,18 @@ class TraefikIngressCharm(CharmBase):
                     "insecureSkipVerify": True
                 }
             }
-            transports["rootCAs"] = [_CERTIFICATE_PATH]
 
         elif is_termination:
             # i.e. traefik itself is related to tls certificates, but the ingress requirer is not
-            pass
+            transports = {}
 
-        # if is_end_to_end:
+        elif is_end_to_end:
+            transports = {
+                "rootCAs": [_CERTIFICATE_PATH]
+            }
+
+        else:
+            transports = {}
 
         config = {
             "http": {
@@ -810,8 +814,8 @@ class TraefikIngressCharm(CharmBase):
                 "services": {
                     traefik_service_name: service_def
                 },
+                "serversTransports": transports
             },
-            "serversTransports": transports
         }
 
         middlewares = self._generate_middleware_config(data, prefix)
