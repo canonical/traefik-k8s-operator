@@ -814,9 +814,11 @@ class TraefikIngressCharm(CharmBase):
                 "services": {
                     traefik_service_name: service_def
                 },
-                "serversTransports": transports
             },
         }
+        # Traefik does not accept an empty serversTransports. Add it only if it's non-empty.
+        if transports:
+            config["http"].update({"serversTransports": transports})
 
         middlewares = self._generate_middleware_config(data, prefix)
 
