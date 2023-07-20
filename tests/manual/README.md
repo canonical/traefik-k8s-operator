@@ -23,7 +23,6 @@ Inspect the server url in the config file:
 ```shell
 juju ssh --container traefik trfk/0 cat /opt/traefik/juju/juju_ingress_ingress_23_am.yaml
 # - url: http://am-0.am-endpoints.welcome-k8s.svc.cluster.local:9093
-# FIXME: why do we only see one unit here?
 ```
 
 ## https fqdn (ca - am)

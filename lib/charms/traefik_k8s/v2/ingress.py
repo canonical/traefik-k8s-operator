@@ -90,6 +90,7 @@ RELATION_INTERFACE = "ingress"
 SchemeLiteral = Literal["http", "https"]
 
 log = logging.getLogger(__name__)
+BUILTIN_JUJU_KEYS = {"ingress-address", "private-address", "egress-subnets"}
 
 
 class DatabagModel(BaseModel):
@@ -111,7 +112,7 @@ class DatabagModel(BaseModel):
             return cls.parse_obj(json.loads(databag[cls._NEST_UNDER]))
 
         try:
-            data = {k: json.loads(v) for k, v in databag.items()}
+            data = {k: json.loads(v) for k, v in databag.items() if k not in BUILTIN_JUJU_KEYS}
         except json.JSONDecodeError:
             log.error(f"invalid databag contents: expecting json. {databag}")
             raise

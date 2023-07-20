@@ -11,10 +11,28 @@ import logging
 import re
 import socket
 import typing
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Union
 from urllib.parse import urlparse
 
 import yaml
+from deepmerge import always_merger
+from lightkube.core.client import Client
+from lightkube.resources.core_v1 import Service
+from ops.charm import (
+    ActionEvent,
+    CharmBase,
+    ConfigChangedEvent,
+    PebbleReadyEvent,
+    RelationBrokenEvent,
+    RelationEvent,
+    StartEvent,
+    UpdateStatusEvent,
+)
+from ops.framework import StoredState
+from ops.main import main
+from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, Relation, WaitingStatus
+from ops.pebble import APIError, PathError
+
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from charms.loki_k8s.v0.loki_push_api import LogProxyConsumer
 from charms.observability_libs.v0.cert_handler import CertHandler
@@ -35,23 +53,6 @@ from charms.traefik_route_k8s.v0.traefik_route import (
     TraefikRouteProvider,
     TraefikRouteRequirerReadyEvent,
 )
-from deepmerge import always_merger
-from lightkube.core.client import Client
-from lightkube.resources.core_v1 import Service
-from ops.charm import (
-    ActionEvent,
-    CharmBase,
-    ConfigChangedEvent,
-    PebbleReadyEvent,
-    RelationBrokenEvent,
-    RelationEvent,
-    StartEvent,
-    UpdateStatusEvent,
-)
-from ops.framework import StoredState
-from ops.main import main
-from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, Relation, WaitingStatus
-from ops.pebble import APIError, PathError
 
 if typing.TYPE_CHECKING:
     from charms.traefik_k8s.v1.ingress_per_unit import RequirerData as RequirerData_IPU
@@ -783,17 +784,19 @@ class TraefikIngressCharm(CharmBase):
         service_def = {
             "loadBalancer": lb_def,
         }
+        transports = {}
 
         if is_reverse_termination:
             # i.e. traefik itself is not related to tls certificates, but the ingress requirer is
-            service_def["rootCAs"] = [_CERTIFICATE_PATH]
+            # service_def["rootCAs"] = [_CERTIFICATE_PATH]
             transport_name = "reverseTerminationTransport"
             lb_def["serversTransport"] = transport_name
-            service_def["serversTransports"] = {
+            transports = {
                 transport_name: {
                     "insecureSkipVerify": True
                 }
             }
+            transports["rootCAs"] = [_CERTIFICATE_PATH]
 
         elif is_termination:
             # i.e. traefik itself is related to tls certificates, but the ingress requirer is not
@@ -807,7 +810,8 @@ class TraefikIngressCharm(CharmBase):
                 "services": {
                     traefik_service_name: service_def
                 },
-            }
+            },
+            "serversTransports": transports
         }
 
         middlewares = self._generate_middleware_config(data, prefix)
@@ -852,10 +856,8 @@ class TraefikIngressCharm(CharmBase):
         # todo: IPA>=v2 uses pydantic models, the other providers use raw dicts.
         #  eventually switch all over to pydantic and handle this uniformly
         app_dict = data.app.dict(by_alias=True)
-        port = "" if data.app.scheme == "https" else f":{data.app.port}"
-
         lb_servers = [
-            {"url": f"{data.app.scheme}://{unit_data.host}{port}"}
+            {"url": f"{data.app.scheme}://{unit_data.host}:{data.app.port}"}
             for unit_data in data.units
         ]
         return self._generate_config_block(prefix, lb_servers, app_dict)
