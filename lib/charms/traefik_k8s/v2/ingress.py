@@ -526,7 +526,9 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         port: Optional[int] = None,
         strip_prefix: bool = False,
         redirect_https: bool = False,
-        use_https_scheme: bool = False,
+        # fixme: this is horrible UX.
+        #  shall we switch to manually calling provide_ingress_requirements with all args when ready?
+        scheme: typing.Callable[[], str] = False,
     ):
         """Constructor for IngressRequirer.
 
@@ -543,7 +545,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
                 application; if unspecified, the default Kubernetes service name will be used.
             strip_prefix: configure Traefik to strip the path prefix.
             redirect_https: redirect incoming requests to HTTPS.
-            use_https_scheme: use https as scheme when constructing the ingress url.
+            scheme: callable returning the scheme to use when constructing the ingress url.
 
         Request Args:
             port: the port of the service
@@ -553,7 +555,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         self.relation_name = relation_name
         self._strip_prefix = strip_prefix
         self._redirect_https = redirect_https
-        self._scheme = typing.cast(SchemeLiteral, "https" if use_https_scheme else "http")
+        self._get_scheme = scheme
 
         self._stored.set_default(current_url=None)  # type: ignore
 
@@ -621,10 +623,10 @@ class IngressPerAppRequirer(_IngressPerAppBase):
                     {
                         "model": self.model.name,
                         "name": self.app.name,
-                        "scheme": self._scheme,
+                        "scheme": self._get_scheme(),
                         "port": port,
-                        "strip_prefix": True if self._strip_prefix else None,
-                        "redirect_https": True if self._redirect_https else None,
+                        "strip_prefix": self._strip_prefix,
+                        "redirect_https": self._redirect_https,
                     }
                 ).dump(app_databag)
 

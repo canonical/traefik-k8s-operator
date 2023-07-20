@@ -622,7 +622,10 @@ class TraefikIngressCharm(CharmBase):
         prefix = self._get_prefix(data.app.dict(by_alias=True))
         config = self._generate_per_app_config(prefix, data)
         if self.unit.is_leader():
-            ipa.publish_url(relation, self._get_external_url(prefix))
+            external_url = self._get_external_url(prefix)
+            logger.debug(f"publishing external url for {relation.app.name}: {external_url}")
+
+            ipa.publish_url(relation, external_url)
 
         return config
 

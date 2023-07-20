@@ -8,7 +8,7 @@ juju deploy --trust ./bundle_1_http.yaml
 Make sure the "proxied endpoint" has http scheme:
 
 ```bash
-juju run trfk/0 show-proxied-endpoints
+juju run trfk/0 show-proxied-endpoints --wait 2m
 # proxied-endpoints: '{"am": {"url": "http://10.43.8.219/welcome-k8s-am"}}'
 ```
 
