@@ -276,6 +276,7 @@ import copy
 import json
 import logging
 import uuid
+from collections import defaultdict
 from contextlib import suppress
 from datetime import datetime, timedelta
 from ipaddress import IPv4Address
@@ -308,7 +309,9 @@ LIBAPI = 2
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 6
+LIBPATCH = 9
+
+PYDEPS = ["cryptography", "jsonschema"]
 
 REQUIRER_JSON_SCHEMA = {
     "$schema": "http://json-schema.org/draft-04/schema#",
@@ -1057,6 +1060,32 @@ class TLSCertificatesProvidesV2(Object):
         for certificate_relation in certificates_relation:
             self._remove_certificate(certificate=certificate, relation_id=certificate_relation.id)
 
+    def get_issued_certificates(
+        self, relation_id: Optional[int] = None
+    ) -> Dict[str, Dict[str, str]]:
+        """Returns a dictionary of issued certificates.
+
+        It returns certificates from all relations if relation_id is not specified.
+        Certificates are returned per application name and CSR.
+
+        Returns:
+            dict: Certificates per application name.
+        """
+        certificates: Dict[str, Dict[str, str]] = defaultdict(dict)
+        relations = (
+            [self.model.relations[self.relationship_name][relation_id]]
+            if relation_id
+            else self.model.relations.get(self.relationship_name, [])
+        )
+        for relation in relations:
+            provider_relation_data = _load_relation_data(relation.data[self.charm.app])
+            provider_certificates = provider_relation_data.get("certificates", [])
+            for certificate in provider_certificates:
+                certificates[relation.app.name].update(  # type: ignore[union-attr]
+                    {certificate["certificate_signing_request"]: certificate["certificate"]}
+                )
+        return certificates
+
     def _on_relation_changed(self, event: RelationChangedEvent) -> None:
         """Handler triggered on relation changed event.
 
@@ -1176,7 +1205,7 @@ class TLSCertificatesRequiresV2(Object):
 
     @property
     def _provider_certificates(self) -> List[Dict[str, str]]:
-        """Returns list of provider CSRs from relation data."""
+        """Returns list of certificates from the provider's relation data."""
         relation = self.model.get_relation(self.relationship_name)
         if not relation:
             logger.debug("No relation: %s", self.relationship_name)
@@ -1362,7 +1391,7 @@ class TLSCertificatesRequiresV2(Object):
                                 ),
                             )
                         except SecretNotFoundError:
-                            secret = self.charm.app.add_secret(
+                            secret = self.charm.unit.add_secret(
                                 {"certificate": certificate["certificate"]},
                                 label=f"{LIBID}-{certificate['certificate_signing_request']}",
                                 expire=self._get_next_secret_expiry_time(
@@ -1463,6 +1492,7 @@ class TLSCertificatesRequiresV2(Object):
             event.secret.remove_all_revisions()
 
     def _find_certificate_in_relation_data(self, csr: str) -> Optional[Dict[str, Any]]:
+        """Returns the certificate that match the given CSR."""
         for certificate_dict in self._provider_certificates:
             if certificate_dict["certificate_signing_request"] != csr:
                 continue
