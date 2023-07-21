@@ -49,3 +49,9 @@ async def remove_application(
 
     # Now, after the workload has hopefully terminated, force removal of the juju leftovers
     await app.destroy(destroy_storage=True, force=True, no_wait=True)
+
+
+def dequote(s: str):
+    if isinstance(s, str) and s.startswith('"') and s.endswith('"'):
+        s = s[1:-1]
+    return s

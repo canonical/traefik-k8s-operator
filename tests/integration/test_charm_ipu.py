@@ -1,6 +1,8 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 
+from urllib.parse import urlparse
+
 import pytest
 import yaml
 from pytest_operator.plugin import OpsTest
@@ -10,7 +12,9 @@ from tests.integration.conftest import (
     deploy_traefik_if_not_deployed,
     get_relation_data,
 )
-from tests.integration.helpers import get_address, remove_application
+from tests.integration.helpers import dequote, get_address, remove_application
+
+# FIXME Replace parts of this itest with a utest
 
 
 @pytest.mark.abort_on_fail
@@ -38,7 +42,9 @@ def assert_ipu_charm_has_ingress(ops_test: OpsTest):
     )
     provider_app_data = yaml.safe_load(data.provider.application_data["ingress"])
     url = provider_app_data["ipu-tester/0"]["url"]
-    ip, port = url.split("//")[1].split("/")[0].split(":")
+    url_parts = urlparse(url)
+    ip = url_parts.hostname
+    port = url_parts.port or 80
     assert_can_connect(ip, port)
 
 
@@ -61,19 +67,19 @@ async def test_relation_data_shape(ops_test: OpsTest):
     # model: foo
     # name: ipu-tester/0
     # port: 9090
-    assert requirer_unit_data["name"] == "ipu-tester/0"
-    assert requirer_unit_data["port"] == "80"
-    assert requirer_unit_data["host"] == "foo.bar"
-    model = requirer_unit_data["model"]
+    assert dequote(requirer_unit_data["name"] == "ipu-tester/0")
+    assert dequote(requirer_unit_data["port"] == "80")
+    assert dequote(requirer_unit_data["host"] == "foo.bar")
+    model = dequote(requirer_unit_data["model"])
 
     provider_app_data = yaml.safe_load(data.provider.application_data["ingress"])
     # example:
     #  ingress:
     #   ipu-tester/0:
-    #     url: http://foo.bar:80/foo-ipu-tester-0
+    #     url: http://foo.bar/foo-ipu-tester-0
     traefik_address = await get_address(ops_test, "traefik-k8s")
     assert provider_app_data == {
-        "ipu-tester/0": {"url": f"http://{traefik_address}:80/{model}-ipu-tester-0"}
+        "ipu-tester/0": {"url": f"http://{traefik_address}/{model}-ipu-tester-0"}
     }
 
 
