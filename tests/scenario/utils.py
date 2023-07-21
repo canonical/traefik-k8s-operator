@@ -118,12 +118,12 @@ def create_ingress_relation(
     }
     remote_units_data = {i: {"host": json.dumps(h)} for i, h in enumerate(hosts)}
 
-    args = dict(
-        endpoint="ingress",
-        remote_app_name=app_name,
-        remote_app_data={k: json.dumps(v) for k, v in app_data.items()},
-        remote_units_data=remote_units_data,
-    )
+    args = {
+        "endpoint": "ingress",
+        "remote_app_name": app_name,
+        "remote_app_data": {k: json.dumps(v) for k, v in app_data.items()},
+        "remote_units_data": remote_units_data,
+    }
 
     # No `next_relation_id()` nor `get_next_id()` in Relation.
     if rel_id is not None:
