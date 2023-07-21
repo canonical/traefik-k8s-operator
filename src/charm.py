@@ -66,8 +66,9 @@ _DYNAMIC_CONFIG_DIR = "/opt/traefik/juju"
 _STATIC_CONFIG_DIR = "/etc/traefik"
 _STATIC_CONFIG_PATH = _STATIC_CONFIG_DIR + "/traefik.yaml"
 _DYNAMIC_CERTS_PATH = _DYNAMIC_CONFIG_DIR + "/certificates.yaml"
-_CERTIFICATE_PATH = _DYNAMIC_CONFIG_DIR + "/certificate.cert"
-_CERTIFICATE_KEY_PATH = _DYNAMIC_CONFIG_DIR + "/certificate.key"
+_SERVER_CERT_PATH = _DYNAMIC_CONFIG_DIR + "/server.cert"
+_SERVER_KEY_PATH = _DYNAMIC_CONFIG_DIR + "/server.key"
+_CA_CERT_PATH = _DYNAMIC_CONFIG_DIR + "/ca.cert"
 BIN_PATH = "/usr/bin/traefik"
 
 
@@ -206,8 +207,8 @@ class TraefikIngressCharm(CharmBase):
             event.defer()
             return
 
-        self.container.remove_path(_CERTIFICATE_PATH, recursive=True)
-        self.container.remove_path(_CERTIFICATE_KEY_PATH, recursive=True)
+        self.container.remove_path(_SERVER_CERT_PATH, recursive=True)
+        self.container.remove_path(_SERVER_KEY_PATH, recursive=True)
 
     def _is_tls_enabled(self) -> bool:
         """Return True if TLS is enabled."""
@@ -221,14 +222,19 @@ class TraefikIngressCharm(CharmBase):
 
         cert_handler = self.cert
         if cert_handler.cert:
-            self.container.push(_CERTIFICATE_PATH, cert_handler.cert, make_dirs=True)
+            self.container.push(_SERVER_CERT_PATH, cert_handler.cert, make_dirs=True)
         else:
-            self.container.remove_path(_CERTIFICATE_PATH)
+            self.container.remove_path(_SERVER_CERT_PATH)
 
         if cert_handler.key:
-            self.container.push(_CERTIFICATE_KEY_PATH, cert_handler.key, make_dirs=True)
+            self.container.push(_SERVER_KEY_PATH, cert_handler.key, make_dirs=True)
         else:
-            self.container.remove_path(_CERTIFICATE_KEY_PATH)
+            self.container.remove_path(_SERVER_KEY_PATH)
+
+        if cert_handler.ca:
+            self.container.push(_CA_CERT_PATH, cert_handler.ca, make_dirs=True)
+        else:
+            self.container.remove_path(_CA_CERT_PATH)
 
         self._push_config()
         self._process_status_and_configurations()
@@ -341,8 +347,8 @@ class TraefikIngressCharm(CharmBase):
             "tls": {
                 "certificates": [
                     {
-                        "certFile": _CERTIFICATE_PATH,
-                        "keyFile": _CERTIFICATE_KEY_PATH,
+                        "certFile": _SERVER_CERT_PATH,
+                        "keyFile": _SERVER_KEY_PATH,
                     }
                 ],
             }
@@ -802,18 +808,8 @@ class TraefikIngressCharm(CharmBase):
             lb_def["serversTransport"] = transport_name
             transports = {
                 transport_name: {
-                    "rootCAs": [_CERTIFICATE_PATH],
-                    # FIXME: traefik's cert has these DNS:
-                    #  DNS:trfk-0.trfk-endpoints.welcome-k8s.svc.cluster.local, DNS:cos.local
-                    #  Here, we are trying to use traefik's cert to authenticate proxied apps.
-                    #  But those are not sufficient for traefik to authenticate the proxied apps,
-                    #  because their DNS look like this:
-                    #  https://am-1.am-endpoints.welcome-k8s.svc.cluster.local:9093
-                    #  We need to figure out a way to get a cert for the proxied endpoints.
-                    #  A stop-gap solution could be what we do in scrape_configs: pass the ca cert
-                    #  via relation data, and then write it to disk on the other end (here).
-                    #  Until then, we need insecureSkipVerify.
-                    "insecureSkipVerify": True,
+                    # Note: assuming traefik's CA is the same CA that signed the proxied apps.
+                    "rootCAs": [_CA_CERT_PATH],
                 }
             }
 
