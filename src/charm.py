@@ -105,7 +105,7 @@ class TraefikIngressCharm(CharmBase):
 
         self.container = self.unit.get_container(_TRAEFIK_CONTAINER_NAME)
         self.cert = CertHandler(
-            self, key="cert_handler", peer_relation_name="peers", cert_subject=self.cert_subject
+            self, key="trfk-server-cert", peer_relation_name="peers", extra_sans_dns=[self.cert_subject]
         )
 
         # FIXME: Do not move these lower. They must exist before `_tcp_ports` is called. The
@@ -801,8 +801,24 @@ class TraefikIngressCharm(CharmBase):
             transports = {}
 
         elif is_end_to_end:
+            transport_name = "endToEndTLS"
+            lb_def["serversTransport"] = transport_name
             transports = {
-                "rootCAs": [_CERTIFICATE_PATH]
+                transport_name: {
+                    "rootCAs": [_CERTIFICATE_PATH],
+
+                    # FIXME: traefik's cert has these DNS:
+                    #  DNS:trfk-0.trfk-endpoints.welcome-k8s.svc.cluster.local, DNS:cos.local
+                    #  Here, we are trying to use traefik's cert to authenticate proxied apps.
+                    #  But those are not sufficient for traefik to authenticate the proxied apps,
+                    #  because their DNS look like this:
+                    #  https://am-1.am-endpoints.welcome-k8s.svc.cluster.local:9093
+                    #  We need to figure out a way to get a cert for the proxied endpoints.
+                    #  A stop-gap solution could be what we do in scrape_configs: pass the ca cert
+                    #  via relation data, and then write it to disk on the other end (here).
+                    #  Until then, we need insecureSkipVerify.
+                    "insecureSkipVerify": True,
+                }
             }
 
         else:
