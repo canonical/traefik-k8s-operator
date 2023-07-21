@@ -3,12 +3,11 @@
 # THEN traefik's config file's `server` section has all the units listed
 # AND WHEN the charm rescales
 # THEN the traefik config file is updated
-import json
 
 import pytest
 import yaml
 from ops import pebble
-from scenario import Container, Model, Mount, Relation, State
+from scenario import Container, Model, Mount, State
 
 from tests.scenario.utils import create_ingress_relation
 
@@ -50,7 +49,7 @@ def traefik_container(tmp_path):
 @pytest.mark.parametrize("event_name", ("joined", "changed", "created"))
 @pytest.mark.parametrize("scheme", ("http", "https"))
 def test_ingress_per_app_created(
-        traefik_ctx, port, host, model, traefik_container, event_name, tmp_path, scheme
+    traefik_ctx, port, host, model, traefik_container, event_name, tmp_path, scheme
 ):
     """Check the config when a new ingress per app is created or changes (single remote unit)."""
     ipa = create_ingress_relation(port=port, scheme=scheme, hosts=[host])
@@ -77,11 +76,13 @@ def test_ingress_per_app_created(
         "loadBalancer": {"servers": [{"url": f"{scheme}://{host}{port}"}]},
     }
 
-    if scheme == 'https':
+    if scheme == "https":
         # traefik has no tls relation, but the requirer does: reverse termination case
         service_def["rootCAs"] = ["/opt/traefik/juju/certificate.cert"]
         service_def["loadBalancer"]["serversTransport"] = "reverseTerminationTransport"
-        service_def["serversTransports"] = {"reverseTerminationTransport": {"insecureSkipVerify": True}}
+        service_def["serversTransports"] = {
+            "reverseTerminationTransport": {"insecureSkipVerify": True}
+        }
 
     assert generated_config["http"]["services"]["juju-test-model-remote-0-service"] == service_def
 
@@ -90,12 +91,14 @@ def test_ingress_per_app_created(
 @pytest.mark.parametrize("n_units", (2, 3, 10))
 @pytest.mark.parametrize("scheme", ("http", "https"))
 def test_ingress_per_app_scale(
-        traefik_ctx, host, port, model, traefik_container, tmp_path, n_units, scheme
+    traefik_ctx, host, port, model, traefik_container, tmp_path, n_units, scheme
 ):
     """Check the config when a new ingress per app unit joins."""
     relation_id = 42
     unit_id = 0
-    cfg_file = tmp_path.joinpath("traefik", "juju", f"juju_ingress_ingress_{relation_id}_remote.yaml")
+    cfg_file = tmp_path.joinpath(
+        "traefik", "juju", f"juju_ingress_ingress_{relation_id}_remote.yaml"
+    )
     cfg_file.parent.mkdir(parents=True)
     cfg_port = "" if scheme == "https" else f":{port}"
 
@@ -118,15 +121,22 @@ def test_ingress_per_app_scale(
             },
             "services": {
                 f"juju-test-model-remote-{unit_id}-service": {
-                    "loadBalancer": {"servers": [{"url": f"{scheme}://{host.format(0)}{cfg_port}"}]}
+                    "loadBalancer": {
+                        "servers": [{"url": f"{scheme}://{host.format(0)}{cfg_port}"}]
+                    }
                 }
             },
         }
     }
     cfg_file.write_text(yaml.safe_dump(initial_cfg))
 
-    ipa = create_ingress_relation(port=port, scheme=scheme, rel_id=relation_id, unit_name="remote/0",
-                                  hosts=[host.format(n) for n in range(n_units)])
+    ipa = create_ingress_relation(
+        port=port,
+        scheme=scheme,
+        rel_id=relation_id,
+        unit_name="remote/0",
+        hosts=[host.format(n) for n in range(n_units)],
+    )
     state = State(
         model=model,
         config={"routing_mode": "path", "external_hostname": "foo.com"},
@@ -138,9 +148,9 @@ def test_ingress_per_app_scale(
 
     new_config = yaml.safe_load(cfg_file.read_text())
     # verify that the config has changed!
-    new_lbs = new_config["http"]["services"][f"juju-test-model-remote-{unit_id}-service"]["loadBalancer"][
-        "servers"
-    ]
+    new_lbs = new_config["http"]["services"][f"juju-test-model-remote-{unit_id}-service"][
+        "loadBalancer"
+    ]["servers"]
 
     assert len(new_lbs) == n_units
     for n in range(n_units):

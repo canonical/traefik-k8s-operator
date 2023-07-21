@@ -1,6 +1,3 @@
-from scenario import Relation, State
-import pytest
-
 #
 # TODO: implement
 # @pytest.mark.parametrize("scheme", ("http", "https", "h2c"))

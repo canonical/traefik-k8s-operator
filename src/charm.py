@@ -15,24 +15,6 @@ from typing import Any, Dict, List, Optional, Union
 from urllib.parse import urlparse
 
 import yaml
-from deepmerge import always_merger
-from lightkube.core.client import Client
-from lightkube.resources.core_v1 import Service
-from ops.charm import (
-    ActionEvent,
-    CharmBase,
-    ConfigChangedEvent,
-    PebbleReadyEvent,
-    RelationBrokenEvent,
-    RelationEvent,
-    StartEvent,
-    UpdateStatusEvent,
-)
-from ops.framework import StoredState
-from ops.main import main
-from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, Relation, WaitingStatus
-from ops.pebble import APIError, PathError
-
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from charms.loki_k8s.v0.loki_push_api import LogProxyConsumer
 from charms.observability_libs.v0.cert_handler import CertHandler
@@ -53,6 +35,23 @@ from charms.traefik_route_k8s.v0.traefik_route import (
     TraefikRouteProvider,
     TraefikRouteRequirerReadyEvent,
 )
+from deepmerge import always_merger
+from lightkube.core.client import Client
+from lightkube.resources.core_v1 import Service
+from ops.charm import (
+    ActionEvent,
+    CharmBase,
+    ConfigChangedEvent,
+    PebbleReadyEvent,
+    RelationBrokenEvent,
+    RelationEvent,
+    StartEvent,
+    UpdateStatusEvent,
+)
+from ops.framework import StoredState
+from ops.main import main
+from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, Relation, WaitingStatus
+from ops.pebble import APIError, PathError
 
 if typing.TYPE_CHECKING:
     from charms.traefik_k8s.v1.ingress_per_unit import RequirerData as RequirerData_IPU
@@ -105,7 +104,10 @@ class TraefikIngressCharm(CharmBase):
 
         self.container = self.unit.get_container(_TRAEFIK_CONTAINER_NAME)
         self.cert = CertHandler(
-            self, key="trfk-server-cert", peer_relation_name="peers", extra_sans_dns=[self.cert_subject]
+            self,
+            key="trfk-server-cert",
+            peer_relation_name="peers",
+            extra_sans_dns=[self.cert_subject],
         )
 
         # FIXME: Do not move these lower. They must exist before `_tcp_ports` is called. The
@@ -386,8 +388,8 @@ class TraefikIngressCharm(CharmBase):
         #  https://github.com/canonical/operator/issues/665
 
         if (
-                self._stored.current_external_host != new_external_host
-                or self._stored.current_routing_mode != new_routing_mode
+            self._stored.current_external_host != new_external_host
+            or self._stored.current_routing_mode != new_routing_mode
         ):
             self._stored.current_external_host = new_external_host
             self._stored.current_routing_mode = new_routing_mode
@@ -446,10 +448,10 @@ class TraefikIngressCharm(CharmBase):
             # we do this BEFORE processing the relations.
 
         for ingress_relation in (
-                self.ingress_per_appv1.relations
-                + self.ingress_per_appv2.relations
-                + self.ingress_per_unit.relations
-                + self.traefik_route.relations
+            self.ingress_per_appv1.relations
+            + self.ingress_per_appv2.relations
+            + self.ingress_per_unit.relations
+            + self.traefik_route.relations
         ):
             self._process_ingress_relation(ingress_relation)
 
@@ -529,11 +531,11 @@ class TraefikIngressCharm(CharmBase):
         # other side, which is the case for the RelationDeparted for the last unit (i.e., the
         # proxied application scales to zero).
         if not self.ready:
-            logger.warning('not ready: early exit')
+            logger.warning("not ready: early exit")
             return
 
         provider = self._provider_from_relation(relation)
-        logger.warning(f'provider: {provider}')
+        logger.warning(f"provider: {provider}")
 
         if not provider.is_ready(relation):
             logger.debug(f"Provider {provider} not ready; resetting ingress configurations.")
@@ -571,9 +573,9 @@ class TraefikIngressCharm(CharmBase):
         self._push_configurations(relation, config)
 
     def _provide_ingress(
-            self,
-            relation: Relation,
-            provider: Union[IPAv1, IPAv2],
+        self,
+        relation: Relation,
+        provider: Union[IPAv1, IPAv2],
     ):
         # to avoid long-gone units from lingering in the databag, we wipe it
         if self.unit.is_leader():
@@ -683,9 +685,9 @@ class TraefikIngressCharm(CharmBase):
         return f"{data['model']}-{name}"
 
     def _generate_middleware_config(
-            self,
-            data: Union["RequirerData_IPU", "RequirerAppData_IPA"],
-            prefix: str,
+        self,
+        data: Union["RequirerData_IPU", "RequirerAppData_IPA"],
+        prefix: str,
     ) -> dict:
         """Generate a middleware config."""
         config = {}  # type: Dict[str, Dict[str, Any]]
@@ -734,10 +736,10 @@ class TraefikIngressCharm(CharmBase):
         return self._generate_config_block(prefix, lb_servers, data)
 
     def _generate_config_block(
-            self,
-            prefix: str,
-            lb_servers: List[Dict[str, str]],
-            data: Union["RequirerData_IPU", "RequirerAppData_IPA"],
+        self,
+        prefix: str,
+        lb_servers: List[Dict[str, str]],
+        data: Union["RequirerData_IPU", "RequirerAppData_IPA"],
     ) -> Dict[str, Any]:
         """Generate a configuration segment.
 
@@ -774,7 +776,7 @@ class TraefikIngressCharm(CharmBase):
 
         # REVERSE TERMINATION: we are providing ingress for a unit who is itself behind https,
         # but traefik is not.
-        internal_tls = data.get('scheme') == 'https'
+        internal_tls = data.get("scheme") == "https"
 
         is_reverse_termination = not external_tls and internal_tls
         is_termination = external_tls and not internal_tls
@@ -787,14 +789,9 @@ class TraefikIngressCharm(CharmBase):
 
         if is_reverse_termination:
             # i.e. traefik itself is not related to tls certificates, but the ingress requirer is
-            # service_def["rootCAs"] = [_CERTIFICATE_PATH]
             transport_name = "reverseTerminationTransport"
             lb_def["serversTransport"] = transport_name
-            transports = {
-                transport_name: {
-                    "insecureSkipVerify": True
-                }
-            }
+            transports = {transport_name: {"insecureSkipVerify": True}}
 
         elif is_termination:
             # i.e. traefik itself is related to tls certificates, but the ingress requirer is not
@@ -806,7 +803,6 @@ class TraefikIngressCharm(CharmBase):
             transports = {
                 transport_name: {
                     "rootCAs": [_CERTIFICATE_PATH],
-
                     # FIXME: traefik's cert has these DNS:
                     #  DNS:trfk-0.trfk-endpoints.welcome-k8s.svc.cluster.local, DNS:cos.local
                     #  Here, we are trying to use traefik's cert to authenticate proxied apps.
@@ -827,9 +823,7 @@ class TraefikIngressCharm(CharmBase):
         config = {
             "http": {
                 "routers": router_cfg,
-                "services": {
-                    traefik_service_name: service_def
-                },
+                "services": {traefik_service_name: service_def},
             },
         }
         # Traefik does not accept an empty serversTransports. Add it only if it's non-empty.
@@ -848,10 +842,10 @@ class TraefikIngressCharm(CharmBase):
         return config
 
     def _generate_tls_block(
-            self,
-            router_name: str,
-            route_rule: str,
-            service_name: str,
+        self,
+        router_name: str,
+        route_rule: str,
+        service_name: str,
     ) -> Dict[str, Any]:
         """Generate a TLS configuration segment."""
         return {
@@ -871,9 +865,9 @@ class TraefikIngressCharm(CharmBase):
         }
 
     def _generate_per_app_config(
-            self,
-            prefix: str,
-            data: "IPADatav2",
+        self,
+        prefix: str,
+        data: "IPADatav2",
     ) -> dict:
         # todo: IPA>=v2 uses pydantic models, the other providers use raw dicts.
         #  eventually switch all over to pydantic and handle this uniformly
@@ -885,9 +879,9 @@ class TraefikIngressCharm(CharmBase):
         return self._generate_config_block(prefix, lb_servers, app_dict)
 
     def _generate_per_leader_config(
-            self,
-            prefix: str,
-            data: "IPADatav1",
+        self,
+        prefix: str,
+        data: "IPADatav1",
     ) -> dict:
         lb_servers = [{"url": f"http://{data['host']}:{data['port']}"}]
         return self._generate_config_block(prefix, lb_servers, data)

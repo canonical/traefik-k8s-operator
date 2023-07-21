@@ -24,15 +24,15 @@ def _render_middlewares(*, strip_prefix: bool = False, redirect_https: bool = Fa
 
 
 def _render_config(
-        *,
-        rel_name: str,
-        routing_mode: str,
-        strip_prefix: bool,
-        redirect_https: bool,
-        scheme: str = "http",
-        tls_enabled: bool = True,
-        host: str = "10.1.10.1",
-        port: str = "42",
+    *,
+    rel_name: str,
+    routing_mode: str,
+    strip_prefix: bool,
+    redirect_https: bool,
+    scheme: str = "http",
+    tls_enabled: bool = True,
+    host: str = "10.1.10.1",
+    port: str = "42",
 ):
     routing_rule = {
         "path": "PathPrefix(`/test-model-remote-0`)",
@@ -43,14 +43,16 @@ def _render_config(
         scheme = "http"
         # ipu does not do https for now
 
-    port = f":{port}" if scheme == 'http' else ""
+    port = f":{port}" if scheme == "http" else ""
     service_spec = {
         "loadBalancer": {"servers": [{"url": f"{scheme}://{host}{port}"}]},
     }
-    if scheme == 'https':
+    if scheme == "https":
         service_spec["rootCAs"] = ["/opt/traefik/juju/certificate.cert"]
         service_spec["loadBalancer"]["serversTransport"] = "reverseTerminationTransport"
-        service_spec["serversTransports"] = {"reverseTerminationTransport": {"insecureSkipVerify": True}}
+        service_spec["serversTransports"] = {
+            "reverseTerminationTransport": {"insecureSkipVerify": True}
+        }
 
     expected = {
         "http": {
@@ -79,7 +81,7 @@ def _render_config(
     }
 
     if middlewares := _render_middlewares(
-            strip_prefix=strip_prefix and routing_mode == "path", redirect_https=redirect_https
+        strip_prefix=strip_prefix and routing_mode == "path", redirect_https=redirect_https
     ):
         expected["http"].update(middlewares)
         expected["http"]["routers"]["juju-test-model-remote-0-router"].update(
@@ -93,9 +95,16 @@ def _render_config(
 
 
 def create_ingress_relation(
-        *, rel_id: int = None, app_name: str = "remote", strip_prefix: bool = False, redirect_https: bool = False,
-        model_name: str = "test-model", unit_name: str = "remote/0", port: int = 42, scheme: str = "http",
-        hosts: list[str] = ["0.0.0.42"]
+    *,
+    rel_id: int = None,
+    app_name: str = "remote",
+    strip_prefix: bool = False,
+    redirect_https: bool = False,
+    model_name: str = "test-model",
+    unit_name: str = "remote/0",
+    port: int = 42,
+    scheme: str = "http",
+    hosts: list[str] = ["0.0.0.42"],
 ) -> Relation:
     app_data = {
         "model": model_name,
@@ -105,9 +114,7 @@ def create_ingress_relation(
         "redirect-https": redirect_https,
         "port": port,
     }
-    remote_units_data = {
-        i: {"host": json.dumps(h)} for i, h in enumerate(hosts)
-    }
+    remote_units_data = {i: {"host": json.dumps(h)} for i, h in enumerate(hosts)}
 
     return Relation(
         endpoint="ingress",

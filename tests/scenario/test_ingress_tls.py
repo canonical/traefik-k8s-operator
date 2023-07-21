@@ -45,7 +45,7 @@ def test_middleware_config(traefik_ctx, routing_mode, strip_prefix, redirect_htt
         unit_name=f"{app_name}/0",
         strip_prefix=strip_prefix,
         redirect_https=redirect_https,
-        hosts=["0.0.0.42"]
+        hosts=["0.0.0.42"],
     )
 
     tls = _create_tls_relation(
@@ -76,16 +76,16 @@ def test_middleware_config(traefik_ctx, routing_mode, strip_prefix, redirect_htt
         strip_prefix=strip_prefix,
         redirect_https=redirect_https,
         scheme="http",
-        host="0.0.0.42"
+        host="0.0.0.42",
     )
 
     assert yaml.safe_load(config_file) == expected
 
-    ipa_out = out.get_relations('ingress')[0]
+    ipa_out = out.get_relations("ingress")[0]
 
-    if routing_mode == 'path':
-        url = f"https://testhostname/test-model-remote-0"
+    if routing_mode == "path":
+        url = "https://testhostname/test-model-remote-0"
     else:
-        url = f"https://test-model-remote-0.testhostname/"
+        url = "https://test-model-remote-0.testhostname/"
 
-    assert ipa_out.local_app_data == {'ingress': f'{{"url": "{url}"}}'}
+    assert ipa_out.local_app_data == {"ingress": f'{{"url": "{url}"}}'}

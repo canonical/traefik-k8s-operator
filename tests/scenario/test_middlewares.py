@@ -13,15 +13,15 @@ from tests.scenario.utils import _render_config, create_ingress_relation
 
 
 def _create_relation(
-        *,
-        rel_id: int,
-        rel_name: str,
-        app_name: str,
-        strip_prefix: bool,
-        redirect_https: bool,
-        scheme: str,
-        port:int,
-        unit_name: str = "remote/0",
+    *,
+    rel_id: int,
+    rel_name: str,
+    app_name: str,
+    strip_prefix: bool,
+    redirect_https: bool,
+    scheme: str,
+    port: int,
+    unit_name: str = "remote/0",
 ):
     if rel_name == "ingress":
         return create_ingress_relation(
@@ -67,7 +67,7 @@ def _create_relation(
 @patch("charm.TraefikIngressCharm._tcp_entrypoints_changed", MagicMock(return_value=False))
 @patch("charm.TraefikIngressCharm.version", PropertyMock(return_value="0.0.0"))
 def test_middleware_config(
-        traefik_ctx, rel_name, routing_mode, strip_prefix, redirect_https, scheme
+    traefik_ctx, rel_name, routing_mode, strip_prefix, redirect_https, scheme
 ):
     td = tempfile.TemporaryDirectory()
     containers = [
@@ -105,7 +105,7 @@ def test_middleware_config(
 
     # THEN the rendered config file contains middlewares
     with out.get_container("traefik").filesystem.open(
-            f"/opt/traefik/juju/juju_ingress_{rel_name}_0_{app_name}.yaml",
+        f"/opt/traefik/juju/juju_ingress_{rel_name}_0_{app_name}.yaml",
     ) as f:
         config_file = f.read()
     expected = _render_config(

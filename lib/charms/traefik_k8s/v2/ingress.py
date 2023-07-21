@@ -64,7 +64,6 @@ from typing import (
     Optional,
     Sequence,
     Tuple,
-    Union,
 )
 
 import pydantic
@@ -98,6 +97,7 @@ class DatabagModel(BaseModel):
 
     class Config:
         """Pydantic config."""
+
         allow_population_by_field_name = True
         """Allow instantiating this class by field name (instead of forcing alias)."""
         extra = "forbid"
@@ -156,6 +156,7 @@ class ProviderSchema(BaseModel):
 
 class IngressRequirerAppData(DatabagModel):
     """Ingress requirer application databag model."""
+
     model: str = Field(description="The model the application is in.")
     name: str = Field(description="the name of the app requesting ingress.")
     port: int = Field(description="The port the app wishes to be exposed.")
@@ -331,8 +332,11 @@ class IngressRequirerData:
 
 
 class TlsProviderType(typing.Protocol):
+    """Placeholder."""
+
     @property
-    def enabled(self) -> bool: ...
+    def enabled(self) -> bool:
+        """Placeholder."""
 
 
 class IngressPerAppProvider(_IngressPerAppBase):
@@ -340,7 +344,11 @@ class IngressPerAppProvider(_IngressPerAppBase):
 
     on = IngressPerAppProviderEvents()  # type: ignore
 
-    def __init__(self, charm: CharmBase, relation_name: str = DEFAULT_RELATION_NAME, ):
+    def __init__(
+        self,
+        charm: CharmBase,
+        relation_name: str = DEFAULT_RELATION_NAME,
+    ):
         """Constructor for IngressPerAppProvider.
 
         Args:
@@ -508,17 +516,17 @@ class IngressPerAppRequirer(_IngressPerAppBase):
     _stored = StoredState()
 
     def __init__(
-            self,
-            charm: CharmBase,
-            relation_name: str = DEFAULT_RELATION_NAME,
-            *,
-            host: Optional[str] = None,
-            port: Optional[int] = None,
-            strip_prefix: bool = False,
-            redirect_https: bool = False,
-            # fixme: this is horrible UX.
-            #  shall we switch to manually calling provide_ingress_requirements with all args when ready?
-            scheme: typing.Callable[[], str] = lambda: "http",
+        self,
+        charm: CharmBase,
+        relation_name: str = DEFAULT_RELATION_NAME,
+        *,
+        host: Optional[str] = None,
+        port: Optional[int] = None,
+        strip_prefix: bool = False,
+        redirect_https: bool = False,
+        # fixme: this is horrible UX.
+        #  shall we switch to manually calling provide_ingress_requirements with all args when ready?
+        scheme: typing.Callable[[], str] = lambda: "http",
     ):
         """Constructor for IngressRequirer.
 
@@ -616,9 +624,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
                     port=port,
                     strip_prefix=self._strip_prefix,
                     redirect_https=self._redirect_https,
-                ).dump(
-                    app_databag
-                )
+                ).dump(app_databag)
             except pydantic.ValidationError as e:
                 msg = "failed to validate app data"
                 log.info(msg, exc_info=True)  # log to INFO because this might be expected
@@ -671,7 +677,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         Returns None if the URL isn't available yet.
         """
         data = (
-                typing.cast(Optional[str], self._stored.current_url)  # type: ignore
-                or self._get_url_from_relation_data()
+            typing.cast(Optional[str], self._stored.current_url)  # type: ignore
+            or self._get_url_from_relation_data()
         )
         return data

@@ -59,7 +59,7 @@ def _requirer_provide_ingress_requirements(
     harness.update_relation_data(
         relation.id,
         "remote" if per_app_relation else "remote/0",
-        {x:json.dumps(y) for x,y in app_data.items()},
+        {x: json.dumps(y) for x, y in app_data.items()},
     )
     return app_data
 
