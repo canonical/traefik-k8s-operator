@@ -59,7 +59,6 @@ from typing import (
     Any,
     Dict,
     List,
-    Literal,
     MutableMapping,
     Optional,
     Sequence,
@@ -86,7 +85,6 @@ PYDEPS = ["pydantic<2.0"]
 
 DEFAULT_RELATION_NAME = "ingress"
 RELATION_INTERFACE = "ingress"
-SchemeLiteral = Literal["http", "https"]
 
 log = logging.getLogger(__name__)
 BUILTIN_JUJU_KEYS = {"ingress-address", "private-address", "egress-subnets"}
