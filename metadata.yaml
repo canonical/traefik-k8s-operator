@@ -67,6 +67,7 @@ provides:
     interface: mutual_tls
     description: |
       Sends the TLS information (certificate, ca, chain) over relation data.
+      Note: The interface name is a misnomer, as this is not in fact mTLS.
 
 requires:
   certificates:
