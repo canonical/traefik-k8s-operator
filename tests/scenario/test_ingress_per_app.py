@@ -70,19 +70,17 @@ def test_ingress_per_app_created(
         ).read()
     )
 
-    port = "" if scheme == "https" else f":{port}"
-
     service_def = {
-        "loadBalancer": {"servers": [{"url": f"{scheme}://{host}{port}"}]},
+        "loadBalancer": {"servers": [{"url": f"{scheme}://{host}:{port}"}]},
     }
 
     if scheme == "https":
         # traefik has no tls relation, but the requirer does: reverse termination case
-        service_def["rootCAs"] = ["/opt/traefik/juju/certificate.cert"]
+        # service_def["rootCAs"] = ["/opt/traefik/juju/certificate.cert"]
         service_def["loadBalancer"]["serversTransport"] = "reverseTerminationTransport"
-        service_def["serversTransports"] = {
-            "reverseTerminationTransport": {"insecureSkipVerify": True}
-        }
+        # service_def["serversTransports"] = {
+        #     "reverseTerminationTransport": {"insecureSkipVerify": True}
+        # }
 
     assert generated_config["http"]["services"]["juju-test-model-remote-0-service"] == service_def
 
@@ -100,7 +98,6 @@ def test_ingress_per_app_scale(
         "traefik", "juju", f"juju_ingress_ingress_{relation_id}_remote.yaml"
     )
     cfg_file.parent.mkdir(parents=True)
-    cfg_port = "" if scheme == "https" else f":{port}"
 
     # config that would have been generated from mock_data_0
     # same as config output of the previous test
@@ -121,9 +118,7 @@ def test_ingress_per_app_scale(
             },
             "services": {
                 f"juju-test-model-remote-{unit_id}-service": {
-                    "loadBalancer": {
-                        "servers": [{"url": f"{scheme}://{host.format(0)}{cfg_port}"}]
-                    }
+                    "loadBalancer": {"servers": [{"url": f"{scheme}://{host.format(0)}:{port}"}]}
                 }
             },
         }
@@ -154,7 +149,7 @@ def test_ingress_per_app_scale(
 
     assert len(new_lbs) == n_units
     for n in range(n_units):
-        assert {"url": f"{scheme}://{host.format(n)}{cfg_port}"} in new_lbs
+        assert {"url": f"{scheme}://{host.format(n)}:{port}"} in new_lbs
 
         # expected config:
 

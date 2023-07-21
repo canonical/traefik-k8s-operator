@@ -120,12 +120,15 @@ class DatabagModel(BaseModel):
         try:
             return cls.parse_raw(json.dumps(data))  # type: ignore
         except pydantic.ValidationError as e:
-            msg = f"failed to validate remote unit databag: {databag}"
+            msg = f"failed to validate databag: {databag}"
             log.error(msg, exc_info=True)
             raise DataValidationError(msg) from e
 
-    def dump(self, databag: MutableMapping):
+    def dump(self, databag: Optional[MutableMapping] = None):
         """Write the contents of this model to Juju databag."""
+        if databag is None:
+            databag = {}
+
         if self._NEST_UNDER:
             databag[self._NEST_UNDER] = self.json()
 
@@ -133,6 +136,8 @@ class DatabagModel(BaseModel):
         for key, field in self.__fields__.items():  # type: ignore
             value = dct[key]
             databag[field.alias or key] = json.dumps(value)
+
+        return databag
 
 
 # todo: import these models from charm-relation-interfaces/ingress/v2 instead of redeclaring them
@@ -335,7 +340,7 @@ class TlsProviderType(typing.Protocol):
     """Placeholder."""
 
     @property
-    def enabled(self) -> bool:
+    def enabled(self) -> bool:  # type: ignore
         """Placeholder."""
 
 
@@ -475,12 +480,22 @@ class IngressPerAppProvider(_IngressPerAppBase):
         results = {}
 
         for ingress_relation in self.relations:
-            assert (
-                ingress_relation.app
-            ), "no app in relation (shouldn't happen)"  # for type checker
-            ingress_data = self._published_url(ingress_relation)
+            if not ingress_relation.app:
+                log.warning(
+                    f"no app in relation {ingress_relation} when fetching proxied endpoints: skipping"
+                )
+                continue
+            try:
+                ingress_data = self._published_url(ingress_relation)
+            except NotReadyError:
+                log.warning(
+                    f"no published url found in {ingress_relation}: "
+                    f"traefik didn't publish_url yet to this relation."
+                )
+                continue
 
             if not ingress_data:
+                log.warning(f"relation {ingress_relation} not ready yet: try again in some time.")
                 continue
 
             results[ingress_relation.app.name] = ingress_data.ingress.dict()
@@ -617,13 +632,13 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         if self.unit.is_leader():
             app_databag = self.relation.data[self.app]
             try:
-                IngressRequirerAppData(
+                IngressRequirerAppData(  # type: ignore  # pyright does not like aliases
                     model=self.model.name,
                     name=self.app.name,
                     scheme=self._get_scheme(),
                     port=port,
-                    strip_prefix=self._strip_prefix,
-                    redirect_https=self._redirect_https,
+                    strip_prefix=self._strip_prefix,  # type: ignore  # pyright does not like aliases
+                    redirect_https=self._redirect_https,  # type: ignore  # pyright does not like aliases
                 ).dump(app_databag)
             except pydantic.ValidationError as e:
                 msg = "failed to validate app data"

@@ -242,17 +242,16 @@ class TraefikIngressCharm(CharmBase):
     def _on_show_proxied_endpoints(self, event: ActionEvent):
         if not self.ready:
             return
+        result = {}
 
-        try:
-            result = {}
-            result.update(self.ingress_per_unit.proxied_endpoints)
-            result.update(self.ingress_per_appv1.proxied_endpoints)
-            result.update(self.ingress_per_appv2.proxied_endpoints)
+        for provider in (self.ingress_per_unit, self.ingress_per_appv1, self.ingress_per_appv2):
+            try:
+                result.update(provider.proxied_endpoints)
+            except Exception as e:
+                msg = f"failed to fetch proxied endpoints from provider {provider} with error {e}."
+                event.log(msg)
 
-            event.set_results({"proxied-endpoints": json.dumps(result)})
-        except Exception as e:
-            logger.exception("Action 'show-proxied-endpoints' failed")
-            event.fail(str(e))
+        event.set_results({"proxied-endpoints": json.dumps(result)})
 
     def _tcp_entrypoints(self):
         # for each unit related via IPU in tcp mode, we need to generate the tcp
@@ -604,7 +603,7 @@ class TraefikIngressCharm(CharmBase):
         configs = config_getter(relation)
         self._push_configurations(relation, configs)
 
-    def _get_configs_per_leader(self, relation: Relation):
+    def _get_configs_per_leader(self, relation: Relation) -> Optional[dict]:
         """Generates ingress per leader config."""
         # this happens to be the same behaviour as ingress v1 (legacy) provided.
         ipa = self.ingress_per_appv1
@@ -622,8 +621,11 @@ class TraefikIngressCharm(CharmBase):
 
         return config
 
-    def _get_configs_per_app(self, relation: Relation):
+    def _get_configs_per_app(self, relation: Relation) -> Optional[dict]:
         ipa = self.ingress_per_appv2
+        if not relation.app:
+            logger.error(f"no app on relation {relation}")
+            return None
 
         try:
             data = ipa.get_data(relation)
@@ -641,7 +643,7 @@ class TraefikIngressCharm(CharmBase):
 
         return config
 
-    def _get_configs_per_unit(self, relation: Relation) -> dict:
+    def _get_configs_per_unit(self, relation: Relation) -> Optional[dict]:
         # FIXME Ideally, follower units could instead watch for the data in the
         # ingress app data bag, but Juju does not allow non-leader units to read
         # the application data bag on their side of the relation, so we may start

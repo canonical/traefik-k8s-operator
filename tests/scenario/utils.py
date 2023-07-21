@@ -43,16 +43,14 @@ def _render_config(
         scheme = "http"
         # ipu does not do https for now
 
-    port = f":{port}" if scheme == "http" else ""
     service_spec = {
-        "loadBalancer": {"servers": [{"url": f"{scheme}://{host}{port}"}]},
+        "loadBalancer": {"servers": [{"url": f"{scheme}://{host}:{port}"}]},
     }
+    transports = {}
     if scheme == "https":
-        service_spec["rootCAs"] = ["/opt/traefik/juju/certificate.cert"]
+        # service_spec["rootCAs"] = ["/opt/traefik/juju/certificate.cert"]
         service_spec["loadBalancer"]["serversTransport"] = "reverseTerminationTransport"
-        service_spec["serversTransports"] = {
-            "reverseTerminationTransport": {"insecureSkipVerify": True}
-        }
+        transports = {"reverseTerminationTransport": {"insecureSkipVerify": True}}
 
     expected = {
         "http": {
@@ -79,6 +77,9 @@ def _render_config(
             "services": {"juju-test-model-remote-0-service": service_spec},
         }
     }
+
+    if transports:
+        expected["http"]["serversTransports"] = transports
 
     if middlewares := _render_middlewares(
         strip_prefix=strip_prefix and routing_mode == "path", redirect_https=redirect_https

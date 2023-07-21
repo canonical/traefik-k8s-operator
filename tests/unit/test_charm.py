@@ -9,6 +9,7 @@ from unittest.mock import Mock, patch
 import ops.testing
 import yaml
 from charm import _STATIC_CONFIG_PATH, TraefikIngressCharm
+from charms.traefik_k8s.v2.ingress import IngressRequirerAppData, IngressRequirerUnitData
 from ops.charm import ActionEvent
 from ops.model import ActiveStatus, Application, BlockedStatus, Relation, WaitingStatus
 from ops.pebble import PathError
@@ -37,29 +38,39 @@ def _requirer_provide_ingress_requirements(
     redirect_https: bool = False,
     per_app_relation: bool = False,
 ):
-    # same as requirer.provide_ingress_requirements(port=port, host=host)s
-    app_data = {"model": "test-model", "name": "remote/0", "mode": mode, "port": str(port)}
-
-    # Must set these to something, because when used with subTest, the previous relation data
-    # must be overwritten: if a key is omitted, then a plain `update` would keep existing keys.
-    # TODO also need to test what happens when any of these is not specified at all
-    app_data["strip-prefix"] = "true" if strip_prefix else "false"
-    app_data["redirect-https"] = "true" if redirect_https else "false"
-
-    unit_data = {"host": host}
-
-    if not per_app_relation:
-        app_data.update(unit_data)
-    else:
+    if per_app_relation:
+        app_data = IngressRequirerAppData(
+            model="test-model",
+            name="remote/0",
+            port=port,
+            redirect_https=redirect_https,
+            strip_prefix=strip_prefix,
+        ).dump()
+        unit_data = IngressRequirerUnitData(host=host).dump()
         # do not emit this event, as we need to 'simultaneously'
         # update the remote unit and app databags
         with harness.hooks_disabled():
             harness.update_relation_data(relation.id, "remote/0", unit_data)
 
+    else:
+        # same as requirer.provide_ingress_requirements(port=port, host=host)s
+        app_data = {
+            "model": "test-model",
+            "name": "remote/0",
+            "mode": mode,
+            "port": str(port),
+            "host": host,
+            # Must set these to something, because when used with subTest, the previous relation data
+            # must be overwritten: if a key is omitted, then a plain `update` would keep existing keys.
+            # TODO also need to test what happens when any of these is not specified at all
+            "strip-prefix": "true" if strip_prefix else "false",
+            "redirect-https": "true" if redirect_https else "false",
+        }
+
     harness.update_relation_data(
         relation.id,
         "remote" if per_app_relation else "remote/0",
-        {x: json.dumps(y) for x, y in app_data.items()},
+        app_data,
     )
     return app_data
 
@@ -434,11 +445,13 @@ class TestConfigOptionsValidation(unittest.TestCase):
     @patch("charm.KubernetesServicePatch", lambda **_: None)
     def test_when_external_hostname_is_invalid_go_into_blocked_status(self):
         for invalid_hostname in [
-            "testhostname80",
+            "testhostname:8080",
             "user:pass@testhostname",
             "testhostname/prefix",
         ]:
             with self.subTest(invalid_hostname=invalid_hostname):
                 self.harness.update_config({"external_hostname": invalid_hostname})
-                self.assertIsInstance(self.harness.charm.unit.status, BlockedStatus)
+                self.assertIsInstance(
+                    self.harness.charm.unit.status, BlockedStatus, invalid_hostname
+                )
                 self.assertEqual(requirer.urls, {})
