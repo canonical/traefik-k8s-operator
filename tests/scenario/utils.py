@@ -1,4 +1,5 @@
 import json
+from typing import List
 
 from scenario import Relation
 
@@ -105,7 +106,7 @@ def create_ingress_relation(
     unit_name: str = "remote/0",
     port: int = 42,
     scheme: str = "http",
-    hosts: list[str] = ["0.0.0.42"],
+    hosts: List[str] = ["0.0.0.42"],
 ) -> Relation:
     app_data = {
         "model": model_name,
