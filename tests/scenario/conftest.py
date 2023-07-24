@@ -10,15 +10,13 @@ MOCK_EXTERNAL_HOSTNAME = "testhostname"
 
 @pytest.fixture
 def traefik_charm():
-    with (
-        patch("charm.KubernetesServicePatch"),
-        patch("lightkube.core.client.GenericSyncClient"),
-        patch(
-            "charm.TraefikIngressCharm.external_host",
-            PropertyMock(return_value=MOCK_EXTERNAL_HOSTNAME),
-        ),
-    ):
-        yield TraefikIngressCharm
+    with patch("charm.KubernetesServicePatch"):
+        with patch("lightkube.core.client.GenericSyncClient"):
+            with patch(
+                "charm.TraefikIngressCharm.external_host",
+                PropertyMock(return_value=MOCK_EXTERNAL_HOSTNAME),
+            ):
+                yield TraefikIngressCharm
 
 
 @pytest.fixture
