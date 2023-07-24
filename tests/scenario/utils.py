@@ -2,7 +2,6 @@ import json
 from typing import List
 
 from scenario import Relation
-from scenario.state import next_relation_id
 
 
 def _render_middlewares(*, strip_prefix: bool = False, redirect_https: bool = False) -> dict:
@@ -119,11 +118,15 @@ def create_ingress_relation(
     }
     remote_units_data = {i: {"host": json.dumps(h)} for i, h in enumerate(hosts)}
 
-    return Relation(
-        endpoint="ingress",
-        remote_app_name=app_name,
-        # todo replace with Relation.get_next_id when bumping to 4.0.2
-        relation_id=rel_id if rel_id is not None else next_relation_id(),
-        remote_app_data={k: json.dumps(v) for k, v in app_data.items()},
-        remote_units_data=remote_units_data,
-    )
+    args = {
+        "endpoint": "ingress",
+        "remote_app_name": app_name,
+        "remote_app_data": {k: json.dumps(v) for k, v in app_data.items()},
+        "remote_units_data": remote_units_data,
+    }
+
+    # No `next_relation_id()` nor `get_next_id()` in Relation.
+    if rel_id is not None:
+        args["relation_id"] = rel_id
+
+    return Relation(**args)
