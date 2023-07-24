@@ -433,7 +433,7 @@ class IngressPerAppProvider(_IngressPerAppBase):
 
         try:
             self.get_data(relation)
-        except DataValidationError as e:
+        except (DataValidationError, NotReadyError) as e:
             log.debug("Provider not ready; validation error encountered: %s" % str(e))
             return False
         return True
