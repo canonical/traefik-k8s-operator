@@ -671,7 +671,8 @@ class TraefikIngressCharm(CharmBase):
             if data.get("mode", "http") == "tcp":
                 unit_config = self._generate_per_unit_tcp_config(prefix, data)
                 if self.unit.is_leader():
-                    ipu.publish_url(relation, data["name"], f"{data['host']}:{data['port']}")
+                    host = self.external_host
+                    ipu.publish_url(relation, data["name"], f"{host}:{data['port']}")
             else:  # "http"
                 unit_config = self._generate_per_unit_http_config(prefix, data)
                 if self.unit.is_leader():

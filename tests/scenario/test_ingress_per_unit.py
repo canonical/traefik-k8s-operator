@@ -48,7 +48,7 @@ def test_ingress_unit_provider_request_response(
         assert not local_app_data
     else:
         if mode == "tcp":
-            expected_url = f"{host}:{port}"
+            expected_url = f"{MOCK_EXTERNAL_HOSTNAME}:{port}"
         else:
             prefix = f"{model}-{remote_unit_name.replace('/', '-')}"
             if routing_mode == "path":

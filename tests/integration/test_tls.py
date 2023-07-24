@@ -103,8 +103,7 @@ async def curl_endpoints(ops_test: OpsTest, certs_dir, cert_path, traefik_app_ip
         # server). This is needed because the certificate issued by the CA would have that same
         # hostname as the subject, and for TLS to succeed, the target url's hostname must match
         # the one in the certificate.
-        rc, stdout, stderr = await ops_test.run(
-            "curl",
+        cmd = ["curl",
             "-s",
             "--fail-with-body",
             "--resolve",
@@ -113,7 +112,10 @@ async def curl_endpoints(ops_test: OpsTest, certs_dir, cert_path, traefik_app_ip
             certs_dir,
             "--cacert",
             cert_path,
-            endpoint,
+            endpoint]
+        print(cmd)
+        rc, stdout, stderr = await ops_test.run(
+            *cmd
         )
         logger.info("%s: %s", endpoint, (rc, stdout, stderr))
         assert rc == 0, (
@@ -178,6 +180,8 @@ async def test_tls_termination_after_charm_upgrade(ops_test: OpsTest, traefik_ch
     )
     await ops_test.model.wait_for_idle(status="active", timeout=600, idle_period=30)
     ip = await get_address(ops_test, trfk.name)
+
+    # fixme: this fails also locally
     await curl_endpoints(ops_test, temp_dir, temp_dir / "local.cert", ip)
 
 
