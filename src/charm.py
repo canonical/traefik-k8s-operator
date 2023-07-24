@@ -668,9 +668,14 @@ class TraefikIngressCharm(CharmBase):
                 continue
 
             prefix = self._get_prefix(data)
-            unit_config = self._generate_per_unit_config(prefix, data)
-            if self.unit.is_leader():
-                ipu.publish_url(relation, data["name"], self._get_external_url(prefix))
+            if data.get("mode", "http") == "tcp":
+                unit_config = self._generate_per_unit_tcp_config(prefix, data)
+                if self.unit.is_leader():
+                    ipu.publish_url(relation, data["name"], f"{data['host']}:{data['port']}")
+            else:  # "http"
+                unit_config = self._generate_per_unit_http_config(prefix, data)
+                if self.unit.is_leader():
+                    ipu.publish_url(relation, data["name"], self._get_external_url(prefix))
             always_merger.merge(config, unit_config)
 
         # Note: We might be pushing an empty configuration if, for example,
@@ -710,36 +715,38 @@ class TraefikIngressCharm(CharmBase):
             return {f"juju-sidecar-noprefix-{prefix}": config}
         return {}
 
-    def _generate_per_unit_config(self, prefix: str, data: "RequirerData_IPU") -> dict:
-        """Generate a config dict for a given unit for IngressPerUnit."""
-        if data["mode"] == "tcp":
-            # TODO: is there a reason why SNI-based routing (from TLS certs) is per-unit only?
-            # This is not a technical limitation in any way. It's meaningful/useful for
-            # authenticating to individual TLS-based servers where it may be desirable to reach
-            # one or more servers in a cluster (let's say Kafka), but limiting it to per-unit only
-            # actively impedes the architectural design of any distributed/ring-buffered TLS-based
-            # scale-out services which may only have frontends dedicated, but which do not "speak"
-            # HTTP(S). Such as any of the "cloud-native" SQL implementations (TiDB, Cockroach, etc)
-            port = data["port"]
-            config = {
-                "tcp": {
-                    "routers": {
-                        f"juju-{prefix}-tcp-router": {
-                            "rule": "HostSNI(`*`)",
-                            "service": f"juju-{prefix}-tcp-service",
-                            # or whatever entrypoint I defined in static config
-                            "entryPoints": [prefix],
-                        },
+    def _generate_per_unit_tcp_config(self, prefix: str, data: "RequirerData_IPU") -> dict:
+        """Generate a config dict for a given unit for IngressPerUnit in tcp mode."""
+        # TODO: is there a reason why SNI-based routing (from TLS certs) is per-unit only?
+        # This is not a technical limitation in any way. It's meaningful/useful for
+        # authenticating to individual TLS-based servers where it may be desirable to reach
+        # one or more servers in a cluster (let's say Kafka), but limiting it to per-unit only
+        # actively impedes the architectural design of any distributed/ring-buffered TLS-based
+        # scale-out services which may only have frontends dedicated, but which do not "speak"
+        # HTTP(S). Such as any of the "cloud-native" SQL implementations (TiDB, Cockroach, etc)
+        config = {
+            "tcp": {
+                "routers": {
+                    f"juju-{prefix}-tcp-router": {
+                        "rule": "HostSNI(`*`)",
+                        "service": f"juju-{prefix}-tcp-service",
+                        # or whatever entrypoint I defined in static config
+                        "entryPoints": [prefix],
                     },
-                    "services": {
-                        f"juju-{prefix}-tcp-service": {
-                            "loadBalancer": {"servers": [{"address": f"{data['host']}:{port}"}]}
+                },
+                "services": {
+                    f"juju-{prefix}-tcp-service": {
+                        "loadBalancer": {
+                            "servers": [{"address": f"{data['host']}:{data['port']}"}]
                         }
-                    },
-                }
+                    }
+                },
             }
-            return config
+        }
+        return config
 
+    def _generate_per_unit_http_config(self, prefix: str, data: "RequirerData_IPU") -> dict:
+        """Generate a config dict for a given unit for IngressPerUnit."""
         lb_servers = [{"url": f"http://{data['host']}:{data['port']}"}]
         return self._generate_config_block(prefix, lb_servers, data)
 

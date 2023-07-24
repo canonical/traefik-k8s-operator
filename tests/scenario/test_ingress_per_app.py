@@ -8,43 +8,10 @@ import json
 import pytest
 import yaml
 from charms.traefik_k8s.v2.ingress import IngressPerAppRequirer
-from ops import CharmBase, Framework, pebble
-from scenario import Container, Context, Model, Mount, Relation, State
+from ops import CharmBase, Framework
+from scenario import Context, Relation, State
 
 from tests.scenario.utils import create_ingress_relation
-
-
-@pytest.fixture
-def model():
-    return Model(name="test-model")
-
-
-@pytest.fixture
-def traefik_container(tmp_path):
-    layer = pebble.Layer(
-        {
-            "summary": "Traefik layer",
-            "description": "Pebble config layer for Traefik",
-            "services": {
-                "traefik": {
-                    "override": "replace",
-                    "summary": "Traefik",
-                    "command": '/bin/sh -c "/usr/bin/traefik | tee /var/log/traefik.log"',
-                    "startup": "enabled",
-                },
-            },
-        }
-    )
-
-    opt = Mount("/opt/", tmp_path)
-
-    return Container(
-        name="traefik",
-        can_connect=True,
-        layers={"traefik": layer},
-        service_status={"traefik": pebble.ServiceStatus.ACTIVE},
-        mounts={"opt": opt},
-    )
 
 
 @pytest.mark.parametrize("port, host", ((80, "1.1.1.1"), (81, "10.1.10.1")))
