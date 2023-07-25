@@ -16,7 +16,11 @@ def traefik_charm():
                 "charm.TraefikIngressCharm.external_host",
                 PropertyMock(return_value=MOCK_EXTERNAL_HOSTNAME),
             ):
-                yield TraefikIngressCharm
+                with patch(
+                    "charm.TraefikIngressCharm.version",
+                    PropertyMock(return_value="0.1.test"),
+                ):
+                    yield TraefikIngressCharm
 
 
 @pytest.fixture

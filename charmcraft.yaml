@@ -15,6 +15,7 @@ parts:
       - setuptools
       - jsonschema
       - cryptography
+      - pydantic
+      - opentelemetry-exporter-otlp-proto-grpc
     build-packages:
       - git
-

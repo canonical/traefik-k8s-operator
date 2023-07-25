@@ -125,7 +125,6 @@ def create_ingress_relation(
         "remote_units_data": remote_units_data,
     }
 
-    # No `next_relation_id()` nor `get_next_id()` in Relation.
     if rel_id is not None:
         args["relation_id"] = rel_id
 
