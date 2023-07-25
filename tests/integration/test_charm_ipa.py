@@ -1,6 +1,7 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 import asyncio
+from urllib.parse import urlparse
 
 import pytest
 import yaml
@@ -11,7 +12,9 @@ from tests.integration.conftest import (
     get_relation_data,
     trfk_resources,
 )
-from tests.integration.helpers import get_address, remove_application
+from tests.integration.helpers import dequote, get_address, remove_application
+
+# FIXME Replace parts of this itest with a utest
 
 
 @pytest.mark.abort_on_fail
@@ -42,7 +45,9 @@ def assert_ipa_charm_has_ingress(ops_test: OpsTest):
     )
     provider_app_data = yaml.safe_load(data.provider.application_data["ingress"])
     url = provider_app_data["url"]
-    ip, port = url.split("//")[1].split("/")[0].split(":")
+    url_parts = urlparse(url)
+    ip = url_parts.hostname
+    port = url_parts.port or 80
     assert_can_connect(ip, port)
 
 
@@ -64,21 +69,21 @@ async def test_relation_data_shape(ops_test: OpsTest):
     # model: foo
     # name: ipa-tester/0
     # port: 8080
-    model = requirer_app_data["model"]
-    assert requirer_app_data["name"] == "ipa-tester"
-    assert requirer_app_data["port"] == "80"
+    model = dequote(requirer_app_data["model"])
+    assert dequote(requirer_app_data["name"]) == "ipa-tester"
+    assert dequote(requirer_app_data["port"]) == "80"
 
     # that was v1. ipa-tester talks v2
     assert not requirer_app_data.get("host")
 
-    assert data.requirer.unit_data["host"] == "foo.bar"
+    assert dequote(data.requirer.unit_data["host"]) == "foo.bar"
 
     # example:
     #  ingress:
-    #    url: http://foo.bar:80/foo-ipa-tester/0
+    #    url: http://foo.bar/foo-ipa-tester/0
     traefik_address = await get_address(ops_test, "traefik-k8s")
     provider_app_data = yaml.safe_load(data.provider.application_data["ingress"])
-    assert provider_app_data == {"url": f"http://{traefik_address}:80/{model}-ipa-tester"}
+    assert provider_app_data == {"url": f"http://{traefik_address}/{model}-ipa-tester"}
 
 
 @pytest.mark.abort_on_fail

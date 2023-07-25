@@ -79,7 +79,7 @@ LIBAPI = 2
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 2
+LIBPATCH = 3
 
 PYDEPS = ["pydantic<2.0"]
 
@@ -433,7 +433,7 @@ class IngressPerAppProvider(_IngressPerAppBase):
 
         try:
             self.get_data(relation)
-        except DataValidationError as e:
+        except (DataValidationError, NotReadyError) as e:
             log.debug("Provider not ready; validation error encountered: %s" % str(e))
             return False
         return True

@@ -71,14 +71,15 @@ def test_ingress_unit_provider_related_is_ready(leader, event_name, ipu_empty, m
 
 @pytest.mark.parametrize("leader", (True, False))
 @pytest.mark.parametrize("url", ("url.com", "http://foo.bar.baz"))
+@pytest.mark.parametrize("mode", ("http", "tcp"))
 @pytest.mark.parametrize("port, host", ((80, "1.1.1.1"), (81, "10.1.10.1")))
-def test_ingress_unit_provider_request_response(port, host, leader, url, ipu_empty, model):
+def test_ingress_unit_provider_request_response(port, host, leader, url, mode, ipu_empty, model):
     mock_data = {
         "port": str(port),
         "host": host,
         "model": "test-model",
         "name": "remote/0",
-        "mode": "http",
+        "mode": mode,
     }
 
     test_url = "http://foo.com/babooz"
@@ -91,7 +92,7 @@ def test_ingress_unit_provider_request_response(port, host, leader, url, ipu_emp
         assert charm.ipu.is_unit_ready(ingress, remote_unit)
 
         data = charm.ipu.get_data(ingress, remote_unit)
-        assert data["mode"] == "http"
+        assert data["mode"] == mode
         assert data["model"] == "test-model"
         assert data["name"] == "remote/0"
         assert data["host"] == host
@@ -112,6 +113,6 @@ def test_ingress_unit_provider_request_response(port, host, leader, url, ipu_emp
 
     if leader:
         local_ipa_data = out.relations[0].local_app_data
-        assert local_ipa_data["ingress"] == "remote/0:\n  url: http://foo.com/babooz\n"
+        assert local_ipa_data["ingress"] == f"remote/0:\n  url: {test_url}\n"
     else:
         assert not out.relations[0].local_app_data

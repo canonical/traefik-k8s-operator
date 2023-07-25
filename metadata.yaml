@@ -63,6 +63,11 @@ provides:
     description: |
       Forwards the built-in grafana dashboard(s) for monitoring traefik.
     interface: grafana_dashboard
+  tracing:
+    description: |
+      Tracing endpoint for integrating with tempo.
+    limit: 1
+    interface: tracing
 
 
 requires:

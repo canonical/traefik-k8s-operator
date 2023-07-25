@@ -8,7 +8,7 @@ from scenario import Container, Mount, Relation, State
 from tests.scenario.utils import _render_config, create_ingress_relation
 
 
-def _create_tls_relation(*, app_name: str, strip_prefix: bool, redirect_https: bool):
+def _create_tls_relation(*, app_name: str):
     app_data = {
         "certificates": "{CERTS}",
     }
@@ -50,8 +50,6 @@ def test_middleware_config(traefik_ctx, routing_mode, strip_prefix, redirect_htt
 
     tls = _create_tls_relation(
         app_name=app_name,
-        strip_prefix=strip_prefix,
-        redirect_https=redirect_https,
     )
 
     # AND GIVEN external host is set (see also decorator)
