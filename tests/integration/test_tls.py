@@ -22,6 +22,7 @@ from urllib.request import urlopen
 import pytest
 import yaml
 from pytest_operator.plugin import OpsTest
+from tenacity import retry, wait_exponential
 
 from tests.integration.helpers import get_address, remove_application
 
@@ -187,7 +188,7 @@ async def test_tls_termination_after_charm_upgrade(
         path=traefik_charm, resources=trfk.resources
     )
     # insanely high wait period otherwise for some reason it won't work?
-    await ops_test.model.wait_for_idle(status="active", timeout=600, idle_period=120)
+    await ops_test.model.wait_for_idle(status="active", timeout=600, idle_period=10)
 
     cert_path = temp_dir / "local.cert"
     if not cert_path.exists():  # allow running this test in isolation for debugging
@@ -195,7 +196,11 @@ async def test_tls_termination_after_charm_upgrade(
 
     ip = await get_address(ops_test, trfk.name)
 
-    await curl_endpoints(ops_test, temp_dir, temp_dir / "local.cert", ip)
+    @retry(wait=wait_exponential(multiplier=1, min=4, max=120))
+    async def eventually_curl():
+        await curl_endpoints(ops_test, temp_dir, temp_dir / "local.cert", ip)
+
+    await eventually_curl()
 
 
 async def test_cleanup(ops_test):
