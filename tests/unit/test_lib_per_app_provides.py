@@ -5,7 +5,10 @@ from textwrap import dedent
 
 import pytest
 import yaml
-from charms.traefik_k8s.v2.ingress import IngressPerAppProvider
+from charms.traefik_k8s.v2.ingress import (
+    IngressPerAppProvider,
+    IngressRequirerAppData,
+)
 from ops.charm import CharmBase
 from ops.testing import Harness
 
@@ -51,20 +54,22 @@ def test_ingress_app_provider_related(harness, provider: IngressPerAppProvider):
 
 
 @pytest.mark.parametrize("strip_prefix", ("true", "false"))
+@pytest.mark.parametrize("scheme", ("http", "https"))
 def test_ingress_app_provider_relate_provide(
-    provider: IngressPerAppProvider, harness, strip_prefix
+    provider: IngressPerAppProvider, harness, strip_prefix, scheme
 ):
     harness.set_leader(True)
     relation_id = harness.add_relation("ingress", "remote")
     harness.add_relation_unit(relation_id, "remote/0")
-    remote_app_data = {
-        "name": "foo",
-        "model": "bar",
-        "port": "42",
-        "strip_prefix": strip_prefix,
-    }
+    remote_app_data = IngressRequirerAppData(
+        name="foo",
+        model="bar",
+        port=42,
+        strip_prefix=strip_prefix,
+        scheme=scheme,
+    ).dump()
     remote_unit_data = {
-        "host": "host",
+        "host": '"host"',
     }
     harness.update_relation_data(relation_id, "remote", remote_app_data)
     harness.update_relation_data(relation_id, "remote/0", remote_unit_data)

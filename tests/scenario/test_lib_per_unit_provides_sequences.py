@@ -124,36 +124,19 @@ def test_ingress_unit_provider_related_is_ready(leader, event_name, ipu_empty, m
 
 @pytest.mark.parametrize("leader", (True, False))
 @pytest.mark.parametrize("url", ("url.com", "http://foo.bar.baz"))
+@pytest.mark.parametrize("mode", ("tcp", "http"))
 @pytest.mark.parametrize("port, host", ((80, "1.1.1.1"), (81, "10.1.10.1")))
-def test_ingress_unit_provider_request_response(port, host, leader, url, ipu_empty, model):
+def test_ingress_unit_provider_request_response(port, host, leader, url, mode, ipu_empty, model):
     mock_data = {
         "port": str(port),
-        "host": str(host),
+        "host": host,
         "model": "test-model",
         "name": "remote/0",
-        "mode": "http",
+        "mode": mode,
     }
 
     ipu_remote_provided = ipu_empty.replace(remote_units_data={0: mock_data})
     state = State(model=model, relations=[ipu_remote_provided], leader=leader)
 
-    Context(charm_type=MockProviderCharm, meta=MockProviderCharm.META).run(
-        ipu_remote_provided.changed_event, state
-    )
-
-    # relation = emitter.harness.model.get_relation('ingress-per-unit')
-    # provider: IngressPerUnitProvider = emitter.harness.charm.ipu
-    # if leader:
-    #     assert provider.publish_url(relation, 'remote/0', url)
-    #
-    # assert_local_published_url(None, None, emitter, url, leader)
-    #
-    # unit_data = provider.get_data(relation, relation.units.pop())
-    # assert unit_data["model"] == "test-model"
-    # assert unit_data["name"] == "remote/0"
-    # assert unit_data["host"] == host
-    # assert unit_data["port"] == port
-    #
-    # # fail because unit isn't leader
-    # with pytest.raises(AssertionError):
-    #     provider.publish_url(relation, unit_data["name"], "http://url/")
+    ctx = Context(charm_type=MockProviderCharm, meta=MockProviderCharm.META)
+    ctx.run(ipu_remote_provided.changed_event, state)

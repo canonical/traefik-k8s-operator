@@ -36,27 +36,19 @@ class TlsWithExternalHostname(unittest.TestCase):
 
         # WHEN a "certificates" relation is formed
         # THEN the charm logs an appropriate DEBUG line
-        with self.assertLogs(level="DEBUG") as cm:
-            self.rel_id = self.harness.add_relation("certificates", "root-ca")
-            self.harness.add_relation_unit(self.rel_id, "root-ca/0")
-
-        self.assertEqual(
-            cm.output,
-            [
-                "DEBUG:charm:Cannot generate CSR: subject is invalid "
-                "(hostname is '10.0.0.1', which is probably invalid)"
-            ],
-        )
+        self.rel_id = self.harness.add_relation("certificates", "root-ca")
+        self.harness.add_relation_unit(self.rel_id, "root-ca/0")
 
         # AND WHEN an external hostname is set
         self.harness.update_config({"external_hostname": "testhostname"})
         self.assertEqual(self.harness.charm.external_host, "testhostname")
+        # AND when a root ca joins
+
+        self.harness.add_relation_unit(self.rel_id, "root-ca/0")
 
         # THEN a CSR is sent
-        with self.assertLogs(level="DEBUG") as cm:
-            self.harness.add_relation_unit(self.rel_id, "root-ca/0")
-
-        self.assertIn("DEBUG:charm:CSR sent", cm.output)
+        unit_databag = self.harness.get_relation_data(self.rel_id, self.harness.charm.unit.name)
+        self.assertIsNotNone(unit_databag.get("certificate_signing_requests"))
 
     @patch("charm._get_loadbalancer_status", lambda **_: "10.0.0.1")
     @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
@@ -66,9 +58,9 @@ class TlsWithExternalHostname(unittest.TestCase):
         self.assertEqual(self.harness.charm.external_host, "testhostname")
 
         # WHEN a "certificates" relation is formed
-        # THEN a CSR is sent
-        with self.assertLogs(level="DEBUG") as cm:
-            self.rel_id = self.harness.add_relation("certificates", "root-ca")
-            self.harness.add_relation_unit(self.rel_id, "root-ca/0")
+        self.rel_id = self.harness.add_relation("certificates", "root-ca")
+        self.harness.add_relation_unit(self.rel_id, "root-ca/0")
 
-        self.assertIn("DEBUG:charm:CSR sent", cm.output)
+        # THEN a CSR is sent
+        unit_databag = self.harness.get_relation_data(self.rel_id, self.harness.charm.unit.name)
+        self.assertIsNotNone(unit_databag.get("certificate_signing_requests"))

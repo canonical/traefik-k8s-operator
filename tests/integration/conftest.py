@@ -286,9 +286,11 @@ def get_relation_data(
 
 
 def _can_connect(ip, port) -> bool:
+    target = (ip, int(port))
+    logger.info("Attempting to connect %s", target)
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.connect((ip, int(port)))
+        s.connect(target)
         return True
     except:  # noqa: E722
         return False

@@ -1,0 +1,58 @@
+# # Deploy bundle
+# juju deploy --trust ./bundle.yaml
+#
+# # Obtain IP addresses
+# IPADDR=$(juju status --format json trfk | jq -r '.applications.trfk.address')
+# IPADDR0=$(juju status --format json am | jq -r '.applications.am.units."am/0".address')
+# IPADDR1=$(juju status --format json am | jq -r '.applications.am.units."am/1".address')
+# IPADDR2=$(juju status --format json am | jq -r '.applications.am.units."am/2".address')
+#
+# # Make sure traefik external-hostname is locally routable
+# echo "$IPADDR cluster.local" | sudo tee -a /etc/hosts
+#
+# # Make sure charm code created web-config, cert and key files
+# juju ssh --container alertmanager am/0 ls /etc/alertmanager/
+#
+# # Inspect server cert and confirm `X509v3 Subject Alternative Name` field is as expected
+# echo | openssl s_client -showcerts -servername cluster.local -connect cluster.local 2>/dev/null | openssl x509 -inform pem -noout -text
+#
+# # Save CA cert locally
+# juju show-unit am/0 --format yaml | yq '.am/0."relation-info"[0]."local-unit".data.ca' > /tmp/cacert.pem
+#
+# # Confirm traefik ingress has `https` for alertmanager's server url
+# juju ssh --container traefik trfk/0 cat /opt/traefik/juju/juju_ingress_ingress_6_am.yaml
+#
+# # Confirm alertmanager TLS endpoint reachable
+# curl --fail-with-body --capath /tmp --cacert /tmp/cacert.pem https://cluster.local/tlstest-am-0/-/ready
+
+---
+# ca - am - trfk - ca
+
+bundle: kubernetes
+applications:
+  am:
+    charm: ./alertmanager-k8s_ubuntu-20.04-amd64.charm
+    series: focal
+    scale: 2
+    trust: true
+    resources:
+      alertmanager-image: ghcr.io/canonical/alertmanager:0.25.0
+
+  trfk:
+    charm: ./traefik-k8s_ubuntu-20.04-amd64.charm
+    series: focal
+    scale: 1
+    resources:
+      traefik-image: docker.io/jnsgruk/traefik:2.9.6
+    options:
+      external_hostname: cluster.local
+
+  ca:
+    charm: self-signed-certificates
+    channel: edge
+    scale: 1
+
+relations:
+- [am:ingress, trfk]
+- [am:certificates, ca:certificates]
+- [trfk:certificates, ca:certificates]

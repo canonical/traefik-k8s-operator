@@ -13,7 +13,7 @@ def test_io_ingress_requirer_unit_data():
 
     unit_data.dump(databag)
     assert databag == {
-        "host": "foo.com",
+        "host": '"foo.com"',
     }
 
     assert IngressRequirerUnitData.load(databag) == unit_data
@@ -24,7 +24,17 @@ def test_io_ingress_requirer_app_data():
     app_data = IngressRequirerAppData(port=10, name="foo", model="coslite", strip_prefix=True)
 
     app_data.dump(databag)
-    assert databag == {"model": "coslite", "port": "10", "name": "foo", "strip-prefix": "true"}
+    assert databag == {
+        k: json.dumps(v)
+        for k, v in {
+            "model": "coslite",
+            "port": 10,
+            "name": "foo",
+            "strip-prefix": True,
+            "redirect-https": None,
+            "scheme": "http",
+        }.items()
+    }
     assert IngressRequirerAppData.load(databag) == app_data
 
 
@@ -36,16 +46,19 @@ def test_aliases():
         model="coslite",
         strip_prefix=True,
         redirect_https=True,
-        by_alias=False,
     )
 
     app_data.dump(databag)
     assert databag == {
-        "model": "coslite",
-        "name": "foo",
-        "port": "10",
-        "strip-prefix": "true",
-        "redirect-https": "true",
+        k: json.dumps(v)
+        for k, v in {
+            "model": "coslite",
+            "name": "foo",
+            "port": 10,
+            "strip-prefix": True,
+            "redirect-https": True,
+            "scheme": "http",
+        }.items()
     }
 
     assert IngressRequirerAppData.load(databag) == app_data

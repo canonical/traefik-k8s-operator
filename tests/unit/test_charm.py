@@ -9,6 +9,7 @@ from unittest.mock import Mock, patch
 import ops.testing
 import yaml
 from charm import _STATIC_CONFIG_PATH, TraefikIngressCharm
+from charms.traefik_k8s.v2.ingress import IngressRequirerAppData, IngressRequirerUnitData
 from ops.charm import ActionEvent
 from ops.model import ActiveStatus, Application, BlockedStatus, Relation, WaitingStatus
 from ops.pebble import PathError
@@ -37,24 +38,34 @@ def _requirer_provide_ingress_requirements(
     redirect_https: bool = False,
     per_app_relation: bool = False,
 ):
-    # same as requirer.provide_ingress_requirements(port=port, host=host)s
-    app_data = {"model": "test-model", "name": "remote/0", "mode": mode, "port": str(port)}
-
-    # Must set these to something, because when used with subTest, the previous relation data
-    # must be overwritten: if a key is omitted, then a plain `update` would keep existing keys.
-    # TODO also need to test what happens when any of these is not specified at all
-    app_data["strip-prefix"] = "true" if strip_prefix else "false"
-    app_data["redirect-https"] = "true" if redirect_https else "false"
-
-    unit_data = {"host": host}
-
-    if not per_app_relation:
-        app_data.update(unit_data)
-    else:
+    if per_app_relation:
+        app_data = IngressRequirerAppData(
+            model="test-model",
+            name="remote/0",
+            port=port,
+            redirect_https=redirect_https,
+            strip_prefix=strip_prefix,
+        ).dump()
+        unit_data = IngressRequirerUnitData(host=host).dump()
         # do not emit this event, as we need to 'simultaneously'
         # update the remote unit and app databags
         with harness.hooks_disabled():
             harness.update_relation_data(relation.id, "remote/0", unit_data)
+
+    else:
+        # same as requirer.provide_ingress_requirements(port=port, host=host)s
+        app_data = {
+            "model": "test-model",
+            "name": "remote/0",
+            "mode": mode,
+            "port": str(port),
+            "host": host,
+            # Must set these to something, because when used with subTest, the previous relation data
+            # must be overwritten: if a key is omitted, then a plain `update` would keep existing keys.
+            # TODO also need to test what happens when any of these is not specified at all
+            "strip-prefix": "true" if strip_prefix else "false",
+            "redirect-https": "true" if redirect_https else "false",
+        }
 
     harness.update_relation_data(
         relation.id,
@@ -225,7 +236,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
         self.assertEqual(
             requirer.urls,
-            {"remote/0": "http://10.0.0.1:80/test-model-remote-0"},
+            {"remote/0": "http://10.0.0.1/test-model-remote-0"},
         )
         self.assertEqual(self.harness.charm.unit.status, ActiveStatus())
 
@@ -246,7 +257,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
         self.assertEqual(
             requirer.urls,
-            {"remote/0": "http://10.0.0.1:80/test-model-remote-0"},
+            {"remote/0": "http://10.0.0.1/test-model-remote-0"},
         )
         self.assertEqual(self.harness.charm.unit.status, ActiveStatus())
 
@@ -254,7 +265,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
         self.assertEqual(
             requirer.urls,
-            {"remote/0": "http://testhostname:80/test-model-remote-0"},
+            {"remote/0": "http://testhostname/test-model-remote-0"},
         )
         self.assertEqual(self.harness.charm.unit.status, ActiveStatus())
 
@@ -274,7 +285,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
         self.assertEqual(
             requirer.urls,
-            {"remote/0": "http://testhostname:80/test-model-remote-0"},
+            {"remote/0": "http://testhostname/test-model-remote-0"},
         )
         self.assertEqual(self.harness.charm.unit.status, ActiveStatus())
 
@@ -347,7 +358,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
         action_event.set_results.assert_called_once_with(
             {
                 "proxied-endpoints": json.dumps(
-                    {"remote": {"url": "http://testhostname:80/test-model-remote-0"}}
+                    {"remote": {"url": "http://testhostname/test-model-remote-0"}}
                 )
             }
         )
@@ -371,7 +382,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
         action_event.set_results.assert_called_once_with(
             {
                 "proxied-endpoints": json.dumps(
-                    {"remote/0": {"url": "http://testhostname:80/test-model-remote-0"}}
+                    {"remote/0": {"url": "http://testhostname/test-model-remote-0"}}
                 )
             }
         )
@@ -422,13 +433,13 @@ class TestConfigOptionsValidation(unittest.TestCase):
     @patch("charm._get_loadbalancer_status", lambda **_: "10.0.0.1")
     @patch("charm.KubernetesServicePatch", lambda **_: None)
     def test_when_external_hostname_not_set_use_ip_with_port_80(self):
-        self.assertEqual(requirer.urls, {"remote/0": "http://10.0.0.1:80/test-model-remote-0"})
+        self.assertEqual(requirer.urls, {"remote/0": "http://10.0.0.1/test-model-remote-0"})
 
     @patch("charm._get_loadbalancer_status", lambda **_: "10.0.0.1")
     @patch("charm.KubernetesServicePatch", lambda **_: None)
     def test_when_external_hostname_is_set_use_it_with_port_80(self):
         self.harness.update_config({"external_hostname": "testhostname"})
-        self.assertEqual(requirer.urls, {"remote/0": "http://testhostname:80/test-model-remote-0"})
+        self.assertEqual(requirer.urls, {"remote/0": "http://testhostname/test-model-remote-0"})
 
     @patch("charm._get_loadbalancer_status", lambda **_: "10.0.0.1")
     @patch("charm.KubernetesServicePatch", lambda **_: None)
@@ -440,5 +451,7 @@ class TestConfigOptionsValidation(unittest.TestCase):
         ]:
             with self.subTest(invalid_hostname=invalid_hostname):
                 self.harness.update_config({"external_hostname": invalid_hostname})
-                self.assertIsInstance(self.harness.charm.unit.status, BlockedStatus)
+                self.assertIsInstance(
+                    self.harness.charm.unit.status, BlockedStatus, invalid_hostname
+                )
                 self.assertEqual(requirer.urls, {})

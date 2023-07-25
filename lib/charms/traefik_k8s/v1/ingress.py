@@ -69,7 +69,7 @@ LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 15
+LIBPATCH = 16
 
 DEFAULT_RELATION_NAME = "ingress"
 RELATION_INTERFACE = "ingress"
@@ -338,7 +338,7 @@ class IngressPerAppProvider(_IngressPerAppBase):
         try:
             return bool(self._get_requirer_data(relation))
         except DataValidationError as e:
-            log.warning("Requirer not ready; validation error encountered: %s" % str(e))
+            log.info("Provider not ready; validation error encountered: %s" % str(e))
             return False
 
     def _provided_url(self, relation: Relation) -> ProviderIngressData:  # type: ignore
@@ -494,7 +494,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         try:
             return bool(self._get_url_from_relation_data())
         except DataValidationError as e:
-            log.warning("Requirer not ready; validation error encountered: %s" % str(e))
+            log.info("Requirer not ready; validation error encountered: %s" % str(e))
             return False
 
     def _publish_auto_data(self, relation: Relation):

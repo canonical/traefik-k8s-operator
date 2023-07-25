@@ -56,7 +56,6 @@ def test_ingress_per_app_created(
             "model": "test-model",
             "name": "remote/0",
             "port": str(port),
-            "mode": "http",
             "host": host,
         },
         relation_id=1,
@@ -82,7 +81,7 @@ def test_ingress_per_app_created(
     )
 
     assert generated_config["http"]["services"]["juju-test-model-remote-0-service"] == {
-        "loadBalancer": {"servers": [{"url": f"http://{host}:{port}"}]}
+        "loadBalancer": {"servers": [{"url": f"http://{host}:{port}"}]},
     }
 
 
