@@ -22,7 +22,6 @@ from urllib.request import urlopen
 import pytest
 import yaml
 from pytest_operator.plugin import OpsTest
-from tenacity import retry, wait_exponential
 
 from tests.integration.helpers import get_address, remove_application
 
@@ -197,11 +196,7 @@ async def test_tls_termination_after_charm_upgrade(
 
     ip = await get_address(ops_test, trfk.name)
 
-    @retry(wait=wait_exponential(multiplier=2, min=10, max=40))
-    async def eventually_curl():
-        await curl_endpoints(ops_test, temp_dir, temp_dir / "local.cert", ip)
-
-    await eventually_curl()
+    await curl_endpoints(ops_test, temp_dir, temp_dir / "local.cert", ip)
 
 
 async def test_cleanup(ops_test):
