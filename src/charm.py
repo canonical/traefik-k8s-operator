@@ -17,6 +17,7 @@ from urllib.parse import urlparse
 import yaml
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from charms.loki_k8s.v0.loki_push_api import LogProxyConsumer
+from charms.mutual_tls_interface.v0.mutual_tls import MutualTLSProvides
 from charms.observability_libs.v0.cert_handler import CertHandler
 from charms.observability_libs.v1.kubernetes_service_patch import (
     KubernetesServicePatch,
@@ -44,7 +45,9 @@ from ops.charm import (
     ConfigChangedEvent,
     PebbleReadyEvent,
     RelationBrokenEvent,
+    RelationDepartedEvent,
     RelationEvent,
+    RelationJoinedEvent,
     StartEvent,
     UpdateStatusEvent,
 )
@@ -110,6 +113,8 @@ class TraefikIngressCharm(CharmBase):
             peer_relation_name="peers",
             extra_sans_dns=[self.cert_subject],
         )
+
+        self.cert_transfer = MutualTLSProvides(self, "cert-transfer")
 
         # FIXME: Do not move these lower. They must exist before `_tcp_ports` is called. The
         # better long-term solution is to allow dynamic modification of the object, and to try
@@ -182,6 +187,8 @@ class TraefikIngressCharm(CharmBase):
         observe(self.on.stop, self._on_stop)
         observe(self.on.update_status, self._on_update_status)
         observe(self.on.config_changed, self._on_config_changed)
+        observe(self.on.cert_transfer_relation_joined, self._on_cert_transfer_relation_joined)
+        observe(self.on.cert_transfer_relation_departed, self._on_cert_transfer_relation_departed)
 
         # observe data_provided and data_removed events for all types of ingress we offer:
         for ingress in (self.ingress_per_unit, self.ingress_per_appv1, self.ingress_per_appv2):
@@ -194,6 +201,20 @@ class TraefikIngressCharm(CharmBase):
 
         # Action handlers
         observe(self.on.show_proxied_endpoints_action, self._on_show_proxied_endpoints)
+
+    def _on_cert_transfer_relation_joined(self, event: RelationJoinedEvent):
+        if self.cert.enabled:
+            self.cert_transfer.set_certificate(
+                self.cert.cert,
+                self.cert.ca,
+                self.cert.chain,
+                relation_id=event.relation.id,
+            )
+
+    def _on_cert_transfer_relation_departed(self, event: RelationDepartedEvent):
+        self.cert_transfer.remove_certificate(
+            relation_id=event.relation.id,
+        )
 
     def _on_certificate_invalidated(self, event: CertificateInvalidatedEvent):
         # Assuming there can be only one cert (metadata also has `limit: 1` on the relation).
@@ -677,6 +698,7 @@ class TraefikIngressCharm(CharmBase):
                 unit_config = self._generate_per_unit_http_config(prefix, data)
                 if self.unit.is_leader():
                     ipu.publish_url(relation, data["name"], self._get_external_url(prefix))
+
             always_merger.merge(config, unit_config)
 
         # Note: We might be pushing an empty configuration if, for example,
@@ -740,7 +762,7 @@ class TraefikIngressCharm(CharmBase):
                         "loadBalancer": {
                             "servers": [{"address": f"{data['host']}:{data['port']}"}]
                         }
-                    }
+                    },
                 },
             }
         }

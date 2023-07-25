@@ -78,6 +78,11 @@ async def test_relation_data_shape(ops_test: OpsTest):
 
     assert dequote(data.requirer.unit_data["host"]) == "foo.bar"
 
+    # that was v1. ipa-tester talks v2
+    assert not requirer_app_data.get("host")
+
+    assert data.requirer.unit_data["host"] == "foo.bar"
+
     # example:
     #  ingress:
     #    url: http://foo.bar/foo-ipa-tester/0

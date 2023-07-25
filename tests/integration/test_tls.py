@@ -146,6 +146,14 @@ async def pull_server_cert(ops_test, path):
     with open(path, "wt") as f:
         f.writelines(stdout)
 
+        # fixme:
+        #          sans:
+        #          - '*.juju.local'
+        #  services:
+        #    juju-test-tls-yuh5-alertmanager-service:
+        #      loadBalancer:
+        #        servers: []  # should not be empty!
+
 
 @pytest.mark.abort_on_fail
 async def test_tls_termination(ops_test: OpsTest, temp_dir):
