@@ -143,7 +143,7 @@ async def pull_server_cert(ops_test, path):
         "cat",
         "/opt/traefik/juju/server.cert",
     )
-
+    logger.info(f"pulled server cert from traefik: {stdout[:100]}...")
     with open(path, "wt") as f:
         f.writelines(stdout)
 
