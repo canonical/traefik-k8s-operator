@@ -405,7 +405,7 @@ class TraefikIngressCharm(CharmBase):
 
     def _get_tracing_config(self) -> dict:
         """Return dictionary with opentelemetry configuration if available."""
-        # ref: https://doc.traefik.io/traefik/master/observability/tracing/opentelemetry/
+        # ref: https://doc.traefik.io/traefik/ma<woke forced me to add this>ster/observability/tracing/opentelemetry/
         if not self._is_tracing_enabled():
             logger.error("tracing not enabled")
             return {}
