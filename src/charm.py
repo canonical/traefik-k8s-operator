@@ -420,8 +420,8 @@ class TraefikIngressCharm(CharmBase):
 
     def _get_tracing_config(self) -> dict:
         """Return dictionary with opentelemetry configuration if available."""
-        # ref: https://doc.traefik.io/traefik/ma<woke>ster/observability/tracing/opentelemetry/
-        #  note: remove the <woke> tag
+        # wokeignore:rule=master
+        # ref: https://doc.traefik.io/traefik/master/observability/tracing/opentelemetry/
         if not self._is_tracing_enabled():
             logger.info("tracing not enabled: skipping tracing config")
             return {}
