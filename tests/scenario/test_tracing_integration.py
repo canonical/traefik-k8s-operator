@@ -3,7 +3,7 @@ from unittest.mock import patch
 import opentelemetry
 import pytest
 import yaml
-from charm import _DYNAMIC_TRACING_PATH, _CA_CERT_PATH
+from charm import _CA_CERT_PATH, _DYNAMIC_TRACING_PATH
 from charms.tempo_k8s.v0.charm_instrumentation import _charm_tracing_disabled
 from charms.tempo_k8s.v0.tracing import Ingester, TracingRequirerAppData
 from scenario import Relation, State
@@ -81,16 +81,18 @@ def test_traefik_tracing_config_with_tls(traefik_ctx, traefik_container, tracing
 
 
 @pytest.mark.parametrize("was_present_before", (True, False))
-def test_traefik_tracing_config_removed_if_relation_data_invalid(traefik_ctx, traefik_container, tracing_relation, was_present_before):
+def test_traefik_tracing_config_removed_if_relation_data_invalid(
+    traefik_ctx, traefik_container, tracing_relation, was_present_before
+):
     if was_present_before:
-        dt_path = traefik_container.mounts['opt'].src.joinpath("traefik", "juju", "tracing.yaml")
+        dt_path = traefik_container.mounts["opt"].src.joinpath("traefik", "juju", "tracing.yaml")
         dt_path.parent.mkdir(parents=True)
         dt_path.write_text("foo")
 
-    state_in = State(relations=[
-        tracing_relation.replace(remote_app_data={"foo": "bar"})
-    ],
-        containers=[traefik_container])
+    state_in = State(
+        relations=[tracing_relation.replace(remote_app_data={"foo": "bar"})],
+        containers=[traefik_container],
+    )
 
     with _charm_tracing_disabled():
         traefik_ctx.run(tracing_relation.changed_event, state_in)
@@ -101,14 +103,15 @@ def test_traefik_tracing_config_removed_if_relation_data_invalid(traefik_ctx, tr
 
 
 @pytest.mark.parametrize("was_present_before", (True, False))
-def test_traefik_tracing_config_removed_on_relation_broken(traefik_ctx, traefik_container, tracing_relation, was_present_before):
+def test_traefik_tracing_config_removed_on_relation_broken(
+    traefik_ctx, traefik_container, tracing_relation, was_present_before
+):
     if was_present_before:
-        dt_path = traefik_container.mounts['opt'].src.joinpath("traefik", "juju", "tracing.yaml")
+        dt_path = traefik_container.mounts["opt"].src.joinpath("traefik", "juju", "tracing.yaml")
         dt_path.parent.mkdir(parents=True)
         dt_path.write_text("foo")
 
-    state_in = State(relations=[tracing_relation],
-                     containers=[traefik_container])
+    state_in = State(relations=[tracing_relation], containers=[traefik_container])
 
     with _charm_tracing_disabled():
         traefik_ctx.run(tracing_relation.broken_event, state_in)

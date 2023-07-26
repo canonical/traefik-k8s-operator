@@ -440,13 +440,15 @@ class TraefikIngressCharm(CharmBase):
 
         otlp_cfg: Dict[str, Any] = {"address": addr}
         if self._is_tls_enabled():
-            # todo: we have an option to use CA or to use CERT+KEY authentication.
-            #  what is the difference and which one is better?
+            # todo: we have an option to use CA or to use CERT+KEY (available with mtls) authentication.
+            #  when we have mTLS, consider this again.
             otlp_cfg["ca"] = _CA_CERT_PATH
         else:
             otlp_cfg["insecure"] = True
 
-            # todo: determine when and if we have to use insecureSkipVerify
+            # todo: determine if this is wise
+            #  it means that the TLS connection to the [other end] will accept any certificate
+            #  presented by the server regardless of the hostnames it covers.
             otlp_cfg["tls"] = {"insecureSkipVerify": True}
 
         if grpc:
