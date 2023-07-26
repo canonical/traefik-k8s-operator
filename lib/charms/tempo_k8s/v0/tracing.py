@@ -64,7 +64,13 @@ import logging
 from typing import TYPE_CHECKING, List, Literal, MutableMapping, Optional, Tuple, cast
 
 import pydantic
-from ops.charm import CharmBase, CharmEvents, RelationEvent, RelationRole
+from ops.charm import (
+    CharmBase,
+    CharmEvents,
+    RelationBrokenEvent,
+    RelationEvent,
+    RelationRole,
+)
 from ops.framework import EventSource, Object
 from ops.model import ModelError, Relation
 from pydantic import BaseModel
@@ -77,7 +83,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 3
+LIBPATCH = 5
 
 PYDEPS = ["pydantic<2.0"]
 
@@ -99,6 +105,7 @@ class DataValidationError(TracingError):
     """Raised when data validation fails on IPU relation data."""
 
 
+# todo: use fully-encoded json fields like Traefik does. MUCH neater
 class DatabagModel(BaseModel):
     """Base databag model."""
 
@@ -358,6 +365,10 @@ class TracingEndpointRequirer(Object):
             raise
 
 
+class EndpointRemovedEvent(RelationBrokenEvent):
+    """Event representing a change in one of the ingester endpoints."""
+
+
 class EndpointChangedEvent(_AutoSnapshotEvent):
     """Event representing a change in one of the ingester endpoints."""
 
@@ -365,10 +376,11 @@ class EndpointChangedEvent(_AutoSnapshotEvent):
 
     if TYPE_CHECKING:
         host = ""  # type: str
-        ingesters = []  # type: List[Ingester]
+        _ingesters = []  # type: List[dict]
 
     @property
-    def ingesters(self):
+    def ingesters(self) -> List[Ingester]:
+        """Cast ingesters back from dict."""
         return [Ingester(**i) for i in self._ingesters]
 
 
@@ -376,6 +388,7 @@ class TracingEndpointEvents(CharmEvents):
     """TracingEndpointProvider events."""
 
     endpoint_changed = EventSource(EndpointChangedEvent)
+    endpoint_removed = EventSource(EndpointRemovedEvent)
 
 
 class TracingEndpointProvider(Object):
@@ -423,42 +436,65 @@ class TracingEndpointProvider(Object):
 
         events = self._charm.on[self._relation_name]
         self.framework.observe(events.relation_changed, self._on_tracing_relation_changed)
+        self.framework.observe(events.relation_broken, self._on_tracing_relation_broken)
 
-    def _is_ready(self, relation: Optional[Relation]):
+    @property
+    def relation(self) -> Relation:
+        """The tracing relation associated with this endpoint.
+
+        Assumes tracing has limit 1.
+        """
+        return self._charm.model.get_relation(self._relation_name)
+
+    def is_ready(self, relation: Optional[Relation] = None):
+        """Is this endpoint ready?"""
+        relation = relation or self.relation
+
         if not relation:
             logger.error("no relation")
             return False
+        if relation.data is None:
+            logger.error("relation data is None")
+            return False
         if not relation.app:
             logger.error(f"{relation} event received but there is no relation.app")
+            return False
+        try:
+            TracingRequirerAppData.load(relation.data[relation.app])
+        except (json.JSONDecodeError, pydantic.ValidationError):
+            logger.info(f"failed validating relation data for {relation}")
             return False
         return True
 
     def _on_tracing_relation_changed(self, event):
         """Notify the providers that there is new endpoint information available."""
         relation = event.relation
-        if not self._is_ready(relation):
+        if not self.is_ready(relation):
+            self.on.endpoint_removed.emit(relation)  # type: ignore
             return
 
         data = TracingRequirerAppData.load(relation.data[relation.app])
-        if data:
-            self.on.endpoint_changed.emit(relation, data.host, [i.dict() for i in data.ingesters])  # type: ignore
+        self.on.endpoint_changed.emit(relation, data.host, [i.dict() for i in data.ingesters])  # type: ignore
+
+    def _on_tracing_relation_broken(self, event: RelationBrokenEvent):
+        """Notify the providers that the endpoint is broken."""
+        relation = event.relation
+        self.on.endpoint_removed.emit(relation)
 
     @property
     def endpoints(self) -> Optional[TracingRequirerAppData]:
         """Unmarshalled relation data."""
-        relation = self._charm.model.get_relation(self._relation_name)
-        if not self._is_ready(relation):
+        relation = self.relation
+        if not self.is_ready(relation):
             return
-        return TracingRequirerAppData.load(relation.data[relation.app])
+        return TracingRequirerAppData.load(relation.data[relation.app])  # type: ignore
 
     def _get_ingester(self, protocol: IngesterProtocol):
         ep = self.endpoints
         if not ep:
             return None
         try:
-            ingester: Ingester = next(
-                filter(lambda i: i.protocol == protocol, ep.ingesters)
-            )
+            ingester: Ingester = next(filter(lambda i: i.protocol == protocol, ep.ingesters))
             return f"{ep.host}:{ingester.port}"
         except StopIteration:
             logger.error(f"no ingester found with protocol={protocol!r}")

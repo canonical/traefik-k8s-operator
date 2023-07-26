@@ -193,6 +193,10 @@ class TraefikIngressCharm(CharmBase):
             self._tracing.on.endpoint_changed,  # type: ignore
             self._on_tracing_endpoint_changed,
         )
+        observe(
+            self._tracing.on.endpoint_removed,  # type: ignore
+            self._on_tracing_endpoint_removed,
+        )
 
         observe(self.on.traefik_pebble_ready, self._on_traefik_pebble_ready)  # type: ignore
         observe(self.on.start, self._on_start)
@@ -248,11 +252,21 @@ class TraefikIngressCharm(CharmBase):
             return False
         return True
 
+    def _on_tracing_endpoint_removed(self, event) -> None:
+        if not self.container.can_connect():
+            event.defer()
+            return
+        self._clear_tracing_config()
+
     def _on_tracing_endpoint_changed(self, event) -> None:
         # On slow machines, this event may come up before pebble is ready
         if not self.container.can_connect():
             event.defer()
             return
+
+        if not self._tracing.is_ready():
+            self._clear_tracing_config()
+
         self._push_tracing_config()
 
     def _on_cert_changed(self, event) -> None:
@@ -260,7 +274,11 @@ class TraefikIngressCharm(CharmBase):
         if not self.container.can_connect():
             event.defer()
             return
+        self._update_cert_configs()
+        self._push_config()
+        self._process_status_and_configurations()
 
+    def _update_cert_configs(self):
         cert_handler = self.cert
         if cert_handler.cert:
             self.container.push(_SERVER_CERT_PATH, cert_handler.cert, make_dirs=True)
@@ -276,9 +294,6 @@ class TraefikIngressCharm(CharmBase):
             self.container.push(_CA_CERT_PATH, cert_handler.ca, make_dirs=True)
         else:
             self.container.remove_path(_CA_CERT_PATH)
-
-        self._push_config()
-        self._process_status_and_configurations()
 
     def _on_show_proxied_endpoints(self, event: ActionEvent):
         if not self.ready:
@@ -405,9 +420,10 @@ class TraefikIngressCharm(CharmBase):
 
     def _get_tracing_config(self) -> dict:
         """Return dictionary with opentelemetry configuration if available."""
-        # ref: https://doc.traefik.io/traefik/ma<woke forced me to add this>ster/observability/tracing/opentelemetry/
+        # ref: https://doc.traefik.io/traefik/ma<woke>ster/observability/tracing/opentelemetry/
+        #  note: remove the <woke> tag
         if not self._is_tracing_enabled():
-            logger.error("tracing not enabled")
+            logger.info("tracing not enabled: skipping tracing config")
             return {}
 
         # traefik supports http and grpc
@@ -451,11 +467,19 @@ class TraefikIngressCharm(CharmBase):
         # configuration files on a storage volume that survives the pod churn, before
         # we start traefik we clean up all Juju-generated config files to avoid spurious
         # routes.
+        self._clear_tracing_config()
         self._clear_dynamic_configs()
         # we push the static config
         self._push_config()
         # now we restart traefik
         self._restart_traefik()
+
+    def _clear_tracing_config(self):
+        """If tracing config is present, clear it up."""
+        try:
+            self.container.remove_path(_DYNAMIC_TRACING_PATH)
+        except PathError:
+            pass
 
     def _on_start(self, _: StartEvent):
         self._process_status_and_configurations()
