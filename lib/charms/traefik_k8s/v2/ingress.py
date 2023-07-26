@@ -63,6 +63,7 @@ from typing import (
     Optional,
     Sequence,
     Tuple,
+Union, Callable
 )
 
 import pydantic
@@ -79,7 +80,7 @@ LIBAPI = 2
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 3
+LIBPATCH = 4
 
 PYDEPS = ["pydantic<2.0"]
 
@@ -194,13 +195,20 @@ class IngressRequirerAppData(DatabagModel):
 class IngressRequirerUnitData(DatabagModel):
     """Ingress requirer unit databag model."""
 
-    host: str = Field(description="Hostname the unit wishes to be exposed.")
+    host: str = Field(description="Hostname at which the unit is reachable.")
+    ip: str = Field(description="IP at which the unit is reachable.")
 
     @validator("host", pre=True)
     def validate_host(cls, host):  # noqa: N805  # pydantic wants 'cls' as first arg
         """Validate host."""
         assert isinstance(host, str), type(host)
         return host
+
+    @validator("ip", pre=True)
+    def validate_ip(cls, ip):  # noqa: N805  # pydantic wants 'cls' as first arg
+        """Validate ip."""
+        assert isinstance(ip, str), type(ip)
+        return ip
 
 
 class RequirerSchema(BaseModel):
@@ -539,7 +547,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         redirect_https: bool = False,
         # fixme: this is horrible UX.
         #  shall we switch to manually calling provide_ingress_requirements with all args when ready?
-        scheme: typing.Callable[[], str] = lambda: "http",
+        scheme: Union[Callable[[], str], str] = lambda: "http",
     ):
         """Constructor for IngressRequirer.
 
@@ -557,6 +565,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
             strip_prefix: configure Traefik to strip the path prefix.
             redirect_https: redirect incoming requests to HTTPS.
             scheme: callable returning the scheme to use when constructing the ingress url.
+                Or a string, if the scheme is known and stable at charm-init-time.
 
         Request Args:
             port: the port of the service
@@ -566,7 +575,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         self.relation_name = relation_name
         self._strip_prefix = strip_prefix
         self._redirect_https = redirect_https
-        self._get_scheme = scheme
+        self._get_scheme = scheme if callable(scheme) else lambda: scheme
 
         self._stored.set_default(current_url=None)  # type: ignore
 
