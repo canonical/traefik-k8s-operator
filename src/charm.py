@@ -187,6 +187,7 @@ class TraefikIngressCharm(CharmBase):
         observe(self.on.stop, self._on_stop)
         observe(self.on.update_status, self._on_update_status)
         observe(self.on.config_changed, self._on_config_changed)
+        observe(self.cert.on.cert_changed, self._on_cert_transfer_relation_joined)
         observe(self.on.cert_transfer_relation_joined, self._on_cert_transfer_relation_joined)
         observe(self.on.cert_transfer_relation_departed, self._on_cert_transfer_relation_departed)
 
@@ -203,7 +204,8 @@ class TraefikIngressCharm(CharmBase):
         observe(self.on.show_proxied_endpoints_action, self._on_show_proxied_endpoints)
 
     def _on_cert_transfer_relation_joined(self, event: RelationJoinedEvent):
-        if self.cert.enabled:
+        # todo: if CertHandler ever gets an is_ready method, this is where we use it
+        if self.cert.enabled and self.cert.cert and self.cert.ca and self.cert.chain:
             self.cert_transfer.set_certificate(
                 self.cert.cert,
                 self.cert.ca,
