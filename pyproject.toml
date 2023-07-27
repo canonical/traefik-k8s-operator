@@ -1,14 +1,5 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
-[project]
-name = "traefik-k8s"
-version = "0.1"  # this is in fact irrelevant
-
-[project.optional-dependencies]
-lib_pydeps = [
-    "opentelemetry-exporter-otlp-proto-grpc",
-    "pydantic<2.0"
-]
 
 # Testing tools configuration
 [tool.coverage.run]

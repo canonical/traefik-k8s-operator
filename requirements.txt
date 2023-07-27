@@ -28,3 +28,7 @@ lightkube-models >= 1.22.0.4
 # Docs: https://ops.rtfd.io/
 # Deps: charm
 ops
+
+# the deps below are from PYDEPS and are needed here for the tox test envs
+opentelemetry-exporter-otlp-proto-grpc
+pydantic<2.0
