@@ -30,5 +30,6 @@ lightkube-models >= 1.22.0.4
 ops
 
 # the deps below are from PYDEPS and are needed here for the tox test envs
-opentelemetry-exporter-otlp-proto-grpc
+# Keep them in sync with pydeps!
+opentelemetry-exporter-otlp-proto-grpc==1.17.0
 pydantic<2.0
