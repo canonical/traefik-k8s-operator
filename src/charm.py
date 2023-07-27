@@ -45,7 +45,6 @@ from ops.charm import (
     ConfigChangedEvent,
     PebbleReadyEvent,
     RelationBrokenEvent,
-    RelationDepartedEvent,
     RelationEvent,
     RelationJoinedEvent,
     StartEvent,
@@ -189,7 +188,6 @@ class TraefikIngressCharm(CharmBase):
         observe(self.on.config_changed, self._on_config_changed)
         observe(self.cert.on.cert_changed, self._on_cert_transfer_relation_joined)
         observe(self.on.cert_transfer_relation_joined, self._on_cert_transfer_relation_joined)
-        observe(self.on.cert_transfer_relation_departed, self._on_cert_transfer_relation_departed)
 
         # observe data_provided and data_removed events for all types of ingress we offer:
         for ingress in (self.ingress_per_unit, self.ingress_per_appv1, self.ingress_per_appv2):
@@ -205,18 +203,13 @@ class TraefikIngressCharm(CharmBase):
 
     def _on_cert_transfer_relation_joined(self, event: RelationJoinedEvent):
         # todo: if CertHandler ever gets an is_ready method, this is where we use it
-        if self.cert.enabled and self.cert.cert and self.cert.ca and self.cert.chain:
+        if self.cert.enabled and self.cert.cert:
             self.cert_transfer.set_certificate(
                 self.cert.cert,
-                self.cert.ca,
+                self.cert.ca or "",  # this will be written to databag as-is.
                 self.cert.chain,
                 relation_id=event.relation.id,
             )
-
-    def _on_cert_transfer_relation_departed(self, event: RelationDepartedEvent):
-        self.cert_transfer.remove_certificate(
-            relation_id=event.relation.id,
-        )
 
     def _on_certificate_invalidated(self, event: CertificateInvalidatedEvent):
         # Assuming there can be only one cert (metadata also has `limit: 1` on the relation).

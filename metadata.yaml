@@ -66,9 +66,9 @@ provides:
   cert-transfer:
     interface: mutual_tls
     description: |
-      Sends the TLS information (certificate, ca, chain) over relation data.
+      Send our CA certificate so clients trust traefik's proxied apps.
+      This relation can be used instead of relating directly to traefik's CA.
       Note: The interface name is a misnomer, as this is not in fact mTLS.
-
 
 requires:
   certificates:
