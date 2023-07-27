@@ -31,5 +31,6 @@ ops
 
 # the deps below are from PYDEPS and are needed here for the tox test envs
 # Keep them in sync with pydeps!
+importlib-metadata==6.0.0
 opentelemetry-exporter-otlp-proto-grpc==1.17.0
 pydantic<2.0
