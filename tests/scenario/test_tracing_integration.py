@@ -52,7 +52,6 @@ def test_traefik_tracing_config(traefik_ctx, traefik_container, tracing_relation
                 "address": "foo.com:81",
                 "grpc": {},
                 "insecure": True,
-                "tls": {"insecureSkipVerify": True},
             }
         }
     }
