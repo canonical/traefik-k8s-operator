@@ -446,11 +446,6 @@ class TraefikIngressCharm(CharmBase):
         else:
             otlp_cfg["insecure"] = True
 
-            # todo: determine if this is wise
-            #  it means that the TLS connection to the [other end] will accept any certificate
-            #  presented by the server regardless of the hostnames it covers.
-            otlp_cfg["tls"] = {"insecureSkipVerify": True}
-
         if grpc:
             otlp_cfg["grpc"] = {}
         logger.debug(f"dumping {otlp_cfg} to {_DYNAMIC_TRACING_PATH}")
