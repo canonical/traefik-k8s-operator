@@ -3,7 +3,7 @@
 # See LICENSE file for licensing details.
 
 """Charm Traefik."""
-
+import contextlib
 import enum
 import ipaddress
 import json
@@ -254,7 +254,9 @@ class TraefikIngressCharm(CharmBase):
 
     def _on_tracing_endpoint_removed(self, event) -> None:
         if not self.container.can_connect():
-            event.defer()
+            # this probably means we're being torn down, so we don't really need to
+            # clear anything up. We could defer, but again, we're being torn down and the unit db
+            # will
             return
         self._clear_tracing_config()
 
@@ -473,10 +475,8 @@ class TraefikIngressCharm(CharmBase):
 
     def _clear_tracing_config(self):
         """If tracing config is present, clear it up."""
-        try:
+        with contextlib.suppress(PathError):
             self.container.remove_path(_DYNAMIC_TRACING_PATH)
-        except PathError:
-            pass
 
     def _on_start(self, _: StartEvent):
         self._process_status_and_configurations()
