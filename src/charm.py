@@ -24,7 +24,7 @@ from charms.observability_libs.v1.kubernetes_service_patch import (
 )
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 from charms.tempo_k8s.v0.charm_instrumentation import trace_charm
-from charms.tempo_k8s.v0.tracing import TracingEndpointProvider
+from charms.tempo_k8s.v0.tracing import TracingEndpointRequirer
 from charms.tls_certificates_interface.v2.tls_certificates import (
     CertificateInvalidatedEvent,
 )
@@ -53,7 +53,13 @@ from ops.charm import (
 )
 from ops.framework import StoredState
 from ops.main import main
-from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, Relation, WaitingStatus
+from ops.model import (
+    ActiveStatus,
+    BlockedStatus,
+    MaintenanceStatus,
+    Relation,
+    WaitingStatus,
+)
 from ops.pebble import APIError, LayerDict, PathError
 
 logger = logging.getLogger(__name__)
@@ -160,7 +166,7 @@ class TraefikIngressCharm(CharmBase):
 
         # Observability integrations
         # tracing integration
-        self._tracing = TracingEndpointProvider(self)
+        self._tracing = TracingEndpointRequirer(self)
 
         # Provide grafana dashboards over a relation interface
         # dashboard to use: https://grafana.com/grafana/dashboards/4475-traefik/
@@ -219,7 +225,7 @@ class TraefikIngressCharm(CharmBase):
     @property
     def charm_tracing_endpoint(self) -> Optional[str]:
         """Otlp grpc endpoint for charm instrumentation."""
-        return self._tracing.otlp_grpc_endpoint
+        return self._tracing.otlp_grpc_endpoint()
 
     @property
     def server_cert(self) -> Optional[str]:
@@ -247,8 +253,7 @@ class TraefikIngressCharm(CharmBase):
 
     def _is_tracing_enabled(self) -> bool:
         """Return True if tracing is enabled."""
-        eps = self._tracing.endpoints
-        if not eps or not eps.host or not eps.ingesters:
+        if not self._tracing.is_ready():
             return False
         return True
 
@@ -429,9 +434,9 @@ class TraefikIngressCharm(CharmBase):
             return {}
 
         # traefik supports http and grpc
-        if addr := self._tracing.otlp_grpc_endpoint:
+        if addr := self._tracing.otlp_grpc_endpoint():
             grpc = True
-        elif addr := self._tracing.otlp_http_endpoint:
+        elif addr := self._tracing.otlp_http_endpoint():
             grpc = False
         else:
             logger.error(
