@@ -176,17 +176,12 @@ class TraefikIngressCharm(CharmBase):
 
         # TODO update init params once auto-renew is implemented
         # https://github.com/canonical/tls-certificates-interface/issues/24
-        observe(
-            self.cert.on.cert_changed,
-            self._on_cert_changed,
-        )
-
         observe(self.on.traefik_pebble_ready, self._on_traefik_pebble_ready)
         observe(self.on.start, self._on_start)
         observe(self.on.stop, self._on_stop)
         observe(self.on.update_status, self._on_update_status)
         observe(self.on.config_changed, self._on_config_changed)
-        observe(self.cert.on.cert_changed, self._on_cert_transfer_relation_joined)
+        observe(self.cert.on.cert_changed, self._on_cert_changed)
         observe(self.on.cert_transfer_relation_joined, self._on_cert_transfer_relation_joined)
 
         # observe data_provided and data_removed events for all types of ingress we offer:
