@@ -5,14 +5,14 @@ import pytest
 import yaml
 from charm import _CA_CERT_PATH, _DYNAMIC_TRACING_PATH
 from charms.tempo_k8s.v0.charm_instrumentation import _charm_tracing_disabled
-from charms.tempo_k8s.v0.tracing import Ingester, TracingRequirerAppData
+from charms.tempo_k8s.v0.tracing import Ingester, TracingProviderAppData
 from scenario import Relation, State
 
 
 @pytest.fixture
 def tracing_relation():
     db = {}
-    TracingRequirerAppData(
+    TracingProviderAppData(
         host="foo.com", ingesters=[Ingester(protocol="otlp_grpc", port=81)]
     ).dump(db)
     tracing = Relation("tracing", remote_app_data=db)

@@ -63,11 +63,6 @@ provides:
     description: |
       Forwards the built-in grafana dashboard(s) for monitoring traefik.
     interface: grafana_dashboard
-  tracing:
-    description: |
-      Tracing endpoint for integrating with tempo.
-    limit: 1
-    interface: tracing
 
 requires:
   certificates:
@@ -79,6 +74,11 @@ requires:
     interface: loki_push_api
     description: |
       Receives Loki's push api endpoint address to push logs to, and forwards charm's built-in alert rules to Loki.
+  tracing:
+    description: |
+      Tracing endpoint for integrating with tempo.
+    limit: 1
+    interface: tracing
 
 
 peers:
