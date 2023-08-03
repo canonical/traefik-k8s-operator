@@ -224,17 +224,17 @@ class TraefikIngressCharm(CharmBase):
         if cert_handler.cert:
             self.container.push(_SERVER_CERT_PATH, cert_handler.cert, make_dirs=True)
         else:
-            self.container.remove_path(_SERVER_CERT_PATH)
+            self.container.remove_path(_SERVER_CERT_PATH, recursive=True)
 
         if cert_handler.key:
             self.container.push(_SERVER_KEY_PATH, cert_handler.key, make_dirs=True)
         else:
-            self.container.remove_path(_SERVER_KEY_PATH)
+            self.container.remove_path(_SERVER_KEY_PATH, recursive=True)
 
         if cert_handler.ca:
             self.container.push(_CA_CERT_PATH, cert_handler.ca, make_dirs=True)
         else:
-            self.container.remove_path(_CA_CERT_PATH)
+            self.container.remove_path(_CA_CERT_PATH, recursive=True)
 
         self._push_config()
         self._process_status_and_configurations()
