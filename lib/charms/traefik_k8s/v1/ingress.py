@@ -69,7 +69,7 @@ LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 16
+LIBPATCH = 17
 
 DEFAULT_RELATION_NAME = "ingress"
 RELATION_INTERFACE = "ingress"
@@ -143,8 +143,8 @@ def _validate_data(data, schema):
     if not DO_VALIDATION:
         return
     try:
-        jsonschema.validate(instance=data, schema=schema)
-    except jsonschema.ValidationError as e:
+        jsonschema.validate(instance=data, schema=schema)  # pyright: ignore[reportUnboundVariable]
+    except jsonschema.ValidationError as e:  # pyright: ignore[reportUnboundVariable]
         raise DataValidationError(data, schema) from e
 
 
