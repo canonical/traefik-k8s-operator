@@ -79,7 +79,7 @@ LIBAPI = 2
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 3
+LIBPATCH = 4
 
 PYDEPS = ["pydantic<2.0"]
 
@@ -98,8 +98,6 @@ class DatabagModel(BaseModel):
 
         allow_population_by_field_name = True
         """Allow instantiating this class by field name (instead of forcing alias)."""
-        extra = "forbid"
-        """Raise if unknown fields are added to the databag."""
 
     _NEST_UNDER = None
 
