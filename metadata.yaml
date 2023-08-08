@@ -63,10 +63,10 @@ provides:
     description: |
       Forwards the built-in grafana dashboard(s) for monitoring traefik.
     interface: grafana_dashboard
-  cert-transfer:
+  send-ca-cert:
     interface: mutual_tls
     description: |
-      Send our CA certificate so clients trust traefik's proxied apps.
+      Send our CA certificate so clients can trust traefik's proxied apps.
       This relation can be used instead of relating directly to traefik's CA.
       Note: The interface name is a misnomer, as this is not in fact mTLS.
 

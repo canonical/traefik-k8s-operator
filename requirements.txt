@@ -29,7 +29,6 @@ lightkube-models >= 1.22.0.4
 # Deps: charm
 ops < 2.5.0  # https://github.com/canonical/ops-scenario/issues/48
 
-
 # the deps below are from PYDEPS and are needed here for the tox test envs
 # Keep them in sync with pydeps!
 importlib-metadata==6.0.0

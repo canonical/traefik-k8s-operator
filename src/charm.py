@@ -127,7 +127,7 @@ class TraefikIngressCharm(CharmBase):
             extra_sans_dns=[self.cert_subject] if self.cert_subject else [],
         )
 
-        self.cert_transfer = MutualTLSProvides(self, "cert-transfer")
+        self.send_ca_cert = MutualTLSProvides(self, "send-ca-cert")
 
         # FIXME: Do not move these lower. They must exist before `_tcp_ports` is called. The
         # better long-term solution is to allow dynamic modification of the object, and to try
@@ -209,8 +209,14 @@ class TraefikIngressCharm(CharmBase):
         observe(self.on.stop, self._on_stop)
         observe(self.on.update_status, self._on_update_status)
         observe(self.on.config_changed, self._on_config_changed)
-        observe(self.cert.on.cert_changed, self._on_cert_changed)
-        observe(self.on.cert_transfer_relation_joined, self._on_cert_transfer_relation_joined)
+        observe(
+            self.cert.on.cert_changed,  # pyright: ignore
+            self._on_cert_changed,
+        )
+        observe(
+            self.on.send_ca_cert_relation_joined,  # pyright: ignore
+            self._on_send_ca_cert_relation_joined,
+        )
 
         # observe data_provided and data_removed events for all types of ingress we offer:
         for ingress in (self.ingress_per_unit, self.ingress_per_appv1, self.ingress_per_appv2):
@@ -224,10 +230,10 @@ class TraefikIngressCharm(CharmBase):
         # Action handlers
         observe(self.on.show_proxied_endpoints_action, self._on_show_proxied_endpoints)  # type: ignore
 
-    def _on_cert_transfer_relation_joined(self, event: RelationJoinedEvent):
+    def _on_send_ca_cert_relation_joined(self, event: RelationJoinedEvent):
         # todo: if CertHandler ever gets an is_ready method, this is where we use it
         if self.cert.enabled and self.cert.cert:
-            self.cert_transfer.set_certificate(
+            self.send_ca_cert.set_certificate(
                 self.cert.cert,
                 self.cert.ca or "",  # this will be written to databag as-is.
                 self.cert.chain,
