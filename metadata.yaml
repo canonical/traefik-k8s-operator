@@ -75,7 +75,7 @@ requires:
     interface: tls-certificates
     limit: 1
     description: |
-      Requires certificates-generating charm for TLS.
+      Send a CSR to- and obtain a signed certificate from an external CA.
   logging:
     interface: loki_push_api
     description: |

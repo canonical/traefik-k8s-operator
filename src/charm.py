@@ -124,10 +124,8 @@ class TraefikIngressCharm(CharmBase):
             self,
             key="trfk-server-cert",
             peer_relation_name="peers",
-            extra_sans_dns=[self.cert_subject] if self.cert_subject else [],
+            extra_sans_dns=self.server_cert_sans_dns,
         )
-
-        self.send_ca_cert = MutualTLSProvides(self, "send-ca-cert")
 
         # FIXME: Do not move these lower. They must exist before `_tcp_ports` is called. The
         # better long-term solution is to allow dynamic modification of the object, and to try
@@ -231,14 +229,24 @@ class TraefikIngressCharm(CharmBase):
         observe(self.on.show_proxied_endpoints_action, self._on_show_proxied_endpoints)  # type: ignore
 
     def _on_send_ca_cert_relation_joined(self, event: RelationJoinedEvent):
-        # todo: if CertHandler ever gets an is_ready method, this is where we use it
-        if self.cert.enabled and self.cert.cert:
-            self.send_ca_cert.set_certificate(
-                self.cert.cert,
-                self.cert.ca or "",  # this will be written to databag as-is.
-                self.cert.chain,
-                relation_id=event.relation.id,
-            )
+        # TODO modify func to also work with deltas (take an event arg)
+        self._send_ca_cert()
+
+    def _send_ca_cert(self):
+        # There is one (and only one) CA cert that we need to forward to multiple apps.
+        rel_name = "send-ca-cert"
+        send_ca_cert = MutualTLSProvides(self, rel_name)
+        if self.cert.enabled and self.cert.ca:
+            for relation in self.model.relations.get(rel_name, []):
+                send_ca_cert.set_certificate(
+                    self.cert.cert or "",
+                    self.cert.ca,
+                    self.cert.chain or [],
+                    relation_id=relation.id,
+                )
+        else:
+            for relation in self.model.relations.get(rel_name, []):
+                send_ca_cert.remove_certificate(relation.id)
 
     @property
     def charm_tracing_endpoint(self) -> Optional[str]:
@@ -302,6 +310,7 @@ class TraefikIngressCharm(CharmBase):
         self._update_cert_configs()
         self._push_config()
         self._process_status_and_configurations()
+        self._send_ca_cert()
 
     def _update_cert_configs(self):
         cert_handler = self.cert
@@ -1183,9 +1192,9 @@ class TraefikIngressCharm(CharmBase):
             )
 
     @property
-    def cert_subject(self) -> Optional[str]:
-        """Provide certificate subject."""
-        host_or_ip = self.external_host
+    def server_cert_sans_dns(self) -> List[str]:
+        """Provide certificate SANs DNS."""
+        target = self.external_host
 
         def is_hostname(st: Optional[str]) -> bool:
             if st is None:
@@ -1197,20 +1206,21 @@ class TraefikIngressCharm(CharmBase):
                 return False
             except ValueError:
                 # This is not an IP address so assume it's a hostname.
-                return st is not None
+                return bool(st)
 
-        if is_hostname(host_or_ip):
-            return host_or_ip
+        if is_hostname(target):
+            assert isinstance(target, str)  # for type checker
+            return [target]
 
         # This is an IP address. Try to look up the hostname.
-        try:
-            lookup = socket.gethostbyaddr(host_or_ip)[0]  # type: ignore
-            return lookup if is_hostname(lookup) else None
-        except (OSError, TypeError):
-            # We do not want to return `socket.getfqdn()` because the user's browser would
-            # immediately complain about an invalid cert. If we can't resolve it via any method,
-            # return None
-            return None
+        with contextlib.suppress(OSError, TypeError):
+            name, _, _ = socket.gethostbyaddr(target)  # type: ignore
+            # Do not return "hostname" like '10-43-8-149.kubernetes.default.svc.cluster.local'
+            if is_hostname(name) and not name.endswith(".svc.cluster.local"):
+                return [name]
+
+        # If all else fails, we'd rather use the bare IP
+        return [target] if target else []
 
     @property
     def _hostname(self) -> str:
