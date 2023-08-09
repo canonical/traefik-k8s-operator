@@ -30,9 +30,12 @@ containers:
 resources:
   traefik-image:
     type: oci-image
-    description: OCI image for traefik (https://hub.docker.com/_/traefik/)
-    # Included for simplicity in integration tests
-    upstream-source: docker.io/jnsgruk/traefik:2.9.6 ### Update this when we settle which image we want to use
+    description: |
+      OCI image for traefik. This charms makes the following assumptions about the image:
+      - executable is `/usr/bin/traefik`
+      - has `update-ca-certificates`
+    # Update this when we settle which image we want to use
+    upstream-source: docker.io/jnsgruk/traefik:2.9.6
 
 storage:
   # We need to store the configurations in a volume, as Traefik's directory
@@ -85,7 +88,17 @@ requires:
       Tracing endpoint for integrating with tempo.
     limit: 1
     interface: tracing
+  receive-ca-cert:
+    interface: mutual_tls
+    description: |
+      Receive a CA cert for traefik to trust.
+      This relation can be used with a local CA to obtain the CA cert that was used to sign proxied
+      endpoints.
+      Note: The interface name is a misnomer, as this is not in fact mTLS.
 
+    # Must limit the relation count to 1 due to
+    # https://github.com/canonical/mutual-tls-interface/issues/6
+    limit: 1
 
 peers:
   peers:

@@ -17,7 +17,11 @@ from urllib.parse import urlparse
 import yaml
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from charms.loki_k8s.v0.loki_push_api import LogProxyConsumer
-from charms.mutual_tls_interface.v0.mutual_tls import MutualTLSProvides
+from charms.mutual_tls_interface.v0.mutual_tls import (
+    CertificateAvailableEvent,
+    MutualTLSProvides,
+    MutualTLSRequires,
+)
 from charms.observability_libs.v0.cert_handler import CertHandler
 from charms.observability_libs.v1.kubernetes_service_patch import (
     KubernetesServicePatch,
@@ -71,12 +75,15 @@ _TRAEFIK_CONTAINER_NAME = _TRAEFIK_LAYER_NAME = _TRAEFIK_SERVICE_NAME = "traefik
 # as that is usually safer for Traefik
 _DYNAMIC_CONFIG_DIR = "/opt/traefik/juju"
 _STATIC_CONFIG_DIR = "/etc/traefik"
-_STATIC_CONFIG_PATH = _STATIC_CONFIG_DIR + "/traefik.yaml"
-_DYNAMIC_CERTS_PATH = _DYNAMIC_CONFIG_DIR + "/certificates.yaml"
-_DYNAMIC_TRACING_PATH = _DYNAMIC_CONFIG_DIR + "/tracing.yaml"
-_SERVER_CERT_PATH = _DYNAMIC_CONFIG_DIR + "/server.cert"
-_SERVER_KEY_PATH = _DYNAMIC_CONFIG_DIR + "/server.key"
-_CA_CERT_PATH = _DYNAMIC_CONFIG_DIR + "/ca.cert"
+_STATIC_CONFIG_PATH = f"{_STATIC_CONFIG_DIR}/traefik.yaml"
+_DYNAMIC_CERTS_PATH = f"{_DYNAMIC_CONFIG_DIR}/certificates.yaml"
+_DYNAMIC_TRACING_PATH = f"{_DYNAMIC_CONFIG_DIR}/tracing.yaml"
+_SERVER_CERT_PATH = f"{_DYNAMIC_CONFIG_DIR}/server.cert"
+_SERVER_KEY_PATH = f"{_DYNAMIC_CONFIG_DIR}/server.key"
+_CA_CERTS_PATH = "/usr/local/share/ca-certificates"
+_CA_CERT_PATH = f"{_CA_CERTS_PATH}/traefik-ca.crt"
+
+
 BIN_PATH = "/usr/bin/traefik"
 
 
@@ -126,6 +133,8 @@ class TraefikIngressCharm(CharmBase):
             peer_relation_name="peers",
             extra_sans_dns=self.server_cert_sans_dns,
         )
+
+        self.recv_ca_cert = MutualTLSRequires(self, "receive-ca-cert")
 
         # FIXME: Do not move these lower. They must exist before `_tcp_ports` is called. The
         # better long-term solution is to allow dynamic modification of the object, and to try
@@ -215,6 +224,16 @@ class TraefikIngressCharm(CharmBase):
             self.on.send_ca_cert_relation_joined,  # pyright: ignore
             self._on_send_ca_cert_relation_joined,
         )
+        observe(
+            self.recv_ca_cert.on.certificate_available,  # pyright: ignore
+            self._on_recv_ca_cert_available,
+        )
+        observe(
+            # Need to observe a managed relation event because a custom wrapper is not available
+            # https://github.com/canonical/mutual-tls-interface/issues/5
+            self.on.receive_ca_cert_relation_broken,  # pyright: ignore
+            self._on_recv_ca_cert_broken,
+        )
 
         # observe data_provided and data_removed events for all types of ingress we offer:
         for ingress in (self.ingress_per_unit, self.ingress_per_appv1, self.ingress_per_appv2):
@@ -247,6 +266,24 @@ class TraefikIngressCharm(CharmBase):
         else:
             for relation in self.model.relations.get(rel_name, []):
                 send_ca_cert.remove_certificate(relation.id)
+
+    def _on_recv_ca_cert_available(self, event: CertificateAvailableEvent):
+        # Assuming only one cert per relation (this is in line with the original lib design).
+        # Assuming only one relation. This is contrived, due to:
+        # https://github.com/canonical/mutual-tls-interface/issues/6
+        rel_id = 0
+        target = f"{_CA_CERTS_PATH}/receive-ca-cert-{rel_id}-ca.crt"
+        self.container.push(target, event.ca, make_dirs=True)
+        self.container.exec(["update-ca-certificates", "--fresh"]).wait()
+
+    def _on_recv_ca_cert_broken(self, event: RelationBrokenEvent):
+        # Assuming only one cert per relation (this is in line with the original lib design).
+        # Assuming only one relation. This is contrived, due to:
+        # https://github.com/canonical/mutual-tls-interface/issues/6
+        rel_id = 0  # TODO: replace with e.g. `event.relation.id` when #6 is fixed
+        target = f"{_CA_CERTS_PATH}/receive-ca-cert-{rel_id}-ca.crt"
+        self.container.remove_path(target, recursive=True)
+        self.container.exec(["update-ca-certificates", "--fresh"]).wait()
 
     @property
     def charm_tracing_endpoint(self) -> Optional[str]:
@@ -328,6 +365,8 @@ class TraefikIngressCharm(CharmBase):
             self.container.push(_CA_CERT_PATH, cert_handler.ca, make_dirs=True)
         else:
             self.container.remove_path(_CA_CERT_PATH, recursive=True)
+
+        self.container.exec(["update-ca-certificates", "--fresh"]).wait()
 
     def _on_show_proxied_endpoints(self, event: ActionEvent):
         if not self.ready:
