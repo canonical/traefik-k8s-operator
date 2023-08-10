@@ -106,8 +106,9 @@ class CertHandler(Object):
         super().__init__(charm, key)
 
         self.charm = charm
-        self.cert_subject = cert_subject or charm.unit.name
-        self.cert_subject = charm.unit.name if not cert_subject else cert_subject
+        # We need to sanitize the unit name, otherwise route53 complains:
+        # "urn:ietf:params:acme:error:malformed" :: Domain name contains an invalid character
+        self.cert_subject = charm.unit.name.replace("/", "-") if not cert_subject else cert_subject
 
         # Use fqdn only if no SANs were given, and drop empty/duplicate SANs
         self.sans_dns = list(set(filter(None, (extra_sans_dns or [socket.getfqdn()]))))
