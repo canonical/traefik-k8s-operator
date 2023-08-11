@@ -127,11 +127,14 @@ class TraefikIngressCharm(CharmBase):
         )
 
         self.container = self.unit.get_container(_TRAEFIK_CONTAINER_NAME)
+        sans = self.server_cert_sans_dns
         self.cert = CertHandler(
             self,
             key="trfk-server-cert",
             peer_relation_name="peers",
-            extra_sans_dns=self.server_cert_sans_dns,
+            # Route53 complains if CN is not a hostname
+            cert_subject=sans[0] if len(sans) else None,
+            extra_sans_dns=sans,
         )
 
         self.recv_ca_cert = MutualTLSRequires(self, "receive-ca-cert")
