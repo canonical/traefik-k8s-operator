@@ -19,7 +19,6 @@ from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from charms.loki_k8s.v0.loki_push_api import LogProxyConsumer
 from charms.mutual_tls_interface.v0.mutual_tls import (
     CertificateAvailableEvent,
-    MutualTLSProvides,
     MutualTLSRequires,
 )
 from charms.observability_libs.v0.cert_handler import CertHandler
@@ -53,7 +52,6 @@ from ops.charm import (
     PebbleReadyEvent,
     RelationBrokenEvent,
     RelationEvent,
-    RelationJoinedEvent,
     StartEvent,
     UpdateStatusEvent,
 )
@@ -224,10 +222,6 @@ class TraefikIngressCharm(CharmBase):
             self._on_cert_changed,
         )
         observe(
-            self.on.send_ca_cert_relation_joined,  # pyright: ignore
-            self._on_send_ca_cert_relation_joined,
-        )
-        observe(
             self.recv_ca_cert.on.certificate_available,  # pyright: ignore
             self._on_recv_ca_cert_available,
         )
@@ -249,26 +243,6 @@ class TraefikIngressCharm(CharmBase):
 
         # Action handlers
         observe(self.on.show_proxied_endpoints_action, self._on_show_proxied_endpoints)  # type: ignore
-
-    def _on_send_ca_cert_relation_joined(self, event: RelationJoinedEvent):
-        # TODO modify func to also work with deltas (take an event arg)
-        self._send_ca_cert()
-
-    def _send_ca_cert(self):
-        # There is one (and only one) CA cert that we need to forward to multiple apps.
-        rel_name = "send-ca-cert"
-        send_ca_cert = MutualTLSProvides(self, rel_name)
-        if self.cert.enabled and self.cert.ca:
-            for relation in self.model.relations.get(rel_name, []):
-                send_ca_cert.set_certificate(
-                    self.cert.cert or "",
-                    self.cert.ca,
-                    self.cert.chain or [],
-                    relation_id=relation.id,
-                )
-        else:
-            for relation in self.model.relations.get(rel_name, []):
-                send_ca_cert.remove_certificate(relation.id)
 
     def _on_recv_ca_cert_available(self, event: CertificateAvailableEvent):
         # Assuming only one cert per relation (this is in line with the original lib design).
@@ -350,7 +324,6 @@ class TraefikIngressCharm(CharmBase):
         self._update_cert_configs()
         self._push_config()
         self._process_status_and_configurations()
-        self._send_ca_cert()
 
     def _update_cert_configs(self):
         cert_handler = self.cert
