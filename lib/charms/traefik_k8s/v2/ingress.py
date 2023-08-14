@@ -50,21 +50,13 @@ class SomeCharm(CharmBase):
     def _on_ingress_revoked(self, event: IngressPerAppRevokedEvent):
         logger.info("This app no longer has ingress")
 """
+import ipaddress
 import json
 import logging
 import socket
 import typing
 from dataclasses import dataclass
-from typing import (
-    Any,
-    Dict,
-    List,
-    MutableMapping,
-    Optional,
-    Sequence,
-    Tuple,
-Union, Callable
-)
+from typing import Any, Callable, Dict, List, MutableMapping, Optional, Sequence, Tuple, Union
 
 import pydantic
 from ops.charm import CharmBase, RelationBrokenEvent, RelationEvent
@@ -208,7 +200,16 @@ class IngressRequirerUnitData(DatabagModel):
     def validate_ip(cls, ip):  # noqa: N805  # pydantic wants 'cls' as first arg
         """Validate ip."""
         assert isinstance(ip, str), type(ip)
-        return ip
+        try:
+            ipaddress.IPv4Address(ip)
+            return ip
+        except ipaddress.AddressValueError:
+            pass
+        try:
+            ipaddress.IPv6Address(ip)
+            return ip
+        except ipaddress.AddressValueError:
+            raise ValueError(f"{ip!r} is not a valid ip address")
 
 
 class RequirerSchema(BaseModel):
@@ -542,6 +543,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         relation_name: str = DEFAULT_RELATION_NAME,
         *,
         host: Optional[str] = None,
+        ip: Optional[str] = None,
         port: Optional[int] = None,
         strip_prefix: bool = False,
         redirect_https: bool = False,
@@ -562,6 +564,8 @@ class IngressPerAppRequirer(_IngressPerAppBase):
                 relation must be of interface type `ingress` and have "limit: 1")
             host: Hostname to be used by the ingress provider to address the requiring
                 application; if unspecified, the default Kubernetes service name will be used.
+            ip: Alternative addressing method other than host to be used by the ingress provider;
+                if unspecified, binding address from juju network API will be used.
             strip_prefix: configure Traefik to strip the path prefix.
             redirect_https: redirect incoming requests to HTTPS.
             scheme: callable returning the scheme to use when constructing the ingress url.
@@ -582,7 +586,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         # if instantiated with a port, and we are related, then
         # we immediately publish our ingress data  to speed up the process.
         if port:
-            self._auto_data = host, port
+            self._auto_data = host, ip, port
         else:
             self._auto_data = None
 
@@ -620,15 +624,19 @@ class IngressPerAppRequirer(_IngressPerAppBase):
 
     def _publish_auto_data(self, relation: Relation):
         if self._auto_data:
-            host, port = self._auto_data
-            self.provide_ingress_requirements(host=host, port=port)
+            host, ip, port = self._auto_data
+            self.provide_ingress_requirements(host=host, ip=ip, port=port)
 
-    def provide_ingress_requirements(self, *, host: Optional[str] = None, port: int):
+    def provide_ingress_requirements(
+        self, *, host: Optional[str] = None, ip: Optional[str] = None, port: int
+    ):
         """Publishes the data that Traefik needs to provide ingress.
 
         Args:
             host: Hostname to be used by the ingress provider to address the
              requirer unit; if unspecified, FQDN will be used instead
+            ip: Alternative addressing method other than host to be used by the ingress provider.
+                if unspecified, binding address from juju network API will be used.
             port: the port of the service (required)
         """
         # get only the leader to publish the data since we only
@@ -655,9 +663,22 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         if not host:
             host = socket.getfqdn()
 
+        if not ip:
+            network_binding = self.charm.model.get_binding(self.relation)
+            if network_binding is None:
+                raise RuntimeError(
+                    f"can't find IP address for relation {self.relation}, network binding is None"
+                )
+            binding_ip = network_binding.network.bind_address
+            if binding_ip is None:
+                raise RuntimeError(
+                    f"can't find IP address for relation {self.relation}, bind address is None"
+                )
+            ip = str(binding_ip)
+
         unit_databag = self.relation.data[self.unit]
         try:
-            IngressRequirerUnitData(host=host).dump(unit_databag)
+            IngressRequirerUnitData(host=host, ip=ip).dump(unit_databag)
         except pydantic.ValidationError as e:
             msg = "failed to validate unit data"
             log.info(msg, exc_info=True)  # log to INFO because this might be expected

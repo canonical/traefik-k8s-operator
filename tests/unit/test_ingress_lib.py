@@ -9,12 +9,10 @@ from charms.traefik_k8s.v2.ingress import (
 
 def test_io_ingress_requirer_unit_data():
     databag = {}
-    unit_data = IngressRequirerUnitData(host="foo.com")
+    unit_data = IngressRequirerUnitData(host="foo.com", ip="10.0.0.1")
 
     unit_data.dump(databag)
-    assert databag == {
-        "host": '"foo.com"',
-    }
+    assert databag == {"host": '"foo.com"', "ip": '"10.0.0.1"'}
 
     assert IngressRequirerUnitData.load(databag) == unit_data
 

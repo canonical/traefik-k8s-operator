@@ -58,12 +58,12 @@ def test_ingress_app_requirer_related(requirer: IngressPerAppRequirer, harness, 
     assert not requirer.is_ready()
     # provider goes to ready immediately because we inited ipa with port=80.
     # auto-data feature...
-
+    harness.add_network("10.0.0.1")
     relation_id = harness.add_relation("ingress", "remote")
     # usually one would provide this via the initializer, but here...
     requirer._strip_prefix = strip_prefix
 
-    requirer.provide_ingress_requirements(host="foo", port=42)
+    requirer.provide_ingress_requirements(host="foo", ip="10.0.0.1", port=42)
     assert not requirer.is_ready()
 
     with capture(harness.charm, IngressPerAppReadyEvent) as captured:
@@ -77,27 +77,28 @@ def test_ingress_app_requirer_related(requirer: IngressPerAppRequirer, harness, 
 @pytest.mark.parametrize(
     "auto_data, ok",
     (
-        ((True, 42), False),
-        ((10, False), False),
-        ((10, None), False),
-        (("foo", 12), True),
+        ((True, "example.com", 42), False),
+        ((10, "example.com", False), False),
+        ((10, "example.com", None), False),
+        (("foo", "10.0.0.1", 12), True),
     ),
 )
 @pytest.mark.parametrize("strip_prefix", (True, False))
 @pytest.mark.parametrize("scheme", ("http", "https"))
 def test_validator(requirer: IngressPerAppRequirer, harness, auto_data, ok, strip_prefix, scheme):
     harness.set_leader(True)
+    harness.add_network("10.0.0.10")
     harness.add_relation("ingress", "remote")
     requirer._strip_prefix = strip_prefix
     requirer._scheme = scheme
 
     if not ok:
         with pytest.raises(DataValidationError):
-            host, port = auto_data
-            requirer.provide_ingress_requirements(host=host, port=port)
+            host, ip, port = auto_data
+            requirer.provide_ingress_requirements(host=host, ip=ip, port=port)
     else:
-        host, port = auto_data
-        requirer.provide_ingress_requirements(host=host, port=port)
+        host, ip, port = auto_data
+        requirer.provide_ingress_requirements(host=host, ip=ip, port=port)
 
 
 class TestIPAEventsEmission(unittest.TestCase):
@@ -127,6 +128,7 @@ class TestIPAEventsEmission(unittest.TestCase):
         # WHEN an ingress relation is formed
         # THEN the ready event is emitted
         with capture(self.harness.charm, IngressPerAppReadyEvent):
+            self.harness.add_network("10.0.0.10")
             self.rel_id = self.harness.add_relation("ingress", "traefik-app")
             self.harness.add_relation_unit(self.rel_id, "traefik-app/0")
 
