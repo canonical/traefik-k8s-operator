@@ -827,7 +827,9 @@ class TraefikIngressCharm(CharmBase):
             if data.get("strip-prefix", False):
                 config.update({"stripPrefix": {"prefixes": [f"/{prefix}"], "forceSlash": False}})
 
-        if data.get("redirect-https", False):
+        # Condition rendering the https-redirect middleware on the scheme, otherwise we'd get a 404
+        # when attempting to reach an http endpoint.
+        if data.get("redirect-https", False) and data.get("scheme") == "https":
             config.update({"redirectScheme": {"scheme": "https", "port": 443, "permanent": True}})
 
         if config:
