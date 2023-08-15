@@ -83,7 +83,8 @@ def _render_config(
         expected["http"]["serversTransports"] = transports
 
     if middlewares := _render_middlewares(
-        strip_prefix=strip_prefix and routing_mode == "path", redirect_https=redirect_https
+        strip_prefix=strip_prefix and routing_mode == "path",
+        redirect_https=redirect_https and scheme == "https",
     ):
         expected["http"].update(middlewares)
         expected["http"]["routers"]["juju-test-model-remote-0-router"].update(
