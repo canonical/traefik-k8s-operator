@@ -82,7 +82,7 @@ LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 13
+LIBPATCH = 14
 
 log = logging.getLogger(__name__)
 
@@ -154,6 +154,7 @@ RequirerData = TypedDict(
         "mode": Optional[Literal["tcp", "http"]],
         "strip-prefix": Optional[bool],
         "redirect-https": Optional[bool],
+        "scheme": Optional[Literal["http", "https"]],
     },
     total=False,
 )
@@ -663,6 +664,7 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
         listen_to: Literal["only-this-unit", "all-units", "both"] = "only-this-unit",
         strip_prefix: bool = False,
         redirect_https: bool = False,
+        scheme: typing.Callable[[], str] = lambda: "http",
     ):
         """Constructor for IngressPerUnitRequirer.
 
@@ -692,6 +694,7 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
                   will be notified *twice* of changes to this unit's ingress!).
             strip_prefix: remove prefixes from the URL path.
             redirect_https: redirect incoming requests to HTTPS
+            scheme: callable returning the scheme to use when constructing the ingress url.
         """
         super().__init__(charm, relation_name)
         self._stored.set_default(current_urls=None)  # type: ignore
@@ -703,6 +706,7 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
         self._mode = mode
         self._strip_prefix = strip_prefix
         self._redirect_https = redirect_https
+        self._get_scheme = scheme
 
         self.listen_to = listen_to
 
@@ -790,6 +794,7 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
             "host": host,
             "port": str(port),
             "mode": self._mode,
+            "scheme": self._get_scheme(),
         }
 
         if self._strip_prefix:
