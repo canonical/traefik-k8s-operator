@@ -821,20 +821,28 @@ class TraefikIngressCharm(CharmBase):
         data: Dict[str, Any],
         prefix: str,
     ) -> dict:
-        """Generate a middleware config."""
-        config = {}  # type: Dict[str, Dict[str, Any]]
+        """Generate a middleware config.
+
+        We need to generate a different section per middleware type, otherwise traefik complains:
+          "cannot create middleware: multi-types middleware not supported, consider declaring two
+          different pieces of middleware instead"
+        """
+        no_prefix_middleware = {}  # type: Dict[str, Dict[str, Any]]
         if self._routing_mode is _RoutingMode.path:
             if data.get("strip-prefix", False):
-                config.update({"stripPrefix": {"prefixes": [f"/{prefix}"], "forceSlash": False}})
+                no_prefix_middleware[f"juju-sidecar-noprefix-{prefix}"] = {
+                    "stripPrefix": {"prefixes": [f"/{prefix}"], "forceSlash": False}
+                }
 
         # Condition rendering the https-redirect middleware on the scheme, otherwise we'd get a 404
         # when attempting to reach an http endpoint.
+        redir_scheme_middleware = {}
         if data.get("redirect-https", False) and data.get("scheme") == "https":
-            config.update({"redirectScheme": {"scheme": "https", "port": 443, "permanent": True}})
+            redir_scheme_middleware[f"juju-sidecar-redir-https-{prefix}"] = {
+                "redirectScheme": {"scheme": "https", "port": 443, "permanent": True}
+            }
 
-        if config:
-            return {f"juju-sidecar-noprefix-{prefix}": config}
-        return {}
+        return {**no_prefix_middleware, **redir_scheme_middleware}
 
     def _generate_per_unit_tcp_config(self, prefix: str, data: RequirerData_IPU) -> dict:
         """Generate a config dict for a given unit for IngressPerUnit in tcp mode."""
