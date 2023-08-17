@@ -251,7 +251,7 @@ class TraefikIngressCharm(CharmBase):
         rel_id = 0
         target = f"{_CA_CERTS_PATH}/receive-ca-cert-{rel_id}-ca.crt"
         self.container.push(target, event.ca, make_dirs=True)
-        self.container.exec(["update-ca-certificates", "--fresh"]).wait()
+        self._update_system_certs()
 
     def _on_recv_ca_cert_broken(self, event: RelationBrokenEvent):
         # Assuming only one cert per relation (this is in line with the original lib design).
@@ -260,7 +260,7 @@ class TraefikIngressCharm(CharmBase):
         rel_id = 0  # TODO: replace with e.g. `event.relation.id` when #6 is fixed
         target = f"{_CA_CERTS_PATH}/receive-ca-cert-{rel_id}-ca.crt"
         self.container.remove_path(target, recursive=True)
-        self.container.exec(["update-ca-certificates", "--fresh"]).wait()
+        self._update_system_certs()
 
     @property
     def charm_tracing_endpoint(self) -> Optional[str]:
@@ -342,7 +342,16 @@ class TraefikIngressCharm(CharmBase):
         else:
             self.container.remove_path(_CA_CERT_PATH, recursive=True)
 
+        self._update_system_certs()
+
+    def _update_system_certs(self):
         self.container.exec(["update-ca-certificates", "--fresh"]).wait()
+
+        # Must restart traefik after refreshing certs, otherwise:
+        # - newly added certs will not be loaded and traefik will keep erroring-out with "signed by
+        #   unknown authority".
+        # - old certs will be kept active.
+        self._restart_traefik()
 
     def _on_show_proxied_endpoints(self, event: ActionEvent):
         if not self.ready:
