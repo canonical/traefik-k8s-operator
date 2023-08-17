@@ -17,6 +17,10 @@ from urllib.parse import urlparse
 import yaml
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from charms.loki_k8s.v0.loki_push_api import LogProxyConsumer
+from charms.mutual_tls_interface.v0.mutual_tls import (
+    CertificateAvailableEvent,
+    MutualTLSRequires,
+)
 from charms.observability_libs.v0.cert_handler import CertHandler
 from charms.observability_libs.v1.kubernetes_service_patch import (
     KubernetesServicePatch,
@@ -69,12 +73,15 @@ _TRAEFIK_CONTAINER_NAME = _TRAEFIK_LAYER_NAME = _TRAEFIK_SERVICE_NAME = "traefik
 # as that is usually safer for Traefik
 _DYNAMIC_CONFIG_DIR = "/opt/traefik/juju"
 _STATIC_CONFIG_DIR = "/etc/traefik"
-_STATIC_CONFIG_PATH = _STATIC_CONFIG_DIR + "/traefik.yaml"
-_DYNAMIC_CERTS_PATH = _DYNAMIC_CONFIG_DIR + "/certificates.yaml"
-_DYNAMIC_TRACING_PATH = _DYNAMIC_CONFIG_DIR + "/tracing.yaml"
-_SERVER_CERT_PATH = _DYNAMIC_CONFIG_DIR + "/server.cert"
-_SERVER_KEY_PATH = _DYNAMIC_CONFIG_DIR + "/server.key"
-_CA_CERT_PATH = _DYNAMIC_CONFIG_DIR + "/ca.cert"
+_STATIC_CONFIG_PATH = f"{_STATIC_CONFIG_DIR}/traefik.yaml"
+_DYNAMIC_CERTS_PATH = f"{_DYNAMIC_CONFIG_DIR}/certificates.yaml"
+_DYNAMIC_TRACING_PATH = f"{_DYNAMIC_CONFIG_DIR}/tracing.yaml"
+_SERVER_CERT_PATH = f"{_DYNAMIC_CONFIG_DIR}/server.cert"
+_SERVER_KEY_PATH = f"{_DYNAMIC_CONFIG_DIR}/server.key"
+_CA_CERTS_PATH = "/usr/local/share/ca-certificates"
+_CA_CERT_PATH = f"{_CA_CERTS_PATH}/traefik-ca.crt"
+
+
 BIN_PATH = "/usr/bin/traefik"
 
 
@@ -118,12 +125,17 @@ class TraefikIngressCharm(CharmBase):
         )
 
         self.container = self.unit.get_container(_TRAEFIK_CONTAINER_NAME)
+        sans = self.server_cert_sans_dns
         self.cert = CertHandler(
             self,
             key="trfk-server-cert",
             peer_relation_name="peers",
-            extra_sans_dns=[self.cert_subject] if self.cert_subject else [],
+            # Route53 complains if CN is not a hostname
+            cert_subject=sans[0] if len(sans) else None,
+            extra_sans_dns=sans,
         )
+
+        self.recv_ca_cert = MutualTLSRequires(self, "receive-ca-cert")
 
         # FIXME: Do not move these lower. They must exist before `_tcp_ports` is called. The
         # better long-term solution is to allow dynamic modification of the object, and to try
@@ -192,10 +204,6 @@ class TraefikIngressCharm(CharmBase):
         # TODO update init params once auto-renew is implemented
         # https://github.com/canonical/tls-certificates-interface/issues/24
         observe(
-            self.cert.on.cert_changed,  # type: ignore
-            self._on_cert_changed,
-        )
-        observe(
             self._tracing.on.endpoint_changed,  # type: ignore
             self._on_tracing_endpoint_changed,
         )
@@ -209,6 +217,20 @@ class TraefikIngressCharm(CharmBase):
         observe(self.on.stop, self._on_stop)
         observe(self.on.update_status, self._on_update_status)
         observe(self.on.config_changed, self._on_config_changed)
+        observe(
+            self.cert.on.cert_changed,  # pyright: ignore
+            self._on_cert_changed,
+        )
+        observe(
+            self.recv_ca_cert.on.certificate_available,  # pyright: ignore
+            self._on_recv_ca_cert_available,
+        )
+        observe(
+            # Need to observe a managed relation event because a custom wrapper is not available
+            # https://github.com/canonical/mutual-tls-interface/issues/5
+            self.on.receive_ca_cert_relation_broken,  # pyright: ignore
+            self._on_recv_ca_cert_broken,
+        )
 
         # observe data_provided and data_removed events for all types of ingress we offer:
         for ingress in (self.ingress_per_unit, self.ingress_per_appv1, self.ingress_per_appv2):
@@ -221,6 +243,24 @@ class TraefikIngressCharm(CharmBase):
 
         # Action handlers
         observe(self.on.show_proxied_endpoints_action, self._on_show_proxied_endpoints)  # type: ignore
+
+    def _on_recv_ca_cert_available(self, event: CertificateAvailableEvent):
+        # Assuming only one cert per relation (this is in line with the original lib design).
+        # Assuming only one relation. This is contrived, due to:
+        # https://github.com/canonical/mutual-tls-interface/issues/6
+        rel_id = 0
+        target = f"{_CA_CERTS_PATH}/receive-ca-cert-{rel_id}-ca.crt"
+        self.container.push(target, event.ca, make_dirs=True)
+        self._update_system_certs()
+
+    def _on_recv_ca_cert_broken(self, event: RelationBrokenEvent):
+        # Assuming only one cert per relation (this is in line with the original lib design).
+        # Assuming only one relation. This is contrived, due to:
+        # https://github.com/canonical/mutual-tls-interface/issues/6
+        rel_id = 0  # TODO: replace with e.g. `event.relation.id` when #6 is fixed
+        target = f"{_CA_CERTS_PATH}/receive-ca-cert-{rel_id}-ca.crt"
+        self.container.remove_path(target, recursive=True)
+        self._update_system_certs()
 
     @property
     def charm_tracing_endpoint(self) -> Optional[str]:
@@ -301,6 +341,17 @@ class TraefikIngressCharm(CharmBase):
             self.container.push(_CA_CERT_PATH, cert_handler.ca, make_dirs=True)
         else:
             self.container.remove_path(_CA_CERT_PATH, recursive=True)
+
+        self._update_system_certs()
+
+    def _update_system_certs(self):
+        self.container.exec(["update-ca-certificates", "--fresh"]).wait()
+
+        # Must restart traefik after refreshing certs, otherwise:
+        # - newly added certs will not be loaded and traefik will keep erroring-out with "signed by
+        #   unknown authority".
+        # - old certs will be kept active.
+        self._restart_traefik()
 
     def _on_show_proxied_endpoints(self, event: ActionEvent):
         if not self.ready:
@@ -795,6 +846,7 @@ class TraefikIngressCharm(CharmBase):
                 unit_config = self._generate_per_unit_http_config(prefix, data)  # type: ignore
                 if self.unit.is_leader():
                     ipu.publish_url(relation, data["name"], self._get_external_url(prefix))
+
             always_merger.merge(config, unit_config)
 
         # Note: We might be pushing an empty configuration if, for example,
@@ -868,7 +920,7 @@ class TraefikIngressCharm(CharmBase):
                         "loadBalancer": {
                             "servers": [{"address": f"{data['host']}:{data['port']}"}]
                         }
-                    }
+                    },
                 },
             }
         }
@@ -1174,9 +1226,9 @@ class TraefikIngressCharm(CharmBase):
             )
 
     @property
-    def cert_subject(self) -> Optional[str]:
-        """Provide certificate subject."""
-        host_or_ip = self.external_host
+    def server_cert_sans_dns(self) -> List[str]:
+        """Provide certificate SANs DNS."""
+        target = self.external_host
 
         def is_hostname(st: Optional[str]) -> bool:
             if st is None:
@@ -1188,20 +1240,21 @@ class TraefikIngressCharm(CharmBase):
                 return False
             except ValueError:
                 # This is not an IP address so assume it's a hostname.
-                return st is not None
+                return bool(st)
 
-        if is_hostname(host_or_ip):
-            return host_or_ip
+        if is_hostname(target):
+            assert isinstance(target, str)  # for type checker
+            return [target]
 
         # This is an IP address. Try to look up the hostname.
-        try:
-            lookup = socket.gethostbyaddr(host_or_ip)[0]  # type: ignore
-            return lookup if is_hostname(lookup) else None
-        except (OSError, TypeError):
-            # We do not want to return `socket.getfqdn()` because the user's browser would
-            # immediately complain about an invalid cert. If we can't resolve it via any method,
-            # return None
-            return None
+        with contextlib.suppress(OSError, TypeError):
+            name, _, _ = socket.gethostbyaddr(target)  # type: ignore
+            # Do not return "hostname" like '10-43-8-149.kubernetes.default.svc.cluster.local'
+            if is_hostname(name) and not name.endswith(".svc.cluster.local"):
+                return [name]
+
+        # If all else fails, we'd rather use the bare IP
+        return [target] if target else []
 
     @property
     def _hostname(self) -> str:
