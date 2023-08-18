@@ -480,7 +480,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 20
+LIBPATCH = 21
 
 logger = logging.getLogger(__name__)
 
@@ -1992,7 +1992,9 @@ class LogProxyConsumer(ConsumerBase):
             workload_binary_path: path in workload container to which promtail binary is pushed.
         """
         with open(binary_path, "rb") as f:
-            self._container.push(workload_binary_path, f, permissions=0o755, make_dirs=True)
+            self._container.push(
+                workload_binary_path, f, permissions=0o755, encoding=None, make_dirs=True
+            )
             logger.debug("The promtail binary file has been pushed to the workload container.")
 
     @property
