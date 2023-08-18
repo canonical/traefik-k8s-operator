@@ -928,7 +928,7 @@ class TraefikIngressCharm(CharmBase):
 
     def _generate_per_unit_http_config(self, prefix: str, data: RequirerData_IPU) -> dict:
         """Generate a config dict for a given unit for IngressPerUnit."""
-        lb_servers = [{"url": f"http://{data['host']}:{data['port']}"}]
+        lb_servers = [{"url": f"{data.get('scheme', 'http')}://{data['host']}:{data['port']}"}]
         return self._generate_config_block(prefix, lb_servers, data)  # type: ignore
 
     def _generate_config_block(
