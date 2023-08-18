@@ -15,12 +15,12 @@ from typing import Any, Dict, List, Optional, Union
 from urllib.parse import urlparse
 
 import yaml
+from charms.certificate_transfer_interface.v0.certificate_transfer import (
+    CertificateAvailableEvent,
+    CertificateTransferRequires,
+)
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from charms.loki_k8s.v0.loki_push_api import LogProxyConsumer
-from charms.mutual_tls_interface.v0.mutual_tls import (
-    CertificateAvailableEvent,
-    MutualTLSRequires,
-)
 from charms.observability_libs.v0.cert_handler import CertHandler
 from charms.observability_libs.v1.kubernetes_service_patch import (
     KubernetesServicePatch,
@@ -135,7 +135,7 @@ class TraefikIngressCharm(CharmBase):
             extra_sans_dns=sans,
         )
 
-        self.recv_ca_cert = MutualTLSRequires(self, "receive-ca-cert")
+        self.recv_ca_cert = CertificateTransferRequires(self, "receive-ca-cert")
 
         # FIXME: Do not move these lower. They must exist before `_tcp_ports` is called. The
         # better long-term solution is to allow dynamic modification of the object, and to try
