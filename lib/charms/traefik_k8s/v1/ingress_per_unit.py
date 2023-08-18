@@ -487,7 +487,16 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
 
         databag = relation.data[remote_unit]
         remote_data: Dict[str, Union[int, str]] = {}
-        for k in ("port", "host", "model", "name", "mode", "strip-prefix", "redirect-https", "scheme"):
+        for k in (
+            "port",
+            "host",
+            "model",
+            "name",
+            "mode",
+            "strip-prefix",
+            "redirect-https",
+            "scheme",
+        ):
             v = databag.get(k)
             if v is not None:
                 remote_data[k] = v
