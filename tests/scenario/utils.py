@@ -38,10 +38,6 @@ def _render_config(
         "subdomain": "Host(`test-model-remote-0.testhostname`)",
     }
 
-    if rel_name != "ingress":
-        scheme = "http"
-        # ipu does not do https for now
-
     service_spec = {
         "loadBalancer": {"servers": [{"url": f"{scheme}://{host}:{port}"}]},
     }
