@@ -82,15 +82,14 @@ requires:
     limit: 1
     interface: tracing
   receive-ca-cert:
-    interface: mutual_tls
+    interface: certificate_transfer
     description: |
       Receive a CA cert for traefik to trust.
       This relation can be used with a local CA to obtain the CA cert that was used to sign proxied
       endpoints.
-      Note: The interface name is a misnomer, as this is not in fact mTLS.
 
     # Must limit the relation count to 1 due to
-    # https://github.com/canonical/mutual-tls-interface/issues/6
+    # https://github.com/canonical/certificate-transfer-interface/issues/6
     limit: 1
 
 peers:
