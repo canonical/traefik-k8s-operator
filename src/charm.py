@@ -987,7 +987,7 @@ class TraefikIngressCharm(CharmBase):
             # i.e. traefik itself is not related to tls certificates, but the ingress requirer is
             transport_name = "reverseTerminationTransport"
             lb_def["serversTransport"] = transport_name
-            transports = {transport_name: {"insecureSkipVerify": True}}
+            transports = {transport_name: {"insecureSkipVerify": False}}
 
         elif is_termination:
             # i.e. traefik itself is related to tls certificates, but the ingress requirer is not
