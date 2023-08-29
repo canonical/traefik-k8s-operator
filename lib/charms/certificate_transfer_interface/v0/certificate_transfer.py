@@ -36,7 +36,7 @@ class DummyCertificateTransferProviderCharm(CharmBase):
         certificate = "my certificate"
         ca = "my CA certificate"
         chain = ["certificate 1", "certificate 2"]
-        self.certificate_transfer.set_certificate(certificate=certificate, ca=ca, chain=chain)
+        self.certificate_transfer.set_certificate(certificate=certificate, ca=ca, chain=chain, relation_id=event.relation.id)
 
 
 if __name__ == "__main__":
@@ -54,6 +54,7 @@ from ops.main import main
 
 from lib.charms.certificate_transfer_interface.v0.certificate_transfer import (
     CertificateAvailableEvent,
+    CertificateRemovedEvent,
     CertificateTransferRequires,
 )
 
@@ -65,11 +66,18 @@ class DummyCertificateTransferRequirerCharm(CharmBase):
         self.framework.observe(
             self.certificate_transfer.on.certificate_available, self._on_certificate_available
         )
+        self.framework.observe(
+            self.certificate_transfer.on.certificate_removed, self._on_certificate_removed
+        )
 
     def _on_certificate_available(self, event: CertificateAvailableEvent):
         print(event.certificate)
         print(event.ca)
         print(event.chain)
+        print(event.relation_id)
+
+    def _on_certificate_removed(self, event: CertificateRemovedEvent):
+        print(event.relation_id)
 
 
 if __name__ == "__main__":
@@ -87,10 +95,10 @@ juju relate <certificate_transfer provider charm> <certificate_transfer requirer
 
 import json
 import logging
-from typing import List, Optional
+from typing import List
 
 from jsonschema import exceptions, validate  # type: ignore[import]
-from ops.charm import CharmBase, CharmEvents, RelationChangedEvent
+from ops.charm import CharmBase, CharmEvents, RelationBrokenEvent, RelationChangedEvent
 from ops.framework import EventBase, EventSource, Handle, Object
 
 # The unique Charmhub library identifier, never change it
@@ -101,7 +109,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 1
+LIBPATCH = 4
 
 PYDEPS = ["jsonschema"]
 
@@ -161,11 +169,13 @@ class CertificateAvailableEvent(EventBase):
         certificate: str,
         ca: str,
         chain: List[str],
+        relation_id: int,
     ):
         super().__init__(handle)
         self.certificate = certificate
         self.ca = ca
         self.chain = chain
+        self.relation_id = relation_id
 
     def snapshot(self) -> dict:
         """Return snapshot."""
@@ -173,6 +183,7 @@ class CertificateAvailableEvent(EventBase):
             "certificate": self.certificate,
             "ca": self.ca,
             "chain": self.chain,
+            "relation_id": self.relation_id,
         }
 
     def restore(self, snapshot: dict):
@@ -180,6 +191,23 @@ class CertificateAvailableEvent(EventBase):
         self.certificate = snapshot["certificate"]
         self.ca = snapshot["ca"]
         self.chain = snapshot["chain"]
+        self.relation_id = snapshot["relation_id"]
+
+
+class CertificateRemovedEvent(EventBase):
+    """Charm Event triggered when a TLS certificate is removed."""
+
+    def __init__(self, handle: Handle, relation_id: int):
+        super().__init__(handle)
+        self.relation_id = relation_id
+
+    def snapshot(self) -> dict:
+        """Return snapshot."""
+        return {"relation_id": self.relation_id}
+
+    def restore(self, snapshot: dict):
+        """Restores snapshot."""
+        self.relation_id = snapshot["relation_id"]
 
 
 def _load_relation_data(raw_relation_data: dict) -> dict:
@@ -204,6 +232,7 @@ class CertificateTransferRequirerCharmEvents(CharmEvents):
     """List of events that the Certificate Transfer requirer charm can leverage."""
 
     certificate_available = EventSource(CertificateAvailableEvent)
+    certificate_removed = EventSource(CertificateRemovedEvent)
 
 
 class CertificateTransferProvides(Object):
@@ -219,7 +248,7 @@ class CertificateTransferProvides(Object):
         certificate: str,
         ca: str,
         chain: List[str],
-        relation_id: Optional[int] = None,
+        relation_id: int,
     ) -> None:
         """Add certificates to relation data.
 
@@ -245,7 +274,7 @@ class CertificateTransferProvides(Object):
         relation.data[self.model.unit]["ca"] = ca
         relation.data[self.model.unit]["chain"] = json.dumps(chain)
 
-    def remove_certificate(self, relation_id: Optional[int] = None) -> None:
+    def remove_certificate(self, relation_id: int) -> None:
         """Remove a given certificate from relation data.
 
         Args:
@@ -303,6 +332,9 @@ class CertificateTransferRequires(Object):
         self.framework.observe(
             charm.on[relationship_name].relation_changed, self._on_relation_changed
         )
+        self.framework.observe(
+            charm.on[relationship_name].relation_broken, self._on_relation_broken
+        )
 
     @staticmethod
     def _relation_data_is_valid(relation_data: dict) -> bool:
@@ -343,4 +375,16 @@ class CertificateTransferRequires(Object):
             certificate=remote_unit_relation_data.get("certificate"),
             ca=remote_unit_relation_data.get("ca"),
             chain=remote_unit_relation_data.get("chain"),
+            relation_id=event.relation.id,
         )
+
+    def _on_relation_broken(self, event: RelationBrokenEvent) -> None:
+        """Handler triggered on relation broken event.
+
+        Args:
+            event: Juju event
+
+        Returns:
+            None
+        """
+        self.on.certificate_removed.emit(relation_id=event.relation.id)
