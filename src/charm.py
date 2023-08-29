@@ -16,7 +16,8 @@ from urllib.parse import urlparse
 
 import yaml
 from charms.certificate_transfer_interface.v0.certificate_transfer import (
-    CertificateAvailableEvent,
+    CertificateAvailableEvent as CertificateTransferAvailableEvent,
+    CertificateRemovedEvent as CertificateTransferRemovedEvent,
     CertificateTransferRequires,
 )
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
@@ -228,8 +229,8 @@ class TraefikIngressCharm(CharmBase):
         observe(
             # Need to observe a managed relation event because a custom wrapper is not available
             # https://github.com/canonical/mutual-tls-interface/issues/5
-            self.on.receive_ca_cert_relation_broken,  # pyright: ignore
-            self._on_recv_ca_cert_broken,
+            self.recv_ca_cert.on.certificate_removed,  # pyright: ignore
+            self._on_recv_ca_cert_removed,
         )
 
         # observe data_provided and data_removed events for all types of ingress we offer:
@@ -244,21 +245,15 @@ class TraefikIngressCharm(CharmBase):
         # Action handlers
         observe(self.on.show_proxied_endpoints_action, self._on_show_proxied_endpoints)  # type: ignore
 
-    def _on_recv_ca_cert_available(self, event: CertificateAvailableEvent):
+    def _on_recv_ca_cert_available(self, event: CertificateTransferAvailableEvent):
         # Assuming only one cert per relation (this is in line with the original lib design).
-        # Assuming only one relation. This is contrived, due to:
-        # https://github.com/canonical/mutual-tls-interface/issues/6
-        rel_id = 0
-        target = f"{_CA_CERTS_PATH}/receive-ca-cert-{rel_id}-ca.crt"
+        target = f"{_CA_CERTS_PATH}/receive-ca-cert-{event.relation_id}-ca.crt"
         self.container.push(target, event.ca, make_dirs=True)
         self._update_system_certs()
 
-    def _on_recv_ca_cert_broken(self, event: RelationBrokenEvent):
+    def _on_recv_ca_cert_removed(self, event: CertificateTransferRemovedEvent):
         # Assuming only one cert per relation (this is in line with the original lib design).
-        # Assuming only one relation. This is contrived, due to:
-        # https://github.com/canonical/mutual-tls-interface/issues/6
-        rel_id = 0  # TODO: replace with e.g. `event.relation.id` when #6 is fixed
-        target = f"{_CA_CERTS_PATH}/receive-ca-cert-{rel_id}-ca.crt"
+        target = f"{_CA_CERTS_PATH}/receive-ca-cert-{event.relation_id}-ca.crt"
         self.container.remove_path(target, recursive=True)
         self._update_system_certs()
 
