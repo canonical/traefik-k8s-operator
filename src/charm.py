@@ -17,7 +17,11 @@ from urllib.parse import urlparse
 import yaml
 from charms.certificate_transfer_interface.v0.certificate_transfer import (
     CertificateAvailableEvent as CertificateTransferAvailableEvent,
+)
+from charms.certificate_transfer_interface.v0.certificate_transfer import (
     CertificateRemovedEvent as CertificateTransferRemovedEvent,
+)
+from charms.certificate_transfer_interface.v0.certificate_transfer import (
     CertificateTransferRequires,
 )
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
