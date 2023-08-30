@@ -34,3 +34,5 @@ ops < 2.5.0  # https://github.com/canonical/ops-scenario/issues/48
 importlib-metadata==6.0.0
 opentelemetry-exporter-otlp-proto-grpc==1.17.0
 pydantic<2.0
+
+cosl
