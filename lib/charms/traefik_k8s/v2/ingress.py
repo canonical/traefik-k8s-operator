@@ -79,7 +79,7 @@ LIBAPI = 2
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 4
+LIBPATCH = 5
 
 PYDEPS = ["pydantic<2.0"]
 
@@ -612,26 +612,38 @@ class IngressPerAppRequirer(_IngressPerAppBase):
             host, port = self._auto_data
             self.provide_ingress_requirements(host=host, port=port)
 
-    def provide_ingress_requirements(self, *, host: Optional[str] = None, port: int):
+    def provide_ingress_requirements(
+        self, *, scheme: Optional[str] = None, host: Optional[str] = None, port: int
+    ):
         """Publishes the data that Traefik needs to provide ingress.
 
         Args:
+            scheme: Scheme to be used; if unspecified, use the one used by __init__.
             host: Hostname to be used by the ingress provider to address the
              requirer unit; if unspecified, FQDN will be used instead
             port: the port of the service (required)
         """
+        # This public method may be used at various points of the charm lifecycle, possible when
+        # the ingress relation is not yet there.
+        # Abort if there is no relation (instead of requiring the caller to guard against it).
+        if not self.relation:
+            return
+
         # get only the leader to publish the data since we only
         # require one unit to publish it -- it will not differ between units,
         # unlike in ingress-per-unit.
-        assert self.relation, "no relation"
-
         if self.unit.is_leader():
             app_databag = self.relation.data[self.app]
+
+            if not scheme:
+                # If scheme was not provided, use the one given to the constructor.
+                scheme = self._get_scheme()
+
             try:
                 IngressRequirerAppData(  # type: ignore  # pyright does not like aliases
                     model=self.model.name,
                     name=self.app.name,
-                    scheme=self._get_scheme(),
+                    scheme=scheme,
                     port=port,
                     strip_prefix=self._strip_prefix,  # type: ignore  # pyright does not like aliases
                     redirect_https=self._redirect_https,  # type: ignore  # pyright does not like aliases
