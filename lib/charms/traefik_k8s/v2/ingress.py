@@ -623,11 +623,15 @@ class IngressPerAppRequirer(_IngressPerAppBase):
              requirer unit; if unspecified, FQDN will be used instead
             port: the port of the service (required)
         """
+        # This public method may be used at various points of the charm lifecycle, possible when
+        # the ingress relation is not yet there.
+        # Abort if there is no relation (instead of requiring the caller to guard against it).
+        if not self.relation:
+            return
+
         # get only the leader to publish the data since we only
         # require one unit to publish it -- it will not differ between units,
         # unlike in ingress-per-unit.
-        assert self.relation, "no relation"
-
         if self.unit.is_leader():
             app_databag = self.relation.data[self.app]
 
