@@ -45,7 +45,7 @@ def _render_config(
     if scheme == "https":
         # service_spec["rootCAs"] = ["/opt/traefik/juju/certificate.cert"]
         service_spec["loadBalancer"]["serversTransport"] = "reverseTerminationTransport"
-        transports = {"reverseTerminationTransport": {"insecureSkipVerify": True}}
+        transports = {"reverseTerminationTransport": {"insecureSkipVerify": False}}
 
     expected = {
         "http": {
