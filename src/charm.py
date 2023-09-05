@@ -159,7 +159,7 @@ class TraefikIngressCharm(CharmBase):
 
         self.ingress_per_unit = IngressPerUnitProvider(charm=self)
         self.traefik_route = TraefikRouteProvider(
-            charm=self, external_host=self.external_host  # type: ignore
+            charm=self, external_host=self.external_host, scheme=self._scheme  # type: ignore
         )
 
         web = ServicePort(self._port, name=f"{self.app.name}")
@@ -1071,12 +1071,15 @@ class TraefikIngressCharm(CharmBase):
         lb_servers = [{"url": f"http://{data['host']}:{data['port']}"}]
         return self._generate_config_block(prefix, lb_servers, data)  # type: ignore
 
+    @property
+    def _scheme(self):
+        return "https" if self.cert.enabled else "http"
+
     def _get_external_url(self, prefix):
-        scheme = "https" if self.cert.enabled else "http"
         if self._routing_mode is _RoutingMode.path:
-            url = f"{scheme}://{self.external_host}/{prefix}"
+            url = f"{self._scheme}://{self.external_host}/{prefix}"
         else:  # _RoutingMode.subdomain
-            url = f"{scheme}://{prefix}.{self.external_host}/"
+            url = f"{self._scheme}://{prefix}.{self.external_host}/"
         return url
 
     def _wipe_ingress_for_all_relations(self):
