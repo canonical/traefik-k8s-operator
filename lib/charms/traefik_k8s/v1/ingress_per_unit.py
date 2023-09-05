@@ -798,7 +798,11 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
              requirer unit; if unspecified, FQDN will be used instead
             port: the port of the service (required)
         """
-        assert self.relation, "no relation"
+        # This public method may be used at various points of the charm lifecycle, possibly when
+        # the ingress relation is not yet there.
+        # Abort if there is no relation (instead of requiring the caller to guard against it).
+        if not self.relation:
+            return
 
         if not host:
             host = socket.getfqdn()
