@@ -34,9 +34,9 @@ def test_ingress_per_app_created(
     traefik_ctx.run(event, state)
 
     generated_config = yaml.safe_load(
-        traefik_container.get_filesystem(traefik_ctx).joinpath(
-            f"opt/traefik/juju/juju_ingress_ingress_{ipa.relation_id}_remote.yaml"
-        ).read_text()
+        traefik_container.get_filesystem(traefik_ctx)
+        .joinpath(f"opt/traefik/juju/juju_ingress_ingress_{ipa.relation_id}_remote.yaml")
+        .read_text()
     )
 
     service_def = {

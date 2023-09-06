@@ -44,7 +44,11 @@ def test_traefik_tracing_config(traefik_ctx, traefik_container, tracing_relation
     with _charm_tracing_disabled():
         traefik_ctx.run(tracing_relation.changed_event, state_in)
 
-    tracing_cfg = traefik_container.get_filesystem(traefik_ctx).joinpath(_DYNAMIC_TRACING_PATH[1:]).read_text()
+    tracing_cfg = (
+        traefik_container.get_filesystem(traefik_ctx)
+        .joinpath(_DYNAMIC_TRACING_PATH[1:])
+        .read_text()
+    )
     cfg = yaml.safe_load(tracing_cfg)
     assert cfg == {
         "tracing": {
@@ -66,7 +70,11 @@ def test_traefik_tracing_config_with_tls(traefik_ctx, traefik_container, tracing
         with _charm_tracing_disabled():
             traefik_ctx.run(tracing_relation.changed_event, state_in)
 
-    tracing_cfg = traefik_container.get_filesystem(traefik_ctx).joinpath(_DYNAMIC_TRACING_PATH[1:]).read_text()
+    tracing_cfg = (
+        traefik_container.get_filesystem(traefik_ctx)
+        .joinpath(_DYNAMIC_TRACING_PATH[1:])
+        .read_text()
+    )
     cfg = yaml.safe_load(tracing_cfg)
     assert cfg == {
         "tracing": {
@@ -97,7 +105,9 @@ def test_traefik_tracing_config_removed_if_relation_data_invalid(
         traefik_ctx.run(tracing_relation.changed_event, state_in)
 
     # assert file is not there
-    assert not traefik_container.get_filesystem(traefik_ctx).joinpath(_DYNAMIC_TRACING_PATH).exists()
+    assert (
+        not traefik_container.get_filesystem(traefik_ctx).joinpath(_DYNAMIC_TRACING_PATH).exists()
+    )
 
 
 @pytest.mark.parametrize("was_present_before", (True, False))
@@ -115,4 +125,6 @@ def test_traefik_tracing_config_removed_on_relation_broken(
         traefik_ctx.run(tracing_relation.broken_event, state_in)
 
     # assert file is not there
-    assert not traefik_container.get_filesystem(traefik_ctx).joinpath(_DYNAMIC_TRACING_PATH).exists()
+    assert (
+        not traefik_container.get_filesystem(traefik_ctx).joinpath(_DYNAMIC_TRACING_PATH).exists()
+    )
