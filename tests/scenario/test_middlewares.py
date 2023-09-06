@@ -104,10 +104,10 @@ def test_middleware_config(
     out = traefik_ctx.run(relation.changed_event, state)
 
     # THEN the rendered config file contains middlewares
-    with out.get_container("traefik").filesystem.open(
-        f"/opt/traefik/juju/juju_ingress_{rel_name}_0_{app_name}.yaml",
+    with out.get_container("traefik").get_filesystem(traefik_ctx).joinpath(
+        f"opt/traefik/juju/juju_ingress_{rel_name}_0_{app_name}.yaml",
     ) as f:
-        config_file = f.read()
+        config_file = f.read_text()
     expected = _render_config(
         rel_name=rel_name,
         routing_mode=routing_mode,
