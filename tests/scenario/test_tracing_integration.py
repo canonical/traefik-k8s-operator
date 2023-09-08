@@ -4,7 +4,7 @@ import opentelemetry
 import pytest
 import yaml
 from charm import _CA_CERT_PATH, _DYNAMIC_TRACING_PATH
-from charms.tempo_k8s.v0.charm_instrumentation import _charm_tracing_disabled
+from charms.tempo_k8s.v0.charm_tracing import _charm_tracing_disabled
 from charms.tempo_k8s.v0.tracing import Ingester, TracingProviderAppData
 from scenario import Relation, State
 
