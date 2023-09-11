@@ -32,7 +32,7 @@ from charms.observability_libs.v1.kubernetes_service_patch import (
     ServicePort,
 )
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
-from charms.tempo_k8s.v0.charm_instrumentation import trace_charm
+from charms.tempo_k8s.v0.charm_tracing import trace_charm
 from charms.tempo_k8s.v0.tracing import TracingEndpointRequirer
 from charms.tls_certificates_interface.v2.tls_certificates import (
     CertificateInvalidatedEvent,

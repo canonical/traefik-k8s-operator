@@ -4,7 +4,7 @@ import opentelemetry
 import pytest
 import yaml
 from charm import _CA_CERT_PATH, _DYNAMIC_TRACING_PATH
-from charms.tempo_k8s.v0.charm_instrumentation import _charm_tracing_disabled
+from charms.tempo_k8s.v0.charm_tracing import charm_tracing_disabled
 from charms.tempo_k8s.v0.tracing import Ingester, TracingProviderAppData
 from scenario import Relation, State
 
@@ -41,7 +41,7 @@ def test_charm_trace_collection(traefik_ctx, traefik_container, caplog, tracing_
 def test_traefik_tracing_config(traefik_ctx, traefik_container, tracing_relation):
     state_in = State(relations=[tracing_relation], containers=[traefik_container])
 
-    with _charm_tracing_disabled():
+    with charm_tracing_disabled():
         traefik_ctx.run(tracing_relation.changed_event, state_in)
 
     tracing_cfg = (
@@ -67,7 +67,7 @@ def test_traefik_tracing_config_with_tls(traefik_ctx, traefik_container, tracing
     with patch("charm.TraefikIngressCharm._is_tls_enabled") as tls_enabled:
         tls_enabled.return_value = "True"
 
-        with _charm_tracing_disabled():
+        with charm_tracing_disabled():
             traefik_ctx.run(tracing_relation.changed_event, state_in)
 
     tracing_cfg = (
@@ -101,7 +101,7 @@ def test_traefik_tracing_config_removed_if_relation_data_invalid(
         containers=[traefik_container],
     )
 
-    with _charm_tracing_disabled():
+    with charm_tracing_disabled():
         traefik_ctx.run(tracing_relation.changed_event, state_in)
 
     # assert file is not there
@@ -121,7 +121,7 @@ def test_traefik_tracing_config_removed_on_relation_broken(
 
     state_in = State(relations=[tracing_relation], containers=[traefik_container])
 
-    with _charm_tracing_disabled():
+    with charm_tracing_disabled():
         traefik_ctx.run(tracing_relation.broken_event, state_in)
 
     # assert file is not there
