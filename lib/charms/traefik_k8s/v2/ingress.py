@@ -109,9 +109,10 @@ class DatabagModel(BaseModel):
 
         try:
             data = {k: json.loads(v) for k, v in databag.items() if k not in BUILTIN_JUJU_KEYS}
-        except json.JSONDecodeError:
-            log.error(f"invalid databag contents: expecting json. {databag}")
-            raise
+        except json.JSONDecodeError as e:
+            msg = f"invalid databag contents: expecting json. {databag}"
+            log.error(msg)
+            raise DataValidationError(msg) from e
 
         try:
             return cls.parse_raw(json.dumps(data))  # type: ignore
@@ -428,7 +429,7 @@ class IngressPerAppProvider(_IngressPerAppBase):
             return IngressRequirerData(
                 self._get_requirer_app_data(relation), self._get_requirer_units_data(relation)
             )
-        except (pydantic.ValidationError, DataValidationError, json.JSONDecodeError) as e:
+        except (pydantic.ValidationError, DataValidationError) as e:
             raise DataValidationError("failed to validate ingress requirer data") from e
 
     def is_ready(self, relation: Optional[Relation] = None):

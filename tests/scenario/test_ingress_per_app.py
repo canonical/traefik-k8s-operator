@@ -222,6 +222,7 @@ def test_ingress_per_app_v1_upgrade_v2(
     ipav1 = Relation(
         "ingress",
         remote_app_name=remote_app_name,
+        remote_app_data={"ingress": 'url: http://10.206.54.240/"openstack"-"keystone"\n'},
         local_app_data={"name": "robin", "host": "host", "port": "4242", "model": model.name},
     )
 
@@ -232,7 +233,10 @@ def test_ingress_per_app_v1_upgrade_v2(
     )
 
     # WHEN a charm upgrade occurs
-    state_out = requirer_ctx.run("upgrade-charm", state)
+    with requirer_ctx.manager("upgrade-charm", state) as mgr:
+        assert not mgr.charm.ipa.is_ready()
+        state_out = mgr.run()
+        assert not mgr.charm.ipa.is_ready()
 
     # THEN the relation databags are upgraded to match the v2 spec
     ingress_out = state_out.get_relations("ingress")[0]
