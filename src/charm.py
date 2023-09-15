@@ -86,7 +86,6 @@ _SERVER_KEY_PATH = f"{_DYNAMIC_CONFIG_DIR}/server.key"
 _CA_CERTS_PATH = "/usr/local/share/ca-certificates"
 _CA_CERT_PATH = f"{_CA_CERTS_PATH}/traefik-ca.crt"
 
-
 BIN_PATH = "/usr/bin/traefik"
 
 
@@ -105,11 +104,11 @@ class _IngressRelationType(enum.Enum):
     tracing_endpoint="charm_tracing_endpoint",
     server_cert="server_cert",
     extra_types=(
-        IPAv2,
-        IPAv1,
-        IngressPerUnitProvider,
-        TraefikRouteProvider,
-        KubernetesServicePatch,
+            IPAv2,
+            IPAv1,
+            IngressPerUnitProvider,
+            TraefikRouteProvider,
+            KubernetesServicePatch,
     ),
 )
 class TraefikIngressCharm(CharmBase):
@@ -421,13 +420,26 @@ class TraefikIngressCharm(CharmBase):
         tcp_entrypoints = self._tcp_entrypoints()
         logger.debug(f"Statically configuring traefik with tcp entrypoints: {tcp_entrypoints}.")
 
+        web_config = {
+            "address": f":{self._port}",
+            # http -> https redirect can be enabled by default
+            'http': {
+                "redirections": {
+                    "entryPoint": {
+                        "to": "websecure",
+                        "scheme": "https"
+                    }
+                }
+            }
+        }
+
         traefik_config = {
             "log": {
                 "level": "DEBUG",
             },
             "entryPoints": {
                 "diagnostics": {"address": f":{self._diagnostics_port}"},
-                "web": {"address": f":{self._port}"},
+                "web": web_config,
                 "websecure": {"address": f":{self._tls_port}"},
                 **tcp_entrypoints,
             },
@@ -554,8 +566,8 @@ class TraefikIngressCharm(CharmBase):
         #  https://github.com/canonical/operator/issues/665
 
         if (
-            self._stored.current_external_host != new_external_host  # type: ignore
-            or self._stored.current_routing_mode != new_routing_mode  # type: ignore
+                self._stored.current_external_host != new_external_host  # type: ignore
+                or self._stored.current_routing_mode != new_routing_mode  # type: ignore
         ):
             self._stored.current_external_host = new_external_host  # type: ignore
             self._stored.current_routing_mode = new_routing_mode  # type: ignore
@@ -614,10 +626,10 @@ class TraefikIngressCharm(CharmBase):
             # we do this BEFORE processing the relations.
 
         for ingress_relation in (
-            self.ingress_per_appv1.relations
-            + self.ingress_per_appv2.relations
-            + self.ingress_per_unit.relations
-            + self.traefik_route.relations
+                self.ingress_per_appv1.relations
+                + self.ingress_per_appv2.relations
+                + self.ingress_per_unit.relations
+                + self.traefik_route.relations
         ):
             self._process_ingress_relation(ingress_relation)
 
@@ -746,9 +758,9 @@ class TraefikIngressCharm(CharmBase):
         self._push_configurations(relation, config)
 
     def _provide_ingress(
-        self,
-        relation: Relation,
-        provider: Union[IPAv1, IPAv2, IngressPerUnitProvider],
+            self,
+            relation: Relation,
+            provider: Union[IPAv1, IPAv2, IngressPerUnitProvider],
     ):
         # to avoid long-gone units from lingering in the databag, we wipe it
         if self.unit.is_leader():
@@ -868,9 +880,9 @@ class TraefikIngressCharm(CharmBase):
         return f"{data['model']}-{name}"
 
     def _generate_middleware_config(
-        self,
-        data: Dict[str, Any],
-        prefix: str,
+            self,
+            data: Dict[str, Any],
+            prefix: str,
     ) -> dict:
         """Generate a middleware config.
 
@@ -931,10 +943,10 @@ class TraefikIngressCharm(CharmBase):
         return self._generate_config_block(prefix, lb_servers, data)  # type: ignore
 
     def _generate_config_block(
-        self,
-        prefix: str,
-        lb_servers: List[Dict[str, str]],
-        data: Dict[str, Any],
+            self,
+            prefix: str,
+            lb_servers: List[Dict[str, str]],
+            data: Dict[str, Any],
     ) -> Dict[str, Any]:
         """Generate a configuration segment.
 
@@ -1027,10 +1039,10 @@ class TraefikIngressCharm(CharmBase):
         return config
 
     def _generate_tls_block(
-        self,
-        router_name: str,
-        route_rule: str,
-        service_name: str,
+            self,
+            router_name: str,
+            route_rule: str,
+            service_name: str,
     ) -> Dict[str, Any]:
         """Generate a TLS configuration segment."""
         return {
@@ -1050,9 +1062,9 @@ class TraefikIngressCharm(CharmBase):
         }
 
     def _generate_per_app_config(
-        self,
-        prefix: str,
-        data: "IPADatav2",
+            self,
+            prefix: str,
+            data: "IPADatav2",
     ) -> dict:
         # todo: IPA>=v2 uses pydantic models, the other providers use raw dicts.
         #  eventually switch all over to pydantic and handle this uniformly
@@ -1064,9 +1076,9 @@ class TraefikIngressCharm(CharmBase):
         return self._generate_config_block(prefix, lb_servers, app_dict)
 
     def _generate_per_leader_config(
-        self,
-        prefix: str,
-        data: "IPADatav1",
+            self,
+            prefix: str,
+            data: "IPADatav1",
     ) -> dict:
         lb_servers = [{"url": f"http://{data['host']}:{data['port']}"}]
         return self._generate_config_block(prefix, lb_servers, data)  # type: ignore
