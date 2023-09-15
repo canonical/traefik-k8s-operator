@@ -11,6 +11,7 @@ import logging
 import re
 import socket
 import typing
+from string import Template
 from typing import Any, Dict, List, Optional, Union
 from urllib.parse import urlparse
 
@@ -70,7 +71,6 @@ from ops.model import (
     WaitingStatus,
 )
 from ops.pebble import APIError, LayerDict, PathError
-from string import Template
 
 logger = logging.getLogger(__name__)
 
@@ -263,10 +263,12 @@ class TraefikIngressCharm(CharmBase):
         preferred.
         """
         if event:
-            self.container.push(_RECV_CA_TEMPLATE.substitute(rel_id=event.relation_id), event.ca, make_dirs=True)
+            self.container.push(
+                _RECV_CA_TEMPLATE.substitute(rel_id=event.relation_id), event.ca, make_dirs=True
+            )
         else:
             for relation in self.model.relations.get(self.recv_ca_cert.relationship_name, []):
-                # For some reason, realtion.units includes our unit and app. Need to exclude them.
+                # For some reason, relation.units includes our unit and app. Need to exclude them.
                 for unit in set(relation.units).difference([self.app, self.unit]):
                     # Note: this nested loop handles the case of multi-unit CA, each unit providing
                     # a different ca cert, but that is not currently supported by the lib itself.
