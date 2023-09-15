@@ -993,14 +993,14 @@ class TraefikIngressCharm(CharmBase):
             transports = {}
 
         elif is_end_to_end:
+            # We cannot assume traefik's CA is the same CA that signed the proxied apps.
+            # Since we use the update_ca_certificates machinery, we don't need to specify the
+            # "rootCAs" entry.
+            # Keeping the serverTransports section anyway because it is informative ("endToEndTLS"
+            # vs "reverseTerminationTransport") when inspecting the config file in production.
             transport_name = "endToEndTLS"
             lb_def["serversTransport"] = transport_name
-            transports = {
-                transport_name: {
-                    # Note: assuming traefik's CA is the same CA that signed the proxied apps.
-                    "rootCAs": [_CA_CERT_PATH],
-                }
-            }
+            transports = {transport_name: {"insecureSkipVerify": False}}
 
         else:
             transports = {}
