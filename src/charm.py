@@ -70,6 +70,7 @@ from ops.model import (
     WaitingStatus,
 )
 from ops.pebble import APIError, LayerDict, PathError
+from string import Template
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +86,7 @@ _SERVER_CERT_PATH = f"{_DYNAMIC_CONFIG_DIR}/server.cert"
 _SERVER_KEY_PATH = f"{_DYNAMIC_CONFIG_DIR}/server.key"
 _CA_CERTS_PATH = "/usr/local/share/ca-certificates"
 _CA_CERT_PATH = f"{_CA_CERTS_PATH}/traefik-ca.crt"
-
+_RECV_CA_TEMPLATE = Template(f"{_CA_CERTS_PATH}/receive-ca-cert-$rel_id-ca.crt")
 
 BIN_PATH = "/usr/bin/traefik"
 
@@ -251,13 +252,33 @@ class TraefikIngressCharm(CharmBase):
 
     def _on_recv_ca_cert_available(self, event: CertificateTransferAvailableEvent):
         # Assuming only one cert per relation (this is in line with the original lib design).
-        target = f"{_CA_CERTS_PATH}/receive-ca-cert-{event.relation_id}-ca.crt"
-        self.container.push(target, event.ca, make_dirs=True)
+        self._update_received_ca_certs(event)
+
+    def _update_received_ca_certs(self, event: Optional[CertificateTransferAvailableEvent] = None):
+        """Push the cert attached to the event, if it is given; otherwise push all certs.
+
+        This function is needed because relation events are not emitted on upgrade, and because we
+        do not have (nor do we want) persistent storage for certs.
+        Calling this function from upgrade-charm might be too early though. Pebble-ready is
+        preferred.
+        """
+        if event:
+            self.container.push(_RECV_CA_TEMPLATE.substitute(rel_id=event.relation_id), event.ca, make_dirs=True)
+        else:
+            for relation in self.model.relations.get(self.recv_ca_cert.relationship_name, []):
+                # For some reason, realtion.units includes our unit and app. Need to exclude them.
+                for unit in set(relation.units).difference([self.app, self.unit]):
+                    # Note: this nested loop handles the case of multi-unit CA, each unit providing
+                    # a different ca cert, but that is not currently supported by the lib itself.
+                    cert_path = _RECV_CA_TEMPLATE.substitute(rel_id=relation.id)
+                    if cert := relation.data[unit].get("ca"):
+                        self.container.push(cert_path, cert, make_dirs=True)
+
         self._update_system_certs()
 
     def _on_recv_ca_cert_removed(self, event: CertificateTransferRemovedEvent):
         # Assuming only one cert per relation (this is in line with the original lib design).
-        target = f"{_CA_CERTS_PATH}/receive-ca-cert-{event.relation_id}-ca.crt"
+        target = _RECV_CA_TEMPLATE.substitute(rel_id=event.relation_id)
         self.container.remove_path(target, recursive=True)
         self._update_system_certs()
 
@@ -514,6 +535,7 @@ class TraefikIngressCharm(CharmBase):
         self._clear_all_configs_and_restart_traefik()
         # push the (fresh new) configs.
         self._process_status_and_configurations()
+        self._update_received_ca_certs()
         self._set_workload_version()
 
     def _clear_all_configs_and_restart_traefik(self):
