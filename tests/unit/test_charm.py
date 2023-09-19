@@ -152,6 +152,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
         self.harness: Harness[TraefikIngressCharm] = Harness(TraefikIngressCharm)
         self.harness.set_model_name("test-model")
         self.addCleanup(self.harness.cleanup)
+        self.harness.handle_exec("traefik", ["update-ca-certificates", "--fresh"], result=0)
 
         patcher = patch.object(TraefikIngressCharm, "version", property(lambda *_: "0.0.0"))
         self.mock_version = patcher.start()
@@ -416,6 +417,7 @@ class TestConfigOptionsValidation(unittest.TestCase):
         self.harness: Harness[TraefikIngressCharm] = Harness(TraefikIngressCharm)
         self.harness.set_model_name("test-model")
         self.addCleanup(self.harness.cleanup)
+        self.harness.handle_exec("traefik", ["update-ca-certificates", "--fresh"], result=0)
 
         patcher = patch.object(TraefikIngressCharm, "version", property(lambda *_: "0.0.0"))
         self.mock_version = patcher.start()
