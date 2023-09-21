@@ -1108,7 +1108,7 @@ class TraefikIngressCharm(CharmBase):
         elif self._routing_mode is _RoutingMode.subdomain:  # _RoutingMode.subdomain
             url = f"{self._scheme}://{prefix}.{self.external_host}/"
         else:  # _RoutingMode.transparent
-            url = f"{self._scheme}://{self.external_host}/"
+            url = f"{self._scheme}://{self.external_host}"
         return url
 
     def _wipe_ingress_for_all_relations(self):
