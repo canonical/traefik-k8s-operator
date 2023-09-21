@@ -91,6 +91,20 @@ _RECV_CA_TEMPLATE = Template(f"{_CA_CERTS_PATH}/receive-ca-cert-$rel_id-ca.crt")
 BIN_PATH = "/usr/bin/traefik"
 
 
+def is_hostname(value: Optional[str]) -> bool:
+    """Return False if input value is an IP address; True otherwise."""
+    if value is None:
+        return False
+
+    try:
+        ipaddress.ip_address(value)
+        # No exception raised so this is an IP address.
+        return False
+    except ValueError:
+        # This is not an IP address so assume it's a hostname.
+        return bool(value)
+
+
 class _RoutingMode(enum.Enum):
     path = "path"
     subdomain = "subdomain"
@@ -495,6 +509,16 @@ class TraefikIngressCharm(CharmBase):
                         "keyFile": _SERVER_KEY_PATH,
                     }
                 ],
+                "stores": {
+                    "default": {
+                        # When the external hostname is a bare IP, traefik cannot match a domain,
+                        # so we must set the default cert for the TLS handshake to succeed.
+                        "defaultCertificate": {
+                            "certFile": _SERVER_CERT_PATH,
+                            "keyFile": _SERVER_KEY_PATH,
+                        },
+                    },
+                },
             }
         }
 
@@ -1057,19 +1081,25 @@ class TraefikIngressCharm(CharmBase):
         service_name: str,
     ) -> Dict[str, Any]:
         """Generate a TLS configuration segment."""
+        tls_entry = (
+            {
+                "domains": [
+                    {
+                        "main": self.external_host,
+                        "sans": [f"*.{self.external_host}"],
+                    },
+                ],
+            }
+            if is_hostname(self.external_host)
+            else {}  # When the external host is a bare IP, we do not need the 'domains' entry.
+        )
+
         return {
             f"{router_name}-tls": {
                 "rule": route_rule,
                 "service": service_name,
                 "entryPoints": ["websecure"],
-                "tls": {
-                    "domains": [
-                        {
-                            "main": self.external_host,
-                            "sans": [f"*.{self.external_host}"],
-                        },
-                    ],
-                },
+                "tls": tls_entry,
             }
         }
 
@@ -1255,18 +1285,6 @@ class TraefikIngressCharm(CharmBase):
     def server_cert_sans_dns(self) -> List[str]:
         """Provide certificate SANs DNS."""
         target = self.external_host
-
-        def is_hostname(st: Optional[str]) -> bool:
-            if st is None:
-                return False
-
-            try:
-                ipaddress.ip_address(st)
-                # No exception raised so this is an IP address.
-                return False
-            except ValueError:
-                # This is not an IP address so assume it's a hostname.
-                return bool(st)
 
         if is_hostname(target):
             assert isinstance(target, str)  # for type checker
