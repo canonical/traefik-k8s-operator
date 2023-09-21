@@ -16,6 +16,12 @@ parts:
       - jsonschema
       - cryptography
 
+      # Due to https://github.com/pypa/setuptools_scm/issues/918
+      - cosl
+      - deepmerge
+      - httpx
+      - "opentelemetry-api==1.17"
+
       # From PYDEPS
       - "importlib-metadata==6.0.0"
       - "opentelemetry-exporter-otlp-proto-grpc==1.17.0"
