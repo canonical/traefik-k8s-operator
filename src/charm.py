@@ -94,6 +94,7 @@ BIN_PATH = "/usr/bin/traefik"
 class _RoutingMode(enum.Enum):
     path = "path"
     subdomain = "subdomain"
+    transparent = "transparent"
 
 
 class _IngressRelationType(enum.Enum):
@@ -969,8 +970,10 @@ class TraefikIngressCharm(CharmBase):
         host = self.external_host
         if self._routing_mode is _RoutingMode.path:
             route_rule = f"PathPrefix(`/{prefix}`)"
-        else:  # _RoutingMode.subdomain
+        elif self._routing_mode is _RoutingMode.subdomain:
             route_rule = f"Host(`{prefix}.{host}`)"
+        else:  # _RoutingMode.transparent
+            route_rule = f"PathPrefix(`/`)"
 
         traefik_router_name = f"juju-{prefix}-router"
         traefik_service_name = f"juju-{prefix}-service"
@@ -1102,8 +1105,10 @@ class TraefikIngressCharm(CharmBase):
     def _get_external_url(self, prefix):
         if self._routing_mode is _RoutingMode.path:
             url = f"{self._scheme}://{self.external_host}/{prefix}"
-        else:  # _RoutingMode.subdomain
+        elif self._routing_mode is _RoutingMode.subdomain:  # _RoutingMode.subdomain
             url = f"{self._scheme}://{prefix}.{self.external_host}/"
+        else:  # _RoutingMode.transparent
+            url = f"{self._scheme}://{self.external_host}/"
         return url
 
     def _wipe_ingress_for_all_relations(self):

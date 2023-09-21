@@ -14,7 +14,7 @@ options:
       The routing mode allows you to specify how Traefik going to generate
       routes on behalf of the requesters.
 
-      Valid values are "path" and "subdomain".
+      Valid values are "path", "subdomain", and "transparent".
 
       With the "path" routing mode, Traefik will use its externally-visible url,
       and create a route for the requester that will be structure like:
