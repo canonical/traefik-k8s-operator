@@ -308,7 +308,7 @@ LIBAPI = 2
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 14
+LIBPATCH = 16
 
 PYDEPS = ["cryptography", "jsonschema"]
 
@@ -701,7 +701,8 @@ def generate_certificate(
     """
     csr_object = x509.load_pem_x509_csr(csr)
     subject = csr_object.subject
-    issuer = x509.load_pem_x509_certificate(ca).issuer
+    ca_pem = x509.load_pem_x509_certificate(ca)
+    issuer = ca_pem.issuer
     private_key = serialization.load_pem_private_key(ca_key, password=ca_key_password)
 
     certificate_builder = (
@@ -712,6 +713,20 @@ def generate_certificate(
         .serial_number(x509.random_serial_number())
         .not_valid_before(datetime.utcnow())
         .not_valid_after(datetime.utcnow() + timedelta(days=validity))
+        .add_extension(
+            x509.AuthorityKeyIdentifier(
+                key_identifier=ca_pem.extensions.get_extension_for_class(
+                    x509.SubjectKeyIdentifier
+                ).value.key_identifier,
+                authority_cert_issuer=None,
+                authority_cert_serial_number=None,
+            ),
+            critical=False,
+        )
+        .add_extension(
+            x509.SubjectKeyIdentifier.from_public_key(csr_object.public_key()), critical=False
+        )
+        .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=False)
     )
 
     extensions_list = csr_object.extensions
@@ -742,6 +757,7 @@ def generate_certificate(
             extension.value,
             critical=extension.critical,
         )
+
     certificate_builder._version = x509.Version.v3
     cert = certificate_builder.sign(private_key, hashes.SHA256())  # type: ignore[arg-type]
     return cert.public_bytes(serialization.Encoding.PEM)
@@ -839,7 +855,7 @@ def generate_csr(
         sans_oid (list): List of registered ID SANs
         sans_dns (list): List of DNS subject alternative names (similar to the arg: sans)
         sans_ip (list): List of IP subject alternative names
-        additional_critical_extensions (list): List if critical additional extension objects.
+        additional_critical_extensions (list): List of critical additional extension objects.
             Object must be a x509 ExtensionType.
 
     Returns:
@@ -1216,16 +1232,19 @@ class TLSCertificatesProvidesV2(Object):
             that don't have a certificate issued.
         """
         all_unit_csr_mappings = copy.deepcopy(self.get_requirer_csrs(relation_id=relation_id))
+        filtered_all_unit_csr_mappings: List[Dict[str, Union[int, str, List[Dict[str, str]]]]] = []
         for unit_csr_mapping in all_unit_csr_mappings:
+            csrs_without_certs = []
             for csr in unit_csr_mapping["unit_csrs"]:  # type: ignore[union-attr]
-                if self.certificate_issued_for_csr(
+                if not self.certificate_issued_for_csr(
                     app_name=unit_csr_mapping["application_name"],  # type: ignore[arg-type]
                     csr=csr["certificate_signing_request"],  # type: ignore[index]
                 ):
-                    unit_csr_mapping["unit_csrs"].remove(csr)  # type: ignore[union-attr, arg-type]
-            if len(unit_csr_mapping["unit_csrs"]) == 0:  # type: ignore[arg-type]
-                all_unit_csr_mappings.remove(unit_csr_mapping)
-        return all_unit_csr_mappings
+                    csrs_without_certs.append(csr)
+            if csrs_without_certs:
+                unit_csr_mapping["unit_csrs"] = csrs_without_certs  # type: ignore[assignment]
+                filtered_all_unit_csr_mappings.append(unit_csr_mapping)
+        return filtered_all_unit_csr_mappings
 
     def get_requirer_csrs(
         self, relation_id: Optional[int] = None
