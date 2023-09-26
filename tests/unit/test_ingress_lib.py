@@ -32,7 +32,6 @@ def test_io_ingress_requirer_unit_data(clear):
 
 def test_io_ingress_requirer_app_data():
     """Round trip test: A.dump().load() == A for A = IngressRequirerAppData."""
-
     databag = {}
     app_data = IngressRequirerAppData(port=10, name="foo", model="coslite", strip_prefix=True)
 
@@ -80,7 +79,6 @@ def test_aliases():
 
 def test_io_provider_data():
     """Round trip test: A.dump().load() == A for A = IngressProviderAppData."""
-
     databag = {}
     url = {"url": "https://foo.com"}
     app_data = IngressProviderAppData(ingress=url)
