@@ -11,6 +11,7 @@ import logging
 import re
 import socket
 import typing
+from string import Template
 from typing import Any, Dict, List, Optional, Union
 from urllib.parse import urlparse
 
@@ -85,9 +86,23 @@ _SERVER_CERT_PATH = f"{_DYNAMIC_CONFIG_DIR}/server.cert"
 _SERVER_KEY_PATH = f"{_DYNAMIC_CONFIG_DIR}/server.key"
 _CA_CERTS_PATH = "/usr/local/share/ca-certificates"
 _CA_CERT_PATH = f"{_CA_CERTS_PATH}/traefik-ca.crt"
-
+_RECV_CA_TEMPLATE = Template(f"{_CA_CERTS_PATH}/receive-ca-cert-$rel_id-ca.crt")
 
 BIN_PATH = "/usr/bin/traefik"
+
+
+def is_hostname(value: Optional[str]) -> bool:
+    """Return False if input value is an IP address; True otherwise."""
+    if value is None:
+        return False
+
+    try:
+        ipaddress.ip_address(value)
+        # No exception raised so this is an IP address.
+        return False
+    except ValueError:
+        # This is not an IP address so assume it's a hostname.
+        return bool(value)
 
 
 class _RoutingMode(enum.Enum):
@@ -251,13 +266,35 @@ class TraefikIngressCharm(CharmBase):
 
     def _on_recv_ca_cert_available(self, event: CertificateTransferAvailableEvent):
         # Assuming only one cert per relation (this is in line with the original lib design).
-        target = f"{_CA_CERTS_PATH}/receive-ca-cert-{event.relation_id}-ca.crt"
-        self.container.push(target, event.ca, make_dirs=True)
+        self._update_received_ca_certs(event)
+
+    def _update_received_ca_certs(self, event: Optional[CertificateTransferAvailableEvent] = None):
+        """Push the cert attached to the event, if it is given; otherwise push all certs.
+
+        This function is needed because relation events are not emitted on upgrade, and because we
+        do not have (nor do we want) persistent storage for certs.
+        Calling this function from upgrade-charm might be too early though. Pebble-ready is
+        preferred.
+        """
+        if event:
+            self.container.push(
+                _RECV_CA_TEMPLATE.substitute(rel_id=event.relation_id), event.ca, make_dirs=True
+            )
+        else:
+            for relation in self.model.relations.get(self.recv_ca_cert.relationship_name, []):
+                # For some reason, relation.units includes our unit and app. Need to exclude them.
+                for unit in set(relation.units).difference([self.app, self.unit]):
+                    # Note: this nested loop handles the case of multi-unit CA, each unit providing
+                    # a different ca cert, but that is not currently supported by the lib itself.
+                    cert_path = _RECV_CA_TEMPLATE.substitute(rel_id=relation.id)
+                    if cert := relation.data[unit].get("ca"):
+                        self.container.push(cert_path, cert, make_dirs=True)
+
         self._update_system_certs()
 
     def _on_recv_ca_cert_removed(self, event: CertificateTransferRemovedEvent):
         # Assuming only one cert per relation (this is in line with the original lib design).
-        target = f"{_CA_CERTS_PATH}/receive-ca-cert-{event.relation_id}-ca.crt"
+        target = _RECV_CA_TEMPLATE.substitute(rel_id=event.relation_id)
         self.container.remove_path(target, recursive=True)
         self._update_system_certs()
 
@@ -472,6 +509,16 @@ class TraefikIngressCharm(CharmBase):
                         "keyFile": _SERVER_KEY_PATH,
                     }
                 ],
+                "stores": {
+                    "default": {
+                        # When the external hostname is a bare IP, traefik cannot match a domain,
+                        # so we must set the default cert for the TLS handshake to succeed.
+                        "defaultCertificate": {
+                            "certFile": _SERVER_CERT_PATH,
+                            "keyFile": _SERVER_KEY_PATH,
+                        },
+                    },
+                },
             }
         }
 
@@ -514,6 +561,7 @@ class TraefikIngressCharm(CharmBase):
         self._clear_all_configs_and_restart_traefik()
         # push the (fresh new) configs.
         self._process_status_and_configurations()
+        self._update_received_ca_certs()
         self._set_workload_version()
 
     def _clear_all_configs_and_restart_traefik(self):
@@ -993,14 +1041,14 @@ class TraefikIngressCharm(CharmBase):
             transports = {}
 
         elif is_end_to_end:
+            # We cannot assume traefik's CA is the same CA that signed the proxied apps.
+            # Since we use the update_ca_certificates machinery, we don't need to specify the
+            # "rootCAs" entry.
+            # Keeping the serverTransports section anyway because it is informative ("endToEndTLS"
+            # vs "reverseTerminationTransport") when inspecting the config file in production.
             transport_name = "endToEndTLS"
             lb_def["serversTransport"] = transport_name
-            transports = {
-                transport_name: {
-                    # Note: assuming traefik's CA is the same CA that signed the proxied apps.
-                    "rootCAs": [_CA_CERT_PATH],
-                }
-            }
+            transports = {transport_name: {"insecureSkipVerify": False}}
 
         else:
             transports = {}
@@ -1033,19 +1081,25 @@ class TraefikIngressCharm(CharmBase):
         service_name: str,
     ) -> Dict[str, Any]:
         """Generate a TLS configuration segment."""
+        tls_entry = (
+            {
+                "domains": [
+                    {
+                        "main": self.external_host,
+                        "sans": [f"*.{self.external_host}"],
+                    },
+                ],
+            }
+            if is_hostname(self.external_host)
+            else {}  # When the external host is a bare IP, we do not need the 'domains' entry.
+        )
+
         return {
             f"{router_name}-tls": {
                 "rule": route_rule,
                 "service": service_name,
                 "entryPoints": ["websecure"],
-                "tls": {
-                    "domains": [
-                        {
-                            "main": self.external_host,
-                            "sans": [f"*.{self.external_host}"],
-                        },
-                    ],
-                },
+                "tls": tls_entry,
             }
         }
 
@@ -1231,18 +1285,6 @@ class TraefikIngressCharm(CharmBase):
     def server_cert_sans_dns(self) -> List[str]:
         """Provide certificate SANs DNS."""
         target = self.external_host
-
-        def is_hostname(st: Optional[str]) -> bool:
-            if st is None:
-                return False
-
-            try:
-                ipaddress.ip_address(st)
-                # No exception raised so this is an IP address.
-                return False
-            except ValueError:
-                # This is not an IP address so assume it's a hostname.
-                return bool(st)
 
         if is_hostname(target):
             assert isinstance(target, str)  # for type checker

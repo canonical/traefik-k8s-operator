@@ -16,7 +16,7 @@ applications:
     series: focal
     scale: 1
     resources:
-      traefik-image: docker.io/jnsgruk/traefik:2.9.6
+      traefik-image: ghcr.io/canonical/traefik:2.10.4
 
 relations:
 - [am:ingress, trfk]
