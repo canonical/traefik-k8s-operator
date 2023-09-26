@@ -79,7 +79,7 @@ LIBAPI = 2
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 5
+LIBPATCH = 6
 
 PYDEPS = ["pydantic<2.0"]
 
@@ -109,9 +109,10 @@ class DatabagModel(BaseModel):
 
         try:
             data = {k: json.loads(v) for k, v in databag.items() if k not in BUILTIN_JUJU_KEYS}
-        except json.JSONDecodeError:
-            log.error(f"invalid databag contents: expecting json. {databag}")
-            raise
+        except json.JSONDecodeError as e:
+            msg = f"invalid databag contents: expecting json. {databag}"
+            log.error(msg)
+            raise DataValidationError(msg) from e
 
         try:
             return cls.parse_raw(json.dumps(data))  # type: ignore
@@ -120,8 +121,15 @@ class DatabagModel(BaseModel):
             log.error(msg, exc_info=True)
             raise DataValidationError(msg) from e
 
-    def dump(self, databag: Optional[MutableMapping] = None):
-        """Write the contents of this model to Juju databag."""
+    def dump(self, databag: Optional[MutableMapping] = None, clear: bool = True):
+        """Write the contents of this model to Juju databag.
+
+        :param databag: the databag to write the data to.
+        :param clear: ensure the databag is cleared before writing it.
+        """
+        if clear and databag:
+            databag.clear()
+
         if databag is None:
             databag = {}
 
@@ -421,7 +429,7 @@ class IngressPerAppProvider(_IngressPerAppBase):
             return IngressRequirerData(
                 self._get_requirer_app_data(relation), self._get_requirer_units_data(relation)
             )
-        except (pydantic.ValidationError, DataValidationError, json.JSONDecodeError) as e:
+        except (pydantic.ValidationError, DataValidationError) as e:
             raise DataValidationError("failed to validate ingress requirer data") from e
 
     def is_ready(self, relation: Optional[Relation] = None):
@@ -577,7 +585,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
 
     def _handle_relation(self, event):
         # created, joined or changed: if we have auto data: publish it
-        self._publish_auto_data(event.relation)
+        self._publish_auto_data()
 
         if self.is_ready():
             # Avoid spurious events, emit only when there is a NEW URL available
@@ -596,8 +604,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
 
     def _handle_upgrade_or_leader(self, event):
         """On upgrade/leadership change: ensure we publish the data we have."""
-        for relation in self.relations:
-            self._publish_auto_data(relation)
+        self._publish_auto_data()
 
     def is_ready(self):
         """The Requirer is ready if the Provider has sent valid data."""
@@ -607,13 +614,17 @@ class IngressPerAppRequirer(_IngressPerAppBase):
             log.debug("Requirer not ready; validation error encountered: %s" % str(e))
             return False
 
-    def _publish_auto_data(self, relation: Relation):
+    def _publish_auto_data(self):
         if self._auto_data:
             host, port = self._auto_data
             self.provide_ingress_requirements(host=host, port=port)
 
     def provide_ingress_requirements(
-        self, *, scheme: Optional[str] = None, host: Optional[str] = None, port: int
+        self,
+        *,
+        scheme: Optional[str] = None,
+        host: Optional[str] = None,
+        port: int,
     ):
         """Publishes the data that Traefik needs to provide ingress.
 
@@ -623,44 +634,61 @@ class IngressPerAppRequirer(_IngressPerAppBase):
              requirer unit; if unspecified, FQDN will be used instead
             port: the port of the service (required)
         """
-        # This public method may be used at various points of the charm lifecycle, possible when
-        # the ingress relation is not yet there.
-        # Abort if there is no relation (instead of requiring the caller to guard against it).
-        if not self.relation:
-            return
+        for relation in self.relations:
+            self._provide_ingress_requirements(scheme, host, port, relation)
 
-        # get only the leader to publish the data since we only
-        # require one unit to publish it -- it will not differ between units,
-        # unlike in ingress-per-unit.
+    def _provide_ingress_requirements(
+        self,
+        scheme: Optional[str],
+        host: Optional[str],
+        port: int,
+        relation: Relation,
+    ):
         if self.unit.is_leader():
-            app_databag = self.relation.data[self.app]
+            self._publish_app_data(scheme, port, relation)
 
-            if not scheme:
-                # If scheme was not provided, use the one given to the constructor.
-                scheme = self._get_scheme()
+        self._publish_unit_data(host, relation)
 
-            try:
-                IngressRequirerAppData(  # type: ignore  # pyright does not like aliases
-                    model=self.model.name,
-                    name=self.app.name,
-                    scheme=scheme,
-                    port=port,
-                    strip_prefix=self._strip_prefix,  # type: ignore  # pyright does not like aliases
-                    redirect_https=self._redirect_https,  # type: ignore  # pyright does not like aliases
-                ).dump(app_databag)
-            except pydantic.ValidationError as e:
-                msg = "failed to validate app data"
-                log.info(msg, exc_info=True)  # log to INFO because this might be expected
-                raise DataValidationError(msg) from e
-
+    def _publish_unit_data(
+        self,
+        host: Optional[str],
+        relation: Relation,
+    ):
         if not host:
             host = socket.getfqdn()
 
-        unit_databag = self.relation.data[self.unit]
+        unit_databag = relation.data[self.unit]
         try:
             IngressRequirerUnitData(host=host).dump(unit_databag)
         except pydantic.ValidationError as e:
             msg = "failed to validate unit data"
+            log.info(msg, exc_info=True)  # log to INFO because this might be expected
+            raise DataValidationError(msg) from e
+
+    def _publish_app_data(
+        self,
+        scheme: Optional[str],
+        port: int,
+        relation: Relation,
+    ):
+        # assumes leadership!
+        app_databag = relation.data[self.app]
+
+        if not scheme:
+            # If scheme was not provided, use the one given to the constructor.
+            scheme = self._get_scheme()
+
+        try:
+            IngressRequirerAppData(  # type: ignore  # pyright does not like aliases
+                model=self.model.name,
+                name=self.app.name,
+                scheme=scheme,
+                port=port,
+                strip_prefix=self._strip_prefix,  # type: ignore  # pyright does not like aliases
+                redirect_https=self._redirect_https,  # type: ignore  # pyright does not like aliases
+            ).dump(app_databag)
+        except pydantic.ValidationError as e:
+            msg = "failed to validate app data"
             log.info(msg, exc_info=True)  # log to INFO because this might be expected
             raise DataValidationError(msg) from e
 
