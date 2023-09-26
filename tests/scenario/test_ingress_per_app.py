@@ -182,10 +182,11 @@ def test_ingress_per_app_cleanup_on_remove(model, traefik_ctx, traefik_container
     """Check that config file is removed when a relation is."""
     ipa = create_ingress_relation()
 
+    # IF there is a config file in opt/traefik
     td = tempfile.TemporaryDirectory()
     filename = f"juju_ingress_ingress_{ipa.relation_id}_remote.yaml"
     conf_file = Path(td.name).joinpath(filename)
-    conf_file.write_text("foobar")
+    conf_file.write_text("foobar")  # contents don't actually matter.
 
     traefik_container = traefik_container.replace(mounts={"conf": Mount("/opt/traefik/", td.name)})
 
@@ -196,10 +197,10 @@ def test_ingress_per_app_cleanup_on_remove(model, traefik_ctx, traefik_container
         relations=[ipa],
     )
 
-    # WHEN the relation goes
+    # WHEN the charm processes a relation-broken event
     traefik_ctx.run(ipa.broken_event, state)
 
-    # THEN the config file was deleted
+    # THEN the config file is deleted from the filesystem
     mock_dynamic_config_folder = traefik_container.get_filesystem(traefik_ctx).joinpath(
         "opt", "traefik", "juju", filename
     )
