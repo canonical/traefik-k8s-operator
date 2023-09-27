@@ -912,7 +912,10 @@ class TraefikIngressCharm(CharmBase):
             self._wipe_ingress_for_relation(relation)
 
     @staticmethod
-    def _get_prefix(data: Dict[str, Any]):
+    def _get_prefix(data: Dict[str, Any]) -> str:
+        """Return a custom prefix if set by the ingress requirer, model-appname otherwise."""
+        if data["prefix"]:
+            return data["prefix"]
         name = data["name"].replace("/", "-")
         return f"{data['model']}-{name}"
 

@@ -201,6 +201,7 @@ class IngressRequirerUnitData(DatabagModel):
     """Ingress requirer unit databag model."""
 
     host: str = Field(description="Hostname the unit wishes to be exposed.")
+    prefix: str = Field(description="The prefix to be used for the routing configuration.")
 
     @validator("host", pre=True)
     def validate_host(cls, host):  # noqa: N805  # pydantic wants 'cls' as first arg
@@ -208,6 +209,11 @@ class IngressRequirerUnitData(DatabagModel):
         assert isinstance(host, str), type(host)
         return host
 
+    @validator("prefix", pre=True)
+    def validate_prefix(cls, prefix):  # noqa: N805  # pydantic wants 'cls' as first arg
+        """Validate host."""
+        assert isinstance(prefix, str), type(prefix)
+        return prefix
 
 class RequirerSchema(BaseModel):
     """Requirer schema for Ingress."""
@@ -541,6 +547,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         *,
         host: Optional[str] = None,
         port: Optional[int] = None,
+        prefix: Optional[str] = None,
         strip_prefix: bool = False,
         redirect_https: bool = False,
         # fixme: this is horrible UX.
@@ -563,6 +570,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
             strip_prefix: configure Traefik to strip the path prefix.
             redirect_https: redirect incoming requests to HTTPS.
             scheme: callable returning the scheme to use when constructing the ingress url.
+            prefix: the prefix to be used for generating the routing configuration.
 
         Request Args:
             port: the port of the service
@@ -633,6 +641,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
             host: Hostname to be used by the ingress provider to address the
              requirer unit; if unspecified, FQDN will be used instead
             port: the port of the service (required)
+            prefix: the prefix to be used for generating the routing configuration.
         """
         for relation in self.relations:
             self._provide_ingress_requirements(scheme, host, port, relation)
@@ -657,9 +666,13 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         if not host:
             host = socket.getfqdn()
 
-        unit_databag = relation.data[self.unit]
+        # TODO: what should be sent to the relation data bag if prefix is None?
+        if not prefix:
+            prefix = ''
+
+        unit_databag = self.relation.data[self.unit]
         try:
-            IngressRequirerUnitData(host=host).dump(unit_databag)
+            IngressRequirerUnitData(host=host, prefix=prefix).dump(unit_databag)
         except pydantic.ValidationError as e:
             msg = "failed to validate unit data"
             log.info(msg, exc_info=True)  # log to INFO because this might be expected
