@@ -194,6 +194,7 @@ class TraefikIngressCharm(CharmBase):
                 self.ingress_per_unit.on.data_removed,  # type: ignore
                 self.traefik_route.on.ready,  # type: ignore
                 self.traefik_route.on.data_removed,  # type: ignore
+                self.on.traefik_pebble_ready,  # type: ignore
             ],
         )
 
