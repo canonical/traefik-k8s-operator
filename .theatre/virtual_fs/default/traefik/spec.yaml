@@ -1,0 +1,4 @@
+traefik:
+  mounts:
+    /opt/traefik/juju: dynamic_cfgs
+    /etc/traefik: static_cfgs
