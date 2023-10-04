@@ -6,11 +6,13 @@ from scenario import Context, Relation, State
 
 
 def create(traefik_ctx: Context, state: State):
+    """Create the ingress relation."""
     ingress = Relation("ingress")
     return traefik_ctx.run(ingress.joined_event, state.replace(relations=[ingress]))
 
 
 def join(traefik_ctx: Context, state: State):
+    """Simulate a new unit joining the ingress relation."""
     ingress = state.get_relations("ingress")[0]
     state = traefik_ctx.run(ingress.joined_event, state)
     remote_units_data = ingress.remote_units_data
@@ -40,7 +42,8 @@ def join(traefik_ctx: Context, state: State):
     return state
 
 
-def depart(traefik_ctx: Context, state: State, pop_unit: bool = True):
+def depart(traefik_ctx: Context, state: State):
+    """Simulate a unit departing the ingress relation."""
     def _pop(state: State):
         ingress = state.get_relations("ingress")[0]
         remote_units_data = ingress.remote_units_data.copy()
@@ -50,19 +53,18 @@ def depart(traefik_ctx: Context, state: State, pop_unit: bool = True):
             relations=[ingress.replace(remote_units_data=remote_units_data,
                                        remote_unit_ids=list(remote_units_data))])
 
-    if pop_unit:  # pop before departed
-        state = _pop(state)
+    state = _pop(state)
 
     state = traefik_ctx.run(state.get_relations("ingress")[0].departed_event, state)
-
-    if not pop_unit:  # pop after departed; before changed
-        state = _pop(state)
-
-    state = traefik_ctx.run(state.get_relations("ingress")[0].changed_event, state)
     return state
 
 
 def break_(traefik_ctx: Context, state: State):
+    """Simulate breaking the ingress relation."""
+    for _ in state.get_relations("ingress")[0].remote_units_data:
+        # depart all units
+        depart(traefik_ctx, state)
+
     ingress = state.get_relations("ingress")[0]
     return traefik_ctx.run(
         ingress.broken_event,
@@ -84,12 +86,17 @@ def get_configs(traefik_ctx: Context, state: State) -> Tuple[Path, List[Path]]:
     return etc, list(opt.glob("*.yaml"))
 
 
-def get_servers(cfg):
+def get_servers(cfg: Path):
+    """Return a list of servers from the traefik config."""
     cfg_yaml = yaml.safe_load(cfg.read_text())
     return cfg_yaml['http']['services']['juju-zaza-neutron-service']['loadBalancer']['servers']
 
 
 def test_traefik_remote_app_scaledown_from_2(traefik_ctx, traefik_container):
+    """Verify that on scale up and down traefik always has the right amount of servers configured.
+
+    TODO: parametrize
+    """
     state = State(containers=[traefik_container])
 
     with traefik_ctx.manager(traefik_container.pebble_ready_event, state) as mgr:
