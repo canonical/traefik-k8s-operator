@@ -3,7 +3,7 @@ from unittest.mock import PropertyMock, patch
 import pytest
 from charm import TraefikIngressCharm
 from ops import pebble
-from scenario import Container, Context, Model, Mount, ExecOutput
+from scenario import Container, Context, ExecOutput, Model, Mount
 
 MOCK_EXTERNAL_HOSTNAME = "testhostname"
 
@@ -53,8 +53,8 @@ def traefik_container(tmp_path):
         can_connect=True,
         layers={"traefik": layer},
         exec_mock={
-            ('update-ca-certificates', '--fresh'): ExecOutput(),
-            ('/usr/bin/traefik', 'version'): ExecOutput(stdout="42.42"),
+            ("update-ca-certificates", "--fresh"): ExecOutput(),
+            ("/usr/bin/traefik", "version"): ExecOutput(stdout="42.42"),
         },
         service_status={"traefik": pebble.ServiceStatus.ACTIVE},
         mounts={"opt": opt},
