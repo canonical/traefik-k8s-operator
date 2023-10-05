@@ -1,0 +1,37 @@
+{
+    "id": 139692356733392,
+    "scene_width": 64000,
+    "scene_height": 64000,
+    "nodes": [
+        {
+            "id": 139690964785312,
+            "title": "Null with containers",
+            "pos_x": -240.0,
+            "pos_y": -87.0,
+            "inputs": [
+                {
+                    "id": 140121608657344,
+                    "index": 0,
+                    "multi_edges": false,
+                    "position": 2,
+                    "socket_type": 1
+                }
+            ],
+            "outputs": [
+                {
+                    "id": 139690964816304,
+                    "index": 0,
+                    "multi_edges": true,
+                    "position": 5,
+                    "socket_type": 2
+                }
+            ],
+            "content": {
+                "value": "new state 0"
+            },
+            "name": "Null with containers",
+            "value": "new state 0"
+        }
+    ],
+    "edges": []
+}
