@@ -53,13 +53,7 @@ def depart(traefik_ctx: Context, state: State):
         remote_units_data = ingress.remote_units_data.copy()
         departing_unit_id = max(remote_units_data)
         del remote_units_data[departing_unit_id]
-        return state.replace(
-            relations=[
-                ingress.replace(
-                    remote_units_data=remote_units_data
-                )
-            ]
-        )
+        return state.replace(relations=[ingress.replace(remote_units_data=remote_units_data)])
 
     state = _pop(state)
 
@@ -76,11 +70,7 @@ def break_(traefik_ctx: Context, state: State):
     ingress = state.get_relations("ingress")[0]
     return traefik_ctx.run(
         ingress.broken_event,
-        state.replace(
-            relations=[
-                ingress.replace(remote_app_data={}, remote_units_data={})
-            ]
-        ),
+        state.replace(relations=[ingress.replace(remote_app_data={}, remote_units_data={})]),
     )
 
 
