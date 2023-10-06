@@ -480,7 +480,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 21
+LIBPATCH = 22
 
 logger = logging.getLogger(__name__)
 
@@ -1773,6 +1773,8 @@ class LogProxyConsumer(ConsumerBase):
         recursive: bool = False,
         container_name: str = "",
         promtail_resource_name: Optional[str] = None,
+        *,  # TODO: In v1, move the star up so everything after 'charm' is a kwarg
+        insecure_skip_verify: bool = False,
     ):
         super().__init__(charm, relation_name, alert_rules_path, recursive)
         self._charm = charm
@@ -1792,6 +1794,7 @@ class LogProxyConsumer(ConsumerBase):
         self._is_syslog = enable_syslog
         self.topology = JujuTopology.from_charm(charm)
         self._promtail_resource_name = promtail_resource_name or "promtail-bin"
+        self.insecure_skip_verify = insecure_skip_verify
 
         # architecture used for promtail binary
         arch = platform.processor()
@@ -2153,8 +2156,15 @@ class LogProxyConsumer(ConsumerBase):
 
     @property
     def _promtail_config(self) -> dict:
-        """Generates the config file for Promtail."""
+        """Generates the config file for Promtail.
+
+        Reference: https://grafana.com/docs/loki/latest/send-data/promtail/configuration
+        """
         config = {"clients": self._clients_list()}
+        if self.insecure_skip_verify:
+            for client in config["clients"]:
+                client["tls_config"] = {"insecure_skip_verify": True}
+
         config.update(self._server_config())
         config.update(self._positions())
         config.update(self._scrape_configs())
