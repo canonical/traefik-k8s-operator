@@ -278,6 +278,9 @@ class TraefikIngressCharm(CharmBase):
         Calling this function from upgrade-charm might be too early though. Pebble-ready is
         preferred.
         """
+        if not self.container.can_connect():
+            return
+
         if event:
             self.container.push(
                 _RECV_CA_TEMPLATE.substitute(rel_id=event.relation_id), event.ca, make_dirs=True
