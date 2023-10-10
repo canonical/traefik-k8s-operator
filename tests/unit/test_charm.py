@@ -423,9 +423,9 @@ class TestTraefikCertTransferInterface(unittest.TestCase):
     @patch("ops.model.Container.exec")
     @patch("charm._get_loadbalancer_status", lambda **__: "10.0.0.1")
     @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
-    def test_given_container_can_connect_when_receive_ca_cert_relation_joins_then_ca_certs_are_updated(
-        self, patch_exec
-    ):
+    def test_transferred_ca_certs_are_updated(self, patch_exec):
+        # Given container is ready, when receive-ca-cert relation joins,
+        # then ca certs are updated.
         provider_app = "self-signed-certificates"
         self.harness.set_leader(True)
         self.harness.begin_with_initial_hooks()
@@ -441,9 +441,9 @@ class TestTraefikCertTransferInterface(unittest.TestCase):
     @patch("ops.model.Container.exec")
     @patch("charm._get_loadbalancer_status", lambda **__: "10.0.0.1")
     @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
-    def test_given_container_not_ready_when_receive_ca_cert_relation_joins_then_ca_certs_are_not_updated(
-        self, patch_exec
-    ):
+    def test_transferred_ca_certs_are_not_updated(self, patch_exec):
+        # Given container is not ready, when receive-ca-cert relation joins,
+        # then not attempting to update ca certs.
         provider_app = "self-signed-certificates"
         self.harness.set_leader(True)
         self.harness.set_can_connect(container=self.container_name, val=False)

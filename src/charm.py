@@ -268,6 +268,8 @@ class TraefikIngressCharm(CharmBase):
 
     def _on_recv_ca_cert_available(self, event: CertificateTransferAvailableEvent):
         # Assuming only one cert per relation (this is in line with the original lib design).
+        if not self.container.can_connect():
+            return
         self._update_received_ca_certs(event)
 
     def _update_received_ca_certs(self, event: Optional[CertificateTransferAvailableEvent] = None):
@@ -278,9 +280,6 @@ class TraefikIngressCharm(CharmBase):
         Calling this function from upgrade-charm might be too early though. Pebble-ready is
         preferred.
         """
-        if not self.container.can_connect():
-            return
-
         if event:
             self.container.push(
                 _RECV_CA_TEMPLATE.substitute(rel_id=event.relation_id), event.ca, make_dirs=True
