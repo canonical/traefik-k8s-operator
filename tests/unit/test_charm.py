@@ -165,7 +165,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
         self.harness.begin_with_initial_hooks()
         self.harness.container_pebble_ready("traefik")
 
-        self.assertTrue(self.harness.charm._traefik_service_running)
+        self.assertTrue(self.harness.charm.traefik.is_running)
 
     @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
     def test_bad_routing_mode_config_and_recovery(self):
@@ -325,7 +325,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
             pass
 
     @patch("charm._get_loadbalancer_status", lambda **__: None)
-    @patch("charm.TraefikIngressCharm._traefik_service_running", lambda **__: True)
+    @patch("traefik.Traefik.is_running", lambda **__: True)
     @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
     def test_show_proxied_endpoints_action_no_relations(self):
         self.harness.begin_with_initial_hooks()

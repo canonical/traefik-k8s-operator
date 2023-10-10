@@ -3,10 +3,10 @@ from unittest.mock import patch
 import opentelemetry
 import pytest
 import yaml
-from charm import _CA_CERT_PATH, _DYNAMIC_TRACING_PATH
 from charms.tempo_k8s.v0.charm_tracing import charm_tracing_disabled
 from charms.tempo_k8s.v0.tracing import Ingester, TracingProviderAppData
 from scenario import Relation, State
+from traefik import CA_CERT_PATH, DYNAMIC_TRACING_PATH
 
 
 @pytest.fixture
@@ -46,7 +46,7 @@ def test_traefik_tracing_config(traefik_ctx, traefik_container, tracing_relation
 
     tracing_cfg = (
         traefik_container.get_filesystem(traefik_ctx)
-        .joinpath(_DYNAMIC_TRACING_PATH[1:])
+        .joinpath(DYNAMIC_TRACING_PATH[1:])
         .read_text()
     )
     cfg = yaml.safe_load(tracing_cfg)
@@ -72,7 +72,7 @@ def test_traefik_tracing_config_with_tls(traefik_ctx, traefik_container, tracing
 
     tracing_cfg = (
         traefik_container.get_filesystem(traefik_ctx)
-        .joinpath(_DYNAMIC_TRACING_PATH[1:])
+        .joinpath(DYNAMIC_TRACING_PATH[1:])
         .read_text()
     )
     cfg = yaml.safe_load(tracing_cfg)
@@ -81,7 +81,7 @@ def test_traefik_tracing_config_with_tls(traefik_ctx, traefik_container, tracing
             "openTelemetry": {
                 "address": "foo.com:81",
                 "grpc": {},
-                "ca": _CA_CERT_PATH,
+                "ca": CA_CERT_PATH,
             }
         }
     }
@@ -106,7 +106,7 @@ def test_traefik_tracing_config_removed_if_relation_data_invalid(
 
     # assert file is not there
     assert (
-        not traefik_container.get_filesystem(traefik_ctx).joinpath(_DYNAMIC_TRACING_PATH).exists()
+        not traefik_container.get_filesystem(traefik_ctx).joinpath(DYNAMIC_TRACING_PATH).exists()
     )
 
 
@@ -126,5 +126,5 @@ def test_traefik_tracing_config_removed_on_relation_broken(
 
     # assert file is not there
     assert (
-        not traefik_container.get_filesystem(traefik_ctx).joinpath(_DYNAMIC_TRACING_PATH).exists()
+        not traefik_container.get_filesystem(traefik_ctx).joinpath(DYNAMIC_TRACING_PATH).exists()
     )

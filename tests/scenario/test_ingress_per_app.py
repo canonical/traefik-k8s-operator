@@ -17,7 +17,7 @@ from charms.traefik_k8s.v2.ingress import (
 from ops import CharmBase, Framework
 from scenario import Context, Mount, Relation, State
 
-from tests.scenario.utils import create_ingress_relation
+from tests.scenario._utils import create_ingress_relation
 
 
 @pytest.mark.parametrize("port, host", ((80, "1.1.1.1"), (81, "10.1.10.1")))
