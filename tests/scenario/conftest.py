@@ -13,7 +13,7 @@ def traefik_charm():
     with patch("charm.KubernetesServicePatch"):
         with patch("lightkube.core.client.GenericSyncClient"):
             with patch(
-                "charm.TraefikIngressCharm.external_host",
+                "charm.TraefikIngressCharm._external_host",
                 PropertyMock(return_value=MOCK_EXTERNAL_HOSTNAME),
             ):
                 yield TraefikIngressCharm

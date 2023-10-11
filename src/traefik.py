@@ -10,7 +10,7 @@ import re
 import socket
 from pathlib import Path
 from string import Template
-from typing import Any, Dict, List, Optional, cast
+from typing import Any, Dict, List, Optional, Union, cast
 
 import yaml
 from lightkube.models.core_v1 import ServicePort
@@ -30,6 +30,11 @@ CA_CERTS_PATH = "/usr/local/share/ca-certificates"
 CA_CERT_PATH = f"{CA_CERTS_PATH}/traefik-ca.crt"
 RECV_CA_TEMPLATE = Template(f"{CA_CERTS_PATH}/receive-ca-cert-$rel_id-ca.crt")
 BIN_PATH = "/usr/bin/traefik"
+LOG_PATH = "/var/log/traefik.log"
+
+_DIAGNOSTICS_PORT = 8082  # Prometheus metrics, healthcheck/ping
+_PORT = 80
+_TLS_PORT = 443
 
 
 class RoutingMode(enum.Enum):
@@ -39,7 +44,7 @@ class RoutingMode(enum.Enum):
     subdomain = "subdomain"
 
 
-class TraefikError(RuntimeError):
+class TraefikError(Exception):
     """Base class for errors raised by this module."""
 
 
@@ -50,10 +55,6 @@ class ContainerNotReadyError(TraefikError):
 class Traefik:
     """Traefik workload representation."""
 
-    diagnostics_port = 8082  # Prometheus metrics, healthcheck/ping
-    _port = 80
-    _tls_port = 443
-    log_path = "/var/log/traefik.log"
     _layer_name = "traefik"
 
     def __init__(
@@ -71,16 +72,16 @@ class Traefik:
         self._tls_enabled = tls_enabled
 
     @property
-    def _hostname(self) -> str:
-        return socket.getfqdn()
-
-    @property
     def service_ports(self) -> List[ServicePort]:
-        """Kubernetes service ports to be opened for this workload."""
-        web = ServicePort(self._port, name=f"{self._service_name}")
-        websecure = ServicePort(self._tls_port, name=f"{self._service_name}-tls")
+        """Kubernetes service ports to be opened for this workload.
+
+        We cannot use ops unit.open_port here because Juju will provision a ClusterIP
+        but for traefik we need LoadBalancer.
+        """
+        web = ServicePort(_PORT, name=f"{self._service_name}")
+        websecure = ServicePort(_TLS_PORT, name=f"{self._service_name}-tls")
         return [web, websecure] + [
-            [ServicePort(int(port), name=name) for name, port in self._tcp_entrypoints.items()]
+            ServicePort(int(port), name=name) for name, port in self._tcp_entrypoints.items()
         ]
 
     @property
@@ -88,12 +89,12 @@ class Traefik:
         """List of static configs for prometheus scrape."""
         return [
             {
-                "static_configs": [{"targets": [f"{self._hostname}:{self.diagnostics_port}"]}],
+                "static_configs": [{"targets": [f"{socket.getfqdn()}:{_DIAGNOSTICS_PORT}"]}],
             }
         ]
 
-    def _config_tls(self) -> str:
-        """Generate tls config yaml for traefik."""
+    def _update_tls_configuration(self):
+        """Generate and push tls config yaml for traefik."""
         config = yaml.safe_dump(
             {
                 "tls": {
@@ -122,12 +123,14 @@ class Traefik:
         """Configure static and tls."""
         # Ensure the required basic configurations and folders exist
         tcp_entrypoints = self._tcp_entrypoints
-        self._config_static(tcp_entrypoints)
+        self._update_static_configuration(tcp_entrypoints)
 
         if self._tls_enabled:
-            self._config_tls()
+            self._update_tls_configuration()
 
-    def config_cert(self, cert: Optional[str], key: Optional[str], ca: Optional[str]):
+    def update_cert_configuration(
+        self, cert: Optional[str], key: Optional[str], ca: Optional[str]
+    ):
         """Update the server cert, ca, and key configuration files."""
         if cert:
             self._container.push(SERVER_CERT_PATH, cert, make_dirs=True)
@@ -146,13 +149,19 @@ class Traefik:
 
         self.update_ca_certs()
 
-    def add_ca(self, ca: str, uid: str | int):
+    def add_ca(self, ca: str, uid: Union[str, int]):
         """Add a ca."""
         ca_path = RECV_CA_TEMPLATE.substitute(rel_id=str(uid))
         self._container.push(ca_path, ca, make_dirs=True)
 
-    def remove_ca(self, uid: str | int):
-        """Remove a ca."""
+    def remove_ca(self, uid: Union[str, int]):
+        """Remove a ca.
+
+        BEWARE of potential race conditions.
+        Traefik watches the dynamic config dir and reloads automatically on change.
+        So make sure any traefik config depending on the certificates being there is updated
+        **before** the certs are removed, otherwise you might have some downtime.
+        """
         ca_path = RECV_CA_TEMPLATE.substitute(rel_id=str(uid))
         self._container.remove_path(ca_path)
 
@@ -166,8 +175,8 @@ class Traefik:
         # - old certs will be kept active.
         self.restart()
 
-    def _config_static(self, tcp_entrypoints: Dict[str, int]) -> str:
-        """Get Traefik's static config yaml file."""
+    def _update_static_configuration(self, tcp_entrypoints: Dict[str, int]):
+        """Generate and push Traefik's static config yaml file."""
         logger.debug(f"Statically configuring traefik with tcp entrypoints: {tcp_entrypoints}.")
 
         # TODO Disable static config with telemetry and check new version
@@ -176,32 +185,30 @@ class Traefik:
                 "level": "DEBUG",
             },
             "entryPoints": {
-                "diagnostics": {
-                    "address": f":{self.diagnostics_port}",
-                    "web": {"address": f":{self._port}"},
-                    "websecure": {"address": f":{self._tls_port}"},
-                    **{
-                        tcp_entrypoint_name: {"address": f":{port}"}
-                        for tcp_entrypoint_name, port in tcp_entrypoints.items()
-                    },
+                "diagnostics": {"address": f":{_DIAGNOSTICS_PORT}"},
+                "web": {"address": f":{_PORT}"},
+                "websecure": {"address": f":{_TLS_PORT}"},
+                **{
+                    tcp_entrypoint_name: {"address": f":{port}"}
+                    for tcp_entrypoint_name, port in tcp_entrypoints.items()
                 },
-                # We always start the Prometheus endpoint for simplicity
-                # TODO: Generate this file in the dynamic configuration folder when the
-                #  metrics-endpoint relation is established?
-                "metrics": {
-                    "prometheus": {
-                        "addRoutersLabels": True,
-                        "addServicesLabels": True,
-                        "entryPoint": "diagnostics",
-                    }
-                },
-                "ping": {"entryPoint": "diagnostics"},
-                "providers": {
-                    "file": {
-                        "directory": DYNAMIC_CONFIG_DIR,
-                        "watch": True,
-                    }
-                },
+            },
+            # We always start the Prometheus endpoint for simplicity
+            # TODO: Generate this file in the dynamic configuration folder when the
+            #  metrics-endpoint relation is established?
+            "metrics": {
+                "prometheus": {
+                    "addRoutersLabels": True,
+                    "addServicesLabels": True,
+                    "entryPoint": "diagnostics",
+                }
+            },
+            "ping": {"entryPoint": "diagnostics"},
+            "providers": {
+                "file": {
+                    "directory": DYNAMIC_CONFIG_DIR,
+                    "watch": True,
+                }
             },
         }
         config = yaml.safe_dump(raw_config)
@@ -211,7 +218,7 @@ class Traefik:
 
     # wokeignore:rule=master
     # ref: https://doc.traefik.io/traefik/master/observability/tracing/opentelemetry/
-    def config_tracing(self, endpoint: str, grpc: bool):
+    def update_tracing_configuration(self, endpoint: str, grpc: bool):
         """Push yaml config with opentelemetry configuration."""
         config = yaml.safe_dump(
             {
@@ -234,15 +241,15 @@ class Traefik:
         self,
         *,
         prefix: str,
-        scheme: str = "http",
         host: str,
         port: int,
-        strip_prefix: bool,
-        redirect_https: bool,
+        scheme: Optional[str],
+        strip_prefix: Optional[bool],
+        redirect_https: Optional[bool],
         external_host: str,
     ) -> dict:
         """Generate a config dict for IngressPerUnit."""
-        lb_servers = [{"url": f"{scheme}://{host}:{port}"}]
+        lb_servers = [{"url": f"{scheme or 'http'}://{host}:{port}"}]
         return self._generate_config_block(
             prefix=prefix,
             lb_servers=lb_servers,
@@ -256,15 +263,17 @@ class Traefik:
         self,
         *,
         prefix: str,
-        scheme: str = "http",
+        scheme: Optional[str],
         hosts: List[str],
         port: int,
-        strip_prefix: bool,
-        redirect_https: bool,
+        strip_prefix: Optional[bool],
+        redirect_https: Optional[bool],
         external_host: str,
     ) -> dict:
         """Generate a config dict for Ingress(PerApp)."""
-        lb_servers = [{"url": f"{scheme}://{host}:{port}"} for host in hosts]
+        # purge potential Nones
+        scheme = scheme or "http"
+        lb_servers = [{"url": f"{scheme or 'http'}://{host}:{port}"} for host in hosts]
         return self._generate_config_block(
             prefix=prefix,
             lb_servers=lb_servers,
@@ -278,7 +287,7 @@ class Traefik:
         self,
         *,
         prefix: str,
-        scheme: str = "http",
+        scheme: str,
         host: str,
         port: int,
         strip_prefix: bool,
@@ -300,9 +309,9 @@ class Traefik:
         self,
         prefix: str,
         lb_servers: List[Dict[str, str]],
-        scheme: str,
-        redirect_https: bool,
-        strip_prefix: bool,
+        scheme: Optional[str],
+        redirect_https: Optional[bool],
+        strip_prefix: Optional[bool],
         external_host: str,
     ) -> Dict[str, Any]:
         """Generate a configuration segment.
@@ -311,6 +320,11 @@ class Traefik:
         difference being the list of servers to load balance across (where IPU is one server per
         unit and IPA may be more than one).
         """
+        # purge any optionals:
+        scheme_: str = scheme if scheme is not None else "http"
+        redirect_https_: bool = redirect_https if redirect_https is not None else False
+        strip_prefix_: bool = strip_prefix if strip_prefix is not None else False
+
         host = external_host
         if self._routing_mode is RoutingMode.path:
             route_rule = f"PathPrefix(`/{prefix}`)"
@@ -328,7 +342,7 @@ class Traefik:
             },
         }
         router_cfg.update(
-            self._route_tls_config(
+            self.generate_tls_config_for_route(
                 traefik_router_name, route_rule, traefik_service_name, external_host=external_host
             )
         )
@@ -342,7 +356,7 @@ class Traefik:
 
         # REVERSE TERMINATION: we are providing ingress for a unit who is itself behind https,
         # but traefik is not.
-        internal_tls = scheme == "https"
+        internal_tls = scheme_ == "https"
 
         is_reverse_termination = not external_tls and internal_tls
         is_termination = external_tls and not internal_tls
@@ -387,7 +401,10 @@ class Traefik:
             config["http"].update({"serversTransports": transports})
 
         middlewares = self._generate_middleware_config(
-            redirect_https=redirect_https, strip_prefix=strip_prefix, scheme=scheme, prefix=prefix
+            redirect_https=redirect_https_,
+            strip_prefix=strip_prefix_,
+            scheme=scheme_,
+            prefix=prefix,
         )
 
         if middlewares:
@@ -430,7 +447,7 @@ class Traefik:
         return {**no_prefix_middleware, **redir_scheme_middleware}
 
     @staticmethod
-    def _route_tls_config(
+    def generate_tls_config_for_route(
         router_name: str,
         route_rule: str,
         service_name: str,
@@ -489,7 +506,7 @@ class Traefik:
                     "override": "replace",
                     "summary": "Traefik",
                     # trick to drop the logs to a file but also keep them available in the pod logs
-                    "command": '/bin/sh -c "{} | tee {}"'.format(BIN_PATH, self.log_path),
+                    "command": '/bin/sh -c "{} | tee {}"'.format(BIN_PATH, LOG_PATH),
                     "startup": "enabled",
                 },
             },
@@ -504,7 +521,8 @@ class Traefik:
             self._container.restart(self._service_name)
 
     def clear_dynamic_configs(self):
-        """Delete all yamls from the dynamic config dir."""
+        """Delete **ALL** yamls from the dynamic config dir."""
+        # instead of multiple calls to self._container.remove_path(), delete all files in a swoop
         self._container.exec(["find", DYNAMIC_CONFIG_DIR, "-name", "*.yaml", "-delete"])
         logger.debug("Deleted all dynamic configuration files.")
 
@@ -518,11 +536,6 @@ class Traefik:
         self._container.push(Path(DYNAMIC_CONFIG_DIR) / file_name, config, make_dirs=True)
 
         logger.debug("Updated dynamic configuration file: %s", file_name)
-
-    def clear_certs(self):
-        """Delete the server cert and server key."""
-        self._container.remove_path(SERVER_CERT_PATH)
-        self._container.remove_path(SERVER_KEY_PATH)
 
     def clear_tracing_config(self):
         """Delete the tracing config yaml."""
@@ -545,7 +558,7 @@ class Traefik:
         return None
 
     @staticmethod
-    def get_per_unit_tcp_config(prefix: str, host: str, port: int) -> dict:
+    def generate_per_unit_tcp_config(prefix: str, host: str, port: int) -> dict:
         """Generate a config dict for a given unit for IngressPerUnit in tcp mode."""
         # TODO: is there a reason why SNI-based routing (from TLS certs) is per-unit only?
         # This is not a technical limitation in any way. It's meaningful/useful for

@@ -57,7 +57,7 @@ def _create_relation(
 @pytest.mark.parametrize("routing_mode", ("path", "subdomain"))
 @pytest.mark.parametrize("strip_prefix", (False, True))
 @pytest.mark.parametrize("redirect_https", (False, True))
-@patch("charm.TraefikIngressCharm.external_host", PropertyMock(return_value="testhostname"))
+@patch("charm.TraefikIngressCharm._external_host", PropertyMock(return_value="testhostname"))
 @patch("traefik.Traefik.is_running", PropertyMock(return_value=True))
 @patch("charm.TraefikIngressCharm._tcp_entrypoints_changed", MagicMock(return_value=False))
 @patch("charm.TraefikIngressCharm.version", PropertyMock(return_value="0.0.0"))

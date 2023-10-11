@@ -20,7 +20,7 @@ class TestWorkloadVersion(unittest.TestCase):
         )
         self.context = Context(charm_type=TraefikIngressCharm)
 
-    @patch("charm.TraefikIngressCharm.external_host", PropertyMock(return_value="foo.bar"))
+    @patch("charm.TraefikIngressCharm._external_host", PropertyMock(return_value="foo.bar"))
     @patch("traefik.Traefik.is_running", PropertyMock(return_value=True))
     @patch("charm.TraefikIngressCharm.version", PropertyMock(return_value="1.2.3"))
     def test_workload_version_is_set_on_update_status(self, *_):
@@ -35,7 +35,7 @@ class TestWorkloadVersion(unittest.TestCase):
         # THEN the workload version is set
         self.assertEqual(out.workload_version, "1.2.3")
 
-    @patch("charm.TraefikIngressCharm.external_host", PropertyMock(return_value="foo.bar"))
+    @patch("charm.TraefikIngressCharm._external_host", PropertyMock(return_value="foo.bar"))
     @patch("traefik.Traefik.is_running", PropertyMock(return_value=True))
     @patch("charm.TraefikIngressCharm.version", PropertyMock(return_value="1.2.3"))
     def test_workload_version_clears_on_stop(self, *_):

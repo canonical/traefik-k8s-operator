@@ -1,7 +1,6 @@
 from pathlib import Path
 from typing import List, Tuple
 
-import pytest
 import yaml
 from scenario import Context, Relation, State
 
@@ -120,7 +119,5 @@ def test_traefik_remote_app_scaledown_from_2(traefik_ctx, traefik_container):
     _, dynamic = get_configs(traefik_ctx, state)
     assert len(get_servers(dynamic[0])) == 1
 
-    with pytest.raises(IndexError):
-        # FIXME: solved in scenario 5.3.1 @https://github.com/canonical/ops-scenario/pull/64
-        break_(traefik_ctx, state)
-        assert not dynamic[0].exists()
+    break_(traefik_ctx, state)
+    assert not dynamic[0].exists()

@@ -8,12 +8,13 @@ from unittest.mock import Mock, patch
 
 import ops.testing
 import yaml
-from charm import _STATIC_CONFIG_PATH, TraefikIngressCharm
+from charm import TraefikIngressCharm
 from charms.traefik_k8s.v2.ingress import IngressRequirerAppData, IngressRequirerUnitData
 from ops.charm import ActionEvent
 from ops.model import ActiveStatus, Application, BlockedStatus, Relation, WaitingStatus
 from ops.pebble import PathError
 from ops.testing import Harness
+from traefik import STATIC_CONFIG_PATH
 
 ops.testing.SIMULATE_CAN_CONNECT = True
 
@@ -153,6 +154,9 @@ class TestTraefikIngressCharm(unittest.TestCase):
         self.harness.set_model_name("test-model")
         self.addCleanup(self.harness.cleanup)
         self.harness.handle_exec("traefik", ["update-ca-certificates", "--fresh"], result=0)
+        self.harness.handle_exec(
+            "traefik", ["find", "/opt/traefik/juju", "-name", "*.yaml", "-delete"], result=0
+        )
 
         patcher = patch.object(TraefikIngressCharm, "version", property(lambda *_: "0.0.0"))
         self.mock_version = patcher.start()
@@ -325,12 +329,9 @@ class TestTraefikIngressCharm(unittest.TestCase):
             pass
 
     @patch("charm._get_loadbalancer_status", lambda **__: None)
-    @patch("traefik.Traefik.is_running", lambda **__: True)
     @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
     def test_show_proxied_endpoints_action_no_relations(self):
         self.harness.begin_with_initial_hooks()
-        self.harness.container_pebble_ready("traefik")
-
         action_event = Mock(spec=ActionEvent)
         self.harness.update_config({"external_hostname": "foo"})
         self.harness.charm._on_show_proxied_endpoints(action_event)
@@ -390,6 +391,31 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
     @patch("charm._get_loadbalancer_status", lambda **__: None)
     @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
+    def test_base_static_config(self):
+        """Verify that the static config that should always be there, is in fact there."""
+        self.harness.set_leader(True)
+        self.harness.update_config({"external_hostname": "testhostname"})
+
+        self.harness.begin_with_initial_hooks()
+
+        # normally the charm would be reinitialized before receiving pebble-ready, but it isn't.
+        # So we have to pretend to reset traefik's tcp_entrypoints that were passed in init
+        charm = self.harness.charm
+        charm.traefik._tcp_entrypoints = charm._tcp_entrypoints()
+
+        self.harness.container_pebble_ready("traefik")
+        static_config = charm.unit.get_container("traefik").pull(STATIC_CONFIG_PATH).read()
+        cfg = yaml.safe_load(static_config)
+        assert cfg["log"] == {"level": "DEBUG"}
+        assert cfg["entryPoints"]["diagnostics"]["address"]
+        assert cfg["entryPoints"]["web"]["address"]
+        assert cfg["entryPoints"]["websecure"]["address"]
+        assert cfg["ping"]["entryPoint"] == "diagnostics"
+        assert cfg["providers"]["file"]["directory"]
+        assert cfg["providers"]["file"]["watch"] is True
+
+    @patch("charm._get_loadbalancer_status", lambda **__: None)
+    @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
     def test_tcp_config(self):
         self.harness.set_leader(True)
         self.harness.update_config({"external_hostname": "testhostname"})
@@ -400,13 +426,17 @@ class TestTraefikIngressCharm(unittest.TestCase):
             harness=self.harness, relation=relation, host="10.0.0.1", port=3000, mode="tcp"
         )
 
-        self.harness.container_pebble_ready("traefik")
+        # normally the charm would be reinitialized before receiving pebble-ready, but it isn't.
+        # So we have to pretend to reset traefik's tcp_entrypoints that were passed in init
         charm = self.harness.charm
-        prefix = charm._get_prefix(data)
-        expected_entrypoint = {"address": ":3000"}
-        assert charm._tcp_entrypoints() == {prefix: expected_entrypoint}
+        charm.traefik._tcp_entrypoints = charm._tcp_entrypoints()
 
-        static_config = charm.unit.get_container("traefik").pull(_STATIC_CONFIG_PATH).read()
+        self.harness.container_pebble_ready("traefik")
+        prefix = charm._get_prefix(data)
+        assert charm._tcp_entrypoints() == {prefix: 3000}
+
+        expected_entrypoint = {"address": ":3000"}
+        static_config = charm.unit.get_container("traefik").pull(STATIC_CONFIG_PATH).read()
         assert yaml.safe_load(static_config)["entryPoints"][prefix] == expected_entrypoint
 
 
@@ -418,6 +448,9 @@ class TestConfigOptionsValidation(unittest.TestCase):
         self.harness.set_model_name("test-model")
         self.addCleanup(self.harness.cleanup)
         self.harness.handle_exec("traefik", ["update-ca-certificates", "--fresh"], result=0)
+        self.harness.handle_exec(
+            "traefik", ["find", "/opt/traefik/juju", "-name", "*.yaml", "-delete"], result=0
+        )
 
         patcher = patch.object(TraefikIngressCharm, "version", property(lambda *_: "0.0.0"))
         self.mock_version = patcher.start()
