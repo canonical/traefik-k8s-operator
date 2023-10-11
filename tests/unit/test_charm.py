@@ -410,6 +410,52 @@ class TestTraefikIngressCharm(unittest.TestCase):
         assert yaml.safe_load(static_config)["entryPoints"][prefix] == expected_entrypoint
 
 
+class TestTraefikCertTransferInterface(unittest.TestCase):
+    def setUp(self):
+        self.harness: Harness[TraefikIngressCharm] = Harness(TraefikIngressCharm)
+        self.harness.set_model_name("test-model")
+        self.addCleanup(self.harness.cleanup)
+        patcher = patch.object(TraefikIngressCharm, "version", property(lambda *_: "0.0.0"))
+        self.mock_version = patcher.start()
+        self.addCleanup(patcher.stop)
+        self.container_name = "traefik"
+
+    @patch("ops.model.Container.exec")
+    @patch("charm._get_loadbalancer_status", lambda **__: "10.0.0.1")
+    @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
+    def test_transferred_ca_certs_are_updated(self, patch_exec):
+        # Given container is ready, when receive-ca-cert relation joins,
+        # then ca certs are updated.
+        provider_app = "self-signed-certificates"
+        self.harness.set_leader(True)
+        self.harness.begin_with_initial_hooks()
+        self.harness.set_can_connect(container=self.container_name, val=True)
+        certificate_transfer_rel_id = self.harness.add_relation(
+            relation_name="receive-ca-cert", remote_app=provider_app
+        )
+        self.harness.add_relation_unit(
+            relation_id=certificate_transfer_rel_id, remote_unit_name=f"{provider_app}/0"
+        )
+        patch_exec.assert_called_once_with(["update-ca-certificates", "--fresh"])
+
+    @patch("ops.model.Container.exec")
+    @patch("charm._get_loadbalancer_status", lambda **__: "10.0.0.1")
+    @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
+    def test_transferred_ca_certs_are_not_updated(self, patch_exec):
+        # Given container is not ready, when receive-ca-cert relation joins,
+        # then not attempting to update ca certs.
+        provider_app = "self-signed-certificates"
+        self.harness.set_leader(True)
+        self.harness.set_can_connect(container=self.container_name, val=False)
+        certificate_transfer_rel_id = self.harness.add_relation(
+            relation_name="receive-ca-cert", remote_app=provider_app
+        )
+        self.harness.add_relation_unit(
+            relation_id=certificate_transfer_rel_id, remote_unit_name=f"{provider_app}/0"
+        )
+        patch_exec.assert_not_called()
+
+
 class TestConfigOptionsValidation(unittest.TestCase):
     @patch("charm._get_loadbalancer_status", lambda **_: "10.0.0.1")
     @patch("charm.KubernetesServicePatch", lambda *_, **__: None)

@@ -268,6 +268,8 @@ class TraefikIngressCharm(CharmBase):
 
     def _on_recv_ca_cert_available(self, event: CertificateTransferAvailableEvent):
         # Assuming only one cert per relation (this is in line with the original lib design).
+        if not self.container.can_connect():
+            return
         self._update_received_ca_certs(event)
 
     def _update_received_ca_certs(self, event: Optional[CertificateTransferAvailableEvent] = None):
