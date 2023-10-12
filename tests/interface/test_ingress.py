@@ -13,10 +13,6 @@ def test_ingress_v1_interface(interface_tester: InterfaceTester):
 
 def test_ingress_v2_interface(interface_tester: InterfaceTester):
     interface_tester.configure(
-        # todo: remove branch/repo overrides when
-        #  https://github.com/canonical/charm-relation-interfaces/pull/113 lands
-        repo="https://github.com/canonical/charm-relation-interfaces",
-        branch="fix-ingress-tests",
         interface_name="ingress",
         interface_version=2,
     )
