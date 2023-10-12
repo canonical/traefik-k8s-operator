@@ -466,7 +466,11 @@ class TestTraefikCertTransferInterface(unittest.TestCase):
         self.harness.add_relation_unit(
             relation_id=certificate_transfer_rel_id, remote_unit_name=f"{provider_app}/0"
         )
-        patch_exec.assert_called_once_with(["update-ca-certificates", "--fresh"])
+        call_list = patch_exec.call_args_list
+        assert [call.args[0] for call in call_list] == [
+            ["find", "/opt/traefik/juju", "-name", "*.yaml", "-delete"],
+            ["update-ca-certificates", "--fresh"],
+        ]
 
     @patch("ops.model.Container.exec")
     @patch("charm._get_loadbalancer_status", lambda **__: "10.0.0.1")
