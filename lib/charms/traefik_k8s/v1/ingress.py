@@ -69,7 +69,7 @@ LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 17
+LIBPATCH = 18
 
 DEFAULT_RELATION_NAME = "ingress"
 RELATION_INTERFACE = "ingress"
@@ -428,6 +428,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         *,
         host: Optional[str] = None,
         port: Optional[int] = None,
+        prefix: Optional[str] = None,
         strip_prefix: bool = False,
         redirect_https: bool = False,
     ):
@@ -446,6 +447,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
                 application; if unspecified, the default Kubernetes service name will be used.
             strip_prefix: configure Traefik to strip the path prefix.
             redirect_https: redirect incoming requests to the HTTPS.
+            prefix: the prefix to be used for generating the routing configuration.
 
         Request Args:
             port: the port of the service
@@ -502,7 +504,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
             host, port = self._auto_data
             self.provide_ingress_requirements(host=host, port=port)
 
-    def provide_ingress_requirements(self, *, host: Optional[str] = None, port: int):
+    def provide_ingress_requirements(self, *, host: Optional[str] = None, port: int, prefix: Optional[str] = None):
         """Publishes the data that Traefik needs to provide ingress.
 
         NB only the leader unit is supposed to do this.
@@ -511,6 +513,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
             host: Hostname to be used by the ingress provider to address the
              requirer unit; if unspecified, FQDN will be used instead
             port: the port of the service (required)
+            prefix: the prefix to be used for generating the routing configuration.
         """
         # get only the leader to publish the data since we only
         # require one unit to publish it -- it will not differ between units,
@@ -521,11 +524,16 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         if not host:
             host = socket.getfqdn()
 
+        # TODO: what should be sent to the relation data bag if prefix is None?
+        if not prefix:
+            prefix = ''
+
         data = {
             "model": self.model.name,
             "name": self.app.name,
             "host": host,
             "port": str(port),
+            "prefix": prefix,
         }
 
         if self._strip_prefix:
