@@ -194,7 +194,7 @@ class IngressRequirerUnitData(DatabagModel):
     """Ingress requirer unit databag model."""
 
     host: str = Field(description="Hostname at which the unit is reachable.")
-    ip: str = Field(description="IP at which the unit is reachable.")
+    ip: Optional[str] = Field(description="IP at which the unit is reachable.")
 
     @validator("host", pre=True)
     def validate_host(cls, host):  # noqa: N805  # pydantic wants 'cls' as first arg
@@ -205,6 +205,8 @@ class IngressRequirerUnitData(DatabagModel):
     @validator("ip", pre=True)
     def validate_ip(cls, ip):  # noqa: N805  # pydantic wants 'cls' as first arg
         """Validate ip."""
+        if ip is None:
+            return None
         assert isinstance(ip, str), type(ip)
         try:
             ipaddress.IPv4Address(ip)
@@ -638,6 +640,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         *,
         scheme: Optional[str] = None,
         host: Optional[str] = None,
+        ip: Optional[str] = None,
         port: int,
     ):
         """Publishes the data that Traefik needs to provide ingress.
@@ -651,40 +654,40 @@ class IngressPerAppRequirer(_IngressPerAppBase):
             port: the port of the service (required)
         """
         for relation in self.relations:
-            self._provide_ingress_requirements(scheme, host, port, relation)
+            self._provide_ingress_requirements(scheme, host, ip, port, relation)
 
     def _provide_ingress_requirements(
         self,
         scheme: Optional[str],
         host: Optional[str],
+        ip: Optional[str],
         port: int,
         relation: Relation,
     ):
         if self.unit.is_leader():
             self._publish_app_data(scheme, port, relation)
 
-        self._publish_unit_data(host, relation)
+        self._publish_unit_data(host, ip, relation)
 
     def _publish_unit_data(
         self,
         host: Optional[str],
+        ip: Optional[str],
         relation: Relation,
     ):
         if not host:
             host = socket.getfqdn()
 
         if not ip:
-            network_binding = self.charm.model.get_binding(self.relation)
+            network_binding = self.charm.model.get_binding(relation)
             if network_binding is None:
-                raise RuntimeError(
-                    f"can't find IP address for relation {self.relation}, network binding is None"
-                )
-            binding_ip = network_binding.network.bind_address
-            if binding_ip is None:
-                raise RuntimeError(
-                    f"can't find IP address for relation {self.relation}, bind address is None"
-                )
-            ip = str(binding_ip)
+                ip = None
+            else:
+                binding_ip = network_binding.network.bind_address
+                if binding_ip is None:
+                    ip = None
+                else:
+                    ip = str(binding_ip)
 
         unit_databag = relation.data[self.unit]
         try:

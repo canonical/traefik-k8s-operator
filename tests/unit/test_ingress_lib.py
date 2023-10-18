@@ -19,10 +19,7 @@ def test_io_ingress_requirer_unit_data(clear):
     unit_data = IngressRequirerUnitData(host="foo.com", ip="10.0.0.1")
 
     unit_data.dump(databag, clear=clear)
-    expected = {
-        "host": '"foo.com"',
-        "ip": '"10.0.0.1"'
-    }
+    expected = {"host": '"foo.com"', "ip": '"10.0.0.1"'}
     if not clear:
         expected["kaboom"] = '"boom"'
 

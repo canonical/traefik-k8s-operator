@@ -148,7 +148,7 @@ def test_ingress_per_app_scale(
 )
 @pytest.mark.parametrize("evt_name", ("joined", "changed"))
 @pytest.mark.parametrize("leader", (True, False))
-def get_requirer_ctx(host, ip, port, model, evt_name, leader):
+def get_requirer_ctx(host, ip, port):
     class MyRequirer(CharmBase):
         def __init__(self, framework: Framework):
             super().__init__(framework)
@@ -161,17 +161,19 @@ def get_requirer_ctx(host, ip, port, model, evt_name, leader):
     return ctx
 
 
-@pytest.mark.parametrize("port, host", ((80, "1.1.1.1"), (81, "10.1.10.1")))
+@pytest.mark.parametrize(
+    "port, ip, host", ((80, "1.1.1.1", "1.1.1.1"), (81, "10.1.10.1", "1.1.1.1"))
+)
 @pytest.mark.parametrize("evt_name", ("joined", "changed"))
 @pytest.mark.parametrize("leader", (True, False))
-def test_ingress_per_app_requirer_with_auto_data(host, port, model, evt_name, leader):
+def test_ingress_per_app_requirer_with_auto_data(host, ip, port, model, evt_name, leader):
     ipa = Relation("ingress")
     state = State(
         model=model,
         leader=leader,
         relations=[ipa],
     )
-    requirer_ctx = get_requirer_ctx(host, port)
+    requirer_ctx = get_requirer_ctx(host, ip, port)
     state_out = requirer_ctx.run(getattr(ipa, evt_name + "_event"), state)
 
     ipa_out = state_out.get_relations("ingress")[0]
@@ -227,7 +229,8 @@ def test_ingress_per_app_v1_upgrade_v2(
     strip_prefix,
     redirect_https,
 ):
-    requirer_ctx = get_requirer_ctx("host", 4242)
+
+    requirer_ctx = get_requirer_ctx("host", "1.2.3.4", 4242)
 
     ipav1 = Relation(
         "ingress",
