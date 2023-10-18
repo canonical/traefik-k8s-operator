@@ -82,7 +82,7 @@ LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 12
+LIBPATCH = 16
 
 log = logging.getLogger(__name__)
 
@@ -114,6 +114,7 @@ INGRESS_REQUIRES_UNIT_SCHEMA = {
         "mode": {"type": "string"},
         "strip-prefix": {"type": "string"},
         "redirect-https": {"type": "string"},
+        "scheme": {"type": "string"},
     },
     "required": ["model", "name", "host", "port"],
 }
@@ -154,6 +155,7 @@ RequirerData = TypedDict(
         "mode": Optional[Literal["tcp", "http"]],
         "strip-prefix": Optional[bool],
         "redirect-https": Optional[bool],
+        "scheme": Optional[Literal["http", "https"]],
     },
     total=False,
 )
@@ -184,8 +186,8 @@ def _validate_data(data, schema):
     if not DO_VALIDATION:
         return
     try:
-        jsonschema.validate(instance=data, schema=schema)
-    except jsonschema.ValidationError as e:
+        jsonschema.validate(instance=data, schema=schema)  # pyright: ignore[reportUnboundVariable]
+    except jsonschema.ValidationError as e:  # pyright: ignore[reportUnboundVariable]
         raise DataValidationError(data, schema) from e
 
 
@@ -485,7 +487,16 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
 
         databag = relation.data[remote_unit]
         remote_data: Dict[str, Union[int, str]] = {}
-        for k in ("port", "host", "model", "name", "mode", "strip-prefix", "redirect-https"):
+        for k in (
+            "port",
+            "host",
+            "model",
+            "name",
+            "mode",
+            "strip-prefix",
+            "redirect-https",
+            "scheme",
+        ):
             v = databag.get(k)
             if v is not None:
                 remote_data[k] = v
@@ -663,6 +674,9 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
         listen_to: Literal["only-this-unit", "all-units", "both"] = "only-this-unit",
         strip_prefix: bool = False,
         redirect_https: bool = False,
+        # FIXME: now that `provide_ingress_requirements` takes a scheme, this arg can be changed to
+        #  str type in v2.
+        scheme: typing.Callable[[], str] = lambda: "http",
     ):
         """Constructor for IngressPerUnitRequirer.
 
@@ -692,6 +706,7 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
                   will be notified *twice* of changes to this unit's ingress!).
             strip_prefix: remove prefixes from the URL path.
             redirect_https: redirect incoming requests to HTTPS
+            scheme: callable returning the scheme to use when constructing the ingress url.
         """
         super().__init__(charm, relation_name)
         self._stored.set_default(current_urls=None)  # type: ignore
@@ -703,6 +718,7 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
         self._mode = mode
         self._strip_prefix = strip_prefix
         self._redirect_https = redirect_https
+        self._get_scheme = scheme
 
         self.listen_to = listen_to
 
@@ -771,18 +787,29 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
             return False
         return bool(self.url)
 
-    def provide_ingress_requirements(self, *, host: Optional[str] = None, port: int):
+    def provide_ingress_requirements(
+        self, *, scheme: Optional[str] = None, host: Optional[str] = None, port: int
+    ):
         """Publishes the data that Traefik needs to provide ingress.
 
         Args:
+            scheme: Scheme to be used; if unspecified, use the one used by __init__.
             host: Hostname to be used by the ingress provider to address the
              requirer unit; if unspecified, FQDN will be used instead
             port: the port of the service (required)
         """
-        assert self.relation, "no relation"
+        # This public method may be used at various points of the charm lifecycle, possibly when
+        # the ingress relation is not yet there.
+        # Abort if there is no relation (instead of requiring the caller to guard against it).
+        if not self.relation:
+            return
 
         if not host:
             host = socket.getfqdn()
+
+        if not scheme:
+            # If scheme was not provided, use the one given to the constructor.
+            scheme = self._get_scheme()
 
         data = {
             "model": self.model.name,
@@ -790,6 +817,7 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
             "host": host,
             "port": str(port),
             "mode": self._mode,
+            "scheme": scheme,
         }
 
         if self._strip_prefix:

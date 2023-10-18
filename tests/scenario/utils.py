@@ -5,23 +5,21 @@ from scenario import Relation
 
 
 def _render_middlewares(*, strip_prefix: bool = False, redirect_https: bool = False) -> dict:
-    middlewares = {}
-    if redirect_https:
-        middlewares.update({"redirectScheme": {"scheme": "https", "port": 443, "permanent": True}})
+    no_prefix_middleware = {}
     if strip_prefix:
-        middlewares.update(
-            {
-                "stripPrefix": {
-                    "prefixes": ["/test-model-remote-0"],
-                    "forceSlash": False,
-                }
-            }
-        )
-    return (
-        {"middlewares": {"juju-sidecar-noprefix-test-model-remote-0": middlewares}}
-        if middlewares
-        else {}
-    )
+        no_prefix_middleware["juju-sidecar-noprefix-test-model-remote-0"] = {
+            "stripPrefix": {"prefixes": ["/test-model-remote-0"], "forceSlash": False}
+        }
+
+    # Condition rendering the https-redirect middleware on the scheme, otherwise we'd get a 404
+    # when attempting to reach an http endpoint.
+    redir_scheme_middleware = {}
+    if redirect_https:
+        redir_scheme_middleware["juju-sidecar-redir-https-test-model-remote-0"] = {
+            "redirectScheme": {"scheme": "https", "port": 443, "permanent": True}
+        }
+
+    return {**no_prefix_middleware, **redir_scheme_middleware}
 
 
 def _render_config(
@@ -40,10 +38,6 @@ def _render_config(
         "subdomain": "Host(`test-model-remote-0.testhostname`)",
     }
 
-    if rel_name != "ingress":
-        scheme = "http"
-        # ipu does not do https for now
-
     service_spec = {
         "loadBalancer": {"servers": [{"url": f"{scheme}://{host}:{port}"}]},
     }
@@ -51,7 +45,7 @@ def _render_config(
     if scheme == "https":
         # service_spec["rootCAs"] = ["/opt/traefik/juju/certificate.cert"]
         service_spec["loadBalancer"]["serversTransport"] = "reverseTerminationTransport"
-        transports = {"reverseTerminationTransport": {"insecureSkipVerify": True}}
+        transports = {"reverseTerminationTransport": {"insecureSkipVerify": False}}
 
     expected = {
         "http": {
@@ -83,14 +77,15 @@ def _render_config(
         expected["http"]["serversTransports"] = transports
 
     if middlewares := _render_middlewares(
-        strip_prefix=strip_prefix and routing_mode == "path", redirect_https=redirect_https
+        strip_prefix=strip_prefix and routing_mode == "path",
+        redirect_https=redirect_https and scheme == "https",
     ):
-        expected["http"].update(middlewares)
+        expected["http"].update({"middlewares": middlewares})
         expected["http"]["routers"]["juju-test-model-remote-0-router"].update(
-            {"middlewares": ["juju-sidecar-noprefix-test-model-remote-0"]},
+            {"middlewares": list(middlewares.keys())},
         )
         expected["http"]["routers"]["juju-test-model-remote-0-router-tls"].update(
-            {"middlewares": ["juju-sidecar-noprefix-test-model-remote-0"]},
+            {"middlewares": list(middlewares.keys())},
         )
 
     return expected

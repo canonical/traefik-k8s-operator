@@ -1,6 +1,7 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 import asyncio
+import json
 from urllib.parse import urlparse
 
 import pytest
@@ -78,11 +79,16 @@ async def test_relation_data_shape(ops_test: OpsTest):
 
     assert dequote(data.requirer.unit_data["host"]) == "foo.bar"
 
+    # that was v1. ipa-tester talks v2
+    assert not requirer_app_data.get("host")
+
+    assert dequote(data.requirer.unit_data["host"]) == "foo.bar"
+
     # example:
     #  ingress:
     #    url: http://foo.bar/foo-ipa-tester/0
     traefik_address = await get_address(ops_test, "traefik-k8s")
-    provider_app_data = yaml.safe_load(data.provider.application_data["ingress"])
+    provider_app_data = json.loads(data.provider.application_data["ingress"])
     assert provider_app_data == {"url": f"http://{traefik_address}/{model}-ipa-tester"}
 
 

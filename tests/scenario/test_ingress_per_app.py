@@ -4,12 +4,18 @@
 # AND WHEN the charm rescales
 # THEN the traefik config file is updated
 import json
+import tempfile
+from pathlib import Path
 
 import pytest
 import yaml
-from charms.traefik_k8s.v2.ingress import IngressPerAppRequirer
+from charms.traefik_k8s.v2.ingress import (
+    IngressPerAppRequirer,
+    IngressRequirerAppData,
+    IngressRequirerUnitData,
+)
 from ops import CharmBase, Framework
-from scenario import Context, Relation, State
+from scenario import Context, Mount, Relation, State
 
 from tests.scenario.utils import create_ingress_relation
 
@@ -36,9 +42,9 @@ def test_ingress_per_app_created(
     traefik_ctx.run(event, state)
 
     generated_config = yaml.safe_load(
-        traefik_container.filesystem.open(
-            f"/opt/traefik/juju/juju_ingress_ingress_{ipa.relation_id}_remote.yaml"
-        ).read()
+        traefik_container.get_filesystem(traefik_ctx)
+        .joinpath(f"opt/traefik/juju/juju_ingress_ingress_{ipa.relation_id}_remote.yaml")
+        .read_text()
     )
 
     service_def = {
@@ -142,7 +148,7 @@ def test_ingress_per_app_scale(
 )
 @pytest.mark.parametrize("evt_name", ("joined", "changed"))
 @pytest.mark.parametrize("leader", (True, False))
-def test_ingress_per_app_requirer_with_auto_data(host, ip, port, model, evt_name, leader):
+def get_requirer_ctx(host, ip, port, model, evt_name, leader):
     class MyRequirer(CharmBase):
         def __init__(self, framework: Framework):
             super().__init__(framework)
@@ -152,15 +158,21 @@ def test_ingress_per_app_requirer_with_auto_data(host, ip, port, model, evt_name
         charm_type=MyRequirer,
         meta={"name": "charlie", "requires": {"ingress": {"interface": "ingress"}}},
     )
+    return ctx
 
+
+@pytest.mark.parametrize("port, host", ((80, "1.1.1.1"), (81, "10.1.10.1")))
+@pytest.mark.parametrize("evt_name", ("joined", "changed"))
+@pytest.mark.parametrize("leader", (True, False))
+def test_ingress_per_app_requirer_with_auto_data(host, port, model, evt_name, leader):
     ipa = Relation("ingress")
     state = State(
         model=model,
         leader=leader,
         relations=[ipa],
     )
-
-    state_out = ctx.run(getattr(ipa, evt_name + "_event"), state)
+    requirer_ctx = get_requirer_ctx(host, port)
+    state_out = requirer_ctx.run(getattr(ipa, evt_name + "_event"), state)
 
     ipa_out = state_out.get_relations("ingress")[0]
     assert ipa_out.local_unit_data == {"host": json.dumps(host), "ip": json.dumps(ip)}
@@ -174,3 +186,69 @@ def test_ingress_per_app_requirer_with_auto_data(host, ip, port, model, evt_name
             "scheme": '"http"',
             "strip-prefix": "false",
         }
+
+
+def test_ingress_per_app_cleanup_on_remove(model, traefik_ctx, traefik_container):
+    """Check that config file is removed when a relation is."""
+    ipa = create_ingress_relation()
+
+    td = tempfile.TemporaryDirectory()
+    filename = f"juju_ingress_ingress_{ipa.relation_id}_remote.yaml"
+    conf_file = Path(td.name).joinpath(filename)
+    conf_file.write_text("foobar")
+
+    traefik_container = traefik_container.replace(mounts={"conf": Mount("/opt/traefik/", td.name)})
+
+    state = State(
+        model=model,
+        config={"routing_mode": "path", "external_hostname": "foo.com"},
+        containers=[traefik_container],
+        relations=[ipa],
+    )
+
+    # WHEN the relation goes
+    traefik_ctx.run(ipa.broken_event, state)
+
+    # THEN the config file was deleted
+    mock_dynamic_config_folder = traefik_container.get_filesystem(traefik_ctx).joinpath(
+        "opt", "traefik", "juju", filename
+    )
+    assert not mock_dynamic_config_folder.exists()
+
+
+@pytest.mark.parametrize("rel_id", (1, 2, 3))
+@pytest.mark.parametrize("remote_app_name", ("remote", "distant"))
+@pytest.mark.parametrize("strip_prefix", (True, False))
+@pytest.mark.parametrize("redirect_https", (True, False))
+def test_ingress_per_app_v1_upgrade_v2(
+    model,
+    rel_id,
+    remote_app_name,
+    strip_prefix,
+    redirect_https,
+):
+    requirer_ctx = get_requirer_ctx("host", 4242)
+
+    ipav1 = Relation(
+        "ingress",
+        remote_app_name=remote_app_name,
+        remote_app_data={"ingress": 'url: http://10.206.54.240/"openstack"-"keystone"\n'},
+        local_app_data={"name": "robin", "host": "host", "port": "4242", "model": model.name},
+    )
+
+    state = State(
+        leader=True,
+        model=model,
+        relations=[ipav1],
+    )
+
+    # WHEN a charm upgrade occurs
+    with requirer_ctx.manager("upgrade-charm", state) as mgr:
+        assert not mgr.charm.ipa.is_ready()
+        state_out = mgr.run()
+        assert not mgr.charm.ipa.is_ready()
+
+    # THEN the relation databags are upgraded to match the v2 spec
+    ingress_out = state_out.get_relations("ingress")[0]
+    IngressRequirerUnitData.load(ingress_out.local_unit_data)
+    IngressRequirerAppData.load(ingress_out.local_app_data)

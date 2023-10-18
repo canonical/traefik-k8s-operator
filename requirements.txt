@@ -27,4 +27,12 @@ lightkube-models >= 1.22.0.4
 # Code: https://github.com/canonical/operator/
 # Docs: https://ops.rtfd.io/
 # Deps: charm
-ops
+ops >= 2.6.0
+
+# the deps below are from PYDEPS and are needed here for the tox test envs
+# Keep them in sync with pydeps!
+importlib-metadata==6.0.0
+opentelemetry-exporter-otlp-proto-grpc==1.17.0
+pydantic<2.0
+
+cosl

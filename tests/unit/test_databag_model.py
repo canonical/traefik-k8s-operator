@@ -41,13 +41,12 @@ def test_invalid_model():
 
 
 def test_extra_fields():
-    with pytest.raises(pydantic.ValidationError):
-        IngressRequirerAppData(
-            model="foo",
-            name="bar",
-            port=10,
-            strip_prefix=True,
-            redirect_https=False,
-            scheme="https",
-            qux="floz",
-        )
+    IngressRequirerAppData(
+        model="foo",
+        name="bar",
+        port=10,
+        strip_prefix=True,
+        redirect_https=False,
+        scheme="https",
+        qux="floz",
+    )

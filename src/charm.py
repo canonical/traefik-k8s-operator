@@ -3,18 +3,29 @@
 # See LICENSE file for licensing details.
 
 """Charm Traefik."""
-
+import contextlib
 import enum
+import functools
 import ipaddress
 import json
 import logging
 import re
 import socket
 import typing
+from string import Template
 from typing import Any, Dict, List, Optional, Union
 from urllib.parse import urlparse
 
 import yaml
+from charms.certificate_transfer_interface.v0.certificate_transfer import (
+    CertificateAvailableEvent as CertificateTransferAvailableEvent,
+)
+from charms.certificate_transfer_interface.v0.certificate_transfer import (
+    CertificateRemovedEvent as CertificateTransferRemovedEvent,
+)
+from charms.certificate_transfer_interface.v0.certificate_transfer import (
+    CertificateTransferRequires,
+)
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from charms.loki_k8s.v0.loki_push_api import LogProxyConsumer
 from charms.observability_libs.v0.cert_handler import CertHandler
@@ -23,12 +34,15 @@ from charms.observability_libs.v1.kubernetes_service_patch import (
     ServicePort,
 )
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
+from charms.tempo_k8s.v0.charm_tracing import trace_charm
+from charms.tempo_k8s.v0.tracing import TracingEndpointRequirer
 from charms.tls_certificates_interface.v2.tls_certificates import (
     CertificateInvalidatedEvent,
 )
 from charms.traefik_k8s.v1.ingress import IngressPerAppProvider as IPAv1
 from charms.traefik_k8s.v1.ingress import RequirerData as IPADatav1
 from charms.traefik_k8s.v1.ingress_per_unit import DataValidationError, IngressPerUnitProvider
+from charms.traefik_k8s.v1.ingress_per_unit import RequirerData as RequirerData_IPU
 from charms.traefik_k8s.v2.ingress import IngressPerAppProvider as IPAv2
 from charms.traefik_k8s.v2.ingress import IngressRequirerData as IPADatav2
 from charms.traefik_route_k8s.v0.traefik_route import (
@@ -50,12 +64,14 @@ from ops.charm import (
 )
 from ops.framework import StoredState
 from ops.main import main
-from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, Relation, WaitingStatus
-from ops.pebble import APIError, PathError
-
-if typing.TYPE_CHECKING:
-    from charms.traefik_k8s.v1.ingress_per_unit import RequirerData as RequirerData_IPU
-    from charms.traefik_k8s.v2.ingress import RequirerAppData as RequirerAppData_IPA
+from ops.model import (
+    ActiveStatus,
+    BlockedStatus,
+    MaintenanceStatus,
+    Relation,
+    WaitingStatus,
+)
+from ops.pebble import APIError, LayerDict, PathError
 
 logger = logging.getLogger(__name__)
 
@@ -64,15 +80,30 @@ _TRAEFIK_CONTAINER_NAME = _TRAEFIK_LAYER_NAME = _TRAEFIK_SERVICE_NAME = "traefik
 # as that is usually safer for Traefik
 _DYNAMIC_CONFIG_DIR = "/opt/traefik/juju"
 _STATIC_CONFIG_DIR = "/etc/traefik"
-_STATIC_CONFIG_PATH = _STATIC_CONFIG_DIR + "/traefik.yaml"
-_DYNAMIC_CERTS_PATH = _DYNAMIC_CONFIG_DIR + "/certificates.yaml"
-_SERVER_CERT_PATH = _DYNAMIC_CONFIG_DIR + "/server.cert"
-_SERVER_KEY_PATH = _DYNAMIC_CONFIG_DIR + "/server.key"
-_CA_CERT_PATH = _DYNAMIC_CONFIG_DIR + "/ca.cert"
+_STATIC_CONFIG_PATH = f"{_STATIC_CONFIG_DIR}/traefik.yaml"
+_DYNAMIC_CERTS_PATH = f"{_DYNAMIC_CONFIG_DIR}/certificates.yaml"
+_DYNAMIC_TRACING_PATH = f"{_DYNAMIC_CONFIG_DIR}/tracing.yaml"
+_SERVER_CERT_PATH = f"{_DYNAMIC_CONFIG_DIR}/server.cert"
+_SERVER_KEY_PATH = f"{_DYNAMIC_CONFIG_DIR}/server.key"
+_CA_CERTS_PATH = "/usr/local/share/ca-certificates"
+_CA_CERT_PATH = f"{_CA_CERTS_PATH}/traefik-ca.crt"
+_RECV_CA_TEMPLATE = Template(f"{_CA_CERTS_PATH}/receive-ca-cert-$rel_id-ca.crt")
+
 BIN_PATH = "/usr/bin/traefik"
 
 
-# pyright: reportGeneralTypeIssues=false
+def is_hostname(value: Optional[str]) -> bool:
+    """Return False if input value is an IP address; True otherwise."""
+    if value is None:
+        return False
+
+    try:
+        ipaddress.ip_address(value)
+        # No exception raised so this is an IP address.
+        return False
+    except ValueError:
+        # This is not an IP address so assume it's a hostname.
+        return bool(value)
 
 
 class _RoutingMode(enum.Enum):
@@ -86,6 +117,17 @@ class _IngressRelationType(enum.Enum):
     routed = "routed"
 
 
+@trace_charm(
+    tracing_endpoint="charm_tracing_endpoint",
+    server_cert="server_cert",
+    extra_types=(
+        IPAv2,
+        IPAv1,
+        IngressPerUnitProvider,
+        TraefikRouteProvider,
+        KubernetesServicePatch,
+    ),
+)
 class TraefikIngressCharm(CharmBase):
     """Charm the service."""
 
@@ -104,12 +146,17 @@ class TraefikIngressCharm(CharmBase):
         )
 
         self.container = self.unit.get_container(_TRAEFIK_CONTAINER_NAME)
+        sans = self.server_cert_sans_dns
         self.cert = CertHandler(
             self,
             key="trfk-server-cert",
             peer_relation_name="peers",
-            extra_sans_dns=[self.cert_subject],
+            # Route53 complains if CN is not a hostname
+            cert_subject=sans[0] if len(sans) else None,
+            extra_sans_dns=sans,
         )
+
+        self.recv_ca_cert = CertificateTransferRequires(self, "receive-ca-cert")
 
         # FIXME: Do not move these lower. They must exist before `_tcp_ports` is called. The
         # better long-term solution is to allow dynamic modification of the object, and to try
@@ -127,7 +174,9 @@ class TraefikIngressCharm(CharmBase):
         self.ingress_per_appv2 = ipa_v2 = IPAv2(charm=self)
 
         self.ingress_per_unit = IngressPerUnitProvider(charm=self)
-        self.traefik_route = TraefikRouteProvider(charm=self, external_host=self.external_host)
+        self.traefik_route = TraefikRouteProvider(
+            charm=self, external_host=self.external_host, scheme=self._scheme  # type: ignore
+        )
 
         web = ServicePort(self._port, name=f"{self.app.name}")
         websecure = ServicePort(self._tls_port, name=f"{self.app.name}-tls")
@@ -137,18 +186,22 @@ class TraefikIngressCharm(CharmBase):
             service_type="LoadBalancer",
             ports=[web, websecure] + tcp_ports,
             refresh_event=[
-                ipa_v1.on.data_provided,
-                ipa_v2.on.data_provided,
-                ipa_v1.on.data_removed,
-                ipa_v2.on.data_removed,
-                self.ingress_per_unit.on.data_provided,
-                self.ingress_per_unit.on.data_removed,
-                self.traefik_route.on.ready,
-                self.traefik_route.on.data_removed,
+                ipa_v1.on.data_provided,  # type: ignore
+                ipa_v2.on.data_provided,  # type: ignore
+                ipa_v1.on.data_removed,  # type: ignore
+                ipa_v2.on.data_removed,  # type: ignore
+                self.ingress_per_unit.on.data_provided,  # type: ignore
+                self.ingress_per_unit.on.data_removed,  # type: ignore
+                self.traefik_route.on.ready,  # type: ignore
+                self.traefik_route.on.data_removed,  # type: ignore
+                self.on.traefik_pebble_ready,  # type: ignore
             ],
         )
 
         # Observability integrations
+        # tracing integration
+        self._tracing = TracingEndpointRequirer(self)
+
         # Provide grafana dashboards over a relation interface
         # dashboard to use: https://grafana.com/grafana/dashboards/4475-traefik/
         # TODO wishlist: I would like for the p60, p70, p80, p90, p99, min, max, and avg for
@@ -164,8 +217,8 @@ class TraefikIngressCharm(CharmBase):
             charm=self,
             jobs=self._scrape_jobs,
             refresh_event=[
-                self.on.traefik_pebble_ready,
-                self.on.update_status,
+                self.on.traefik_pebble_ready,  # type: ignore
+                self.on.update_status,  # type: ignore
             ],
         )
         observe = self.framework.observe
@@ -173,27 +226,91 @@ class TraefikIngressCharm(CharmBase):
         # TODO update init params once auto-renew is implemented
         # https://github.com/canonical/tls-certificates-interface/issues/24
         observe(
-            self.cert.on.cert_changed,
-            self._on_cert_changed,
+            self._tracing.on.endpoint_changed,  # type: ignore
+            self._on_tracing_endpoint_changed,
+        )
+        observe(
+            self._tracing.on.endpoint_removed,  # type: ignore
+            self._on_tracing_endpoint_removed,
         )
 
-        observe(self.on.traefik_pebble_ready, self._on_traefik_pebble_ready)
+        observe(self.on.traefik_pebble_ready, self._on_traefik_pebble_ready)  # type: ignore
         observe(self.on.start, self._on_start)
         observe(self.on.stop, self._on_stop)
         observe(self.on.update_status, self._on_update_status)
         observe(self.on.config_changed, self._on_config_changed)
+        observe(
+            self.cert.on.cert_changed,  # pyright: ignore
+            self._on_cert_changed,
+        )
+        observe(
+            self.recv_ca_cert.on.certificate_available,  # pyright: ignore
+            self._on_recv_ca_cert_available,
+        )
+        observe(
+            # Need to observe a managed relation event because a custom wrapper is not available
+            # https://github.com/canonical/mutual-tls-interface/issues/5
+            self.recv_ca_cert.on.certificate_removed,  # pyright: ignore
+            self._on_recv_ca_cert_removed,
+        )
 
         # observe data_provided and data_removed events for all types of ingress we offer:
         for ingress in (self.ingress_per_unit, self.ingress_per_appv1, self.ingress_per_appv2):
-            observe(ingress.on.data_provided, self._handle_ingress_data_provided)
-            observe(ingress.on.data_removed, self._handle_ingress_data_removed)
+            observe(ingress.on.data_provided, self._handle_ingress_data_provided)  # type: ignore
+            observe(ingress.on.data_removed, self._handle_ingress_data_removed)  # type: ignore
 
         route_events = self.traefik_route.on
-        observe(route_events.ready, self._handle_traefik_route_ready)
-        observe(route_events.data_removed, self._handle_ingress_data_removed)
+        observe(route_events.ready, self._handle_traefik_route_ready)  # type: ignore
+        observe(route_events.data_removed, self._handle_ingress_data_removed)  # type: ignore
 
         # Action handlers
-        observe(self.on.show_proxied_endpoints_action, self._on_show_proxied_endpoints)
+        observe(self.on.show_proxied_endpoints_action, self._on_show_proxied_endpoints)  # type: ignore
+
+    def _on_recv_ca_cert_available(self, event: CertificateTransferAvailableEvent):
+        # Assuming only one cert per relation (this is in line with the original lib design).
+        if not self.container.can_connect():
+            return
+        self._update_received_ca_certs(event)
+
+    def _update_received_ca_certs(self, event: Optional[CertificateTransferAvailableEvent] = None):
+        """Push the cert attached to the event, if it is given; otherwise push all certs.
+
+        This function is needed because relation events are not emitted on upgrade, and because we
+        do not have (nor do we want) persistent storage for certs.
+        Calling this function from upgrade-charm might be too early though. Pebble-ready is
+        preferred.
+        """
+        if event:
+            self.container.push(
+                _RECV_CA_TEMPLATE.substitute(rel_id=event.relation_id), event.ca, make_dirs=True
+            )
+        else:
+            for relation in self.model.relations.get(self.recv_ca_cert.relationship_name, []):
+                # For some reason, relation.units includes our unit and app. Need to exclude them.
+                for unit in set(relation.units).difference([self.app, self.unit]):
+                    # Note: this nested loop handles the case of multi-unit CA, each unit providing
+                    # a different ca cert, but that is not currently supported by the lib itself.
+                    cert_path = _RECV_CA_TEMPLATE.substitute(rel_id=relation.id)
+                    if cert := relation.data[unit].get("ca"):
+                        self.container.push(cert_path, cert, make_dirs=True)
+
+        self._update_system_certs()
+
+    def _on_recv_ca_cert_removed(self, event: CertificateTransferRemovedEvent):
+        # Assuming only one cert per relation (this is in line with the original lib design).
+        target = _RECV_CA_TEMPLATE.substitute(rel_id=event.relation_id)
+        self.container.remove_path(target, recursive=True)
+        self._update_system_certs()
+
+    @property
+    def charm_tracing_endpoint(self) -> Optional[str]:
+        """Otlp grpc endpoint for charm instrumentation."""
+        return self._tracing.otlp_grpc_endpoint()
+
+    @property
+    def server_cert(self) -> Optional[str]:
+        """Server certificate for tls tracing."""
+        return self.cert.cert
 
     def _on_certificate_invalidated(self, event: CertificateInvalidatedEvent):
         # Assuming there can be only one cert (metadata also has `limit: 1` on the relation).
@@ -214,30 +331,67 @@ class TraefikIngressCharm(CharmBase):
         """Return True if TLS is enabled."""
         return self.cert.enabled
 
-    def _on_cert_changed(self, event) -> None:
+    def _is_tracing_enabled(self) -> bool:
+        """Return True if tracing is enabled."""
+        if not self._tracing.is_ready():
+            return False
+        return True
+
+    def _on_tracing_endpoint_removed(self, event) -> None:
+        if not self.container.can_connect():
+            # this probably means we're being torn down, so we don't really need to
+            # clear anything up. We could defer, but again, we're being torn down and the unit db
+            # will
+            return
+        self._clear_tracing_config()
+
+    def _on_tracing_endpoint_changed(self, event) -> None:
         # On slow machines, this event may come up before pebble is ready
         if not self.container.can_connect():
             event.defer()
             return
 
+        if not self._tracing.is_ready():
+            self._clear_tracing_config()
+
+        self._push_tracing_config()
+
+    def _on_cert_changed(self, event) -> None:
+        # On slow machines, this event may come up before pebble is ready
+        if not self.container.can_connect():
+            event.defer()
+            return
+        self._update_cert_configs()
+        self._push_config()
+        self._process_status_and_configurations()
+
+    def _update_cert_configs(self):
         cert_handler = self.cert
         if cert_handler.cert:
             self.container.push(_SERVER_CERT_PATH, cert_handler.cert, make_dirs=True)
         else:
-            self.container.remove_path(_SERVER_CERT_PATH)
+            self.container.remove_path(_SERVER_CERT_PATH, recursive=True)
 
         if cert_handler.key:
             self.container.push(_SERVER_KEY_PATH, cert_handler.key, make_dirs=True)
         else:
-            self.container.remove_path(_SERVER_KEY_PATH)
+            self.container.remove_path(_SERVER_KEY_PATH, recursive=True)
 
         if cert_handler.ca:
             self.container.push(_CA_CERT_PATH, cert_handler.ca, make_dirs=True)
         else:
-            self.container.remove_path(_CA_CERT_PATH)
+            self.container.remove_path(_CA_CERT_PATH, recursive=True)
 
-        self._push_config()
-        self._process_status_and_configurations()
+        self._update_system_certs()
+
+    def _update_system_certs(self):
+        self.container.exec(["update-ca-certificates", "--fresh"]).wait()
+
+        # Must restart traefik after refreshing certs, otherwise:
+        # - newly added certs will not be loaded and traefik will keep erroring-out with "signed by
+        #   unknown authority".
+        # - old certs will be kept active.
+        self._restart_traefik()
 
     def _on_show_proxied_endpoints(self, event: ActionEvent):
         if not self.ready:
@@ -269,7 +423,7 @@ class TraefikIngressCharm(CharmBase):
 
                 data = ipu.get_data(relation, unit)
                 if data.get("mode", "http") == "tcp":
-                    entrypoint_name = self._get_prefix(data)
+                    entrypoint_name = self._get_prefix(data)  # type: ignore
                     entrypoints[entrypoint_name] = {"address": f":{data['port']}"}
 
         return entrypoints
@@ -334,9 +488,18 @@ class TraefikIngressCharm(CharmBase):
             },
         }
         self.container.push(_STATIC_CONFIG_PATH, yaml.dump(traefik_config), make_dirs=True)
-        self.container.push(_DYNAMIC_CERTS_PATH, yaml.dump(self._get_tls_config()), make_dirs=True)
-
         self.container.make_dir(_DYNAMIC_CONFIG_DIR, make_parents=True)
+
+        tls_config = self._get_tls_config()
+        if tls_config:
+            self.container.push(_DYNAMIC_CERTS_PATH, yaml.dump(tls_config), make_dirs=True)
+
+        self._push_tracing_config()
+
+    def _push_tracing_config(self):
+        tracing_config = self._get_tracing_config()
+        if tracing_config:
+            self.container.push(_DYNAMIC_TRACING_PATH, yaml.dump(tracing_config), make_dirs=True)
 
     def _get_tls_config(self) -> dict:
         """Return dictionary with TLS traefik configuration if it exists."""
@@ -350,8 +513,51 @@ class TraefikIngressCharm(CharmBase):
                         "keyFile": _SERVER_KEY_PATH,
                     }
                 ],
+                "stores": {
+                    "default": {
+                        # When the external hostname is a bare IP, traefik cannot match a domain,
+                        # so we must set the default cert for the TLS handshake to succeed.
+                        "defaultCertificate": {
+                            "certFile": _SERVER_CERT_PATH,
+                            "keyFile": _SERVER_KEY_PATH,
+                        },
+                    },
+                },
             }
         }
+
+    def _get_tracing_config(self) -> dict:
+        """Return dictionary with opentelemetry configuration if available."""
+        # wokeignore:rule=master
+        # ref: https://doc.traefik.io/traefik/master/observability/tracing/opentelemetry/
+        if not self._is_tracing_enabled():
+            logger.info("tracing not enabled: skipping tracing config")
+            return {}
+
+        # traefik supports http and grpc
+        if addr := self._tracing.otlp_grpc_endpoint():
+            grpc = True
+        elif addr := self._tracing.otlp_http_endpoint():
+            grpc = False
+        else:
+            logger.error(
+                "tracing integration is active but none of the "
+                "protocols traefik supports is available."
+            )
+            return {}
+
+        otlp_cfg: Dict[str, Any] = {"address": addr}
+        if self._is_tls_enabled():
+            # todo: we have an option to use CA or to use CERT+KEY (available with mtls) authentication.
+            #  when we have mTLS, consider this again.
+            otlp_cfg["ca"] = _CA_CERT_PATH
+        else:
+            otlp_cfg["insecure"] = True
+
+        if grpc:
+            otlp_cfg["grpc"] = {}
+        logger.debug(f"dumping {otlp_cfg} to {_DYNAMIC_TRACING_PATH}")
+        return {"tracing": {"openTelemetry": otlp_cfg}}
 
     def _on_traefik_pebble_ready(self, _: PebbleReadyEvent):
         # If the Traefik container comes up, e.g., after a pod churn, we
@@ -359,6 +565,7 @@ class TraefikIngressCharm(CharmBase):
         self._clear_all_configs_and_restart_traefik()
         # push the (fresh new) configs.
         self._process_status_and_configurations()
+        self._update_received_ca_certs()
         self._set_workload_version()
 
     def _clear_all_configs_and_restart_traefik(self):
@@ -366,11 +573,17 @@ class TraefikIngressCharm(CharmBase):
         # configuration files on a storage volume that survives the pod churn, before
         # we start traefik we clean up all Juju-generated config files to avoid spurious
         # routes.
+        self._clear_tracing_config()
         self._clear_dynamic_configs()
         # we push the static config
         self._push_config()
         # now we restart traefik
         self._restart_traefik()
+
+    def _clear_tracing_config(self):
+        """If tracing config is present, clear it up."""
+        with contextlib.suppress(PathError):
+            self.container.remove_path(_DYNAMIC_TRACING_PATH)
 
     def _on_start(self, _: StartEvent):
         self._process_status_and_configurations()
@@ -393,11 +606,11 @@ class TraefikIngressCharm(CharmBase):
         #  https://github.com/canonical/operator/issues/665
 
         if (
-            self._stored.current_external_host != new_external_host
-            or self._stored.current_routing_mode != new_routing_mode
+            self._stored.current_external_host != new_external_host  # type: ignore
+            or self._stored.current_routing_mode != new_routing_mode  # type: ignore
         ):
-            self._stored.current_external_host = new_external_host
-            self._stored.current_routing_mode = new_routing_mode
+            self._stored.current_external_host = new_external_host  # type: ignore
+            self._stored.current_routing_mode = new_routing_mode  # type: ignore
             self._process_status_and_configurations()
 
     def _process_status_and_configurations(self):
@@ -555,11 +768,18 @@ class TraefikIngressCharm(CharmBase):
             self._provide_routed_ingress(relation)
             return
 
-        self._provide_ingress(relation, provider)
+        self._provide_ingress(relation, provider)  # type: ignore
 
     def _provide_routed_ingress(self, relation: Relation):
         """Provide ingress to a unit related through TraefikRoute."""
         config = self.traefik_route.get_config(relation)
+        if not config:
+            logger.warning(
+                f"traefik route config could not be accessed: "
+                f"traefik_route.get_config({relation}) returned None"
+            )
+            return
+
         config = yaml.safe_load(config)
 
         if "http" in config.keys():
@@ -580,7 +800,7 @@ class TraefikIngressCharm(CharmBase):
     def _provide_ingress(
         self,
         relation: Relation,
-        provider: Union[IPAv1, IPAv2],
+        provider: Union[IPAv1, IPAv2, IngressPerUnitProvider],
     ):
         # to avoid long-gone units from lingering in the databag, we wipe it
         if self.unit.is_leader():
@@ -603,7 +823,7 @@ class TraefikIngressCharm(CharmBase):
         configs = config_getter(relation)
         self._push_configurations(relation, configs)
 
-    def _get_configs_per_leader(self, relation: Relation) -> Optional[dict]:
+    def _get_configs_per_leader(self, relation: Relation) -> Dict[str, Any]:
         """Generates ingress per leader config."""
         # this happens to be the same behaviour as ingress v1 (legacy) provided.
         ipa = self.ingress_per_appv1
@@ -612,26 +832,26 @@ class TraefikIngressCharm(CharmBase):
             data = ipa.get_data(relation)
         except DataValidationError as e:
             logger.error(f"invalid data shared through {relation}... Error: {e}.")
-            return None
+            return {}
 
-        prefix = self._get_prefix(data)
-        config = self._generate_per_leader_config(prefix, data)
+        prefix = self._get_prefix(data)  # type: ignore
+        config = self._generate_per_leader_config(prefix, data)  # type: ignore
         if self.unit.is_leader():
             ipa.publish_url(relation, self._get_external_url(prefix))
 
         return config
 
-    def _get_configs_per_app(self, relation: Relation) -> Optional[dict]:
+    def _get_configs_per_app(self, relation: Relation) -> Dict[str, Any]:
         ipa = self.ingress_per_appv2
         if not relation.app:
             logger.error(f"no app on relation {relation}")
-            return None
+            return {}
 
         try:
             data = ipa.get_data(relation)
         except DataValidationError as e:
             logger.error(f"invalid data shared through {relation}... Error: {e}.")
-            return None
+            return {}
 
         prefix = self._get_prefix(data.app.dict(by_alias=True))
         config = self._generate_per_app_config(prefix, data)
@@ -643,7 +863,7 @@ class TraefikIngressCharm(CharmBase):
 
         return config
 
-    def _get_configs_per_unit(self, relation: Relation) -> Optional[dict]:
+    def _get_configs_per_unit(self, relation: Relation) -> Dict[str, Any]:
         # FIXME Ideally, follower units could instead watch for the data in the
         # ingress app data bag, but Juju does not allow non-leader units to read
         # the application data bag on their side of the relation, so we may start
@@ -667,16 +887,17 @@ class TraefikIngressCharm(CharmBase):
                 )
                 continue
 
-            prefix = self._get_prefix(data)
+            prefix = self._get_prefix(data)  # type: ignore
             if data.get("mode", "http") == "tcp":
-                unit_config = self._generate_per_unit_tcp_config(prefix, data)
+                unit_config = self._generate_per_unit_tcp_config(prefix, data)  # type: ignore
                 if self.unit.is_leader():
                     host = self.external_host
                     ipu.publish_url(relation, data["name"], f"{host}:{data['port']}")
             else:  # "http"
-                unit_config = self._generate_per_unit_http_config(prefix, data)
+                unit_config = self._generate_per_unit_http_config(prefix, data)  # type: ignore
                 if self.unit.is_leader():
                     ipu.publish_url(relation, data["name"], self._get_external_url(prefix))
+
             always_merger.merge(config, unit_config)
 
         # Note: We might be pushing an empty configuration if, for example,
@@ -684,7 +905,7 @@ class TraefikIngressCharm(CharmBase):
         # relation. Traefik is fine with it :-)
         return config
 
-    def _push_configurations(self, relation: Relation, config: Union[dict, str]):
+    def _push_configurations(self, relation: Relation, config: Union[Dict[str, Any], str]):
         if config:
             yaml_config = yaml.dump(config) if not isinstance(config, str) else config
             config_filename = f"{_DYNAMIC_CONFIG_DIR}/{self._relation_config_file(relation)}"
@@ -694,29 +915,39 @@ class TraefikIngressCharm(CharmBase):
             self._wipe_ingress_for_relation(relation)
 
     @staticmethod
-    def _get_prefix(data: Union["RequirerData_IPU", "RequirerAppData_IPA"]):
+    def _get_prefix(data: Dict[str, Any]):
         name = data["name"].replace("/", "-")
         return f"{data['model']}-{name}"
 
     def _generate_middleware_config(
         self,
-        data: Union["RequirerData_IPU", "RequirerAppData_IPA"],
+        data: Dict[str, Any],
         prefix: str,
     ) -> dict:
-        """Generate a middleware config."""
-        config = {}  # type: Dict[str, Dict[str, Any]]
+        """Generate a middleware config.
+
+        We need to generate a different section per middleware type, otherwise traefik complains:
+          "cannot create middleware: multi-types middleware not supported, consider declaring two
+          different pieces of middleware instead"
+        """
+        no_prefix_middleware = {}  # type: Dict[str, Dict[str, Any]]
         if self._routing_mode is _RoutingMode.path:
             if data.get("strip-prefix", False):
-                config.update({"stripPrefix": {"prefixes": [f"/{prefix}"], "forceSlash": False}})
+                no_prefix_middleware[f"juju-sidecar-noprefix-{prefix}"] = {
+                    "stripPrefix": {"prefixes": [f"/{prefix}"], "forceSlash": False}
+                }
 
-        if data.get("redirect-https", False):
-            config.update({"redirectScheme": {"scheme": "https", "port": 443, "permanent": True}})
+        # Condition rendering the https-redirect middleware on the scheme, otherwise we'd get a 404
+        # when attempting to reach an http endpoint.
+        redir_scheme_middleware = {}
+        if data.get("redirect-https", False) and data.get("scheme") == "https":
+            redir_scheme_middleware[f"juju-sidecar-redir-https-{prefix}"] = {
+                "redirectScheme": {"scheme": "https", "port": 443, "permanent": True}
+            }
 
-        if config:
-            return {f"juju-sidecar-noprefix-{prefix}": config}
-        return {}
+        return {**no_prefix_middleware, **redir_scheme_middleware}
 
-    def _generate_per_unit_tcp_config(self, prefix: str, data: "RequirerData_IPU") -> dict:
+    def _generate_per_unit_tcp_config(self, prefix: str, data: RequirerData_IPU) -> dict:
         """Generate a config dict for a given unit for IngressPerUnit in tcp mode."""
         # TODO: is there a reason why SNI-based routing (from TLS certs) is per-unit only?
         # This is not a technical limitation in any way. It's meaningful/useful for
@@ -740,22 +971,22 @@ class TraefikIngressCharm(CharmBase):
                         "loadBalancer": {
                             "servers": [{"address": f"{data['host']}:{data['port']}"}]
                         }
-                    }
+                    },
                 },
             }
         }
         return config
 
-    def _generate_per_unit_http_config(self, prefix: str, data: "RequirerData_IPU") -> dict:
+    def _generate_per_unit_http_config(self, prefix: str, data: RequirerData_IPU) -> dict:
         """Generate a config dict for a given unit for IngressPerUnit."""
-        lb_servers = [{"url": f"http://{data['host']}:{data['port']}"}]
-        return self._generate_config_block(prefix, lb_servers, data)
+        lb_servers = [{"url": f"{data.get('scheme', 'http')}://{data['host']}:{data['port']}"}]
+        return self._generate_config_block(prefix, lb_servers, data)  # type: ignore
 
     def _generate_config_block(
         self,
         prefix: str,
         lb_servers: List[Dict[str, str]],
-        data: Union["RequirerData_IPU", "RequirerAppData_IPA"],
+        data: Dict[str, Any],
     ) -> Dict[str, Any]:
         """Generate a configuration segment.
 
@@ -798,7 +1029,7 @@ class TraefikIngressCharm(CharmBase):
         is_termination = external_tls and not internal_tls
         is_end_to_end = external_tls and internal_tls
 
-        lb_def = {"servers": lb_servers}
+        lb_def: Dict[str, Any] = {"servers": lb_servers}
         service_def = {
             "loadBalancer": lb_def,
         }
@@ -807,21 +1038,21 @@ class TraefikIngressCharm(CharmBase):
             # i.e. traefik itself is not related to tls certificates, but the ingress requirer is
             transport_name = "reverseTerminationTransport"
             lb_def["serversTransport"] = transport_name
-            transports = {transport_name: {"insecureSkipVerify": True}}
+            transports = {transport_name: {"insecureSkipVerify": False}}
 
         elif is_termination:
             # i.e. traefik itself is related to tls certificates, but the ingress requirer is not
             transports = {}
 
         elif is_end_to_end:
+            # We cannot assume traefik's CA is the same CA that signed the proxied apps.
+            # Since we use the update_ca_certificates machinery, we don't need to specify the
+            # "rootCAs" entry.
+            # Keeping the serverTransports section anyway because it is informative ("endToEndTLS"
+            # vs "reverseTerminationTransport") when inspecting the config file in production.
             transport_name = "endToEndTLS"
             lb_def["serversTransport"] = transport_name
-            transports = {
-                transport_name: {
-                    # Note: assuming traefik's CA is the same CA that signed the proxied apps.
-                    "rootCAs": [_CA_CERT_PATH],
-                }
-            }
+            transports = {transport_name: {"insecureSkipVerify": False}}
 
         else:
             transports = {}
@@ -854,19 +1085,25 @@ class TraefikIngressCharm(CharmBase):
         service_name: str,
     ) -> Dict[str, Any]:
         """Generate a TLS configuration segment."""
+        tls_entry = (
+            {
+                "domains": [
+                    {
+                        "main": self.external_host,
+                        "sans": [f"*.{self.external_host}"],
+                    },
+                ],
+            }
+            if is_hostname(self.external_host)
+            else {}  # When the external host is a bare IP, we do not need the 'domains' entry.
+        )
+
         return {
             f"{router_name}-tls": {
                 "rule": route_rule,
                 "service": service_name,
                 "entryPoints": ["websecure"],
-                "tls": {
-                    "domains": [
-                        {
-                            "main": self.external_host,
-                            "sans": [f"*.{self.external_host}"],
-                        },
-                    ],
-                },
+                "tls": tls_entry,
             }
         }
 
@@ -890,14 +1127,17 @@ class TraefikIngressCharm(CharmBase):
         data: "IPADatav1",
     ) -> dict:
         lb_servers = [{"url": f"http://{data['host']}:{data['port']}"}]
-        return self._generate_config_block(prefix, lb_servers, data)
+        return self._generate_config_block(prefix, lb_servers, data)  # type: ignore
+
+    @property
+    def _scheme(self):
+        return "https" if self.cert.enabled else "http"
 
     def _get_external_url(self, prefix):
-        scheme = "https" if self.cert.enabled else "http"
         if self._routing_mode is _RoutingMode.path:
-            url = f"{scheme}://{self.external_host}/{prefix}"
+            url = f"{self._scheme}://{self.external_host}/{prefix}"
         else:  # _RoutingMode.subdomain
-            url = f"{scheme}://{prefix}.{self.external_host}/"
+            url = f"{self._scheme}://{prefix}.{self.external_host}/"
         return url
 
     def _wipe_ingress_for_all_relations(self):
@@ -925,7 +1165,7 @@ class TraefikIngressCharm(CharmBase):
         # Skip this for traefik-route because it doesn't have a `wipe_ingress_data` method.
         provider = self._provider_from_relation(relation)
         if wipe_rel_data and self.unit.is_leader() and provider != self.traefik_route:
-            provider.wipe_ingress_data(relation)
+            provider.wipe_ingress_data(relation)  # type: ignore  # this is an ingress-type relation
 
     @staticmethod
     def _relation_config_file(relation: Relation):
@@ -962,7 +1202,9 @@ class TraefikIngressCharm(CharmBase):
 
         if _TRAEFIK_SERVICE_NAME not in current_services:
             self.unit.status = MaintenanceStatus(f"creating the {_TRAEFIK_SERVICE_NAME!r} service")
-            self.container.add_layer(_TRAEFIK_LAYER_NAME, layer, combine=True)
+            self.container.add_layer(
+                _TRAEFIK_LAYER_NAME, typing.cast(LayerDict, layer), combine=True
+            )
             logger.debug(f"replanning {_TRAEFIK_SERVICE_NAME!r} after a service update")
             self.container.replan()
         else:
@@ -1044,32 +1286,23 @@ class TraefikIngressCharm(CharmBase):
             )
 
     @property
-    def cert_subject(self) -> Optional[str]:
-        """Provide certificate subject."""
-        host_or_ip = self.external_host
+    def server_cert_sans_dns(self) -> List[str]:
+        """Provide certificate SANs DNS."""
+        target = self.external_host
 
-        def is_hostname(st: Optional[str]) -> bool:
-            try:
-                ipaddress.ip_address(st)
-                # No exception raised so this is an IP address.
-                return False
-            except ValueError:
-                # This is not an IP address so assume it's a hostname.
-                # Note: a ValueError will be raised if `st` is None, which is ok here.
-                return st is not None
-
-        if is_hostname(host_or_ip):
-            return host_or_ip
+        if is_hostname(target):
+            assert isinstance(target, str)  # for type checker
+            return [target]
 
         # This is an IP address. Try to look up the hostname.
-        try:
-            lookup = socket.gethostbyaddr(host_or_ip)[0]
-            return lookup if is_hostname(lookup) else None
-        except (OSError, TypeError):
-            # We do not want to return `socket.getfqdn()` because the user's browser would
-            # immediately complain about an invalid cert. If we can't resolve it via any method,
-            # return None
-            return None
+        with contextlib.suppress(OSError, TypeError):
+            name, _, _ = socket.gethostbyaddr(target)  # type: ignore
+            # Do not return "hostname" like '10-43-8-149.kubernetes.default.svc.cluster.local'
+            if is_hostname(name) and not name.endswith(".svc.cluster.local"):
+                return [name]
+
+        # If all else fails, we'd rather use the bare IP
+        return [target] if target else []
 
     @property
     def _hostname(self) -> str:
@@ -1084,11 +1317,12 @@ class TraefikIngressCharm(CharmBase):
         ]
 
 
+@functools.lru_cache
 def _get_loadbalancer_status(namespace: str, service_name: str):
-    client = Client()
+    client = Client()  # type: ignore
     traefik_service = client.get(Service, name=service_name, namespace=namespace)
 
-    if status := traefik_service.status:
+    if status := traefik_service.status:  # type: ignore
         if load_balancer_status := status.loadBalancer:
             if ingress_addresses := load_balancer_status.ingress:
                 if ingress_address := ingress_addresses[0]:

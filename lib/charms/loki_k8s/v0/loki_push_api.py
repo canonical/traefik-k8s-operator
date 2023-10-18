@@ -67,21 +67,20 @@ and three optional arguments.
           def __init__(self, *args):
               super().__init__(*args)
               ...
-              self._loki_ready()
+              external_url = urlparse(self._external_url)
+              self.loki_provider = LokiPushApiProvider(
+                  self,
+                  address=external_url.hostname or self.hostname,
+                  port=external_url.port or 80,
+                  scheme=external_url.scheme,
+                  path=f"{external_url.path}/loki/api/v1/push",
+              )
               ...
 
-          def _loki_ready(self):
-              try:
-                  version = self._loki_server.version
-                  self.loki_provider = LokiPushApiProvider(self)
-                  logger.debug("Loki Provider is available. Loki version: %s", version)
-              except LokiServerNotReadyError as e:
-                  self.unit.status = MaintenanceStatus(str(e))
-              except LokiServerError as e:
-                  self.unit.status = BlockedStatus(str(e))
-
-  - `port`: Loki Push Api endpoint port. Default value: 3100.
-  - `rules_dir`: Directory to store alert rules. Default value: "/loki/rules".
+  - `port`: Loki Push Api endpoint port. Default value: `3100`.
+  - `scheme`: Loki Push Api endpoint scheme (`HTTP` or `HTTPS`). Default value: `HTTP`
+  - `address`: Loki Push Api endpoint address. Default value: `localhost`
+  - `path`: Loki Push Api endpoint path. Default value: `loki/api/v1/push`
 
 
 The `LokiPushApiProvider` object has several responsibilities:
@@ -481,7 +480,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 19
+LIBPATCH = 22
 
 logger = logging.getLogger(__name__)
 
@@ -1774,6 +1773,8 @@ class LogProxyConsumer(ConsumerBase):
         recursive: bool = False,
         container_name: str = "",
         promtail_resource_name: Optional[str] = None,
+        *,  # TODO: In v1, move the star up so everything after 'charm' is a kwarg
+        insecure_skip_verify: bool = False,
     ):
         super().__init__(charm, relation_name, alert_rules_path, recursive)
         self._charm = charm
@@ -1793,6 +1794,7 @@ class LogProxyConsumer(ConsumerBase):
         self._is_syslog = enable_syslog
         self.topology = JujuTopology.from_charm(charm)
         self._promtail_resource_name = promtail_resource_name or "promtail-bin"
+        self.insecure_skip_verify = insecure_skip_verify
 
         # architecture used for promtail binary
         arch = platform.processor()
@@ -1993,7 +1995,9 @@ class LogProxyConsumer(ConsumerBase):
             workload_binary_path: path in workload container to which promtail binary is pushed.
         """
         with open(binary_path, "rb") as f:
-            self._container.push(workload_binary_path, f, permissions=0o755, make_dirs=True)
+            self._container.push(
+                workload_binary_path, f, permissions=0o755, encoding=None, make_dirs=True
+            )
             logger.debug("The promtail binary file has been pushed to the workload container.")
 
     @property
@@ -2152,8 +2156,15 @@ class LogProxyConsumer(ConsumerBase):
 
     @property
     def _promtail_config(self) -> dict:
-        """Generates the config file for Promtail."""
+        """Generates the config file for Promtail.
+
+        Reference: https://grafana.com/docs/loki/latest/send-data/promtail/configuration
+        """
         config = {"clients": self._clients_list()}
+        if self.insecure_skip_verify:
+            for client in config["clients"]:
+                client["tls_config"] = {"insecure_skip_verify": True}
+
         config.update(self._server_config())
         config.update(self._positions())
         config.update(self._scrape_configs())

@@ -16,15 +16,15 @@ applications:
     series: focal
     scale: 1
     resources:
-      traefik-image: docker.io/jnsgruk/traefik:2.9.6
+      traefik-image: ghcr.io/canonical/traefik:2.10.4
     options:
       external_hostname: cluster.local
 
-  ca:
+  external-ca:
     charm: self-signed-certificates
     channel: edge
     scale: 1
 
 relations:
 - [am:ingress, trfk]
-- [trfk:certificates, ca:certificates]
+- [trfk:certificates, external-ca:certificates]

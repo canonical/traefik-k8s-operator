@@ -219,7 +219,7 @@ LIBAPI = 0
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
 
-LIBPATCH = 31
+LIBPATCH = 35
 
 logger = logging.getLogger(__name__)
 
@@ -525,7 +525,7 @@ def _validate_relation_by_interface_and_direction(
     relation = charm.meta.relations[relation_name]
 
     actual_relation_interface = relation.interface_name
-    if actual_relation_interface != expected_relation_interface:
+    if actual_relation_interface and actual_relation_interface != expected_relation_interface:
         raise RelationInterfaceMismatchError(
             relation_name, expected_relation_interface, actual_relation_interface
         )
@@ -665,14 +665,14 @@ def _template_panels(
             continue
         if not existing_templates:
             datasource = panel.get("datasource")
-            if type(datasource) == str:
+            if isinstance(datasource, str):
                 if "loki" in datasource:
                     panel["datasource"] = "${lokids}"
                 elif "grafana" in datasource:
                     continue
                 else:
                     panel["datasource"] = "${prometheusds}"
-            elif type(datasource) == dict:
+            elif isinstance(datasource, dict):
                 # In dashboards exported by Grafana 9, datasource type is dict
                 dstype = datasource.get("type", "")
                 if dstype == "loki":
@@ -686,7 +686,7 @@ def _template_panels(
                 logger.error("Unknown datasource format: skipping")
                 continue
         else:
-            if type(panel["datasource"]) == str:
+            if isinstance(panel["datasource"], str):
                 if panel["datasource"].lower() in replacements.values():
                     # Already a known template variable
                     continue
@@ -701,7 +701,7 @@ def _template_panels(
                 if replacement:
                     used_replacements.append(ds)
                 panel["datasource"] = replacement or panel["datasource"]
-            elif type(panel["datasource"]) == dict:
+            elif isinstance(panel["datasource"], dict):
                 dstype = panel["datasource"].get("type", "")
                 if panel["datasource"].get("uid", "").lower() in replacements.values():
                     # Already a known template variable
@@ -790,7 +790,7 @@ def _inject_labels(content: str, topology: dict, transformer: "CosTool") -> str:
 
     # We need to use an index so we can insert the changed element back later
     for panel_idx, panel in enumerate(panels):
-        if type(panel) is not dict:
+        if not isinstance(panel, dict):
             continue
 
         # Use the index to insert it back in the same location
@@ -831,11 +831,11 @@ def _modify_panel(panel: dict, topology: dict, transformer: "CosTool") -> dict:
         if "datasource" not in panel.keys():
             continue
 
-        if type(panel["datasource"]) == str:
+        if isinstance(panel["datasource"], str):
             if panel["datasource"] not in known_datasources:
                 continue
             querytype = known_datasources[panel["datasource"]]
-        elif type(panel["datasource"]) == dict:
+        elif isinstance(panel["datasource"], dict):
             if panel["datasource"]["uid"] not in known_datasources:
                 continue
             querytype = known_datasources[panel["datasource"]["uid"]]
@@ -1195,6 +1195,7 @@ class GrafanaDashboardProvider(Object):
                 `grafana_dashboaard` relationship is joined
         """
         if self._charm.unit.is_leader():
+            self._update_all_dashboards_from_dir()
             self._upset_dashboards_on_relation(event.relation)
 
     def _on_grafana_dashboard_relation_changed(self, event: RelationChangedEvent) -> None:

@@ -15,6 +15,11 @@ parts:
       - setuptools
       - jsonschema
       - cryptography
+
+      # From PYDEPS
+      - "importlib-metadata==6.0.0"
+      - "opentelemetry-exporter-otlp-proto-grpc==1.17.0"
+      - "pydantic<2"
     build-packages:
       - git
 

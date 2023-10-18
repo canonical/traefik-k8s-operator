@@ -75,9 +75,9 @@ def test_ingress_per_app_created(
     assert "is using a deprecated ingress v1 protocol to talk to Traefik." in caplog.text
 
     generated_config = yaml.safe_load(
-        traefik_container.filesystem.open(
-            f"/opt/traefik/juju/juju_ingress_ingress_{ipa.relation_id}_remote.yaml"
-        ).read()
+        traefik_container.get_filesystem(traefik_ctx)
+        .joinpath(f"opt/traefik/juju/juju_ingress_ingress_{ipa.relation_id}_remote.yaml")
+        .read_text()
     )
 
     assert generated_config["http"]["services"]["juju-test-model-remote-0-service"] == {

@@ -18,13 +18,6 @@ provide a scrape target for Prometheus.
 Source code can be found on GitHub at:
  https://github.com/canonical/prometheus-k8s-operator/tree/main/lib/charms/prometheus_k8s
 
-## Dependencies
-
-Using this library requires you to fetch the juju_topology library from
-[observability-libs](https://charmhub.io/observability-libs/libraries/juju_topology).
-
-`charmcraft fetch-lib charms.observability_libs.v0.juju_topology`
-
 ## Provider Library Usage
 
 This Prometheus charm interacts with its scrape targets using its
@@ -343,12 +336,11 @@ import tempfile
 from collections import defaultdict
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
-from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
-from urllib.request import urlopen
 
 import yaml
-from charms.observability_libs.v0.juju_topology import JujuTopology
+from cosl import JujuTopology
+from cosl.rules import AlertRules
 from ops.charm import CharmBase, RelationRole
 from ops.framework import (
     BoundEvent,
@@ -370,7 +362,9 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 38
+LIBPATCH = 42
+
+PYDEPS = ["cosl"]
 
 logger = logging.getLogger(__name__)
 
@@ -610,12 +604,12 @@ class PrometheusConfig:
         return {
             "alertmanagers": [
                 {
+                    # For https we still do not render a `tls_config` section because
+                    # certs are expected to be made available by the charm via the
+                    # `update-ca-certificates` mechanism.
                     "scheme": scheme,
                     "path_prefix": path_prefix,
                     "static_configs": [{"targets": netlocs}],
-                    # FIXME figure out how to get alertmanager's ca_file into here
-                    #  Without this, prom errors: "x509: certificate signed by unknown authority"
-                    "tls_config": {"insecure_skip_verify": True},
                 }
                 for (scheme, path_prefix), netlocs in paths.items()
             ]
@@ -836,206 +830,6 @@ def _is_single_alert_rule_format(rules_dict: dict) -> bool:
     """
     # one alert rule per file
     return set(rules_dict) >= {"alert", "expr"}
-
-
-class AlertRules:
-    """Utility class for amalgamating prometheus alert rule files and injecting juju topology.
-
-    An `AlertRules` object supports aggregating alert rules from files and directories in both
-    official and single rule file formats using the `add_path()` method. All the alert rules
-    read are annotated with Juju topology labels and amalgamated into a single data structure
-    in the form of a Python dictionary using the `as_dict()` method. Such a dictionary can be
-    easily dumped into JSON format and exchanged over relation data. The dictionary can also
-    be dumped into YAML format and written directly into an alert rules file that is read by
-    Prometheus. Note that multiple `AlertRules` objects must not be written into the same file,
-    since Prometheus allows only a single list of alert rule groups per alert rules file.
-
-    The official Prometheus format is a YAML file conforming to the Prometheus documentation
-    (https://prometheus.io/docs/prometheus/latest/configuration/alerting_rules/).
-    The custom single rule format is a subsection of the official YAML, having a single alert
-    rule, effectively "one alert per file".
-    """
-
-    # This class uses the following terminology for the various parts of a rule file:
-    # - alert rules file: the entire groups[] yaml, including the "groups:" key.
-    # - alert groups (plural): the list of groups[] (a list, i.e. no "groups:" key) - it is a list
-    #   of dictionaries that have the "name" and "rules" keys.
-    # - alert group (singular): a single dictionary that has the "name" and "rules" keys.
-    # - alert rules (plural): all the alerts in a given alert group - a list of dictionaries with
-    #   the "alert" and "expr" keys.
-    # - alert rule (singular): a single dictionary that has the "alert" and "expr" keys.
-
-    def __init__(self, topology: Optional[JujuTopology] = None):
-        """Build and alert rule object.
-
-        Args:
-            topology: an optional `JujuTopology` instance that is used to annotate all alert rules.
-        """
-        self.topology = topology
-        self.tool = CosTool(None)
-        self.alert_groups = []  # type: List[dict]
-
-    def _from_file(self, root_path: Path, file_path: Path) -> List[dict]:
-        """Read a rules file from path, injecting juju topology.
-
-        Args:
-            root_path: full path to the root rules folder (used only for generating group name)
-            file_path: full path to a *.rule file.
-
-        Returns:
-            A list of dictionaries representing the rules file, if file is valid (the structure is
-            formed by `yaml.safe_load` of the file); an empty list otherwise.
-        """
-        with file_path.open() as rf:
-            # Load a list of rules from file then add labels and filters
-            try:
-                rule_file = yaml.safe_load(rf)
-
-            except Exception as e:
-                logger.error("Failed to read alert rules from %s: %s", file_path.name, e)
-                return []
-
-            if not rule_file:
-                logger.warning("Empty rules file: %s", file_path.name)
-                return []
-            if not isinstance(rule_file, dict):
-                logger.error("Invalid rules file (must be a dict): %s", file_path.name)
-                return []
-            if _is_official_alert_rule_format(rule_file):
-                alert_groups = rule_file["groups"]
-            elif _is_single_alert_rule_format(rule_file):
-                # convert to list of alert groups
-                # group name is made up from the file name
-                alert_groups = [{"name": file_path.stem, "rules": [rule_file]}]
-            else:
-                # invalid/unsupported
-                logger.error("Invalid rules file: %s", file_path.name)
-                return []
-
-            # update rules with additional metadata
-            for alert_group in alert_groups:
-                # update group name with topology and sub-path
-                alert_group["name"] = self._group_name(
-                    str(root_path),
-                    str(file_path),
-                    alert_group["name"],
-                )
-
-                # add "juju_" topology labels
-                for alert_rule in alert_group["rules"]:
-                    if "labels" not in alert_rule:
-                        alert_rule["labels"] = {}
-
-                    if self.topology:
-                        alert_rule["labels"].update(self.topology.label_matcher_dict)
-                        # insert juju topology filters into a prometheus alert rule
-                        alert_rule["expr"] = self.tool.inject_label_matchers(
-                            re.sub(r"%%juju_topology%%,?", "", alert_rule["expr"]),
-                            self.topology.label_matcher_dict,
-                        )
-
-            return alert_groups
-
-    def _group_name(self, root_path: str, file_path: str, group_name: str) -> str:
-        """Generate group name from path and topology.
-
-        The group name is made up of the relative path between the root dir_path, the file path,
-        and topology identifier.
-
-        Args:
-            root_path: path to the root rules dir.
-            file_path: path to rule file.
-            group_name: original group name to keep as part of the new augmented group name
-
-        Returns:
-            New group name, augmented by juju topology and relative path.
-        """
-        rel_path = os.path.relpath(os.path.dirname(file_path), root_path)
-        rel_path = "" if rel_path == "." else rel_path.replace(os.path.sep, "_")
-
-        # Generate group name:
-        #  - name, from juju topology
-        #  - suffix, from the relative path of the rule file;
-        group_name_parts = [self.topology.identifier] if self.topology else []
-        group_name_parts.extend([rel_path, group_name, "alerts"])
-        # filter to remove empty strings
-        return "_".join(filter(None, group_name_parts))
-
-    @classmethod
-    def _multi_suffix_glob(
-        cls, dir_path: Path, suffixes: List[str], recursive: bool = True
-    ) -> list:
-        """Helper function for getting all files in a directory that have a matching suffix.
-
-        Args:
-            dir_path: path to the directory to glob from.
-            suffixes: list of suffixes to include in the glob (items should begin with a period).
-            recursive: a flag indicating whether a glob is recursive (nested) or not.
-
-        Returns:
-            List of files in `dir_path` that have one of the suffixes specified in `suffixes`.
-        """
-        all_files_in_dir = dir_path.glob("**/*" if recursive else "*")
-        return list(filter(lambda f: f.is_file() and f.suffix in suffixes, all_files_in_dir))
-
-    def _from_dir(self, dir_path: Path, recursive: bool) -> List[dict]:
-        """Read all rule files in a directory.
-
-        All rules from files for the same directory are loaded into a single
-        group. The generated name of this group includes juju topology.
-        By default, only the top directory is scanned; for nested scanning, pass `recursive=True`.
-
-        Args:
-            dir_path: directory containing *.rule files (alert rules without groups).
-            recursive: flag indicating whether to scan for rule files recursively.
-
-        Returns:
-            a list of dictionaries representing prometheus alert rule groups, each dictionary
-            representing an alert group (structure determined by `yaml.safe_load`).
-        """
-        alert_groups = []  # type: List[dict]
-
-        # Gather all alerts into a list of groups
-        for file_path in self._multi_suffix_glob(
-            dir_path, [".rule", ".rules", ".yml", ".yaml"], recursive
-        ):
-            alert_groups_from_file = self._from_file(dir_path, file_path)
-            if alert_groups_from_file:
-                logger.debug("Reading alert rule from %s", file_path)
-                alert_groups.extend(alert_groups_from_file)
-
-        return alert_groups
-
-    def add_path(self, path: str, *, recursive: bool = False) -> None:
-        """Add rules from a dir path.
-
-        All rules from files are aggregated into a data structure representing a single rule file.
-        All group names are augmented with juju topology.
-
-        Args:
-            path: either a rules file or a dir of rules files.
-            recursive: whether to read files recursively or not (no impact if `path` is a file).
-
-        Returns:
-            True if path was added else False.
-        """
-        path = Path(path)  # type: Path
-        if path.is_dir():
-            self.alert_groups.extend(self._from_dir(path, recursive))
-        elif path.is_file():
-            self.alert_groups.extend(self._from_file(path.parent, path))
-        else:
-            logger.debug("Alert rules path does not exist: %s", path)
-
-    def as_dict(self) -> dict:
-        """Return standard alert rules file in dict representation.
-
-        Returns:
-            a dictionary containing a single list of alert rule groups.
-            The list of alert rule groups is provided as value of the
-            "groups" dictionary key.
-        """
-        return {"groups": self.alert_groups} if self.alert_groups else {}
 
 
 class TargetsChangedEvent(EventBase):
@@ -1328,7 +1122,7 @@ class MetricsEndpointConsumer(Object):
                         # Inject topology and put it back in the list
                         rule["expr"] = self._tool.inject_label_matchers(
                             re.sub(r"%%juju_topology%%,?", "", rule["expr"]),
-                            topology.label_matcher_dict,
+                            topology.alert_expression_dict,
                         )
                     except KeyError:
                         # Some required JujuTopology key is missing. Just move on.
@@ -1382,16 +1176,8 @@ class MetricsEndpointConsumer(Object):
             scrape_configs, hosts, topology
         )
 
-        # If scheme is https but no ca section present, then auto add "insecure_skip_verify",
-        # otherwise scraping errors out with "x509: certificate signed by unknown authority".
-        # https://prometheus.io/docs/prometheus/latest/configuration/configuration/#tls_config
-        for scrape_config in scrape_configs:
-            tls_config = scrape_config.get("tls_config", {})
-            ca_present = "ca" in tls_config or "ca_file" in tls_config
-            if scrape_config.get("scheme") == "https" and not ca_present:
-                tls_config["insecure_skip_verify"] = True
-                scrape_config["tls_config"] = tls_config
-
+        # For https scrape targets we still do not render a `tls_config` section because certs
+        # are expected to be made available by the charm via the `update-ca-certificates` mechanism.
         return scrape_configs
 
     def _relation_hosts(self, relation: Relation) -> Dict[str, Tuple[str, str]]:
@@ -1739,7 +1525,7 @@ class MetricsEndpointProvider(Object):
         if not self._charm.unit.is_leader():
             return
 
-        alert_rules = AlertRules(topology=self.topology)
+        alert_rules = AlertRules(query_type="promql", topology=self.topology)
         alert_rules.add_path(self._alert_rules_path, recursive=True)
         alert_rules_as_dict = alert_rules.as_dict()
 
@@ -1886,7 +1672,7 @@ class PrometheusRulesProvider(Object):
         if not self._charm.unit.is_leader():
             return
 
-        alert_rules = AlertRules()
+        alert_rules = AlertRules(query_type="promql")
         alert_rules.add_path(self.dir_path, recursive=self._recursive)
         alert_rules_as_dict = alert_rules.as_dict()
 
@@ -2266,16 +2052,7 @@ class MetricsEndpointAggregator(Object):
                 logger.debug("Could not perform DNS lookup for %s", target["hostname"])
                 dns_name = target["hostname"]
             extra_info["dns_name"] = dns_name
-        label_re = re.compile(r'(?P<label>juju.*?)="(?P<value>.*?)",?')
 
-        try:
-            with urlopen(f'http://{target["hostname"]}:{target["port"]}/metrics') as resp:
-                data = resp.read().decode("utf-8").splitlines()
-                for metric in data:
-                    for match in label_re.finditer(metric):
-                        extra_info[match.group("label")] = match.group("value")
-        except (HTTPError, URLError, OSError, ConnectionResetError, Exception) as e:
-            logger.debug("Could not scrape target: %s", e)
         return extra_info
 
     @property
