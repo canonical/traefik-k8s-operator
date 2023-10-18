@@ -229,7 +229,6 @@ def test_ingress_per_app_v1_upgrade_v2(
     strip_prefix,
     redirect_https,
 ):
-
     requirer_ctx = get_requirer_ctx("host", "1.2.3.4", 4242)
 
     ipav1 = Relation(
