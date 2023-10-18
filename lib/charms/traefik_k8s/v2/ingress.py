@@ -194,7 +194,10 @@ class IngressRequirerUnitData(DatabagModel):
     """Ingress requirer unit databag model."""
 
     host: str = Field(description="Hostname at which the unit is reachable.")
-    ip: Optional[str] = Field(description="IP at which the unit is reachable.")
+    ip: Optional[str] = Field(
+        description="IP at which the unit is reachable, "
+        "IP can only be None if the IP information can't be retrieved from juju."
+    )
 
     @validator("host", pre=True)
     def validate_host(cls, host):  # noqa: N805  # pydantic wants 'cls' as first arg
@@ -207,7 +210,8 @@ class IngressRequirerUnitData(DatabagModel):
         """Validate ip."""
         if ip is None:
             return None
-        assert isinstance(ip, str), type(ip)
+        if not isinstance(ip, str):
+            raise TypeError(f"got ip of type {type(ip)} instead of expected str")
         try:
             ipaddress.IPv4Address(ip)
             return ip
@@ -683,8 +687,10 @@ class IngressPerAppRequirer(_IngressPerAppBase):
             if network_binding is None:
                 ip = None
             else:
-                binding_ip = network_binding.network.bind_address
-                if binding_ip is None:
+                if (
+                    network_binding is None
+                    or (binding_ip := network_binding.network.bind_address) is None
+                ):
                     ip = None
                 else:
                     ip = str(binding_ip)
