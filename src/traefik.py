@@ -124,6 +124,7 @@ class Traefik:
         # Ensure the required basic configurations and folders exist
         tcp_entrypoints = self._tcp_entrypoints
         self._update_static_configuration(tcp_entrypoints)
+        self._setup_dynamic_config_folder()
 
         if self._tls_enabled:
             self._update_tls_configuration()
@@ -532,7 +533,14 @@ class Traefik:
         logger.debug("deleted dynamic configuration file: %s", file_name)
 
     def add_dynamic_config(self, file_name: str, config: str):
-        """Push a yaml to the dynamic config dir."""
+        """Push a yaml to the dynamic config dir.
+
+        The dynamic config dir is assumed to exist already.
+        """
+        # make_dirs is technically not necessary at runtime, since traefik.configure() should
+        # guarantee that the dynamic config dir exists. However, it simplifies testing as it means
+        # we don't have to worry about setting up manually the traefik container every time we
+        # simulate an event.
         self._container.push(Path(DYNAMIC_CONFIG_DIR) / file_name, config, make_dirs=True)
 
         logger.debug("Updated dynamic configuration file: %s", file_name)
@@ -585,3 +593,8 @@ class Traefik:
             }
         }
         return config
+
+    def _setup_dynamic_config_folder(self):
+        # ensure the dynamic config dir exists else traefik will error on startup and fail to
+        # set up the watcher
+        self._container.make_dir(DYNAMIC_CONFIG_DIR, make_parents=True)
