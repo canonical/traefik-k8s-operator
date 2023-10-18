@@ -34,7 +34,7 @@ resources:
       OCI image for traefik. This charms makes the following assumptions about the image:
       - executable is `/usr/bin/traefik`
       - has `update-ca-certificates`
-    upstream-source: ghcr.io/canonical/traefik:2.10.4
+    upstream-source: docker.io/ubuntu/traefik:2-22.04
 
 storage:
   # We need to store the configurations in a volume, as Traefik's directory
