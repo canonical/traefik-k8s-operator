@@ -694,6 +694,8 @@ class IngressPerAppRequirer(_IngressPerAppBase):
                     ip = None
                 else:
                     ip = str(binding_ip)
+        if ip is None:
+            log.error("failed to retrieve ip information from juju")
 
         unit_databag = relation.data[self.unit]
         try:
