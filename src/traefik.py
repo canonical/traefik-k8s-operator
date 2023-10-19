@@ -4,16 +4,16 @@
 
 """Traefik workload interface."""
 import contextlib
+import dataclasses
 import enum
 import logging
 import re
 import socket
 from pathlib import Path
 from string import Template
-from typing import Any, Dict, List, Optional, Union, cast
+from typing import Any, Dict, Iterable, List, Optional, Union, cast
 
 import yaml
-from lightkube.models.core_v1 import ServicePort
 from ops import Container
 from ops.pebble import LayerDict, PathError
 from utils import is_hostname
@@ -33,8 +33,19 @@ BIN_PATH = "/usr/bin/traefik"
 LOG_PATH = "/var/log/traefik.log"
 
 _DIAGNOSTICS_PORT = 8082  # Prometheus metrics, healthcheck/ping
-_PORT = 80
-_TLS_PORT = 443
+
+
+@dataclasses.dataclass
+class CA:
+    """Represents a Certificate Authority."""
+
+    ca: str
+    uid: Union[int, str]
+
+    @property
+    def path(self) -> str:
+        """Predictable file path at which this CA will be stored on-disk in traefik."""
+        return RECV_CA_TEMPLATE.substitute(rel_id=str(self.uid))
 
 
 class RoutingMode(enum.Enum):
@@ -55,34 +66,24 @@ class ContainerNotReadyError(TraefikError):
 class Traefik:
     """Traefik workload representation."""
 
+    port = 80
+    tls_port = 443
+
     _layer_name = "traefik"
+    service_name = "traefik"
 
     def __init__(
         self,
-        service_name: str,
+        *,
         container: Container,
         routing_mode: RoutingMode,
         tls_enabled: bool,
         tcp_entrypoints: Dict[str, int],
     ):
-        self._service_name = service_name
         self._container = container
         self._tcp_entrypoints = tcp_entrypoints
         self._routing_mode = routing_mode
         self._tls_enabled = tls_enabled
-
-    @property
-    def service_ports(self) -> List[ServicePort]:
-        """Kubernetes service ports to be opened for this workload.
-
-        We cannot use ops unit.open_port here because Juju will provision a ClusterIP
-        but for traefik we need LoadBalancer.
-        """
-        web = ServicePort(_PORT, name=f"{self._service_name}")
-        websecure = ServicePort(_TLS_PORT, name=f"{self._service_name}-tls")
-        return [web, websecure] + [
-            ServicePort(int(port), name=name) for name, port in self._tcp_entrypoints.items()
-        ]
 
     @property
     def scrape_jobs(self) -> list:
@@ -122,8 +123,7 @@ class Traefik:
     def configure(self):
         """Configure static and tls."""
         # Ensure the required basic configurations and folders exist
-        tcp_entrypoints = self._tcp_entrypoints
-        self._update_static_configuration(tcp_entrypoints)
+        self._update_static_configuration()
         self._setup_dynamic_config_folder()
 
         if self._tls_enabled:
@@ -150,21 +150,36 @@ class Traefik:
 
         self.update_ca_certs()
 
-    def add_ca(self, ca: str, uid: Union[str, int]):
-        """Add a ca."""
-        ca_path = RECV_CA_TEMPLATE.substitute(rel_id=str(uid))
-        self._container.push(ca_path, ca, make_dirs=True)
+    def add_cas(self, cas: Iterable[CA]):
+        """Add any number of CAs to Traefik.
 
-    def remove_ca(self, uid: Union[str, int]):
-        """Remove a ca.
+        Calls update-ca-certificates once done.
+        """
+        for ca in cas:
+            self._add_ca(ca)
+        self.update_ca_certs()
+
+    def _add_ca(self, ca: CA):
+        """Add a ca.
+
+        After doing this (any number of times), the caller is responsible for invoking update-ca-certs.
+        """
+        self._container.push(ca.path, ca.ca, make_dirs=True)
+
+    def remove_cas(self, uids: Iterable[Union[str, int]]):
+        """Remove all CAs with these UIDs.
 
         BEWARE of potential race conditions.
         Traefik watches the dynamic config dir and reloads automatically on change.
         So make sure any traefik config depending on the certificates being there is updated
         **before** the certs are removed, otherwise you might have some downtime.
+
+        Calls update-ca-certificates once done.
         """
-        ca_path = RECV_CA_TEMPLATE.substitute(rel_id=str(uid))
-        self._container.remove_path(ca_path)
+        for uid in uids:
+            ca_path = RECV_CA_TEMPLATE.substitute(rel_id=str(uid))
+            self._container.remove_path(ca_path)
+        self.update_ca_certs()
 
     def update_ca_certs(self):
         """Update ca certificates and restart traefik."""
@@ -176,8 +191,9 @@ class Traefik:
         # - old certs will be kept active.
         self.restart()
 
-    def _update_static_configuration(self, tcp_entrypoints: Dict[str, int]):
+    def _update_static_configuration(self):
         """Generate and push Traefik's static config yaml file."""
+        tcp_entrypoints = self._tcp_entrypoints
         logger.debug(f"Statically configuring traefik with tcp entrypoints: {tcp_entrypoints}.")
 
         # TODO Disable static config with telemetry and check new version
@@ -187,8 +203,8 @@ class Traefik:
             },
             "entryPoints": {
                 "diagnostics": {"address": f":{_DIAGNOSTICS_PORT}"},
-                "web": {"address": f":{_PORT}"},
-                "websecure": {"address": f":{_TLS_PORT}"},
+                "web": {"address": f":{self.port}"},
+                "websecure": {"address": f":{self.tls_port}"},
                 **{
                     tcp_entrypoint_name: {"address": f":{port}"}
                     for tcp_entrypoint_name, port in tcp_entrypoints.items()
@@ -491,11 +507,11 @@ class Traefik:
         return {k: v for k, v in eps.items() if k not in {"diagnostics", "web", "websecure"}}
 
     @property
-    def is_running(self):
+    def is_ready(self):
         """Whether the traefik service is running."""
         if not self._container.can_connect():
             return False
-        return bool(self._container.get_services(self._service_name))
+        return bool(self._container.get_services(self.service_name))
 
     def restart(self):
         """Restart the pebble service."""
@@ -503,7 +519,7 @@ class Traefik:
             "summary": "Traefik layer",
             "description": "Pebble config layer for Traefik",
             "services": {
-                self._service_name: {
+                self.service_name: {
                     "override": "replace",
                     "summary": "Traefik",
                     # trick to drop the logs to a file but also keep them available in the pod logs
@@ -513,15 +529,15 @@ class Traefik:
             },
         }
 
-        if not self.is_running:
+        if not self.is_ready:
             self._container.add_layer(self._layer_name, cast(LayerDict, layer), combine=True)
-            logger.debug(f"replanning {self._service_name!r} after a service update")
+            logger.debug(f"replanning {self.service_name!r} after a service update")
             self._container.replan()
         else:
-            logger.debug(f"restarting {self._service_name!r}")
-            self._container.restart(self._service_name)
+            logger.debug(f"restarting {self.service_name!r}")
+            self._container.restart(self.service_name)
 
-    def clear_dynamic_configs(self):
+    def delete_dynamic_configs(self):
         """Delete **ALL** yamls from the dynamic config dir."""
         # instead of multiple calls to self._container.remove_path(), delete all files in a swoop
         self._container.exec(["find", DYNAMIC_CONFIG_DIR, "-name", "*.yaml", "-delete"])
@@ -530,7 +546,7 @@ class Traefik:
     def delete_dynamic_config(self, file_name: str):
         """Delete a specific yaml from the dynamic config dir."""
         self._container.remove_path(Path(DYNAMIC_CONFIG_DIR) / file_name)
-        logger.debug("deleted dynamic configuration file: %s", file_name)
+        logger.debug("Deleted dynamic configuration file: %s", file_name)
 
     def add_dynamic_config(self, file_name: str, config: str):
         """Push a yaml to the dynamic config dir.
@@ -545,7 +561,7 @@ class Traefik:
 
         logger.debug("Updated dynamic configuration file: %s", file_name)
 
-    def clear_tracing_config(self):
+    def delete_tracing_config(self):
         """Delete the tracing config yaml."""
         with contextlib.suppress(PathError):
             self._container.remove_path(DYNAMIC_TRACING_PATH)

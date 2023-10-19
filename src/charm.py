@@ -41,6 +41,7 @@ from charms.traefik_route_k8s.v0.traefik_route import (
 )
 from deepmerge import always_merger
 from lightkube.core.client import Client
+from lightkube.models.core_v1 import ServicePort
 from lightkube.resources.core_v1 import Service
 from ops.charm import (
     ActionEvent,
@@ -62,12 +63,12 @@ from ops.model import (
     WaitingStatus,
 )
 from ops.pebble import PathError
-from traefik import LOG_PATH, RoutingMode, Traefik
+from traefik import CA, LOG_PATH, RoutingMode, Traefik
 from utils import is_hostname
 
 logger = logging.getLogger(__name__)
 
-_TRAEFIK_CONTAINER_NAME = _TRAEFIK_LAYER_NAME = _TRAEFIK_SERVICE_NAME = "traefik"
+_TRAEFIK_CONTAINER_NAME = "traefik"
 
 
 class _IngressRelationType(enum.Enum):
@@ -144,8 +145,7 @@ class TraefikIngressCharm(CharmBase):
         )
 
         self.traefik = Traefik(
-            _TRAEFIK_SERVICE_NAME,
-            self.container,
+            container=self.container,
             routing_mode=self._routing_mode,
             tcp_entrypoints=self._tcp_entrypoints(),
             tls_enabled=self._is_tls_enabled(),
@@ -154,7 +154,7 @@ class TraefikIngressCharm(CharmBase):
         self.service_patch = KubernetesServicePatch(
             charm=self,
             service_type="LoadBalancer",
-            ports=self.traefik.service_ports,
+            ports=self._service_ports,
             refresh_event=[
                 ipa_v1.on.data_provided,  # type: ignore
                 ipa_v2.on.data_provided,  # type: ignore
@@ -236,6 +236,21 @@ class TraefikIngressCharm(CharmBase):
         # Action handlers
         observe(self.on.show_proxied_endpoints_action, self._on_show_proxied_endpoints)  # type: ignore
 
+    @property
+    def _service_ports(self) -> List[ServicePort]:
+        """Kubernetes service ports to be opened for this workload.
+
+        We cannot use ops unit.open_port here because Juju will provision a ClusterIP
+        but for traefik we need LoadBalancer.
+        """
+        traefik = self.traefik
+        service_name = traefik.service_name
+        web = ServicePort(traefik.port, name=f"{service_name}")
+        websecure = ServicePort(traefik.tls_port, name=f"{service_name}-tls")
+        return [web, websecure] + [
+            ServicePort(int(port), name=name) for name, port in self._tcp_entrypoints().items()
+        ]
+
     def _on_recv_ca_cert_available(self, event: CertificateTransferAvailableEvent):
         # Assuming only one cert per relation (this is in line with the original lib design).
         if not self.container.can_connect():
@@ -250,8 +265,9 @@ class TraefikIngressCharm(CharmBase):
         Calling this function from upgrade-charm might be too early though. Pebble-ready is
         preferred.
         """
+        cas = []
         if event:
-            self.traefik.add_ca(event.ca, uid=event.relation_id)
+            cas.append(CA(event.ca, uid=event.relation_id))
         else:
             for relation in self.model.relations.get(self.recv_ca_cert.relationship_name, []):
                 # For some reason, relation.units includes our unit and app. Need to exclude them.
@@ -259,14 +275,13 @@ class TraefikIngressCharm(CharmBase):
                     # Note: this nested loop handles the case of multi-unit CA, each unit providing
                     # a different ca cert, but that is not currently supported by the lib itself.
                     if ca := relation.data[unit].get("ca"):
-                        self.traefik.add_ca(ca, uid=relation.id)
+                        cas.append(CA(ca, uid=relation.id))
 
-        self._update_system_certs()
+        self.traefik.add_cas(cas)
 
     def _on_recv_ca_cert_removed(self, event: CertificateTransferRemovedEvent):
         # Assuming only one cert per relation (this is in line with the original lib design).
-        self.traefik.remove_ca(event.relation_id)
-        self._update_system_certs()
+        self.traefik.remove_cas([event.relation_id])
 
     @property
     def charm_tracing_endpoint(self) -> Optional[str]:
@@ -294,7 +309,7 @@ class TraefikIngressCharm(CharmBase):
             # clear anything up. We could defer, but again, we're being torn down and the unit db
             # will
             return
-        self.traefik.clear_tracing_config()
+        self.traefik.delete_tracing_config()
 
     def _on_tracing_endpoint_changed(self, event) -> None:
         # On slow machines, this event may come up before pebble is ready
@@ -303,7 +318,7 @@ class TraefikIngressCharm(CharmBase):
             return
 
         if not self._tracing.is_ready():
-            self.traefik.clear_tracing_config()
+            self.traefik.delete_tracing_config()
 
         self._configure_tracing()
 
@@ -322,10 +337,6 @@ class TraefikIngressCharm(CharmBase):
         self.traefik.update_cert_configuration(
             cert_handler.cert, cert_handler.key, cert_handler.ca
         )
-
-    def _update_system_certs(self):
-        with self.status(MaintenanceStatus("updating ca certificates")):
-            self.traefik.update_ca_certs()
 
     def _on_show_proxied_endpoints(self, event: ActionEvent):
         if not self.ready:
@@ -400,7 +411,7 @@ class TraefikIngressCharm(CharmBase):
         # configuration files on a storage volume that survives the pod churn, before
         # we start traefik we clean up all Juju-generated config files to avoid spurious
         # routes.
-        self.traefik.clear_dynamic_configs()
+        self.traefik.delete_dynamic_configs()
 
         # we push the static config
         self._configure_traefik()
@@ -468,8 +479,8 @@ class TraefikIngressCharm(CharmBase):
             )
             return
 
-        if not self.traefik.is_running:
-            self.unit.status = WaitingStatus(f"waiting for service: '{_TRAEFIK_SERVICE_NAME}'")
+        if not self.traefik.is_ready:
+            self.unit.status = WaitingStatus(f"waiting for service: '{self.traefik.service_name}'")
             return
 
         with self.status(MaintenanceStatus("updating ingress configurations")):
@@ -525,8 +536,8 @@ class TraefikIngressCharm(CharmBase):
             self._wipe_ingress_for_all_relations()  # fixme: no side-effects in prop
             self.unit.status = WaitingStatus("gateway address unavailable")
             return False
-        if not self.traefik.is_running:
-            self.unit.status = WaitingStatus(f"waiting for service: '{_TRAEFIK_SERVICE_NAME}'")
+        if not self.traefik.is_ready:
+            self.unit.status = WaitingStatus(f"waiting for service: '{self.traefik.service_name}'")
             return False
         return True
 
@@ -655,8 +666,8 @@ class TraefikIngressCharm(CharmBase):
         else:
             raise ValueError(f"unknown provider: {provider}")
 
-        configs = config_getter(relation)
-        self._push_configurations(relation, configs)
+        config = config_getter(relation)
+        self._push_configurations(relation, config)
 
     def _get_configs_per_leader(self, relation: Relation) -> Dict[str, Any]:
         """Generates ingress per leader config."""

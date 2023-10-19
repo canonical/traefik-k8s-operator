@@ -5,8 +5,9 @@
 
 from unittest.mock import MagicMock, PropertyMock, patch
 
-from charm import _TRAEFIK_SERVICE_NAME, TraefikIngressCharm
+from charm import TraefikIngressCharm
 from scenario import Container, Context, State
+from traefik import Traefik
 
 
 @patch("charm.TraefikIngressCharm._external_host", PropertyMock(return_value="foo.bar"))
@@ -39,7 +40,7 @@ def test_start_traefik_is_not_running(*_, traefik_ctx):
         ],
     )
     out = Context(charm_type=TraefikIngressCharm).run("start", state)
-    assert out.unit_status == ("waiting", f"waiting for service: '{_TRAEFIK_SERVICE_NAME}'")
+    assert out.unit_status == ("waiting", f"waiting for service: '{Traefik.service_name}'")
 
 
 @patch("charm.TraefikIngressCharm._external_host", PropertyMock(return_value=False))
@@ -53,7 +54,7 @@ def test_start_traefik_no_hostname(*_, traefik_ctx):
 
 
 @patch("charm.TraefikIngressCharm._external_host", PropertyMock(return_value="foo.bar"))
-@patch("traefik.Traefik.is_running", PropertyMock(return_value=True))
+@patch("traefik.Traefik.is_ready", PropertyMock(return_value=True))
 @patch("charm.TraefikIngressCharm._tcp_entrypoints_changed", MagicMock(return_value=False))
 def test_start_traefik_active(*_, traefik_ctx):
     state = State(

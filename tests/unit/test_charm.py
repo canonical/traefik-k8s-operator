@@ -169,7 +169,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
         self.harness.begin_with_initial_hooks()
         self.harness.container_pebble_ready("traefik")
 
-        self.assertTrue(self.harness.charm.traefik.is_running)
+        self.assertTrue(self.harness.charm.traefik.is_ready)
 
     @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
     def test_bad_routing_mode_config_and_recovery(self):
