@@ -1,0 +1,43 @@
+bundle: kubernetes
+applications:
+  ca:
+    charm: self-signed-certificates
+    channel: edge
+    revision: 40
+    scale: 1
+    constraints: arch=amd64
+  external-ca:
+    charm: self-signed-certificates
+    channel: edge
+    revision: 40
+    scale: 1
+    constraints: arch=amd64
+  prom:
+    charm: prometheus-k8s
+    channel: edge
+    revision: 152
+    series: focal
+    resources:
+      prometheus-image: 130
+    scale: 1
+    constraints: arch=amd64
+    storage:
+      database: kubernetes,1,1024M
+    trust: true
+  trfk:
+    charm: local:traefik-k8s-0
+    series: focal
+    scale: 1
+    constraints: arch=amd64
+    storage:
+      configurations: kubernetes,1,1024M
+    trust: true
+relations:
+- - prom:ingress
+  - trfk:ingress-per-unit
+- - trfk:certificates
+  - external-ca:certificates
+- - prom:certificates
+  - ca:certificates
+- - trfk:receive-ca-cert
+  - ca:send-ca-cert
