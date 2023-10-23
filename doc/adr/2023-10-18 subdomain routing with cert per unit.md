@@ -29,6 +29,8 @@ the use-case of strict subdomain routing (no wildcards).
 * Bad, because may get rate limited by the CA.
   * IPA: new CSR (CRR) for every added (removed) app
   * IPU: new CSR (CRR) for every added (removed) unit
+* Bad, because if we are not careful, the rate limit could break the only cert
+  in use.
 
 ## Pros and Cons of the Options
 
@@ -67,7 +69,9 @@ SAN example: app1.example.com, app2.example.com
 
 * Good, because no wildcard certs (more secure).
 * Bad, because the number of SANs per cert is limited.
-
+* Bad, because may get rate limited by the CA.
+* Bad, because depends on the order things are done on an ACME server: if the
+  server first revokes the previous certificate, it could create outages.
 
 ### One cert per app (wildcard SANs only for ingress-per-unit)
 ```
@@ -108,3 +112,8 @@ echo | openssl s_client -showcerts -connect google.com:443 | openssl x509 -noout
 - StackExchange projects have wildcard SAN.
 - Government and bank websites have a separate cert per subdomain (and they do not use wildcard SANs)
 - Let's Encrypt limits to 100 SANs per cert ([ref](https://community.letsencrypt.org/t/why-sans-are-limited-to-100-domains-only/154930))
+- Wildcard certs don't allow HTTP challenge, nor ALPN validation using ACME
+  protocol, only DNS challenge is supported
+  (https://letsencrypt.org/docs/challenge-types/).
+- For now, the only `tls-certificates` providers in the ecosystem are using the
+  DNS-01 challenge.
