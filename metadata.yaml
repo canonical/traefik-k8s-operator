@@ -72,6 +72,9 @@ requires:
     limit: 1
     description: |
       Send a CSR to- and obtain a signed certificate from an external CA.
+  forward-auth:
+    interface: forward_auth
+    limit: 1
   logging:
     interface: loki_push_api
     description: |

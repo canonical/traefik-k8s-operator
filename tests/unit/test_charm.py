@@ -97,26 +97,6 @@ def _render_middlewares(*, strip_prefix: bool = False, redirect_https: bool = Fa
     )
 
 
-def _render_middlewares(*, strip_prefix: bool = False, redirect_https: bool = False) -> dict:
-    middlewares = {}
-    if redirect_https:
-        middlewares.update({"redirectScheme": {"scheme": "https", "port": 443, "permanent": True}})
-    if strip_prefix:
-        middlewares.update(
-            {
-                "stripPrefix": {
-                    "prefixes": ["/test-model-remote-0"],
-                    "forceSlash": False,
-                }
-            }
-        )
-    return (
-        {"middlewares": {"juju-sidecar-noprefix-test-model-remote-0": middlewares}}
-        if middlewares
-        else {}
-    )
-
-
 class _RequirerMock:
     local_app: Application = None
     relation: Relation = None
@@ -440,6 +420,71 @@ class TestTraefikIngressCharm(unittest.TestCase):
         expected_entrypoint = {"address": ":3000"}
         static_config = charm.unit.get_container("traefik").pull(STATIC_CONFIG_PATH).read()
         assert yaml.safe_load(static_config)["entryPoints"][prefix] == expected_entrypoint
+
+    def setup_forward_auth_relation(self) -> int:
+        relation_id = self.harness.add_relation("forward-auth", "provider")
+        self.harness.add_relation_unit(relation_id, "provider/0")
+        self.harness.update_relation_data(
+            relation_id,
+            "provider",
+            {
+                "decisions_address": "https://oathkeeper.test-model.svc.cluster.local:4456/decisions",
+                "app_names": '["charmed-app"]',
+                "headers": '["X-User"]',
+            },
+        )
+
+        return relation_id
+
+    @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
+    def test_forward_auth_relation_databag(self):
+        self.harness.set_leader(True)
+        self.harness.update_config({"external_hostname": "testhostname"})
+        self.harness.begin_with_initial_hooks()
+
+        provider_info = {
+            "decisions_address": "https://oathkeeper.test-model.svc.cluster.local:4456/decisions",
+            "app_names": ["charmed-app"],
+            "headers": ["X-User"],
+        }
+
+        _ = self.setup_forward_auth_relation()
+
+        self.assertTrue(self.harness.charm.forward_auth.is_ready())
+
+        expected_provider_info = self.harness.charm.forward_auth.get_provider_info()
+
+        assert expected_provider_info.decisions_address == provider_info["decisions_address"]
+        assert expected_provider_info.app_names == provider_info["app_names"]
+        assert expected_provider_info.headers == provider_info["headers"]
+
+    @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
+    def test_forward_auth_relation_changed(self):
+        self.harness.set_leader(True)
+        self.harness.update_config({"external_hostname": "testhostname"})
+        self.harness.begin_with_initial_hooks()
+
+        self.harness.charm._on_forward_auth_config_changed = mocked_handle = Mock(
+            return_value=None
+        )
+
+        _ = self.setup_forward_auth_relation()
+        assert mocked_handle.called
+
+    @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
+    def test_forward_auth_relation_removed(self):
+        self.harness.set_leader(True)
+        self.harness.update_config({"external_hostname": "testhostname"})
+        self.harness.begin_with_initial_hooks()
+
+        self.harness.charm._on_forward_auth_config_removed = mocked_handle = Mock(
+            return_value=None
+        )
+
+        relation_id = self.setup_forward_auth_relation()
+        self.harness.remove_relation(relation_id)
+
+        assert mocked_handle.called
 
 
 class TestTraefikCertTransferInterface(unittest.TestCase):

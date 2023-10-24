@@ -83,4 +83,3 @@ def capture(charm: CharmBase, typ_: Type[_T] = EventBase) -> Iterator[Captured[_
     event = captured[0]
     assert isinstance(event, typ_), f"expected {typ_}, not {type(event)}"
     result.event = event
-
