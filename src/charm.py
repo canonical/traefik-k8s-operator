@@ -278,7 +278,7 @@ class TraefikIngressCharm(CharmBase):
             + self.ingress_per_unit.relations
             + self.traefik_route.relations
         ):
-            ingress_app_names.append(ingress_relation.app.name)
+            ingress_app_names.append(ingress_relation.app.name)  # type: ignore
         return RequirerConfig(ingress_app_names)
 
     def _on_forward_auth_config_changed(self, event: ForwardAuthConfigChangedEvent):
