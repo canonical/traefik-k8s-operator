@@ -82,7 +82,7 @@ def test_ingress_app_requirer_related(requirer: IngressPerAppRequirer, harness, 
         ((10, "example.com", False), False),
         ((10, "example.com", None), False),
         (("foo", "10.0.0.1", 12), True),
-        (("foo", "not.an.ip", 12), True),
+        (("foo", "not.an.ip", 12), False),
     ),
 )
 @pytest.mark.parametrize("strip_prefix", (True, False))
