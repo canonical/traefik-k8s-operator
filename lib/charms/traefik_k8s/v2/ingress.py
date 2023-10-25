@@ -682,20 +682,15 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         if not host:
             host = socket.getfqdn()
 
-        if not ip:
-            network_binding = self.charm.model.get_binding(relation)
-            if network_binding is None:
-                ip = None
-            else:
-                if (
-                    network_binding is None
-                    or (binding_ip := network_binding.network.bind_address) is None
-                ):
-                    ip = None
-                else:
-                    ip = str(binding_ip)
         if ip is None:
-            log.error("failed to retrieve ip information from juju")
+            network_binding = self.charm.model.get_binding(relation)
+            if (
+                network_binding is not None
+                and (bind_address := network_binding.network.bind_address) is not None
+            ):
+                ip = str(bind_address)
+            else:
+                log.error("failed to retrieve ip information from juju")
 
         unit_databag = relation.data[self.unit]
         try:

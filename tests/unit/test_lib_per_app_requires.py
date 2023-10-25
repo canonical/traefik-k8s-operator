@@ -2,6 +2,7 @@
 # See LICENSE file for licensing details.
 import json
 import unittest
+import unittest.mock
 from textwrap import dedent
 
 import pytest
@@ -81,6 +82,7 @@ def test_ingress_app_requirer_related(requirer: IngressPerAppRequirer, harness, 
         ((10, "example.com", False), False),
         ((10, "example.com", None), False),
         (("foo", "10.0.0.1", 12), True),
+        (("foo", "not.an.ip", 12), True),
     ),
 )
 @pytest.mark.parametrize("strip_prefix", (True, False))
@@ -122,9 +124,10 @@ class TestIPAEventsEmission(unittest.TestCase):
         self.addCleanup(self.harness.cleanup)
 
         self.harness.set_model_name(self.__class__.__name__)
-        self.harness.begin_with_initial_hooks()
 
     def test_ipa_events(self):
+        self.harness.begin_with_initial_hooks()
+
         # WHEN an ingress relation is formed
         # THEN the ready event is emitted
         with capture(self.harness.charm, IngressPerAppReadyEvent):
@@ -148,3 +151,14 @@ class TestIPAEventsEmission(unittest.TestCase):
 
         # AND ingress.url returns a false-y value
         self.assertFalse(self.harness.charm.ipa.url)
+
+    def test_ipa_events_juju_binding_failure(self):
+        with unittest.mock.patch("ops.Model.get_binding", return_value=None):
+            self.harness.begin_with_initial_hooks()
+            self.rel_id = self.harness.add_relation("ingress", "traefik-app")
+            self.harness.add_relation_unit(self.rel_id, "traefik-app/0")
+            self.harness.charm.ipa.provide_ingress_requirements(port=80)
+
+            self.assertEqual(
+                self.harness.get_relation_data(self.rel_id, "ipa-requirer/0")["ip"], "null"
+            )
