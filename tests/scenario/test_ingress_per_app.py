@@ -20,14 +20,16 @@ from scenario import Context, Mount, Relation, State
 from tests.scenario.utils import create_ingress_relation
 
 
-@pytest.mark.parametrize("port, host", ((80, "1.1.1.1"), (81, "10.1.10.1")))
+@pytest.mark.parametrize(
+    "port, ip, host", ((80, "1.1.1.1", "1.1.1.1"), (81, "10.1.10.1", "10.1.10.1"))
+)
 @pytest.mark.parametrize("event_name", ("joined", "changed", "created"))
 @pytest.mark.parametrize("scheme", ("http", "https"))
 def test_ingress_per_app_created(
-    traefik_ctx, port, host, model, traefik_container, event_name, tmp_path, scheme
+    traefik_ctx, port, ip, host, model, traefik_container, event_name, tmp_path, scheme
 ):
     """Check the config when a new ingress per app is created or changes (single remote unit)."""
-    ipa = create_ingress_relation(port=port, scheme=scheme, hosts=[host])
+    ipa = create_ingress_relation(port=port, scheme=scheme, hosts=[host], ips=[ip])
     state = State(
         model=model,
         config={"routing_mode": "path", "external_hostname": "foo.com"},
@@ -60,12 +62,14 @@ def test_ingress_per_app_created(
     assert generated_config["http"]["services"]["juju-test-model-remote-0-service"] == service_def
 
 
-@pytest.mark.parametrize("port, host", ((80, "1.1.1.{}"), (81, "10.1.10.{}")))
+@pytest.mark.parametrize(
+    "port, ip, host", ((80, "1.1.1.{}", "1.1.1.{}"), (81, "10.1.10.{}", "10.1.10.{}"))
+)
 @pytest.mark.parametrize("n_units", (2, 3, 10))
 @pytest.mark.parametrize("evt_name", ("joined", "changed"))
 @pytest.mark.parametrize("scheme", ("http", "https"))
 def test_ingress_per_app_scale(
-    traefik_ctx, host, port, model, traefik_container, tmp_path, n_units, scheme, evt_name
+    traefik_ctx, host, ip, port, model, traefik_container, tmp_path, n_units, scheme, evt_name
 ):
     """Check the config when a new ingress per app unit joins."""
     relation_id = 42
@@ -107,6 +111,7 @@ def test_ingress_per_app_scale(
         rel_id=relation_id,
         unit_name="remote/0",
         hosts=[host.format(n) for n in range(n_units)],
+        ips=[ip.format(n) for n in range(n_units)],
     )
     state = State(
         model=model,
@@ -138,11 +143,16 @@ def test_ingress_per_app_scale(
         # d["service"][svc_name]["loadBalancer"]["servers"][0]["url"] == leader_url
 
 
-def get_requirer_ctx(host, port):
+@pytest.mark.parametrize(
+    "port, ip, host", ((80, "1.1.1.1", "1.1.1.1"), (81, "10.1.10.1", "10.1.10.1"))
+)
+@pytest.mark.parametrize("evt_name", ("joined", "changed"))
+@pytest.mark.parametrize("leader", (True, False))
+def get_requirer_ctx(host, ip, port):
     class MyRequirer(CharmBase):
         def __init__(self, framework: Framework):
             super().__init__(framework)
-            self.ipa = IngressPerAppRequirer(self, host=host, port=port)
+            self.ipa = IngressPerAppRequirer(self, host=host, ip=ip, port=port)
 
     ctx = Context(
         charm_type=MyRequirer,
@@ -151,21 +161,23 @@ def get_requirer_ctx(host, port):
     return ctx
 
 
-@pytest.mark.parametrize("port, host", ((80, "1.1.1.1"), (81, "10.1.10.1")))
+@pytest.mark.parametrize(
+    "port, ip, host", ((80, "1.1.1.1", "1.1.1.1"), (81, "10.1.10.1", "1.1.1.1"))
+)
 @pytest.mark.parametrize("evt_name", ("joined", "changed"))
 @pytest.mark.parametrize("leader", (True, False))
-def test_ingress_per_app_requirer_with_auto_data(host, port, model, evt_name, leader):
+def test_ingress_per_app_requirer_with_auto_data(host, ip, port, model, evt_name, leader):
     ipa = Relation("ingress")
     state = State(
         model=model,
         leader=leader,
         relations=[ipa],
     )
-    requirer_ctx = get_requirer_ctx(host, port)
+    requirer_ctx = get_requirer_ctx(host, ip, port)
     state_out = requirer_ctx.run(getattr(ipa, evt_name + "_event"), state)
 
     ipa_out = state_out.get_relations("ingress")[0]
-    assert ipa_out.local_unit_data == {"host": json.dumps(host)}
+    assert ipa_out.local_unit_data == {"host": json.dumps(host), "ip": json.dumps(ip)}
 
     if leader:
         assert ipa_out.local_app_data == {
@@ -217,7 +229,7 @@ def test_ingress_per_app_v1_upgrade_v2(
     strip_prefix,
     redirect_https,
 ):
-    requirer_ctx = get_requirer_ctx("host", 4242)
+    requirer_ctx = get_requirer_ctx("host", "1.2.3.4", 4242)
 
     ipav1 = Relation(
         "ingress",

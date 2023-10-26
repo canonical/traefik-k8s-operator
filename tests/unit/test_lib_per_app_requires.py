@@ -2,6 +2,7 @@
 # See LICENSE file for licensing details.
 import json
 import unittest
+import unittest.mock
 from textwrap import dedent
 
 import pytest
@@ -58,12 +59,12 @@ def test_ingress_app_requirer_related(requirer: IngressPerAppRequirer, harness, 
     assert not requirer.is_ready()
     # provider goes to ready immediately because we inited ipa with port=80.
     # auto-data feature...
-
+    harness.add_network("10.0.0.1")
     relation_id = harness.add_relation("ingress", "remote")
     # usually one would provide this via the initializer, but here...
     requirer._strip_prefix = strip_prefix
 
-    requirer.provide_ingress_requirements(host="foo", port=42)
+    requirer.provide_ingress_requirements(host="foo", ip="10.0.0.1", port=42)
     assert not requirer.is_ready()
 
     with capture(harness.charm, IngressPerAppReadyEvent) as captured:
@@ -77,27 +78,29 @@ def test_ingress_app_requirer_related(requirer: IngressPerAppRequirer, harness, 
 @pytest.mark.parametrize(
     "auto_data, ok",
     (
-        ((True, 42), False),
-        ((10, False), False),
-        ((10, None), False),
-        (("foo", 12), True),
+        ((True, "example.com", 42), False),
+        ((10, "example.com", False), False),
+        ((10, "example.com", None), False),
+        (("foo", "10.0.0.1", 12), True),
+        (("foo", "not.an.ip", 12), False),
     ),
 )
 @pytest.mark.parametrize("strip_prefix", (True, False))
 @pytest.mark.parametrize("scheme", ("http", "https"))
 def test_validator(requirer: IngressPerAppRequirer, harness, auto_data, ok, strip_prefix, scheme):
     harness.set_leader(True)
+    harness.add_network("10.0.0.10")
     harness.add_relation("ingress", "remote")
     requirer._strip_prefix = strip_prefix
     requirer._scheme = scheme
 
     if not ok:
         with pytest.raises(DataValidationError):
-            host, port = auto_data
-            requirer.provide_ingress_requirements(host=host, port=port)
+            host, ip, port = auto_data
+            requirer.provide_ingress_requirements(host=host, ip=ip, port=port)
     else:
-        host, port = auto_data
-        requirer.provide_ingress_requirements(host=host, port=port)
+        host, ip, port = auto_data
+        requirer.provide_ingress_requirements(host=host, ip=ip, port=port)
 
 
 class TestIPAEventsEmission(unittest.TestCase):
@@ -121,12 +124,14 @@ class TestIPAEventsEmission(unittest.TestCase):
         self.addCleanup(self.harness.cleanup)
 
         self.harness.set_model_name(self.__class__.__name__)
-        self.harness.begin_with_initial_hooks()
 
     def test_ipa_events(self):
+        self.harness.begin_with_initial_hooks()
+
         # WHEN an ingress relation is formed
         # THEN the ready event is emitted
         with capture(self.harness.charm, IngressPerAppReadyEvent):
+            self.harness.add_network("10.0.0.10")
             self.rel_id = self.harness.add_relation("ingress", "traefik-app")
             self.harness.add_relation_unit(self.rel_id, "traefik-app/0")
 
@@ -146,3 +151,14 @@ class TestIPAEventsEmission(unittest.TestCase):
 
         # AND ingress.url returns a false-y value
         self.assertFalse(self.harness.charm.ipa.url)
+
+    def test_ipa_events_juju_binding_failure(self):
+        with unittest.mock.patch("ops.Model.get_binding", return_value=None):
+            self.harness.begin_with_initial_hooks()
+            self.rel_id = self.harness.add_relation("ingress", "traefik-app")
+            self.harness.add_relation_unit(self.rel_id, "traefik-app/0")
+            self.harness.charm.ipa.provide_ingress_requirements(port=80)
+
+            self.assertEqual(
+                self.harness.get_relation_data(self.rel_id, "ipa-requirer/0")["ip"], "null"
+            )

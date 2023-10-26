@@ -33,6 +33,7 @@ def _requirer_provide_ingress_requirements(
     port: int,
     relation: Relation,
     host=socket.getfqdn(),
+    ip=socket.gethostbyname(socket.gethostname()),
     mode="http",
     strip_prefix: bool = False,
     redirect_https: bool = False,
@@ -46,7 +47,7 @@ def _requirer_provide_ingress_requirements(
             redirect_https=redirect_https,
             strip_prefix=strip_prefix,
         ).dump()
-        unit_data = IngressRequirerUnitData(host=host).dump()
+        unit_data = IngressRequirerUnitData(host=host, ip=ip).dump()
         # do not emit this event, as we need to 'simultaneously'
         # update the remote unit and app databags
         with harness.hooks_disabled():
@@ -348,6 +349,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
             harness=self.harness,
             relation=relation,
             host="10.0.0.1",
+            ip="10.0.0.1",
             port=3000,
             per_app_relation=True,
         )
