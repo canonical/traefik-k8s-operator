@@ -4,13 +4,71 @@
     "scene_height": 64000,
     "nodes": [
         {
-            "id": 139690964785312,
-            "title": "Null with containers",
-            "pos_x": -240.0,
-            "pos_y": -87.0,
+            "id": 139999571194592,
+            "title": "Null State",
+            "pos_x": -578.0,
+            "pos_y": -221.0,
+            "inputs": [],
+            "outputs": [
+                {
+                    "id": 139999571405808,
+                    "index": 0,
+                    "multi_edges": true,
+                    "position": 5,
+                    "socket_type": 2
+                },
+                {
+                    "id": 139999571472928,
+                    "index": 1,
+                    "multi_edges": true,
+                    "position": 5,
+                    "socket_type": 3
+                }
+            ],
+            "content": {
+                "value": "new state 0"
+            },
+            "name": "Null State",
+            "value": "new state 0",
+            "custom-state": {
+                "config": {},
+                "relations": [],
+                "networks": [],
+                "containers": [],
+                "storage": [],
+                "opened_ports": [],
+                "leader": false,
+                "model": {
+                    "name": "TkzXG3jrxgf6mjrJ0jyM",
+                    "uuid": "6da70c4e-4ac0-4f9d-b53a-ba56cb4f6ed6",
+                    "type": "kubernetes"
+                },
+                "secrets": [],
+                "resources": {},
+                "planned_units": 1,
+                "unit_id": 0,
+                "deferred": [],
+                "stored_state": [],
+                "app_status": {
+                    "name": "unknown",
+                    "message": ""
+                },
+                "unit_status": {
+                    "name": "unknown",
+                    "message": ""
+                },
+                "workload_version": ""
+            },
+            "deltas_source": "from scenario import *\nfrom ops import pebble\nfrom charms.traefik_k8s.v2.ingress import IngressRequirerAppData, IngressRequirerUnitData\n\n\ndef with_ingress(state: State) -> State:\n    return state.replace(\n        containers=[Container(\n            'traefik',\n            can_connect=True,\n            layers={\"traefik\": pebble.Layer({\"services\": {\"traefik\": {\"startup\": \"enabled\"}}})},\n            service_status={\n                \"traefik\": pebble.ServiceStatus.ACTIVE\n            },\n            exec_mock={('update-ca-certificates', '--fresh'): ExecOutput()})\n        ],\n        relations=[\n            Relation(\n                \"ingress\",\n                remote_app_data=IngressRequirerAppData(\n                    host=\"goo.com\", model=\"foo\", name=\"bar\", port=42\n                ).dump(),\n                remote_units_data={\n                    1: IngressRequirerUnitData(host=\"goo.com\").dump()}\n            )\n        ]\n    )\n"
+        },
+        {
+            "id": 139999561086432,
+            "title": "State",
+            "pos_x": -263.0,
+            "pos_y": -134.0,
             "inputs": [
                 {
-                    "id": 140121608657344,
+                    "id": 139999561173456,
                     "index": 0,
                     "multi_edges": false,
                     "position": 2,
@@ -19,7 +77,7 @@
             ],
             "outputs": [
                 {
-                    "id": 139690964816304,
+                    "id": 139999561173648,
                     "index": 0,
                     "multi_edges": true,
                     "position": 5,
@@ -27,11 +85,289 @@
                 }
             ],
             "content": {
-                "value": "new state 0"
+                "value": "new state 8"
             },
-            "name": "Null with containers",
-            "value": "new state 0"
+            "name": "State",
+            "value": "new state 8",
+            "deltas_source": null
+        },
+        {
+            "id": 139999560350352,
+            "title": "State",
+            "pos_x": 937.0,
+            "pos_y": -134.0,
+            "inputs": [
+                {
+                    "id": 139999561256672,
+                    "index": 0,
+                    "multi_edges": false,
+                    "position": 2,
+                    "socket_type": 1
+                }
+            ],
+            "outputs": [
+                {
+                    "id": 139999561257056,
+                    "index": 0,
+                    "multi_edges": true,
+                    "position": 5,
+                    "socket_type": 2
+                }
+            ],
+            "content": {
+                "value": "new state 12"
+            },
+            "name": "State",
+            "value": "new state 12",
+            "deltas_source": null
+        },
+        {
+            "id": 139999560462640,
+            "title": "State",
+            "pos_x": 457.0,
+            "pos_y": -134.0,
+            "inputs": [
+                {
+                    "id": 139999561256960,
+                    "index": 0,
+                    "multi_edges": false,
+                    "position": 2,
+                    "socket_type": 1
+                }
+            ],
+            "outputs": [
+                {
+                    "id": 139999561257680,
+                    "index": 0,
+                    "multi_edges": true,
+                    "position": 5,
+                    "socket_type": 2
+                }
+            ],
+            "content": {
+                "value": "new state 10"
+            },
+            "name": "State",
+            "value": "new state 10",
+            "deltas_source": null
+        },
+        {
+            "id": 139999561256816,
+            "title": "State",
+            "pos_x": 697.0,
+            "pos_y": -134.0,
+            "inputs": [
+                {
+                    "id": 139999561085952,
+                    "index": 0,
+                    "multi_edges": false,
+                    "position": 2,
+                    "socket_type": 1
+                }
+            ],
+            "outputs": [
+                {
+                    "id": 139999561086288,
+                    "index": 0,
+                    "multi_edges": true,
+                    "position": 5,
+                    "socket_type": 2
+                }
+            ],
+            "content": {
+                "value": "new state 11"
+            },
+            "name": "State",
+            "value": "new state 11",
+            "deltas_source": null
+        },
+        {
+            "id": 139999561085472,
+            "title": "State",
+            "pos_x": -23.0,
+            "pos_y": -134.0,
+            "inputs": [
+                {
+                    "id": 139999561086480,
+                    "index": 0,
+                    "multi_edges": false,
+                    "position": 2,
+                    "socket_type": 1
+                }
+            ],
+            "outputs": [
+                {
+                    "id": 139999561084944,
+                    "index": 0,
+                    "multi_edges": true,
+                    "position": 5,
+                    "socket_type": 2
+                }
+            ],
+            "content": {
+                "value": "new state 8"
+            },
+            "name": "State",
+            "value": "new state 8",
+            "deltas_source": null
+        },
+        {
+            "id": 139999560351024,
+            "title": "State",
+            "pos_x": 217.0,
+            "pos_y": -134.0,
+            "inputs": [
+                {
+                    "id": 139999561087152,
+                    "index": 0,
+                    "multi_edges": false,
+                    "position": 2,
+                    "socket_type": 1
+                }
+            ],
+            "outputs": [
+                {
+                    "id": 139999561086528,
+                    "index": 0,
+                    "multi_edges": true,
+                    "position": 5,
+                    "socket_type": 2
+                }
+            ],
+            "content": {
+                "value": "new state 9"
+            },
+            "name": "State",
+            "value": "new state 9",
+            "deltas_source": null
         }
     ],
-    "edges": []
+    "edges": [
+        {
+            "id": 139999561086096,
+            "edge_type": 2,
+            "start": 139999571472928,
+            "end": 139999561173456,
+            "event_spec": {
+                "event": {
+                    "path": "traefik_pebble_ready",
+                    "args": [],
+                    "kwargs": {},
+                    "storage": null,
+                    "relation": null,
+                    "relation_remote_unit_id": null,
+                    "secret": null,
+                    "container": null,
+                    "action": null,
+                    "_owner_path": []
+                },
+                "env": ""
+            }
+        },
+        {
+            "id": 139999559300192,
+            "edge_type": 2,
+            "start": 139999561257680,
+            "end": 139999561085952,
+            "event_spec": {
+                "event": {
+                    "path": "ingress_relation_departed",
+                    "args": null,
+                    "kwargs": {},
+                    "storage": null,
+                    "relation": null,
+                    "relation_remote_unit_id": null,
+                    "secret": null,
+                    "container": null,
+                    "action": null,
+                    "_owner_path": []
+                },
+                "env": ""
+            }
+        },
+        {
+            "id": 139999559297792,
+            "edge_type": 2,
+            "start": 139999561084944,
+            "end": 139999561087152,
+            "event_spec": {
+                "event": {
+                    "path": "ingress_relation_joined",
+                    "args": null,
+                    "kwargs": {},
+                    "storage": null,
+                    "relation": null,
+                    "relation_remote_unit_id": null,
+                    "secret": null,
+                    "container": null,
+                    "action": null,
+                    "_owner_path": []
+                },
+                "env": ""
+            }
+        },
+        {
+            "id": 139999559298896,
+            "edge_type": 2,
+            "start": 139999561086288,
+            "end": 139999561256672,
+            "event_spec": {
+                "event": {
+                    "path": "ingress_relation_broken",
+                    "args": null,
+                    "kwargs": {},
+                    "storage": null,
+                    "relation": null,
+                    "relation_remote_unit_id": null,
+                    "secret": null,
+                    "container": null,
+                    "action": null,
+                    "_owner_path": []
+                },
+                "env": ""
+            }
+        },
+        {
+            "id": 139999559300144,
+            "edge_type": 2,
+            "start": 139999561086528,
+            "end": 139999561256960,
+            "event_spec": {
+                "event": {
+                    "path": "ingress_relation_changed",
+                    "args": null,
+                    "kwargs": {},
+                    "storage": null,
+                    "relation": null,
+                    "relation_remote_unit_id": null,
+                    "secret": null,
+                    "container": null,
+                    "action": null,
+                    "_owner_path": []
+                },
+                "env": ""
+            }
+        },
+        {
+            "id": 139999560759664,
+            "edge_type": 2,
+            "start": 139999561173648,
+            "end": 139999561086480,
+            "event_spec": {
+                "event": {
+                    "path": "ingress_relation_created",
+                    "args": null,
+                    "kwargs": {},
+                    "storage": null,
+                    "relation": null,
+                    "relation_remote_unit_id": null,
+                    "secret": null,
+                    "container": null,
+                    "action": null,
+                    "_owner_path": []
+                },
+                "env": ""
+            }
+        }
+    ]
 }
