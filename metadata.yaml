@@ -75,6 +75,9 @@ requires:
   forward-auth:
     interface: forward_auth
     limit: 1
+    description: |
+      Receives forwardAuth middleware config from Oathkeeper.
+      The same middleware will be applied to all charms that requested Identity and Access Proxy protection.
   logging:
     interface: loki_push_api
     description: |

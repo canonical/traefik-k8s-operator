@@ -27,18 +27,18 @@ requires:
 
 Then, to initialise the library:
 ```python
-from charms.oathkeeper.v0.forward_auth import ForwardAuthConfigChangedEvent, ForwardAuthRequirer
+from charms.oathkeeper.v0.forward_auth import AuthConfigChangedEvent, ForwardAuthRequirer
 
 class ApiGatewayCharm(CharmBase):
     def __init__(self, *args):
         # ...
         self.forward_auth = ForwardAuthRequirer(self)
         self.framework.observe(
-            self.forward_auth.on.forward_auth_config_changed,
+            self.forward_auth.on.auth_config_changed,
             self.some_event_function
             )
 
-    def some_event_function(self, event: ForwardAuthConfigChangedEvent):
+    def some_event_function(self, event: AuthConfigChangedEvent):
         if self.forward_auth.is_ready():
             # Fetch the relation info
             forward_auth_data = self.forward_auth.get_forward_auth_data()
@@ -66,7 +66,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 1
+LIBPATCH = 2
 
 RELATION_NAME = "forward-auth"
 INTERFACE_NAME = "forward_auth"
@@ -198,7 +198,7 @@ class RequirerConfig:
         return {k: v for k, v in asdict(self).items() if v is not None}
 
 
-class ForwardAuthConfigChangedEvent(EventBase):
+class AuthConfigChangedEvent(EventBase):
     """Event to notify the requirer charm that the forward-auth config has changed."""
 
     def __init__(
@@ -236,7 +236,7 @@ class ForwardAuthConfigChangedEvent(EventBase):
         self.relation_app_name = snapshot["relation_app_name"]
 
 
-class ForwardAuthConfigRemovedEvent(EventBase):
+class AuthConfigRemovedEvent(EventBase):
     """Event to notify the requirer charm that the forward-auth config was removed."""
 
     def __init__(
@@ -259,8 +259,8 @@ class ForwardAuthConfigRemovedEvent(EventBase):
 class ForwardAuthRequirerEvents(ObjectEvents):
     """Event descriptor for events raised by `ForwardAuthRequirer`."""
 
-    forward_auth_config_changed = EventSource(ForwardAuthConfigChangedEvent)
-    forward_auth_config_removed = EventSource(ForwardAuthConfigRemovedEvent)
+    auth_config_changed = EventSource(AuthConfigChangedEvent)
+    auth_config_removed = EventSource(AuthConfigRemovedEvent)
 
 
 class ForwardAuthRequirer(ForwardAuthRelation):
@@ -318,13 +318,13 @@ class ForwardAuthRequirer(ForwardAuthRelation):
         relation_app_name = event.relation.app.name
 
         # Notify Traefik to update the routes
-        self.on.forward_auth_config_changed.emit(
+        self.on.auth_config_changed.emit(
             decisions_address, app_names, headers, relation_id, relation_app_name
         )
 
     def _on_relation_departed_event(self, event: RelationDepartedEvent) -> None:
         """Notify the requirer that the relation has departed."""
-        self.on.forward_auth_config_removed.emit(event.relation.id)
+        self.on.auth_config_removed.emit(event.relation.id)
 
     def update_requirer_relation_data(
         self, ingress_app_names: Optional[RequirerConfig], relation_id: Optional[int] = None
