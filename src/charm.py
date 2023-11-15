@@ -12,7 +12,6 @@ import socket
 from typing import Any, Dict, List, Optional, Union
 from urllib.parse import urlparse
 
-import ops
 import yaml
 from charms.certificate_transfer_interface.v0.certificate_transfer import (
     CertificateAvailableEvent as CertificateTransferAvailableEvent,
@@ -483,8 +482,8 @@ class TraefikIngressCharm(CharmBase):
             self.unit.status = WaitingStatus(f"waiting for service: '{self.traefik.service_name}'")
             return
 
-        with self.status(MaintenanceStatus("updating ingress configurations")):
-            self._update_ingress_configurations()
+        self.unit.status = MaintenanceStatus("updating ingress configurations")
+        self._update_ingress_configurations()
 
     def _update_ingress_configurations(self):
         # if there are changes in the tcp configs, we'll need to restart
@@ -601,14 +600,14 @@ class TraefikIngressCharm(CharmBase):
 
         rel = f"{relation.name}:{relation.id}"
 
-        with self.status(MaintenanceStatus(f"updating ingress configuration for '{rel}'")):
-            logger.debug("Updating ingress for relation '%s'", rel)
+        self.unit.status = MaintenanceStatus(f"updating ingress configuration for '{rel}'")
+        logger.debug("Updating ingress for relation '%s'", rel)
 
-            if provider is self.traefik_route:
-                self._provide_routed_ingress(relation)
-                return
+        if provider is self.traefik_route:
+            self._provide_routed_ingress(relation)
+            return
 
-            self._provide_ingress(relation, provider)  # type: ignore
+        self._provide_ingress(relation, provider)  # type: ignore
 
     def _provide_routed_ingress(self, relation: Relation):
         """Provide ingress to a unit related through TraefikRoute."""
@@ -807,11 +806,9 @@ class TraefikIngressCharm(CharmBase):
         return url
 
     def _wipe_ingress_for_all_relations(self):
-        with self.status(MaintenanceStatus("resetting ingress relations")):
-            for relation in (
-                self.model.relations["ingress"] + self.model.relations["ingress-per-unit"]
-            ):
-                self._wipe_ingress_for_relation(relation)
+        self.unit.status = MaintenanceStatus("resetting all ingress relations")
+        for relation in self.model.relations["ingress"] + self.model.relations["ingress-per-unit"]:
+            self._wipe_ingress_for_relation(relation)
 
     def _wipe_ingress_for_relation(self, relation: Relation, *, wipe_rel_data=True):
         logger.debug(f"Wiping ingress for the '{relation.name}:{relation.id}' relation")
@@ -847,8 +844,8 @@ class TraefikIngressCharm(CharmBase):
         return f"juju_ingress_{relation.name}_{relation.id}_{relation.app.name}.yaml"
 
     def _restart_traefik(self):
-        with self.status(MaintenanceStatus("restarting traefik...")):
-            self.traefik.restart()
+        self.unit.status = MaintenanceStatus("restarting traefik...")
+        self.traefik.restart()
 
     def _provider_from_relation(self, relation: Relation):
         """Returns the correct IngressProvider based on a relation."""
@@ -946,18 +943,6 @@ class TraefikIngressCharm(CharmBase):
 
         # If all else fails, we'd rather use the bare IP
         return [target] if target else []
-
-    @contextlib.contextmanager
-    def status(self, status: ops.StatusBase):
-        """Temporarily set the status to `status`, then reset it to what it was before."""
-        previous = self.unit.status
-        self.unit.status = status
-
-        yield
-
-        # if something else changed the status in the meantime, we respect that decision
-        if self.unit.status is status:
-            self.unit.status = previous
 
 
 @functools.lru_cache
