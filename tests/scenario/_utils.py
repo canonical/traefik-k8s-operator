@@ -102,6 +102,7 @@ def create_ingress_relation(
     port: int = 42,
     scheme: str = "http",
     hosts: List[str] = ["0.0.0.42"],
+    ips: List[str] = ["0.0.0.42"],
 ) -> Relation:
     app_data = {
         "model": model_name,
@@ -111,7 +112,10 @@ def create_ingress_relation(
         "redirect-https": redirect_https,
         "port": port,
     }
-    remote_units_data = {i: {"host": json.dumps(h)} for i, h in enumerate(hosts)}
+    remote_units_data = {
+        i: {"host": json.dumps(h), "ip": json.dumps(ip)}
+        for i, (h, ip) in enumerate(zip(hosts, ips))
+    }
 
     args = {
         "endpoint": "ingress",

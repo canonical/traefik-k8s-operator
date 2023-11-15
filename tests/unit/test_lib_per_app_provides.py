@@ -68,9 +68,7 @@ def test_ingress_app_provider_relate_provide(
         strip_prefix=strip_prefix,
         scheme=scheme,
     ).dump()
-    remote_unit_data = {
-        "host": '"host"',
-    }
+    remote_unit_data = {"host": '"host"', "ip": '"10.87.0.1"'}
     harness.update_relation_data(relation_id, "remote", remote_app_data)
     harness.update_relation_data(relation_id, "remote/0", remote_unit_data)
 

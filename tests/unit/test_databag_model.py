@@ -30,7 +30,7 @@ def test_round_trip():
 
 
 def test_deserialize_raw():
-    remote_unit_data = {"host": '"foo"'}
+    remote_unit_data = {"host": '"foo"', "ip": '"10.0.0.1"'}
     data = IngressRequirerUnitData.load(remote_unit_data)
     assert data.host == "foo"
 
