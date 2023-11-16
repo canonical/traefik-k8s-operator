@@ -201,9 +201,7 @@ class TraefikIngressCharm(CharmBase):
             ],
         )
 
-        self.forward_auth = ForwardAuthRequirer(
-            self, forward_auth_requirer_config=self._forward_auth_config
-        )
+        self.forward_auth = ForwardAuthRequirer(self, relation_name="experimental-forward-auth")
 
         observe = self.framework.observe
 
@@ -281,9 +279,14 @@ class TraefikIngressCharm(CharmBase):
         return RequirerConfig(ingress_app_names)
 
     def _on_forward_auth_config_changed(self, event: AuthConfigChangedEvent):
-        self.forward_auth.update_requirer_relation_data(self._forward_auth_config)
-        if self.forward_auth.is_ready():
-            self._process_status_and_configurations()
+        if self.config["enable_experimental_forward_auth"]:
+            self.forward_auth.update_requirer_relation_data(self._forward_auth_config)
+            if self.forward_auth.is_ready():
+                self._process_status_and_configurations()
+        else:
+            logger.info(
+                "The `enable_experimental_forward_auth` config option is not enabled. Forward-auth relation will not be processed"
+            )
 
     def _on_forward_auth_config_removed(self, event: AuthConfigRemovedEvent):
         self._process_status_and_configurations()
@@ -472,6 +475,10 @@ class TraefikIngressCharm(CharmBase):
         # reconsider all data sent over the relations and all configs
         new_external_host = self._external_host
         new_routing_mode = self.config["routing_mode"]
+
+        if self.config["enable_experimental_forward_auth"]:
+            self.forward_auth.update_requirer_relation_data(self._forward_auth_config)
+
         # TODO set BlockedStatus here when compound_status is introduced
         #  https://github.com/canonical/operator/issues/665
 

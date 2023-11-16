@@ -72,12 +72,13 @@ requires:
     limit: 1
     description: |
       Send a CSR to- and obtain a signed certificate from an external CA.
-  forward-auth:
+  experimental-forward-auth:
     interface: forward_auth
     limit: 1
     description: |
       Receives forwardAuth middleware config from Oathkeeper.
       The same middleware will be applied to all charms that requested Identity and Access Proxy protection.
+      This feature is experimental and may be unstable. In order to enable it, run `juju config enable_experimental_forward_auth=True`.
   logging:
     interface: loki_push_api
     description: |
