@@ -422,7 +422,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
         assert yaml.safe_load(static_config)["entryPoints"][prefix] == expected_entrypoint
 
     def setup_forward_auth_relation(self) -> int:
-        relation_id = self.harness.add_relation("forward-auth", "provider")
+        relation_id = self.harness.add_relation("experimental-forward-auth", "provider")
         self.harness.add_relation_unit(relation_id, "provider/0")
         self.harness.update_relation_data(
             relation_id,
@@ -438,6 +438,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
     @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
     def test_forward_auth_relation_databag(self):
+        self.harness.update_config({"enable_experimental_forward_auth": True})
         self.harness.set_leader(True)
         self.harness.update_config({"external_hostname": "testhostname"})
         self.harness.begin_with_initial_hooks()
@@ -460,6 +461,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
     @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
     def test_forward_auth_relation_changed(self):
+        self.harness.update_config({"enable_experimental_forward_auth": True})
         self.harness.set_leader(True)
         self.harness.update_config({"external_hostname": "testhostname"})
         self.harness.begin_with_initial_hooks()
