@@ -32,7 +32,7 @@ from charms.oathkeeper.v0.forward_auth import (
     AuthConfigChangedEvent,
     AuthConfigRemovedEvent,
     ForwardAuthRequirer,
-    RequirerConfig,
+    ForwardAuthRequirerConfig,
 )
 from charms.observability_libs.v0.cert_handler import CertHandler
 from charms.observability_libs.v1.kubernetes_service_patch import (
@@ -266,7 +266,7 @@ class TraefikIngressCharm(CharmBase):
             ServicePort(int(port), name=name) for name, port in self._tcp_entrypoints().items()
         ]
 
-    def _forward_auth_config(self) -> RequirerConfig:
+    def _forward_auth_config(self) -> ForwardAuthRequirerConfig:
         ingress_app_names = [
             rel.app.name  # type: ignore
             for rel in itertools.chain(
@@ -276,7 +276,7 @@ class TraefikIngressCharm(CharmBase):
                 self.traefik_route.relations,
             )
         ]
-        return RequirerConfig(ingress_app_names)
+        return ForwardAuthRequirerConfig(ingress_app_names)
 
     def _on_forward_auth_config_changed(self, event: AuthConfigChangedEvent):
         if self.config["enable_experimental_forward_auth"]:

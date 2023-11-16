@@ -191,7 +191,7 @@ class ForwardAuthConfig:
 
 
 @dataclass
-class RequirerConfig:
+class ForwardAuthRequirerConfig:
     """Helper class containing configuration required by Oathkeeper.
 
     Its purpose is to evaluate whether apps can be protected by IAP.
@@ -279,13 +279,13 @@ class ForwardAuthRequirer(ForwardAuthRelation):
         charm: CharmBase,
         *,
         relation_name: str = RELATION_NAME,
-        forward_auth_requirer_config: Optional[RequirerConfig] = None,
+        ingress_app_names: Optional[ForwardAuthRequirerConfig] = None,
     ):
         super().__init__(charm, relation_name)
 
         self._charm = charm
         self._relation_name = relation_name
-        self._forward_auth_requirer_config = forward_auth_requirer_config
+        self._ingress_app_names = ingress_app_names
 
         events = self._charm.on[relation_name]
         self.framework.observe(events.relation_changed, self._on_relation_changed_event)
@@ -326,7 +326,9 @@ class ForwardAuthRequirer(ForwardAuthRelation):
         self.on.auth_config_removed.emit(event.relation.id)
 
     def update_requirer_relation_data(
-        self, ingress_app_names: Optional[RequirerConfig], relation_id: Optional[int] = None
+        self,
+        ingress_app_names: Optional[ForwardAuthRequirerConfig],
+        relation_id: Optional[int] = None,
     ) -> None:
         """Update the relation databag with app names that can get IAP protection."""
         if not self.model.unit.is_leader():
@@ -336,7 +338,7 @@ class ForwardAuthRequirer(ForwardAuthRelation):
             logger.error("Ingress-related app names are missing")
             return
 
-        if not isinstance(ingress_app_names, RequirerConfig):
+        if not isinstance(ingress_app_names, ForwardAuthRequirerConfig):
             raise TypeError(f"Unexpected type: {type(ingress_app_names)}")
 
         try:

@@ -76,8 +76,9 @@ requires:
     interface: forward_auth
     limit: 1
     description: |
-      Receives forwardAuth middleware config from Oathkeeper.
-      The same middleware will be applied to all charms that requested Identity and Access Proxy protection.
+      Receive config from e.g. oathkeeper, for rendering the forwardAuth middleware.
+      The same middleware is applied to all proxied endpoints that requested Identity and Access Proxy (IAP) protection.
+      For this reason we set a relation count limit of 1.
       This feature is experimental and may be unstable. In order to enable it, run `juju config enable_experimental_forward_auth=True`.
   logging:
     interface: loki_push_api
