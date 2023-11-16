@@ -54,7 +54,13 @@ from dataclasses import asdict, dataclass, field
 from typing import Dict, List, Mapping, Optional
 
 import jsonschema
-from ops.charm import CharmBase, RelationChangedEvent, RelationCreatedEvent, RelationDepartedEvent
+from ops.charm import (
+    CharmBase,
+    RelationBrokenEvent,
+    RelationChangedEvent,
+    RelationCreatedEvent,
+    RelationDepartedEvent,
+)
 from ops.framework import EventBase, EventSource, Handle, Object, ObjectEvents
 from ops.model import Relation, TooManyRelatedAppsError
 
@@ -271,6 +277,7 @@ class ForwardAuthRequirer(ForwardAuthRelation):
     def __init__(
         self,
         charm: CharmBase,
+        *,
         relation_name: str = RELATION_NAME,
         forward_auth_requirer_config: Optional[RequirerConfig] = None,
     ):
@@ -281,16 +288,8 @@ class ForwardAuthRequirer(ForwardAuthRelation):
         self._forward_auth_requirer_config = forward_auth_requirer_config
 
         events = self._charm.on[relation_name]
-        self.framework.observe(events.relation_created, self._on_relation_created_event)
         self.framework.observe(events.relation_changed, self._on_relation_changed_event)
-        self.framework.observe(events.relation_departed, self._on_relation_departed_event)
-
-    def _on_relation_created_event(self, event: RelationCreatedEvent) -> None:
-        """Update the relation with requirer data when a relation is created."""
-        if not self.model.unit.is_leader():
-            return
-
-        self.update_requirer_relation_data(self._forward_auth_requirer_config, event.relation.id)
+        self.framework.observe(events.relation_broken, self._on_relation_broken_event)
 
     def _on_relation_changed_event(self, event: RelationChangedEvent) -> None:
         """Get the forward-auth config and emit a custom config-changed event."""
@@ -299,7 +298,7 @@ class ForwardAuthRequirer(ForwardAuthRelation):
 
         data = event.relation.data[event.app]
         if not data:
-            logger.info("No provider relation data available.")
+            logger.debug("No provider relation data available.")
             return
 
         try:
@@ -322,8 +321,8 @@ class ForwardAuthRequirer(ForwardAuthRelation):
             decisions_address, app_names, headers, relation_id, relation_app_name
         )
 
-    def _on_relation_departed_event(self, event: RelationDepartedEvent) -> None:
-        """Notify the requirer that the relation has departed."""
+    def _on_relation_broken_event(self, event: RelationBrokenEvent) -> None:
+        """Notify the requirer that the relation was broken."""
         self.on.auth_config_removed.emit(event.relation.id)
 
     def update_requirer_relation_data(
@@ -338,14 +337,16 @@ class ForwardAuthRequirer(ForwardAuthRelation):
             return
 
         if not isinstance(ingress_app_names, RequirerConfig):
-            raise ValueError(f"Unexpected type: {type(ingress_app_names)}")
+            raise TypeError(f"Unexpected type: {type(ingress_app_names)}")
 
         try:
             relation = self.model.get_relation(
                 relation_name=self._relation_name, relation_id=relation_id
             )
         except TooManyRelatedAppsError:
-            raise RuntimeError("More than one relation is defined. Please provide a relation_id")
+            raise TooManyRelatedAppsError(
+                "More than one relation is defined. Please provide a relation_id"
+            )
 
         if not relation or not relation.app:
             return
@@ -360,18 +361,20 @@ class ForwardAuthRequirer(ForwardAuthRelation):
         try:
             relation = self.model.get_relation(self._relation_name, relation_id=relation_id)
         except TooManyRelatedAppsError:
-            raise RuntimeError("More than one relation is defined. Please provide a relation_id")
+            raise TooManyRelatedAppsError(
+                "More than one relation is defined. Please provide a relation_id"
+            )
         if not relation or not relation.app:
             return None
 
         data = relation.data[relation.app]
         if not data:
-            logger.info("No relation data available.")
+            logger.debug("No relation data available.")
             return
 
         data = _load_data(data, FORWARD_AUTH_PROVIDER_JSON_SCHEMA)
         forward_auth_config = ForwardAuthConfig.from_dict(data)
-        logger.info(f"ForwardAuthConfig: {forward_auth_config}")
+        logger.debug(f"ForwardAuthConfig: {forward_auth_config}")
 
         return forward_auth_config
 
@@ -382,7 +385,9 @@ class ForwardAuthRequirer(ForwardAuthRelation):
         try:
             relation = self.model.get_relation(self._relation_name, relation_id=relation_id)
         except TooManyRelatedAppsError:
-            raise RuntimeError("More than one relation is defined. Please provide a relation_id")
+            raise TooManyRelatedAppsError(
+                "More than one relation is defined. Please provide a relation_id"
+            )
         if not relation or not relation.app:
             return None
 
@@ -398,7 +403,9 @@ class ForwardAuthRequirer(ForwardAuthRelation):
         try:
             relation = self.model.get_relation(self._relation_name, relation_id=relation_id)
         except TooManyRelatedAppsError:
-            raise RuntimeError("More than one relation is defined. Please provide a relation_id")
+            raise TooManyRelatedAppsError(
+                "More than one relation is defined. Please provide a relation_id"
+            )
 
         if not relation or not relation.app:
             return None
@@ -526,7 +533,9 @@ class ForwardAuthProvider(ForwardAuthRelation):
         try:
             relation = self.model.get_relation(self._relation_name, relation_id=relation_id)
         except TooManyRelatedAppsError:
-            raise RuntimeError("More than one relation is defined. Please provide a relation_id")
+            raise TooManyRelatedAppsError(
+                "More than one relation is defined. Please provide a relation_id"
+            )
         if not relation or not relation.app:
             return None
 
@@ -555,14 +564,16 @@ class ForwardAuthProvider(ForwardAuthRelation):
             return
 
         if not isinstance(forward_auth_config, ForwardAuthConfig):
-            raise ValueError(f"Unexpected forward_auth_config type: {type(forward_auth_config)}")
+            raise TypeError(f"Unexpected forward_auth_config type: {type(forward_auth_config)}")
 
         try:
             relation = self.model.get_relation(
                 relation_name=self._relation_name, relation_id=relation_id
             )
         except TooManyRelatedAppsError:
-            raise RuntimeError("More than one relation is defined. Please provide a relation_id")
+            raise TooManyRelatedAppsError(
+                "More than one relation is defined. Please provide a relation_id"
+            )
 
         if not relation or not relation.app:
             return
