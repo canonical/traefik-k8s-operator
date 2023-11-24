@@ -74,7 +74,7 @@ def copy_traefik_library_into_tester_charms(ops_test):
         "observability_libs/v1/kubernetes_service_patch.py",
         "traefik_route_k8s/v0/traefik_route.py",
     ]
-    for tester in ["ipa", "ipu", "tcp", "route"]:
+    for tester in ["forward-auth", "ipa", "ipu", "tcp", "route"]:
         for lib in libraries:
             install_path = f"tests/integration/testers/{tester}/lib/charms/{lib}"
             os.makedirs(os.path.dirname(install_path), exist_ok=True)
@@ -95,6 +95,14 @@ async def traefik_charm(ops_test):
 
             if count == 3:
                 raise
+
+
+@pytest.fixture(scope="module")
+@timed_memoizer
+async def forward_auth_tester_charm(ops_test):
+    charm_path = (Path(__file__).parent / "testers" / "forward-auth").absolute()
+    charm = await ops_test.build_charm(charm_path, verbosity="debug")
+    return charm
 
 
 @pytest.fixture(scope="module")
