@@ -280,7 +280,6 @@ class TraefikIngressCharm(CharmBase):
 
     def _on_forward_auth_config_changed(self, event: AuthConfigChangedEvent):
         if self.config["enable_experimental_forward_auth"]:
-            self.forward_auth.update_requirer_relation_data(self._forward_auth_config)
             if self.forward_auth.is_ready():
                 self._process_status_and_configurations()
         else:
@@ -543,6 +542,9 @@ class TraefikIngressCharm(CharmBase):
 
         errors = False
 
+        if self.config["enable_experimental_forward_auth"]:
+            self.forward_auth.update_requirer_relation_data(self._forward_auth_config)
+
         for ingress_relation in (
             self.ingress_per_appv1.relations
             + self.ingress_per_appv2.relations
@@ -596,9 +598,6 @@ class TraefikIngressCharm(CharmBase):
         # update-status.
         self._process_status_and_configurations()
 
-        if self.forward_auth.is_ready():
-            self.forward_auth.update_requirer_relation_data(self._forward_auth_config)
-
         if isinstance(self.unit.status, MaintenanceStatus):
             self.unit.status = ActiveStatus()
 
@@ -607,9 +606,6 @@ class TraefikIngressCharm(CharmBase):
         self._wipe_ingress_for_relation(
             event.relation, wipe_rel_data=not isinstance(event, RelationBrokenEvent)
         )
-
-        if self.forward_auth.is_ready():
-            self.forward_auth.update_requirer_relation_data(self._forward_auth_config)
 
         # FIXME? on relation broken, data is still there so cannot simply call
         #  self._process_status_and_configurations(). For this reason, the static config in

@@ -417,6 +417,14 @@ class ForwardAuthRequirer(ForwardAuthRelation):
             and "app_names" in relation.data[relation.app]
         )
 
+    def is_protected_app(self, app: str) -> bool:
+        if self.is_ready():
+            forward_auth_config = self.get_provider_info()
+            if forward_auth_config and app in forward_auth_config.app_names:
+                return True
+            return False
+
+        return False
 
 class ForwardAuthProxySet(EventBase):
     """Event to notify the charm that the proxy was set successfully."""
