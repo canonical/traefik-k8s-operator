@@ -58,6 +58,7 @@ async def test_deployment(ops_test: OpsTest, traefik_charm, forward_auth_tester_
     await ops_test.model.deploy(
         OATHKEEPER_CHARM,
         channel="latest/edge",
+        config={"dev": "True"},
         trust=True,
     )
 
