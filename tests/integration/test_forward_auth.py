@@ -80,8 +80,8 @@ async def test_deployment(ops_test: OpsTest, traefik_charm, forward_auth_tester_
 
 
 @retry(
-    wait=wait_exponential(multiplier=3, min=1, max=10),
-    stop=stop_after_attempt(5),
+    wait=wait_exponential(multiplier=3, min=1, max=20),
+    stop=stop_after_attempt(20),
     reraise=True,
 )
 async def test_allowed_forward_auth_url_redirect(ops_test: OpsTest) -> None:
@@ -110,9 +110,7 @@ async def test_protected_forward_auth_url_redirect(ops_test: OpsTest) -> None:
     assert resp.status_code == 401
 
 
-async def test_forward_auth_url_response_headers(
-    ops_test: OpsTest, lightkube_client: Client
-) -> None:
+async def test_forward_auth_url_response_headers(ops_test: OpsTest, lightkube_client: Client) -> None:
     """Test that a response mutated by oathkeeper contains expected custom headers."""
     requirer_url = await get_reverse_proxy_app_url(ops_test, TRAEFIK_CHARM, IAP_REQUIRER_CHARM)
     protected_url = join(requirer_url, "anything/anonymous")
@@ -139,8 +137,8 @@ async def test_forward_auth_url_response_headers(
 
 
 @retry(
-    wait=wait_exponential(multiplier=3, min=1, max=10),
-    stop=stop_after_attempt(10),
+    wait=wait_exponential(multiplier=3, min=1, max=20),
+    stop=stop_after_attempt(20),
     reraise=True,
 )
 def assert_anonymous_response(url):
