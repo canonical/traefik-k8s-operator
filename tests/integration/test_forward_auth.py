@@ -110,7 +110,9 @@ async def test_protected_forward_auth_url_redirect(ops_test: OpsTest) -> None:
     assert resp.status_code == 401
 
 
-async def test_forward_auth_url_response_headers(ops_test: OpsTest, lightkube_client: Client) -> None:
+async def test_forward_auth_url_response_headers(
+    ops_test: OpsTest, lightkube_client: Client
+) -> None:
     """Test that a response mutated by oathkeeper contains expected custom headers."""
     requirer_url = await get_reverse_proxy_app_url(ops_test, TRAEFIK_CHARM, IAP_REQUIRER_CHARM)
     protected_url = join(requirer_url, "anything/anonymous")
