@@ -418,6 +418,7 @@ class ForwardAuthRequirer(ForwardAuthRelation):
         )
 
     def is_protected_app(self, app: str) -> bool:
+        """Checks whether a given app requested to be protected by IAP."""
         if self.is_ready():
             forward_auth_config = self.get_provider_info()
             if forward_auth_config and app in forward_auth_config.app_names:
@@ -425,6 +426,7 @@ class ForwardAuthRequirer(ForwardAuthRelation):
             return False
 
         return False
+
 
 class ForwardAuthProxySet(EventBase):
     """Event to notify the charm that the proxy was set successfully."""
