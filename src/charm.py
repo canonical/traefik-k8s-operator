@@ -116,6 +116,7 @@ class TraefikIngressCharm(CharmBase):
         self._stored.set_default(
             current_external_host=None,
             current_routing_mode=None,
+            current_forward_auth_mode=self.config["enable_experimental_forward_auth"],
         )
 
         self.container = self.unit.get_container(_TRAEFIK_CONTAINER_NAME)
@@ -474,9 +475,7 @@ class TraefikIngressCharm(CharmBase):
         # reconsider all data sent over the relations and all configs
         new_external_host = self._external_host
         new_routing_mode = self.config["routing_mode"]
-
-        if self.config["enable_experimental_forward_auth"]:
-            self.forward_auth.update_requirer_relation_data(self._forward_auth_config)
+        new_forward_auth_mode = self.config["enable_experimental_forward_auth"]
 
         # TODO set BlockedStatus here when compound_status is introduced
         #  https://github.com/canonical/operator/issues/665
@@ -484,9 +483,11 @@ class TraefikIngressCharm(CharmBase):
         if (
             self._stored.current_external_host != new_external_host  # type: ignore
             or self._stored.current_routing_mode != new_routing_mode  # type: ignore
+            or self._stored.current_forward_auth_mode != new_forward_auth_mode  # type: ignore
         ):
             self._stored.current_external_host = new_external_host  # type: ignore
             self._stored.current_routing_mode = new_routing_mode  # type: ignore
+            self._stored.current_forward_auth_mode = new_forward_auth_mode  # type: ignore
             self._process_status_and_configurations()
 
     def _process_status_and_configurations(self):
