@@ -34,59 +34,6 @@ def ipu_empty():
     )
 
 
-# def assert_not_ready(_, __, emitter: Emitter):
-#     h: Harness = emitter.harness
-#     relation = h.model.get_relation('ingress-per-unit')
-#     if not relation:
-#         return True
-#     assert not h.charm.ipu.is_ready(relation)
-#
-#
-# def assert_ready(_, __, emitter: Emitter):
-#     h: Harness = emitter.harness
-#     relation = h.model.get_relation('ingress-per-unit')
-#     assert relation, 'relation not present'
-#     assert h.charm.ipu.is_ready(relation)
-#
-#
-# def assert_local_published_url(_, __, harness: Emitter, url: str = None, value: bool = True):
-#     # check that the local side has published a url in their relation data.
-#     # and that that matches the proxied_endpoints
-#
-#     h: Harness = emitter.harness
-#     relation = h.model.get_relation('ingress-per-unit')
-#     if not value:
-#         assert h.charm.ipu.proxied_endpoints == {}
-#         assert not relation.data[h.model.app], \
-#           'non-leader IPU providers should not have app data'
-#         assert not relation.data[
-#             h.model.unit], 'non-leader IPU providers should not have unit data'
-#         return
-#
-#     for unit_dct in h.charm.ipu.proxied_endpoints.values():
-#         if url:
-#             assert unit_dct['url'] == url
-#         else:
-#             assert unit_dct['url']
-#
-#     assert relation.data[h.model.app]['ingress'] == yaml.safe_dump({'remote/0': {'url': url}})
-#     assert not relation.data[h.model.unit], 'leader IPU providers should not have unit data'
-#
-#
-# def assert_remote_data(_, __, emitter: Emitter, data: dict = None):
-#     # check that the remote unit has correct mocked data
-#     h: Harness = emitter.harness
-#     data = data or {}
-#     relation = h.model.get_relation('ingress-per-unit')
-#     for unit in relation.units:
-#         unit_data = relation.data[unit]
-#         for key in ("port", "host", "model", "name", "mode"):
-#             if data:
-#                 assert unit_data[key] == data.get(key)
-#             else:
-#                 assert unit_data[key]
-
-
 def test_builtin_sequences():
     check_builtin_sequences(
         charm_type=MockProviderCharm,

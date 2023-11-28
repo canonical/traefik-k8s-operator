@@ -92,7 +92,7 @@ async def test_build_and_deploy(ops_test: OpsTest, traefik_charm):
 async def test_ingressed_endpoints_reachable_after_metallb_enabled(ops_test: OpsTest):
     ip = await get_address(ops_test, trfk.name)
     for ep in get_endpoints(ops_test, scheme="http", netloc=ip):
-        logger.debug("Attempting to reach %s", ep)  # Traceback doesn't spell out the endpoint
+        logger.info("Attempting to reach %s", ep)  # Traceback doesn't spell out the endpoint
         urlopen(ep)
 
 
