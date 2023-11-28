@@ -447,11 +447,10 @@ class Traefik:
           different pieces of middleware instead"
         """
         no_prefix_middleware = {}  # type: Dict[str, Dict[str, Any]]
-        if self._routing_mode is RoutingMode.path:
-            if strip_prefix:
-                no_prefix_middleware[f"juju-sidecar-noprefix-{prefix}"] = {
-                    "stripPrefix": {"prefixes": [f"/{prefix}"], "forceSlash": False}
-                }
+        if self._routing_mode is RoutingMode.path and strip_prefix:
+            no_prefix_middleware[f"juju-sidecar-noprefix-{prefix}"] = {
+                "stripPrefix": {"prefixes": [f"/{prefix}"], "forceSlash": False}
+            }
 
         # Condition rendering the https-redirect middleware on the scheme, otherwise we'd get a 404
         # when attempting to reach an http endpoint.
