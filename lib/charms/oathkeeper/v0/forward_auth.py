@@ -372,7 +372,7 @@ class ForwardAuthRequirer(ForwardAuthRelation):
         data = relation.data[relation.app]
         if not data:
             logger.debug("No relation data available.")
-            return
+            return None
 
         data = _load_data(data, FORWARD_AUTH_PROVIDER_JSON_SCHEMA)
         forward_auth_config = ForwardAuthConfig.from_dict(data)
@@ -417,7 +417,7 @@ class ForwardAuthRequirer(ForwardAuthRelation):
             and "app_names" in relation.data[relation.app]
         )
 
-    def is_protected_app(self, app: str) -> bool:
+    def is_protected_app(self, app: Optional[str]) -> bool:
         """Checks whether a given app requested to be protected by IAP."""
         if self.is_ready():
             forward_auth_config = self.get_provider_info()

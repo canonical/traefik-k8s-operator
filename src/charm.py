@@ -6,13 +6,10 @@
 import contextlib
 import enum
 import functools
-import ipaddress
 import itertools
 import json
 import logging
 import socket
-import typing
-from string import Template
 from typing import Any, Dict, List, Optional, Union
 from urllib.parse import urlparse
 
@@ -267,6 +264,7 @@ class TraefikIngressCharm(CharmBase):
             ServicePort(int(port), name=name) for name, port in self._tcp_entrypoints().items()
         ]
 
+    @property
     def _forward_auth_config(self) -> ForwardAuthRequirerConfig:
         ingress_app_names = [
             rel.app.name  # type: ignore
@@ -279,8 +277,14 @@ class TraefikIngressCharm(CharmBase):
         ]
         return ForwardAuthRequirerConfig(ingress_app_names)
 
-    def _on_forward_auth_config_changed(self, event: AuthConfigChangedEvent):
+    @property
+    def _is_forward_auth_enabled(self) -> bool:
         if self.config["enable_experimental_forward_auth"]:
+            return True
+        return False
+
+    def _on_forward_auth_config_changed(self, event: AuthConfigChangedEvent):
+        if self._is_forward_auth_enabled:
             if self.forward_auth.is_ready():
                 self._process_status_and_configurations()
         else:
@@ -475,7 +479,7 @@ class TraefikIngressCharm(CharmBase):
         # reconsider all data sent over the relations and all configs
         new_external_host = self._external_host
         new_routing_mode = self.config["routing_mode"]
-        new_forward_auth_mode = self.config["enable_experimental_forward_auth"]
+        new_forward_auth_mode = self._is_forward_auth_enabled
 
         # TODO set BlockedStatus here when compound_status is introduced
         #  https://github.com/canonical/operator/issues/665
@@ -543,7 +547,7 @@ class TraefikIngressCharm(CharmBase):
 
         errors = False
 
-        if self.config["enable_experimental_forward_auth"]:
+        if self._is_forward_auth_enabled:
             self.forward_auth.update_requirer_relation_data(self._forward_auth_config)
 
         for ingress_relation in (
@@ -736,6 +740,9 @@ class TraefikIngressCharm(CharmBase):
             redirect_https=data.get("redirect-https", False),
             strip_prefix=data.get("strip-prefix", False),
             external_host=self.external_host,
+            enable_experimental_forward_auth=self._is_forward_auth_enabled,
+            forward_auth_app=self.forward_auth.is_protected_app(app=data.get("name")),
+            forward_auth_config=self.forward_auth.get_provider_info(),
         )
 
         if self.unit.is_leader():
@@ -767,6 +774,9 @@ class TraefikIngressCharm(CharmBase):
             port=data.app.port,
             external_host=self.external_host,
             hosts=[udata.host for udata in data.units],
+            enable_experimental_forward_auth=self._is_forward_auth_enabled,
+            forward_auth_app=self.forward_auth.is_protected_app(app=data.app.name),
+            forward_auth_config=self.forward_auth.get_provider_info(),
         )
 
         if self.unit.is_leader():
@@ -818,6 +828,9 @@ class TraefikIngressCharm(CharmBase):
                     strip_prefix=data.get("strip-prefix"),
                     redirect_https=data.get("redirect-https"),
                     external_host=self.external_host,
+                    enable_experimental_forward_auth=self._is_forward_auth_enabled,
+                    forward_auth_app=self.forward_auth.is_protected_app(app=data.get("name")),
+                    forward_auth_config=self.forward_auth.get_provider_info(),
                 )
 
                 if self.unit.is_leader():
