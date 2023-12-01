@@ -2,6 +2,7 @@
 # See LICENSE file for licensing details.
 
 r"""# [DEPRECATED!] Interface Library for ingress.
+
 This is a DEPRECATED version of the Ingress interface library.
 
 It was dropped in favour of ingress v2 because it contained a data model bug that
