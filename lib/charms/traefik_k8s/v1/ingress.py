@@ -40,13 +40,6 @@ RELATION_INTERFACE = "ingress"
 
 log = logging.getLogger(__name__)
 
-log.warning(
-    "The ``ingress v1`` library is DEPRECATED in favour of ``ingress v2`` "
-    "and no longer maintained. This library does NOT in fact implement the "
-    "``ingress`` interface, but, instead, the ``ingress-per-leader`` one."
-    "Please bump with ``charmcraft fetch-lib chars.traefik_k8s.v2.ingress``."
-)
-
 try:
     import jsonschema
 
@@ -421,6 +414,13 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         Request Args:
             port: the port of the service
         """
+        log.warning(
+            "The ``ingress v1`` library is DEPRECATED in favour of ``ingress v2`` "
+            "and no longer maintained. This library does NOT in fact implement the "
+            "``ingress`` interface, but, instead, the ``ingress-per-leader`` one."
+            "Please bump with ``charmcraft fetch-lib chars.traefik_k8s.v2.ingress``."
+        )
+
         super().__init__(charm, relation_name)
         self.charm: CharmBase = charm
         self.relation_name = relation_name
