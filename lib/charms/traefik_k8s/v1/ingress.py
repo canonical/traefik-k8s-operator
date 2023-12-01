@@ -419,7 +419,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
             "The ``ingress v1`` library is DEPRECATED in favour of ``ingress v2`` "
             "and no longer maintained. This library does NOT in fact implement the "
             "``ingress`` interface, but, instead, the ``ingress-per-leader`` one."
-            "Please bump with ``charmcraft fetch-lib chars.traefik_k8s.v2.ingress``."
+            "Please bump with ``charmcraft fetch-lib charms.traefik_k8s.v2.ingress``."
         )
 
         super().__init__(charm, relation_name)
