@@ -79,12 +79,14 @@ class Traefik:
         container: Container,
         routing_mode: RoutingMode,
         tls_enabled: bool,
+        experimental_forward_auth_enabled: bool,
         tcp_entrypoints: Dict[str, int],
     ):
         self._container = container
         self._tcp_entrypoints = tcp_entrypoints
         self._routing_mode = routing_mode
         self._tls_enabled = tls_enabled
+        self._experimental_forward_auth_enabled = experimental_forward_auth_enabled
 
     @property
     def scrape_jobs(self) -> list:
@@ -265,7 +267,6 @@ class Traefik:
         strip_prefix: Optional[bool],
         redirect_https: Optional[bool],
         external_host: str,
-        enable_experimental_forward_auth: bool,
         forward_auth_app: bool,
         forward_auth_config: Optional[ForwardAuthConfig],
     ) -> dict:
@@ -278,7 +279,6 @@ class Traefik:
             strip_prefix=strip_prefix,
             redirect_https=redirect_https,
             external_host=external_host,
-            enable_experimental_forward_auth=enable_experimental_forward_auth,
             forward_auth_app=forward_auth_app,
             forward_auth_config=forward_auth_config,
         )
@@ -293,7 +293,6 @@ class Traefik:
         strip_prefix: Optional[bool],
         redirect_https: Optional[bool],
         external_host: str,
-        enable_experimental_forward_auth: bool,
         forward_auth_app: bool,
         forward_auth_config: Optional[ForwardAuthConfig],
     ) -> dict:
@@ -308,7 +307,6 @@ class Traefik:
             strip_prefix=strip_prefix,
             redirect_https=redirect_https,
             external_host=external_host,
-            enable_experimental_forward_auth=enable_experimental_forward_auth,
             forward_auth_app=forward_auth_app,
             forward_auth_config=forward_auth_config,
         )
@@ -323,7 +321,6 @@ class Traefik:
         strip_prefix: bool,
         redirect_https: bool,
         external_host: str,
-        enable_experimental_forward_auth: bool,
         forward_auth_app: bool,
         forward_auth_config: Optional[ForwardAuthConfig],
     ) -> dict:
@@ -336,7 +333,6 @@ class Traefik:
             strip_prefix=strip_prefix,
             redirect_https=redirect_https,
             external_host=external_host,
-            enable_experimental_forward_auth=enable_experimental_forward_auth,
             forward_auth_app=forward_auth_app,
             forward_auth_config=forward_auth_config,
         )
@@ -349,7 +345,6 @@ class Traefik:
         redirect_https: Optional[bool],
         strip_prefix: Optional[bool],
         external_host: str,
-        enable_experimental_forward_auth: bool,
         forward_auth_app: bool,
         forward_auth_config: Optional[ForwardAuthConfig],
     ) -> Dict[str, Any]:
@@ -444,7 +439,6 @@ class Traefik:
             strip_prefix=strip_prefix_,
             scheme=scheme_,
             prefix=prefix,
-            enable_experimental_forward_auth=enable_experimental_forward_auth,
             forward_auth_app=forward_auth_app,
             forward_auth_config=forward_auth_config,
         )
@@ -464,7 +458,6 @@ class Traefik:
         strip_prefix: bool,
         scheme: str,
         prefix: str,
-        enable_experimental_forward_auth: bool,
         forward_auth_app: bool,
         forward_auth_config: Optional[ForwardAuthConfig],
     ) -> dict:
@@ -475,7 +468,7 @@ class Traefik:
           different pieces of middleware instead"
         """
         forwardauth_middleware = {}
-        if enable_experimental_forward_auth:
+        if self._experimental_forward_auth_enabled:
             if forward_auth_app:
                 forwardauth_middleware[f"juju-sidecar-forward-auth-{prefix}"] = {
                     "forwardAuth": {

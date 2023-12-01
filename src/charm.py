@@ -156,6 +156,7 @@ class TraefikIngressCharm(CharmBase):
             routing_mode=self._routing_mode,
             tcp_entrypoints=self._tcp_entrypoints(),
             tls_enabled=self._is_tls_enabled(),
+            experimental_forward_auth_enabled=self._is_forward_auth_enabled,
         )
 
         self.service_patch = KubernetesServicePatch(
@@ -740,7 +741,6 @@ class TraefikIngressCharm(CharmBase):
             redirect_https=data.get("redirect-https", False),
             strip_prefix=data.get("strip-prefix", False),
             external_host=self.external_host,
-            enable_experimental_forward_auth=self._is_forward_auth_enabled,
             forward_auth_app=self.forward_auth.is_protected_app(app=data.get("name")),
             forward_auth_config=self.forward_auth.get_provider_info(),
         )
@@ -774,7 +774,6 @@ class TraefikIngressCharm(CharmBase):
             port=data.app.port,
             external_host=self.external_host,
             hosts=[udata.host for udata in data.units],
-            enable_experimental_forward_auth=self._is_forward_auth_enabled,
             forward_auth_app=self.forward_auth.is_protected_app(app=data.app.name),
             forward_auth_config=self.forward_auth.get_provider_info(),
         )
@@ -828,7 +827,6 @@ class TraefikIngressCharm(CharmBase):
                     strip_prefix=data.get("strip-prefix"),
                     redirect_https=data.get("redirect-https"),
                     external_host=self.external_host,
-                    enable_experimental_forward_auth=self._is_forward_auth_enabled,
                     forward_auth_app=self.forward_auth.is_protected_app(app=data.get("name")),
                     forward_auth_config=self.forward_auth.get_provider_info(),
                 )
