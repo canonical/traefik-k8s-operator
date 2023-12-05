@@ -6,6 +6,7 @@
 import contextlib
 import enum
 import functools
+import itertools
 import json
 import logging
 import socket
@@ -24,6 +25,12 @@ from charms.certificate_transfer_interface.v0.certificate_transfer import (
 )
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from charms.loki_k8s.v0.loki_push_api import LogProxyConsumer
+from charms.oathkeeper.v0.forward_auth import (
+    AuthConfigChangedEvent,
+    AuthConfigRemovedEvent,
+    ForwardAuthRequirer,
+    ForwardAuthRequirerConfig,
+)
 from charms.observability_libs.v0.cert_handler import CertHandler
 from charms.observability_libs.v1.kubernetes_service_patch import (
     KubernetesServicePatch,
@@ -106,6 +113,7 @@ class TraefikIngressCharm(CharmBase):
         self._stored.set_default(
             current_external_host=None,
             current_routing_mode=None,
+            current_forward_auth_mode=self.config["enable_experimental_forward_auth"],
         )
 
         self.container = self.unit.get_container(_TRAEFIK_CONTAINER_NAME)
@@ -148,6 +156,7 @@ class TraefikIngressCharm(CharmBase):
             routing_mode=self._routing_mode,
             tcp_entrypoints=self._tcp_entrypoints(),
             tls_enabled=self._is_tls_enabled(),
+            experimental_forward_auth_enabled=self._is_forward_auth_enabled,
         )
 
         self.service_patch = KubernetesServicePatch(
@@ -190,6 +199,9 @@ class TraefikIngressCharm(CharmBase):
                 self.on.update_status,  # type: ignore
             ],
         )
+
+        self.forward_auth = ForwardAuthRequirer(self, relation_name="experimental-forward-auth")
+
         observe = self.framework.observe
 
         # TODO update init params once auto-renew is implemented
@@ -223,6 +235,9 @@ class TraefikIngressCharm(CharmBase):
             self._on_recv_ca_cert_removed,
         )
 
+        observe(self.forward_auth.on.auth_config_changed, self._on_forward_auth_config_changed)
+        observe(self.forward_auth.on.auth_config_removed, self._on_forward_auth_config_removed)
+
         # observe data_provided and data_removed events for all types of ingress we offer:
         for ingress in (self.ingress_per_unit, self.ingress_per_appv1, self.ingress_per_appv2):
             observe(ingress.on.data_provided, self._handle_ingress_data_provided)  # type: ignore
@@ -249,6 +264,37 @@ class TraefikIngressCharm(CharmBase):
         return [web, websecure] + [
             ServicePort(int(port), name=name) for name, port in self._tcp_entrypoints().items()
         ]
+
+    @property
+    def _forward_auth_config(self) -> ForwardAuthRequirerConfig:
+        ingress_app_names = [
+            rel.app.name  # type: ignore
+            for rel in itertools.chain(
+                self.ingress_per_appv1.relations,
+                self.ingress_per_appv2.relations,
+                self.ingress_per_unit.relations,
+                self.traefik_route.relations,
+            )
+        ]
+        return ForwardAuthRequirerConfig(ingress_app_names)
+
+    @property
+    def _is_forward_auth_enabled(self) -> bool:
+        if self.config["enable_experimental_forward_auth"]:
+            return True
+        return False
+
+    def _on_forward_auth_config_changed(self, event: AuthConfigChangedEvent):
+        if self._is_forward_auth_enabled:
+            if self.forward_auth.is_ready():
+                self._process_status_and_configurations()
+        else:
+            logger.info(
+                "The `enable_experimental_forward_auth` config option is not enabled. Forward-auth relation will not be processed"
+            )
+
+    def _on_forward_auth_config_removed(self, event: AuthConfigRemovedEvent):
+        self._process_status_and_configurations()
 
     def _on_recv_ca_cert_available(self, event: CertificateTransferAvailableEvent):
         # Assuming only one cert per relation (this is in line with the original lib design).
@@ -434,16 +480,20 @@ class TraefikIngressCharm(CharmBase):
         # reconsider all data sent over the relations and all configs
         new_external_host = self._external_host
         new_routing_mode = self.config["routing_mode"]
+        new_forward_auth_mode = self._is_forward_auth_enabled
+
         # TODO set BlockedStatus here when compound_status is introduced
         #  https://github.com/canonical/operator/issues/665
 
         if (
             self._stored.current_external_host != new_external_host  # type: ignore
             or self._stored.current_routing_mode != new_routing_mode  # type: ignore
+            or self._stored.current_forward_auth_mode != new_forward_auth_mode  # type: ignore
         ):
+            self._process_status_and_configurations()
             self._stored.current_external_host = new_external_host  # type: ignore
             self._stored.current_routing_mode = new_routing_mode  # type: ignore
-            self._process_status_and_configurations()
+            self._stored.current_forward_auth_mode = new_forward_auth_mode  # type: ignore
 
     def _process_status_and_configurations(self):
         routing_mode = self.config["routing_mode"]
@@ -497,6 +547,9 @@ class TraefikIngressCharm(CharmBase):
             # we do this BEFORE processing the relations.
 
         errors = False
+
+        if self._is_forward_auth_enabled:
+            self.forward_auth.update_requirer_relation_data(self._forward_auth_config)
 
         for ingress_relation in (
             self.ingress_per_appv1.relations
@@ -688,6 +741,8 @@ class TraefikIngressCharm(CharmBase):
             redirect_https=data.get("redirect-https", False),
             strip_prefix=data.get("strip-prefix", False),
             external_host=self.external_host,
+            forward_auth_app=self.forward_auth.is_protected_app(app=data.get("name")),
+            forward_auth_config=self.forward_auth.get_provider_info(),
         )
 
         if self.unit.is_leader():
@@ -719,6 +774,8 @@ class TraefikIngressCharm(CharmBase):
             port=data.app.port,
             external_host=self.external_host,
             hosts=[udata.host for udata in data.units],
+            forward_auth_app=self.forward_auth.is_protected_app(app=data.app.name),
+            forward_auth_config=self.forward_auth.get_provider_info(),
         )
 
         if self.unit.is_leader():
@@ -770,6 +827,8 @@ class TraefikIngressCharm(CharmBase):
                     strip_prefix=data.get("strip-prefix"),
                     redirect_https=data.get("redirect-https"),
                     external_host=self.external_host,
+                    forward_auth_app=self.forward_auth.is_protected_app(app=data.get("name")),
+                    forward_auth_config=self.forward_auth.get_provider_info(),
                 )
 
                 if self.unit.is_leader():
