@@ -89,6 +89,7 @@ async def test_allowed_forward_auth_url_redirect(ops_test: OpsTest) -> None:
     """Test that a request hitting an application protected by IAP is forwarded by traefik to oathkeeper.
 
     An allowed request should be performed without authentication.
+    Retry the request to ensure the access rules were populated by oathkeeper.
     """
     requirer_url = await get_reverse_proxy_app_url(ops_test, TRAEFIK_CHARM, IAP_REQUIRER_CHARM)
 
@@ -158,6 +159,11 @@ def assert_anonymous_response(url):
     reraise=True,
 )
 def update_access_rules_configmap(ops_test: OpsTest, lightkube_client: Client, rule):
+    """Modify the configmap to force access rules update.
+
+    This is a workaround to test response headers without deploying identity-platform bundle.
+    The anonymous authenticator is used only for testing purposes.
+    """
     cm = lightkube_client.get(ConfigMap, "access-rules", namespace=ops_test.model.name)
     data = {"access-rules-iap-requirer-anonymous.json": str(rule)}
     cm.data = data

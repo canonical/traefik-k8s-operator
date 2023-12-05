@@ -490,10 +490,10 @@ class TraefikIngressCharm(CharmBase):
             or self._stored.current_routing_mode != new_routing_mode  # type: ignore
             or self._stored.current_forward_auth_mode != new_forward_auth_mode  # type: ignore
         ):
+            self._process_status_and_configurations()
             self._stored.current_external_host = new_external_host  # type: ignore
             self._stored.current_routing_mode = new_routing_mode  # type: ignore
             self._stored.current_forward_auth_mode = new_forward_auth_mode  # type: ignore
-            self._process_status_and_configurations()
 
     def _process_status_and_configurations(self):
         routing_mode = self.config["routing_mode"]
