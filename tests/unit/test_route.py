@@ -66,6 +66,9 @@ def harness() -> Harness[TraefikIngressCharm]:
     harness = Harness(TraefikIngressCharm)
     harness.set_model_name(MODEL_NAME)
     harness.handle_exec("traefik", ["update-ca-certificates", "--fresh"], result=0)
+    harness.handle_exec(
+        "traefik", ["find", "/opt/traefik/juju", "-name", "*.yaml", "-delete"], result=0
+    )
 
     patcher = patch.object(TraefikIngressCharm, "version", property(lambda *_: "0.0.0"))
     patcher.start()

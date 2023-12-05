@@ -13,7 +13,7 @@ def traefik_charm():
     with patch("charm.KubernetesServicePatch"):
         with patch("lightkube.core.client.GenericSyncClient"):
             with patch(
-                "charm.TraefikIngressCharm.external_host",
+                "charm.TraefikIngressCharm._external_host",
                 PropertyMock(return_value=MOCK_EXTERNAL_HOSTNAME),
             ):
                 yield TraefikIngressCharm
@@ -54,6 +54,7 @@ def traefik_container(tmp_path):
         layers={"traefik": layer},
         exec_mock={
             ("update-ca-certificates", "--fresh"): ExecOutput(),
+            ("find", "/opt/traefik/juju", "-name", "*.yaml", "-delete"): ExecOutput(),
             ("/usr/bin/traefik", "version"): ExecOutput(stdout="42.42"),
         },
         service_status={"traefik": pebble.ServiceStatus.ACTIVE},
