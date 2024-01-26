@@ -59,7 +59,7 @@ from ops.model import (
     BlockedStatus,
     MaintenanceStatus,
     Relation,
-    WaitingStatus,
+    WaitingStatus, ModelError,
 )
 from ops.pebble import PathError
 from traefik import CA, LOG_PATH, RoutingMode, Traefik
@@ -545,7 +545,16 @@ class TraefikIngressCharm(CharmBase):
         if not self.ready:
             event.defer()
             return
-        self._process_ingress_relation(event.relation)
+        try:
+            self._process_ingress_relation(event.relation)
+        except IngressSetupError as e:
+            # this can happen if the remote unit is being removed.
+            err_msg = e.args[0]
+            logger.error(
+                f"failed processing the ingress relation {event.relation}: {err_msg!r}. "
+                f"If the remote unit is being removed, this could be normal."
+            )
+            return
 
         # Without the following line, traefik.STATIC_CONFIG_PATH is updated with TCP endpoints only on
         # update-status.
@@ -831,7 +840,14 @@ class TraefikIngressCharm(CharmBase):
         # Skip this for traefik-route because it doesn't have a `wipe_ingress_data` method.
         provider = self._provider_from_relation(relation)
         if wipe_rel_data and self.unit.is_leader() and provider != self.traefik_route:
-            provider.wipe_ingress_data(relation)  # type: ignore  # this is an ingress-type relation
+            try:
+                provider.wipe_ingress_data(relation)  # type: ignore  # this is an ingress-type relation
+            except ModelError as e:
+                # if the relation is (being) deleted, sometimes we might get a:
+                # ERROR cannot read relation application settings: permission denied (unauthorized access)
+                logger.info(f"error {e} wiping ingress data for {relation}; "
+                            f"if this relation is dead or dying, this could be normal.")
+
 
     @staticmethod
     def _relation_config_file(relation: Relation):
