@@ -58,8 +58,9 @@ from ops.model import (
     ActiveStatus,
     BlockedStatus,
     MaintenanceStatus,
+    ModelError,
     Relation,
-    WaitingStatus, ModelError,
+    WaitingStatus,
 )
 from ops.pebble import PathError
 from traefik import CA, LOG_PATH, RoutingMode, Traefik
@@ -845,9 +846,10 @@ class TraefikIngressCharm(CharmBase):
             except ModelError as e:
                 # if the relation is (being) deleted, sometimes we might get a:
                 # ERROR cannot read relation application settings: permission denied (unauthorized access)
-                logger.info(f"error {e} wiping ingress data for {relation}; "
-                            f"if this relation is dead or dying, this could be normal.")
-
+                logger.info(
+                    f"error {e} wiping ingress data for {relation}; "
+                    f"if this relation is dead or dying, this could be normal."
+                )
 
     @staticmethod
     def _relation_config_file(relation: Relation):
