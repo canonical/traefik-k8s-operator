@@ -360,7 +360,7 @@ class AuthProxyProvider(AuthProxyRelation):
         if not self._charm.model.relations[self._relation_name]:
             return []
 
-        app_names = list()
+        app_names = []
         for relation in self._charm.model.relations[self._relation_name]:
             app_names.append(relation.app.name)
 
