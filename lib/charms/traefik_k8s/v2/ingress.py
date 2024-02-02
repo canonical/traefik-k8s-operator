@@ -13,7 +13,7 @@ To get started using the library, you just need to fetch the library using `char
 
 ```shell
 cd some-charm
-charmcraft fetch-lib charms.traefik_k8s.v2.ingress
+charmcraft fetch-lib charms.traefik_k8s.v1.ingress
 ```
 
 In the `metadata.yaml` of the charm, add the following:
@@ -105,8 +105,8 @@ if pydantic.version.VERSION.split(".") <= ["2"]:
                 data = {
                     k: json.loads(v)
                     for k, v in databag.items()
-                    if k
-                    in cls.__fields__  # is one of our fields. Don't attempt to parse model-external values
+                    # Don't attempt to parse model-external values
+                    if k in {f.alias for f in cls.__fields__.values()}
                 }
             except json.JSONDecodeError as e:
                 msg = f"invalid databag contents: expecting json. {databag}"
@@ -133,7 +133,8 @@ if pydantic.version.VERSION.split(".") <= ["2"]:
                 databag = {}
 
             if self._NEST_UNDER:
-                databag[self._NEST_UNDER] = self.json()
+                databag[self._NEST_UNDER] = self.json(by_alias=True)
+                return databag
 
             dct = self.dict()
             for key, field in self.__fields__.items():  # type: ignore
@@ -168,8 +169,8 @@ else:
                 data = {
                     k: json.loads(v)
                     for k, v in databag.items()
-                    if k
-                    in cls.__fields__  # is one of our fields. Don't attempt to parse model-external values
+                    # Don't attempt to parse model-external values
+                    if k in {(f.alias or n) for n, f in cls.__fields__.items()}
                 }
             except json.JSONDecodeError as e:
                 msg = f"invalid databag contents: expecting json. {databag}"
@@ -201,6 +202,7 @@ else:
                     # skip keys whose values are default
                     exclude_defaults=True,
                 )
+                return databag
 
             dct = self.model_dump()  # type: ignore
             for key, field in self.model_fields.items():  # type: ignore
