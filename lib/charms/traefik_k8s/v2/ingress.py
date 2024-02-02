@@ -84,7 +84,7 @@ BUILTIN_JUJU_KEYS = {"ingress-address", "private-address", "egress-subnets"}
 
 if pydantic.version.VERSION.split(".") <= ["2"]:
 
-    class DatabagModel(BaseModel):   # type: ignore
+    class DatabagModel(BaseModel):  # type: ignore
         """Base databag model."""
 
         class Config:
