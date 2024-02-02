@@ -63,7 +63,7 @@ import typing
 from typing import Any, Dict, Optional, Tuple, Union
 
 import yaml
-from ops.charm import CharmBase, RelationBrokenEvent, RelationEvent
+from ops.charm import CharmBase, RelationEvent
 from ops.framework import (
     EventSource,
     Object,
