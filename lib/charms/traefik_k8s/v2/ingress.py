@@ -13,7 +13,7 @@ To get started using the library, you just need to fetch the library using `char
 
 ```shell
 cd some-charm
-charmcraft fetch-lib charms.traefik_k8s.v1.ingress
+charmcraft fetch-lib charms.traefik_k8s.v2.ingress
 ```
 
 In the `metadata.yaml` of the charm, add the following:
@@ -101,7 +101,10 @@ if pydantic.version.VERSION.split('.') <= ["2"]:
                 return cls.parse_obj(json.loads(databag[cls._NEST_UNDER]))
 
             try:
-                data = {k: json.loads(v) for k, v in databag.items() if k not in BUILTIN_JUJU_KEYS}
+                data = {
+                    k: json.loads(v) for k, v in databag.items() if
+                    k in cls.__fields__  # is one of our fields. Don't attempt to parse model-external values
+                }
             except json.JSONDecodeError as e:
                 msg = f"invalid databag contents: expecting json. {databag}"
                 log.error(msg)
@@ -111,7 +114,7 @@ if pydantic.version.VERSION.split('.') <= ["2"]:
                 return cls.parse_raw(json.dumps(data))  # type: ignore
             except pydantic.ValidationError as e:
                 msg = f"failed to validate databag: {databag}"
-                log.error(msg, exc_info=True)
+                log.debug(msg, exc_info=True)
                 raise DataValidationError(msg) from e
 
         def dump(self, databag: Optional[MutableMapping] = None, clear: bool = True):
@@ -137,6 +140,8 @@ if pydantic.version.VERSION.split('.') <= ["2"]:
             return databag
 else:
     from pydantic import ConfigDict
+
+
     class DatabagModel(BaseModel):
         """Base databag model."""
 
@@ -157,10 +162,13 @@ else:
                 return cls.model_validate(json.loads(databag[nest_under]))
 
             try:
-                data = {k: json.loads(v) for k, v in databag.items() if k not in BUILTIN_JUJU_KEYS}
+                data = {
+                    k: json.loads(v) for k, v in databag.items() if
+                    k in cls.__fields__  # is one of our fields. Don't attempt to parse model-external values
+                }
             except json.JSONDecodeError as e:
                 msg = f"invalid databag contents: expecting json. {databag}"
-                logger.error(msg)
+                log.error(msg)
                 raise DataValidationError(msg) from e
 
             try:
@@ -258,7 +266,7 @@ class IngressRequirerUnitData(DatabagModel):
     host: str = Field(description="Hostname at which the unit is reachable.")
     ip: Optional[str] = Field(
         description="IP at which the unit is reachable, "
-        "IP can only be None if the IP information can't be retrieved from juju."
+                    "IP can only be None if the IP information can't be retrieved from juju."
     )
 
     @validator("host", pre=True)
@@ -432,9 +440,9 @@ class IngressPerAppProvider(_IngressPerAppBase):
     on = IngressPerAppProviderEvents()  # type: ignore
 
     def __init__(
-        self,
-        charm: CharmBase,
-        relation_name: str = DEFAULT_RELATION_NAME,
+            self,
+            charm: CharmBase,
+            relation_name: str = DEFAULT_RELATION_NAME,
     ):
         """Constructor for IngressPerAppProvider.
 
@@ -613,18 +621,18 @@ class IngressPerAppRequirer(_IngressPerAppBase):
     _stored = StoredState()
 
     def __init__(
-        self,
-        charm: CharmBase,
-        relation_name: str = DEFAULT_RELATION_NAME,
-        *,
-        host: Optional[str] = None,
-        ip: Optional[str] = None,
-        port: Optional[int] = None,
-        strip_prefix: bool = False,
-        redirect_https: bool = False,
-        # fixme: this is horrible UX.
-        #  shall we switch to manually calling provide_ingress_requirements with all args when ready?
-        scheme: Union[Callable[[], str], str] = lambda: "http",
+            self,
+            charm: CharmBase,
+            relation_name: str = DEFAULT_RELATION_NAME,
+            *,
+            host: Optional[str] = None,
+            ip: Optional[str] = None,
+            port: Optional[int] = None,
+            strip_prefix: bool = False,
+            redirect_https: bool = False,
+            # fixme: this is horrible UX.
+            #  shall we switch to manually calling provide_ingress_requirements with all args when ready?
+            scheme: Union[Callable[[], str], str] = lambda: "http",
     ):
         """Constructor for IngressRequirer.
 
@@ -702,12 +710,12 @@ class IngressPerAppRequirer(_IngressPerAppBase):
             self.provide_ingress_requirements(host=host, ip=ip, port=port)
 
     def provide_ingress_requirements(
-        self,
-        *,
-        scheme: Optional[str] = None,
-        host: Optional[str] = None,
-        ip: Optional[str] = None,
-        port: int,
+            self,
+            *,
+            scheme: Optional[str] = None,
+            host: Optional[str] = None,
+            ip: Optional[str] = None,
+            port: int,
     ):
         """Publishes the data that Traefik needs to provide ingress.
 
@@ -723,12 +731,12 @@ class IngressPerAppRequirer(_IngressPerAppBase):
             self._provide_ingress_requirements(scheme, host, ip, port, relation)
 
     def _provide_ingress_requirements(
-        self,
-        scheme: Optional[str],
-        host: Optional[str],
-        ip: Optional[str],
-        port: int,
-        relation: Relation,
+            self,
+            scheme: Optional[str],
+            host: Optional[str],
+            ip: Optional[str],
+            port: int,
+            relation: Relation,
     ):
         if self.unit.is_leader():
             self._publish_app_data(scheme, port, relation)
@@ -736,10 +744,10 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         self._publish_unit_data(host, ip, relation)
 
     def _publish_unit_data(
-        self,
-        host: Optional[str],
-        ip: Optional[str],
-        relation: Relation,
+            self,
+            host: Optional[str],
+            ip: Optional[str],
+            relation: Relation,
     ):
         if not host:
             host = socket.getfqdn()
@@ -747,8 +755,8 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         if ip is None:
             network_binding = self.charm.model.get_binding(relation)
             if (
-                network_binding is not None
-                and (bind_address := network_binding.network.bind_address) is not None
+                    network_binding is not None
+                    and (bind_address := network_binding.network.bind_address) is not None
             ):
                 ip = str(bind_address)
             else:
@@ -763,10 +771,10 @@ class IngressPerAppRequirer(_IngressPerAppBase):
             raise DataValidationError(msg) from e
 
     def _publish_app_data(
-        self,
-        scheme: Optional[str],
-        port: int,
-        relation: Relation,
+            self,
+            scheme: Optional[str],
+            port: int,
+            relation: Relation,
     ):
         # assumes leadership!
         app_databag = relation.data[self.app]
@@ -825,7 +833,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         Returns None if the URL isn't available yet.
         """
         data = (
-            typing.cast(Optional[str], self._stored.current_url)  # type: ignore
-            or self._get_url_from_relation_data()
+                typing.cast(Optional[str], self._stored.current_url)  # type: ignore
+                or self._get_url_from_relation_data()
         )
         return data
