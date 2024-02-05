@@ -1,71 +1,63 @@
-# SD-Core Traefik K8s Terraform Module
+# SD-Core Traefik K8s Terraform module
 
-This SD-Core Traefik K8s Terraform module aims to deploy the [traefik-k8s charm](https://charmhub.io/traefik-k8s) via Terraform.
+This folder contains a base [Terraform][Terraform] module for the traefik-k8s charm.
 
-## Getting Started
+The module uses the [Terraform Juju provider][Terraform Juju provider] to model the charm deployment onto any Kubernetes environment managed by [Juju][Juju].
 
-### Prerequisites
+The base module is not intended to be deployed in separation (it is possible though), but should rather serve as a building block for higher level modules.
 
-The following software and tools needs to be installed and should be running in the local environment.
+## Module structure
 
-- `microk8s`
-- `juju 3.x`
-- `terrafom`
+- **main.tf** - Defines the Juju application to be deployed.
+- **variables.tf** - Allows customization of the deployment. Except for exposing the deployment options (Juju model name, channel or application name) also models the charm configuration.
+- **output.tf** - Responsible for integrating the module with other Terraform modules, primarily by defining potential integration endpoints (charm integrations), but also by exposing the application name.
+- **terraform.tf** - Defines the Terraform provider.
 
-### Deploy the traefik-k8s charm using Terraform
+## Pre-requisites
 
-Make sure that `storage` and `metallb` plugins are enabled for Microk8s:
+The following tools needs to be installed and should be running in the environment. Please [set up your environment][set-up-environment] before deployment.
 
-```console
-sudo microk8s enable hostpath-storage
-sudo microk8s enable metallb:10.0.0.2-10.0.0.4
+- A Kubernetes cluster
+- Juju
+- Juju controller bootstrapped onto the K8s cluster
+- Terraform
+
+## Using Grafana-agent-k8s base module in higher level modules
+
+If you want to use `traefik-k8s` base module as part of your Terraform module, import it like shown below.
+
+```text
+module "traefik-k8s" {
+  source = "git::https://github.com/canonical/traefik-k8s-operator//terraform"
+  
+  model_name = "juju_model_name"
+  (Customize configuration variables here if needed)
+}
 ```
 
-Add a Juju model:
+Create the integrations, for instance:
 
-```console
-juju add model <model-name>
+```text
+resource "juju_integration" "tls-certificates" {
+  model = var.model_name
+
+  application {
+    name     = module.traefik.app_name
+    endpoint = module.traefik.certificates_endpoint
+  }
+
+  application {
+    name     = module.self-signed-certificates.app_name
+    endpoint = module.self-signed-certificates.certificates_endpoint
+  }
+}
 ```
 
-Initialise the provider:
+The complete list of available integrations can be found [here][traefik-integrations].
 
-```console
-terraform init
-```
+[Terraform]: https://www.terraform.io/
+[Terraform Juju provider]: https://registry.terraform.io/providers/juju/juju/latest
+[Juju]: https://juju.is
+[grafana-agent-integrations]: https://charmhub.io/traefik-k8s/integrations
+[set-up-environment]: [https://discourse.charmhub.io/t/set-up-your-development-environment-with-microk8s-for-juju-terraform-provider/13109]
 
-Customize the configuration inputs under `terraform.tfvars` file according to requirement.
-
-Replace the values in the `terraform.tfvars` file:
-
-```yaml
-# Mandatory Config Options
-model_name = "put your model-name here"
-```
-
-Run Terraform Plan by providing var-file:
-
-```console
-terraform plan -var-file="terraform.tfvars" 
-```
-
-Deploy the resources, skip the approval:
-
-```console
-terraform apply -auto-approve 
-```
-
-### Check the Output
-
-Run `juju switch <juju model>` to switch to the target Juju model and observe the status of the application.
-
-```console
-juju status --relations
-```
-
-### Clean up
-
-Remove the application:
-
-```console
-terraform destroy -auto-approve
-```

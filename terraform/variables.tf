@@ -4,15 +4,20 @@ variable "model_name" {
   default     = ""
 }
 
+variable "app_name" {
+  description = "Name of the application in the Juju model"
+  type        = string
+  default     = "traefik"
+}
+
 variable "channel" {
   description = "The channel to use when deploying a charm."
   type        = string
   default     = "latest/stable"
 }
 
-variable "traefik-config" {
-  description = "Additional configuration for the Traefik"
-  default = {
-    routing_mode = "subdomain"
-  }
+variable "config" {
+  description = "Additional configuration for the Traefik charm. Please see the available options: https://charmhub.io/traefik-k8s/configure."
+  type        = map(string)
+  default     = {}
 }

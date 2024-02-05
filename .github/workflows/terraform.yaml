@@ -1,0 +1,14 @@
+# Copyright 2024 Canonical Ltd.
+# See LICENSE file for licensing details.
+
+name: Check Terraform Module
+
+on:
+  pull_request:
+
+
+jobs:
+  check-terraform-module:
+    name: Check Terraform Module
+    uses: canonical/observability/.github/workflows/terraform.yaml@main
+    secrets: inherit
