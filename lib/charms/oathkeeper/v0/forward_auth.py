@@ -54,13 +54,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Dict, List, Mapping, Optional
 
 import jsonschema
-from ops.charm import (
-    CharmBase,
-    RelationBrokenEvent,
-    RelationChangedEvent,
-    RelationCreatedEvent,
-    RelationDepartedEvent,
-)
+from ops.charm import CharmBase, RelationBrokenEvent, RelationChangedEvent, RelationCreatedEvent
 from ops.framework import EventBase, EventSource, Handle, Object, ObjectEvents
 from ops.model import Relation, TooManyRelatedAppsError
 
@@ -72,7 +66,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 2
+LIBPATCH = 3
 
 RELATION_NAME = "forward-auth"
 INTERFACE_NAME = "forward_auth"
@@ -505,7 +499,7 @@ class ForwardAuthProvider(ForwardAuthRelation):
         events = self.charm.on[relation_name]
         self.framework.observe(events.relation_created, self._on_relation_created_event)
         self.framework.observe(events.relation_changed, self._on_relation_changed_event)
-        self.framework.observe(events.relation_departed, self._on_relation_departed_event)
+        self.framework.observe(events.relation_broken, self._on_relation_broken_event)
 
     def _on_relation_created_event(self, event: RelationCreatedEvent) -> None:
         """Update the relation with provider data when a relation is created."""
@@ -525,8 +519,8 @@ class ForwardAuthProvider(ForwardAuthRelation):
         # Compare ingress-related apps with apps that requested the proxy
         self._compare_apps()
 
-    def _on_relation_departed_event(self, event: RelationDepartedEvent) -> None:
-        """Wipe the relation databag and notify the charm that the relation has departed."""
+    def _on_relation_broken_event(self, event: RelationBrokenEvent) -> None:
+        """Wipe the relation databag and notify the charm that the relation is broken."""
         # Workaround for https://github.com/canonical/operator/issues/888
         self._pop_relation_data(event.relation.id)
 
