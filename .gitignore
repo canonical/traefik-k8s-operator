@@ -8,3 +8,8 @@ __pycache__/
 .idea
 tests/integration/testers/*/lib
 *.egg-info/
+
+# charmcraft bug: leaves the build folders behind after a pack.
+**/parts/
+**/prime/
+**/stage/
