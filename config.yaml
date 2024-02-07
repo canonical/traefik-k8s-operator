@@ -2,6 +2,12 @@
 # See LICENSE file for licensing details.
 
 options:
+  enable_experimental_forward_auth:
+    description: |
+      Enables `forward-auth` middleware capabilities required to set up Identity and Access Proxy.
+      This feature is experimental and may be unstable.
+    type: boolean
+    default: False
   external_hostname:
     description: |
       The DNS name to be used by Traefik ingress.

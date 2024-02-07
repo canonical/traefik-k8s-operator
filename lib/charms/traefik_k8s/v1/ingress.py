@@ -1,54 +1,19 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-r"""# Interface Library for ingress.
+r"""# [DEPRECATED!] Interface Library for ingress.
 
-This library wraps relation endpoints using the `ingress` interface
-and provides a Python API for both requesting and providing per-application
-ingress, with load-balancing occurring across all units.
+This is a DEPRECATED version of the Ingress interface library.
 
-## Getting Started
+It was dropped in favour of ingress v2 because it contained a data model bug that
+could not be fixed while maintaining backwards compatibility.
 
-To get started using the library, you just need to fetch the library using `charmcraft`.
+What the bug means, is that by using the ingress v1 interface you are not able to obtain
+unit-level load balancing, but instead, all traffic will be routed to your leader unit.
+Which is not what you most likely want.
 
-```shell
-cd some-charm
-charmcraft fetch-lib charms.traefik_k8s.v1.ingress
-```
-
-In the `metadata.yaml` of the charm, add the following:
-
-```yaml
-requires:
-    ingress:
-        interface: ingress
-        limit: 1
-```
-
-Then, to initialise the library:
-
-```python
-from charms.traefik_k8s.v1.ingress import (IngressPerAppRequirer,
-  IngressPerAppReadyEvent, IngressPerAppRevokedEvent)
-
-class SomeCharm(CharmBase):
-  def __init__(self, *args):
-    # ...
-    self.ingress = IngressPerAppRequirer(self, port=80)
-    # The following event is triggered when the ingress URL to be used
-    # by this deployment of the `SomeCharm` is ready (or changes).
-    self.framework.observe(
-        self.ingress.on.ready, self._on_ingress_ready
-    )
-    self.framework.observe(
-        self.ingress.on.revoked, self._on_ingress_revoked
-    )
-
-    def _on_ingress_ready(self, event: IngressPerAppReadyEvent):
-        logger.info("This app's ingress URL: %s", event.url)
-
-    def _on_ingress_revoked(self, event: IngressPerAppRevokedEvent):
-        logger.info("This app no longer has ingress")
+If it IS what you want after all, consider opening a feature request for explicit
+'ingress-per-leader' support.
 """
 
 import logging
@@ -69,7 +34,7 @@ LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 17
+LIBPATCH = 18
 
 DEFAULT_RELATION_NAME = "ingress"
 RELATION_INTERFACE = "ingress"
@@ -450,6 +415,13 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         Request Args:
             port: the port of the service
         """
+        log.warning(
+            "The ``ingress v1`` library is DEPRECATED in favour of ``ingress v2`` "
+            "and no longer maintained. This library does NOT in fact implement the "
+            "``ingress`` interface, but, instead, the ``ingress-per-leader`` one."
+            "Please bump with ``charmcraft fetch-lib charms.traefik_k8s.v2.ingress``."
+        )
+
         super().__init__(charm, relation_name)
         self.charm: CharmBase = charm
         self.relation_name = relation_name

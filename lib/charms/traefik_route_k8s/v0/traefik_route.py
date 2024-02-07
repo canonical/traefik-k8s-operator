@@ -88,7 +88,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 8
+LIBPATCH = 9
 
 log = logging.getLogger(__name__)
 
@@ -137,7 +137,7 @@ class TraefikRouteProvider(Object):
     The TraefikRouteProvider provides api to do this easily.
     """
 
-    on = TraefikRouteProviderEvents()
+    on = TraefikRouteProviderEvents()  # pyright: ignore
     _stored = StoredState()
 
     def __init__(
@@ -163,7 +163,10 @@ class TraefikRouteProvider(Object):
         self._charm = charm
         self._relation_name = relation_name
 
-        if self._stored.external_host != external_host or self._stored.scheme != scheme:
+        if (
+            self._stored.external_host != external_host  # pyright: ignore
+            or self._stored.scheme != scheme  # pyright: ignore
+        ):
             # If traefik endpoint details changed, update
             self.update_traefik_address(external_host=external_host, scheme=scheme)
 
@@ -197,7 +200,7 @@ class TraefikRouteProvider(Object):
         This is split out into a separate method since, in the case of multi-unit deployments,
         removal of a `TraefikRouteRequirer` will not cause a `RelationEvent`, but the guard on
         app data ensures that only the previous leader will know what it is. Separating it
-        allows for re-use both when the property is called and if the relation changes, so a
+        allows for reuse both when the property is called and if the relation changes, so a
         leader change where the new leader checks the property will do the right thing.
         """
         if not self._charm.unit.is_leader():
@@ -209,9 +212,11 @@ class TraefikRouteProvider(Object):
                 self._stored.scheme = ""
                 return
             external_host = relation.data[relation.app].get("external_host", "")
-            self._stored.external_host = external_host or self._stored.external_host
+            self._stored.external_host = (
+                external_host or self._stored.external_host  # pyright: ignore
+            )
             scheme = relation.data[relation.app].get("scheme", "")
-            self._stored.scheme = scheme or self._stored.scheme
+            self._stored.scheme = scheme or self._stored.scheme  # pyright: ignore
 
     def _on_relation_changed(self, event: RelationEvent):
         if self.is_ready(event.relation):
@@ -269,7 +274,7 @@ class TraefikRouteRequirer(Object):
     application databag.
     """
 
-    on = TraefikRouteRequirerEvents()
+    on = TraefikRouteRequirerEvents()  # pyright: ignore
     _stored = StoredState()
 
     def __init__(self, charm: CharmBase, relation: Relation, relation_name: str = "traefik-route"):
@@ -304,7 +309,7 @@ class TraefikRouteRequirer(Object):
         This is split out into a separate method since, in the case of multi-unit deployments,
         removal of a `TraefikRouteRequirer` will not cause a `RelationEvent`, but the guard on
         app data ensures that only the previous leader will know what it is. Separating it
-        allows for re-use both when the property is called and if the relation changes, so a
+        allows for reuse both when the property is called and if the relation changes, so a
         leader change where the new leader checks the property will do the right thing.
         """
         if not self._charm.unit.is_leader():
@@ -317,9 +322,11 @@ class TraefikRouteRequirer(Object):
                     self._stored.scheme = ""
                     return
                 external_host = relation.data[relation.app].get("external_host", "")
-                self._stored.external_host = external_host or self._stored.external_host
+                self._stored.external_host = (
+                    external_host or self._stored.external_host  # pyright: ignore
+                )
                 scheme = relation.data[relation.app].get("scheme", "")
-                self._stored.scheme = scheme or self._stored.scheme
+                self._stored.scheme = scheme or self._stored.scheme  # pyright: ignore
 
     def _on_relation_changed(self, event: RelationEvent) -> None:
         """Update StoredState with external_host and other information from Traefik."""

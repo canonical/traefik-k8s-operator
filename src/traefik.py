@@ -14,6 +14,7 @@ from string import Template
 from typing import Any, Dict, Iterable, List, Optional, Union, cast
 
 import yaml
+from charms.oathkeeper.v0.forward_auth import ForwardAuthConfig
 from ops import Container
 from ops.pebble import LayerDict, PathError
 from utils import is_hostname
@@ -78,12 +79,14 @@ class Traefik:
         container: Container,
         routing_mode: RoutingMode,
         tls_enabled: bool,
+        experimental_forward_auth_enabled: bool,
         tcp_entrypoints: Dict[str, int],
     ):
         self._container = container
         self._tcp_entrypoints = tcp_entrypoints
         self._routing_mode = routing_mode
         self._tls_enabled = tls_enabled
+        self._experimental_forward_auth_enabled = experimental_forward_auth_enabled
 
     @property
     def scrape_jobs(self) -> list:
@@ -264,6 +267,8 @@ class Traefik:
         strip_prefix: Optional[bool],
         redirect_https: Optional[bool],
         external_host: str,
+        forward_auth_app: bool,
+        forward_auth_config: Optional[ForwardAuthConfig],
     ) -> dict:
         """Generate a config dict for IngressPerUnit."""
         lb_servers = [{"url": f"{scheme or 'http'}://{host}:{port}"}]
@@ -274,6 +279,8 @@ class Traefik:
             strip_prefix=strip_prefix,
             redirect_https=redirect_https,
             external_host=external_host,
+            forward_auth_app=forward_auth_app,
+            forward_auth_config=forward_auth_config,
         )
 
     def get_per_app_http_config(
@@ -286,6 +293,8 @@ class Traefik:
         strip_prefix: Optional[bool],
         redirect_https: Optional[bool],
         external_host: str,
+        forward_auth_app: bool,
+        forward_auth_config: Optional[ForwardAuthConfig],
     ) -> dict:
         """Generate a config dict for Ingress(PerApp)."""
         # purge potential Nones
@@ -298,6 +307,8 @@ class Traefik:
             strip_prefix=strip_prefix,
             redirect_https=redirect_https,
             external_host=external_host,
+            forward_auth_app=forward_auth_app,
+            forward_auth_config=forward_auth_config,
         )
 
     def get_per_leader_http_config(
@@ -310,6 +321,8 @@ class Traefik:
         strip_prefix: bool,
         redirect_https: bool,
         external_host: str,
+        forward_auth_app: bool,
+        forward_auth_config: Optional[ForwardAuthConfig],
     ) -> dict:
         """Generate a config dict for Ingress v1 (PerLeader)."""
         lb_servers = [{"url": f"http://{host}:{port}"}]
@@ -320,6 +333,8 @@ class Traefik:
             strip_prefix=strip_prefix,
             redirect_https=redirect_https,
             external_host=external_host,
+            forward_auth_app=forward_auth_app,
+            forward_auth_config=forward_auth_config,
         )
 
     def _generate_config_block(
@@ -330,6 +345,8 @@ class Traefik:
         redirect_https: Optional[bool],
         strip_prefix: Optional[bool],
         external_host: str,
+        forward_auth_app: bool,
+        forward_auth_config: Optional[ForwardAuthConfig],
     ) -> Dict[str, Any]:
         """Generate a configuration segment.
 
@@ -422,6 +439,8 @@ class Traefik:
             strip_prefix=strip_prefix_,
             scheme=scheme_,
             prefix=prefix,
+            forward_auth_app=forward_auth_app,
+            forward_auth_config=forward_auth_config,
         )
 
         if middlewares:
@@ -439,6 +458,8 @@ class Traefik:
         strip_prefix: bool,
         scheme: str,
         prefix: str,
+        forward_auth_app: bool,
+        forward_auth_config: Optional[ForwardAuthConfig],
     ) -> dict:
         """Generate a middleware config.
 
@@ -446,6 +467,16 @@ class Traefik:
           "cannot create middleware: multi-types middleware not supported, consider declaring two
           different pieces of middleware instead"
         """
+        forwardauth_middleware = {}
+        if self._experimental_forward_auth_enabled:
+            if forward_auth_app:
+                forwardauth_middleware[f"juju-sidecar-forward-auth-{prefix}"] = {
+                    "forwardAuth": {
+                        "address": forward_auth_config.decisions_address,  # type: ignore
+                        "authResponseHeaders": forward_auth_config.headers,  # type: ignore
+                    }
+                }
+
         no_prefix_middleware = {}  # type: Dict[str, Dict[str, Any]]
         if self._routing_mode is RoutingMode.path and strip_prefix:
             no_prefix_middleware[f"juju-sidecar-noprefix-{prefix}"] = {
@@ -460,7 +491,7 @@ class Traefik:
                 "redirectScheme": {"scheme": "https", "port": 443, "permanent": True}
             }
 
-        return {**no_prefix_middleware, **redir_scheme_middleware}
+        return {**forwardauth_middleware, **no_prefix_middleware, **redir_scheme_middleware}
 
     @staticmethod
     def generate_tls_config_for_route(

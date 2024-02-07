@@ -1,0 +1,22 @@
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+name: iap-requirer
+display-name: iap-requirer
+description: Identity and Access Proxy Tester
+summary: IAP Tester
+assumes:
+  - k8s-api
+containers:
+  httpbin:
+    resource: oci-image
+resources:
+  oci-image:
+    type: oci-image
+    description: OCI image for IAP Tester container
+    upstream-source: kennethreitz/httpbin
+requires:
+  auth-proxy:
+    interface: auth_proxy
+    limit: 1
+  ingress:
+    interface: ingress
