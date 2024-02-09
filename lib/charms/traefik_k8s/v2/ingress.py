@@ -150,6 +150,8 @@ else:
         """Base databag model."""
 
         model_config = ConfigDict(
+            # tolerate additional keys in databag
+            extra="ignore",
             # Allow instantiating this class by field name (instead of forcing alias).
             populate_by_name=True,
             # Custom config key: whether to nest the whole datastructure (as json)
