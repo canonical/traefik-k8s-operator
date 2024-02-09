@@ -83,6 +83,7 @@ log = logging.getLogger(__name__)
 BUILTIN_JUJU_KEYS = {"ingress-address", "private-address", "egress-subnets"}
 
 if int(pydantic.version.VERSION.split(".")[0]) <= 2:
+
     class DatabagModel(BaseModel):  # type: ignore
         """Base databag model."""
 
