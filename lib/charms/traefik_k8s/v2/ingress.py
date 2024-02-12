@@ -1,4 +1,4 @@
-# Copyright 2023 Canonical Ltd.
+# Copyright 2024 Canonical Ltd.
 # See LICENSE file for licensing details.
 
 r"""# Interface Library for ingress.
@@ -72,7 +72,7 @@ LIBAPI = 2
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 9
+LIBPATCH = 10
 
 PYDEPS = ["pydantic"]
 
@@ -82,7 +82,7 @@ RELATION_INTERFACE = "ingress"
 log = logging.getLogger(__name__)
 BUILTIN_JUJU_KEYS = {"ingress-address", "private-address", "egress-subnets"}
 
-if pydantic.version.VERSION.split(".") <= ["2"]:
+if int(pydantic.version.VERSION.split(".")[0]) < 2:
 
     class DatabagModel(BaseModel):  # type: ignore
         """Base databag model."""
@@ -150,6 +150,8 @@ else:
         """Base databag model."""
 
         model_config = ConfigDict(
+            # tolerate additional keys in databag
+            extra="ignore",
             # Allow instantiating this class by field name (instead of forcing alias).
             populate_by_name=True,
             # Custom config key: whether to nest the whole datastructure (as json)
