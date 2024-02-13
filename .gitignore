@@ -51,3 +51,8 @@ override.tf.json
 .terraformrc
 terraform.rc
 .terraform.lock.hcl
+
+# charmcraft bug: leaves the build folders behind after a pack.
+**/parts/
+**/prime/
+**/stage/

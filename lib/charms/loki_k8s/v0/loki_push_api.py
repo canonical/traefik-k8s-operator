@@ -12,9 +12,9 @@ This document explains how to use the two principal objects this library provide
 implement the provider side of the `loki_push_api` relation interface. For instance, a Loki charm.
 The provider side of the relation represents the server side, to which logs are being pushed.
 
-- `LokiPushApiConsumer`: This object is meant to be used by any Charmed Operator that needs to
-send log to Loki by implementing the consumer side of the `loki_push_api` relation interface.
-For instance, a Promtail or Grafana agent charm which needs to send logs to Loki.
+- `LokiPushApiConsumer`: Used to obtain the loki api endpoint. This is useful for configuring
+  applications such as pebble, or charmed operators of workloads such as grafana-agent or promtail,
+  that can communicate with loki directly.
 
 - `LogProxyConsumer`: This object can be used by any Charmed Operator which needs to
 send telemetry, such as logs, to Loki through a Log Proxy by implementing the consumer side of the
@@ -456,7 +456,7 @@ from urllib import request
 from urllib.error import HTTPError
 
 import yaml
-from charms.observability_libs.v0.juju_topology import JujuTopology
+from cosl import JujuTopology
 from ops.charm import (
     CharmBase,
     HookEvent,
@@ -480,7 +480,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 22
+LIBPATCH = 26
 
 logger = logging.getLogger(__name__)
 
@@ -604,7 +604,9 @@ def _validate_relation_by_interface_and_direction(
     actual_relation_interface = relation.interface_name
     if actual_relation_interface != expected_relation_interface:
         raise RelationInterfaceMismatchError(
-            relation_name, expected_relation_interface, actual_relation_interface
+            relation_name,
+            expected_relation_interface,
+            actual_relation_interface,  # pyright: ignore
         )
 
     if expected_relation_role == RelationRole.provides:
@@ -866,20 +868,20 @@ class AlertRules:
 
         return alert_groups
 
-    def add_path(self, path: str, *, recursive: bool = False):
+    def add_path(self, path_str: str, *, recursive: bool = False):
         """Add rules from a dir path.
 
         All rules from files are aggregated into a data structure representing a single rule file.
         All group names are augmented with juju topology.
 
         Args:
-            path: either a rules file or a dir of rules files.
+            path_str: either a rules file or a dir of rules files.
             recursive: whether to read files recursively or not (no impact if `path` is a file).
 
         Raises:
             InvalidAlertRulePathError: if the provided path is invalid.
         """
-        path = Path(path)  # type: Path
+        path = Path(path_str)  # type: Path
         if path.is_dir():
             self.alert_groups.extend(self._from_dir(path, recursive))
         elif path.is_file():
@@ -992,6 +994,8 @@ class LokiPushApiAlertRulesChanged(EventBase):
 
     def snapshot(self) -> Dict:
         """Save event information."""
+        if not self.relation:
+            return {}
         snapshot = {"relation_name": self.relation.name, "relation_id": self.relation.id}
         if self.app:
             snapshot["app_name"] = self.app.name
@@ -1052,7 +1056,7 @@ class LokiPushApiEvents(ObjectEvents):
 class LokiPushApiProvider(Object):
     """A LokiPushApiProvider class."""
 
-    on = LokiPushApiEvents()
+    on = LokiPushApiEvents()  # pyright: ignore
 
     def __init__(
         self,
@@ -1146,11 +1150,11 @@ class LokiPushApiProvider(Object):
             event: a `CharmEvent` in response to which the consumer
                 charm must update its relation data.
         """
-        should_update = self._process_logging_relation_changed(event.relation)
+        should_update = self._process_logging_relation_changed(event.relation)  # pyright: ignore
         if should_update:
             self.on.loki_push_api_alert_rules_changed.emit(
-                relation=event.relation,
-                relation_id=event.relation.id,
+                relation=event.relation,  # pyright: ignore
+                relation_id=event.relation.id,  # pyright: ignore
                 app=self._charm.app,
                 unit=self._charm.unit,
             )
@@ -1517,7 +1521,7 @@ class ConsumerBase(Object):
 class LokiPushApiConsumer(ConsumerBase):
     """Loki Consumer class."""
 
-    on = LokiPushApiEvents()
+    on = LokiPushApiEvents()  # pyright: ignore
 
     def __init__(
         self,
@@ -1760,7 +1764,7 @@ class LogProxyConsumer(ConsumerBase):
             role.
     """
 
-    on = LogProxyEvents()
+    on = LogProxyEvents()  # pyright: ignore
 
     def __init__(
         self,
@@ -1885,7 +1889,7 @@ class LogProxyConsumer(ConsumerBase):
             self._container.stop(WORKLOAD_SERVICE_NAME)
         self.on.log_proxy_endpoint_departed.emit()
 
-    def _get_container(self, container_name: str = "") -> Container:
+    def _get_container(self, container_name: str = "") -> Container:  # pyright: ignore
         """Gets a single container by name or using the only container running in the Pod.
 
         If there is more than one container in the Pod a `PromtailDigestError` is emitted.
@@ -1959,7 +1963,9 @@ class LogProxyConsumer(ConsumerBase):
                 }
             },
         }
-        self._container.add_layer(self._container_name, pebble_layer, combine=True)
+        self._container.add_layer(
+            self._container_name, pebble_layer, combine=True  # pyright: ignore
+        )
 
     def _create_directories(self) -> None:
         """Creates the directories for Promtail binary and config file."""
@@ -1996,7 +2002,11 @@ class LogProxyConsumer(ConsumerBase):
         """
         with open(binary_path, "rb") as f:
             self._container.push(
-                workload_binary_path, f, permissions=0o755, encoding=None, make_dirs=True
+                workload_binary_path,
+                f,
+                permissions=0o755,
+                encoding=None,  # pyright: ignore
+                make_dirs=True,
             )
             logger.debug("The promtail binary file has been pushed to the workload container.")
 
@@ -2105,7 +2115,21 @@ class LogProxyConsumer(ConsumerBase):
                - "zipsha": sha256 sum of zip file of promtail binary
                - "binsha": sha256 sum of unpacked promtail binary
         """
-        with request.urlopen(promtail_info["url"]) as r:
+        # Check for Juju proxy variables and fall back to standard ones if not set
+        proxies: Optional[Dict[str, str]] = {}
+        if proxies and os.environ.get("JUJU_CHARM_HTTP_PROXY"):
+            proxies.update({"http": os.environ["JUJU_CHARM_HTTP_PROXY"]})
+        if proxies and os.environ.get("JUJU_CHARM_HTTPS_PROXY"):
+            proxies.update({"https": os.environ["JUJU_CHARM_HTTPS_PROXY"]})
+        if proxies and os.environ.get("JUJU_CHARM_NO_PROXY"):
+            proxies.update({"no_proxy": os.environ["JUJU_CHARM_NO_PROXY"]})
+        else:
+            proxies = None
+
+        proxy_handler = request.ProxyHandler(proxies)
+        opener = request.build_opener(proxy_handler)
+
+        with opener.open(promtail_info["url"]) as r:
             file_bytes = r.read()
             file_path = os.path.join(BINARY_DIR, promtail_info["filename"] + ".gz")
             with open(file_path, "wb") as f:

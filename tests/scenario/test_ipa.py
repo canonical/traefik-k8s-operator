@@ -3,6 +3,7 @@ from typing import List, Tuple
 
 import yaml
 from scenario import Context, Relation, State
+from scenario.state import DEFAULT_JUJU_DATABAG
 
 
 def create(traefik_ctx: Context, state: State):
@@ -18,7 +19,7 @@ def join(traefik_ctx: Context, state: State):
     remote_units_data = ingress.remote_units_data
 
     joining_unit_id = max(remote_units_data)
-    if remote_units_data[joining_unit_id]:
+    if set(remote_units_data[joining_unit_id]).difference(DEFAULT_JUJU_DATABAG):
         joining_unit_id += 1
 
     remote_units_data[joining_unit_id] = {

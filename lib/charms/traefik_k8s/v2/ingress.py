@@ -1,4 +1,4 @@
-# Copyright 2023 Canonical Ltd.
+# Copyright 2024 Canonical Ltd.
 # See LICENSE file for licensing details.
 
 r"""# Interface Library for ingress.
@@ -13,7 +13,7 @@ To get started using the library, you just need to fetch the library using `char
 
 ```shell
 cd some-charm
-charmcraft fetch-lib charms.traefik_k8s.v2.ingress
+charmcraft fetch-lib charms.traefik_k8s.v1.ingress
 ```
 
 In the `metadata.yaml` of the charm, add the following:
@@ -72,9 +72,9 @@ LIBAPI = 2
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 8
+LIBPATCH = 10
 
-PYDEPS = ["pydantic<2.0"]
+PYDEPS = ["pydantic"]
 
 DEFAULT_RELATION_NAME = "ingress"
 RELATION_INTERFACE = "ingress"
@@ -82,59 +82,138 @@ RELATION_INTERFACE = "ingress"
 log = logging.getLogger(__name__)
 BUILTIN_JUJU_KEYS = {"ingress-address", "private-address", "egress-subnets"}
 
+if int(pydantic.version.VERSION.split(".")[0]) < 2:
 
-class DatabagModel(BaseModel):
-    """Base databag model."""
+    class DatabagModel(BaseModel):  # type: ignore
+        """Base databag model."""
 
-    class Config:
+        class Config:
+            """Pydantic config."""
+
+            allow_population_by_field_name = True
+            """Allow instantiating this class by field name (instead of forcing alias)."""
+
+        _NEST_UNDER = None
+
+        @classmethod
+        def load(cls, databag: MutableMapping):
+            """Load this model from a Juju databag."""
+            if cls._NEST_UNDER:
+                return cls.parse_obj(json.loads(databag[cls._NEST_UNDER]))
+
+            try:
+                data = {
+                    k: json.loads(v)
+                    for k, v in databag.items()
+                    # Don't attempt to parse model-external values
+                    if k in {f.alias for f in cls.__fields__.values()}
+                }
+            except json.JSONDecodeError as e:
+                msg = f"invalid databag contents: expecting json. {databag}"
+                log.error(msg)
+                raise DataValidationError(msg) from e
+
+            try:
+                return cls.parse_raw(json.dumps(data))  # type: ignore
+            except pydantic.ValidationError as e:
+                msg = f"failed to validate databag: {databag}"
+                log.debug(msg, exc_info=True)
+                raise DataValidationError(msg) from e
+
+        def dump(self, databag: Optional[MutableMapping] = None, clear: bool = True):
+            """Write the contents of this model to Juju databag.
+
+            :param databag: the databag to write the data to.
+            :param clear: ensure the databag is cleared before writing it.
+            """
+            if clear and databag:
+                databag.clear()
+
+            if databag is None:
+                databag = {}
+
+            if self._NEST_UNDER:
+                databag[self._NEST_UNDER] = self.json(by_alias=True)
+                return databag
+
+            dct = self.dict()
+            for key, field in self.__fields__.items():  # type: ignore
+                value = dct[key]
+                databag[field.alias or key] = json.dumps(value)
+
+            return databag
+
+else:
+    from pydantic import ConfigDict
+
+    class DatabagModel(BaseModel):
+        """Base databag model."""
+
+        model_config = ConfigDict(
+            # tolerate additional keys in databag
+            extra="ignore",
+            # Allow instantiating this class by field name (instead of forcing alias).
+            populate_by_name=True,
+            # Custom config key: whether to nest the whole datastructure (as json)
+            # under a field or spread it out at the toplevel.
+            _NEST_UNDER=None,
+        )  # type: ignore
         """Pydantic config."""
 
-        allow_population_by_field_name = True
-        """Allow instantiating this class by field name (instead of forcing alias)."""
+        @classmethod
+        def load(cls, databag: MutableMapping):
+            """Load this model from a Juju databag."""
+            nest_under = cls.model_config.get("_NEST_UNDER")
+            if nest_under:
+                return cls.model_validate(json.loads(databag[nest_under]))  # type: ignore
 
-    _NEST_UNDER = None
+            try:
+                data = {
+                    k: json.loads(v)
+                    for k, v in databag.items()
+                    # Don't attempt to parse model-external values
+                    if k in {(f.alias or n) for n, f in cls.__fields__.items()}
+                }
+            except json.JSONDecodeError as e:
+                msg = f"invalid databag contents: expecting json. {databag}"
+                log.error(msg)
+                raise DataValidationError(msg) from e
 
-    @classmethod
-    def load(cls, databag: MutableMapping):
-        """Load this model from a Juju databag."""
-        if cls._NEST_UNDER:
-            return cls.parse_obj(json.loads(databag[cls._NEST_UNDER]))
+            try:
+                return cls.model_validate_json(json.dumps(data))  # type: ignore
+            except pydantic.ValidationError as e:
+                msg = f"failed to validate databag: {databag}"
+                log.debug(msg, exc_info=True)
+                raise DataValidationError(msg) from e
 
-        try:
-            data = {k: json.loads(v) for k, v in databag.items() if k not in BUILTIN_JUJU_KEYS}
-        except json.JSONDecodeError as e:
-            msg = f"invalid databag contents: expecting json. {databag}"
-            log.error(msg)
-            raise DataValidationError(msg) from e
+        def dump(self, databag: Optional[MutableMapping] = None, clear: bool = True):
+            """Write the contents of this model to Juju databag.
 
-        try:
-            return cls.parse_raw(json.dumps(data))  # type: ignore
-        except pydantic.ValidationError as e:
-            msg = f"failed to validate databag: {databag}"
-            log.error(msg, exc_info=True)
-            raise DataValidationError(msg) from e
+            :param databag: the databag to write the data to.
+            :param clear: ensure the databag is cleared before writing it.
+            """
+            if clear and databag:
+                databag.clear()
 
-    def dump(self, databag: Optional[MutableMapping] = None, clear: bool = True):
-        """Write the contents of this model to Juju databag.
+            if databag is None:
+                databag = {}
+            nest_under = self.model_config.get("_NEST_UNDER")
+            if nest_under:
+                databag[nest_under] = self.model_dump_json(  # type: ignore
+                    by_alias=True,
+                    # skip keys whose values are default
+                    exclude_defaults=True,
+                )
+                return databag
 
-        :param databag: the databag to write the data to.
-        :param clear: ensure the databag is cleared before writing it.
-        """
-        if clear and databag:
-            databag.clear()
+            dct = self.model_dump()  # type: ignore
+            for key, field in self.model_fields.items():  # type: ignore
+                value = dct[key]
+                if value == field.default:
+                    continue
+                databag[field.alias or key] = json.dumps(value)
 
-        if databag is None:
-            databag = {}
-
-        if self._NEST_UNDER:
-            databag[self._NEST_UNDER] = self.json()
-
-        dct = self.dict()
-        for key, field in self.__fields__.items():  # type: ignore
-            value = dct[key]
-            databag[field.alias or key] = json.dumps(value)
-
-        return databag
+            return databag
 
 
 # todo: import these models from charm-relation-interfaces/ingress/v2 instead of redeclaring them

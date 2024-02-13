@@ -63,7 +63,7 @@ import typing
 from typing import Any, Dict, Optional, Tuple, Union
 
 import yaml
-from ops.charm import CharmBase, RelationBrokenEvent, RelationEvent
+from ops.charm import CharmBase, RelationEvent
 from ops.framework import (
     EventSource,
     Object,
@@ -82,7 +82,7 @@ LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 17
+LIBPATCH = 18
 
 log = logging.getLogger(__name__)
 
@@ -734,9 +734,10 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
         # we calculate the diff between the urls we were aware of
         # before and those we know now
         previous_urls = self._stored.current_urls or {}  # type: ignore
-        current_urls = (
-            {} if isinstance(event, RelationBrokenEvent) else self._urls_from_relation_data
-        )
+
+        # since ops 2.10, breaking relations won't show up in self.model.relations, so we're safe
+        # in assuming all relations that are there are alive and well.
+        current_urls = self._urls_from_relation_data
         self._stored.current_urls = current_urls  # type: ignore
 
         removed = previous_urls.keys() - current_urls.keys()  # type: ignore
@@ -750,7 +751,7 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
                 )
 
             if this_unit_name in removed:
-                self.on.revoked_for_unit.emit(self.relation)  # type: ignore
+                self.on.revoked_for_unit.emit(event.relation)  # type: ignore
 
         if self.listen_to in {"all-units", "both"}:
             for unit_name in changed:
@@ -759,7 +760,7 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
                 )
 
             for unit_name in removed:
-                self.on.revoked.emit(self.relation, unit_name)  # type: ignore
+                self.on.revoked.emit(event.relation, unit_name)  # type: ignore
 
         self._publish_auto_data()
 
