@@ -36,8 +36,8 @@ from charms.observability_libs.v1.kubernetes_service_patch import (
     KubernetesServicePatch,
 )
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
-from charms.tempo_k8s.v0.charm_tracing import trace_charm
-from charms.tempo_k8s.v0.tracing import TracingEndpointRequirer
+from charms.tempo_k8s.v1.charm_tracing import trace_charm
+from charms.tempo_k8s.v2.tracing import TracingEndpointRequirer
 from charms.traefik_k8s.v1.ingress import IngressPerAppProvider as IPAv1
 from charms.traefik_k8s.v1.ingress_per_unit import DataValidationError, IngressPerUnitProvider
 from charms.traefik_k8s.v2.ingress import IngressPerAppProvider as IPAv2
@@ -69,7 +69,7 @@ from ops.model import (
     WaitingStatus,
 )
 from ops.pebble import PathError
-from traefik import CA, LOG_PATH, RoutingMode, Traefik
+from traefik import CA, LOG_PATH, SERVER_CERT_PATH, RoutingMode, Traefik
 from utils import is_hostname
 
 logger = logging.getLogger(__name__)
@@ -178,7 +178,7 @@ class TraefikIngressCharm(CharmBase):
 
         # Observability integrations
         # tracing integration
-        self._tracing = TracingEndpointRequirer(self)
+        self._tracing = TracingEndpointRequirer(self, protocols=["otlp_http"])
 
         # Provide grafana dashboards over a relation interface
         # dashboard to use: https://grafana.com/grafana/dashboards/4475-traefik/
@@ -330,13 +330,15 @@ class TraefikIngressCharm(CharmBase):
 
     @property
     def charm_tracing_endpoint(self) -> Optional[str]:
-        """Otlp grpc endpoint for charm instrumentation."""
-        return self._tracing.otlp_grpc_endpoint()
+        """Otlp http endpoint for charm instrumentation."""
+        if self._tracing.is_ready():
+            return self._tracing.get_endpoint("otlp_http")
+        return None
 
     @property
     def server_cert(self) -> Optional[str]:
-        """Server certificate for tls tracing."""
-        return self.cert.cert
+        """Server certificate path for tls tracing."""
+        return SERVER_CERT_PATH
 
     def _is_tls_enabled(self) -> bool:
         """Return True if TLS is enabled."""
