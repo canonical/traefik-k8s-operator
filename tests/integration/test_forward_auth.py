@@ -147,6 +147,7 @@ async def test_forward_auth_url_response_headers(
 )
 def assert_anonymous_response(url):
     resp = requests.get(url, verify=False)
+    logger.info(f"{resp.status_code}: {resp.content}")
     assert resp.status_code == 200
 
     headers = json.loads(resp.content).get("headers")
