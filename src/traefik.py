@@ -199,6 +199,12 @@ class Traefik:
         tcp_entrypoints = self._tcp_entrypoints
         logger.debug(f"Statically configuring traefik with tcp entrypoints: {tcp_entrypoints}.")
 
+        web_config = {
+            "address": f":{self.port}",
+            # enable by default http -> https redirect
+            "http": {"redirections": {"entryPoint": {"to": "websecure", "scheme": "https"}}},
+        }
+
         # TODO Disable static config with telemetry and check new version
         raw_config = {
             "log": {
@@ -206,7 +212,7 @@ class Traefik:
             },
             "entryPoints": {
                 "diagnostics": {"address": f":{_DIAGNOSTICS_PORT}"},
-                "web": {"address": f":{self.port}"},
+                "web": web_config,
                 "websecure": {"address": f":{self.tls_port}"},
                 **{
                     tcp_entrypoint_name: {"address": f":{port}"}
