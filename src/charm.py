@@ -433,8 +433,6 @@ class TraefikIngressCharm(CharmBase):
 
         if endpoint := self._tracing.otlp_http_endpoint():
             grpc = False
-        elif endpoint := self._tracing.otlp_grpc_endpoint():
-            grpc = True
         else:
             logger.error(
                 "tracing integration is active but none of the "
