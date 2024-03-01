@@ -756,9 +756,7 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
 
         if self.listen_to in {"all-units", "both"}:
             for unit_name in changed:
-                self.on.ready.emit(  # type: ignore
-                    relation, unit_name, current_urls[unit_name]
-                )
+                self.on.ready.emit(relation, unit_name, current_urls[unit_name])  # type: ignore
 
             for unit_name in removed:
                 self.on.revoked.emit(relation, unit_name)  # type: ignore
