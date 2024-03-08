@@ -72,7 +72,7 @@ LIBAPI = 2
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 10
+LIBPATCH = 11
 
 PYDEPS = ["pydantic"]
 
@@ -136,7 +136,7 @@ if int(pydantic.version.VERSION.split(".")[0]) < 2:
                 databag[self._NEST_UNDER] = self.json(by_alias=True)
                 return databag
 
-            dct = self.dict()
+            dct = self.dict(by_alias=True)
             for key, field in self.__fields__.items():  # type: ignore
                 value = dct[key]
                 databag[field.alias or key] = json.dumps(value)
@@ -206,7 +206,7 @@ else:
                 )
                 return databag
 
-            dct = self.model_dump()  # type: ignore
+            dct = self.model_dump(by_alias=True)  # type: ignore
             for key, field in self.model_fields.items():  # type: ignore
                 value = dct[key]
                 if value == field.default:
@@ -244,10 +244,14 @@ class IngressRequirerAppData(DatabagModel):
 
     # fields on top of vanilla 'ingress' interface:
     strip_prefix: Optional[bool] = Field(
-        description="Whether to strip the prefix from the ingress url.", alias="strip-prefix"
+        default=False,
+        description="Whether to strip the prefix from the ingress url.",
+        alias="strip-prefix",
     )
     redirect_https: Optional[bool] = Field(
-        description="Whether to redirect http traffic to https.", alias="redirect-https"
+        default=False,
+        description="Whether to redirect http traffic to https.",
+        alias="redirect-https",
     )
 
     scheme: Optional[str] = Field(
@@ -435,14 +439,6 @@ class IngressRequirerData:
     units: List["IngressRequirerUnitData"]
 
 
-class TlsProviderType(typing.Protocol):
-    """Placeholder."""
-
-    @property
-    def enabled(self) -> bool:  # type: ignore
-        """Placeholder."""
-
-
 class IngressPerAppProvider(_IngressPerAppBase):
     """Implementation of the provider of ingress."""
 
@@ -561,7 +557,7 @@ class IngressPerAppProvider(_IngressPerAppBase):
         IngressProviderAppData.parse_obj({"ingress": ingress_url}).dump(relation.data[self.app])
 
     @property
-    def proxied_endpoints(self) -> Dict[str, str]:
+    def proxied_endpoints(self) -> Dict[str, Dict[str, str]]:
         """Returns the ingress settings provided to applications by this IngressPerAppProvider.
 
         For example, when this IngressPerAppProvider has provided the
@@ -576,7 +572,7 @@ class IngressPerAppProvider(_IngressPerAppBase):
         }
         ```
         """
-        results = {}
+        results: Dict[str, Dict[str, str]] = {}
 
         for ingress_relation in self.relations:
             if not ingress_relation.app:
@@ -685,7 +681,6 @@ class IngressPerAppRequirer(_IngressPerAppBase):
     def _handle_relation(self, event):
         # created, joined or changed: if we have auto data: publish it
         self._publish_auto_data()
-
         if self.is_ready():
             # Avoid spurious events, emit only when there is a NEW URL available
             new_url = (
