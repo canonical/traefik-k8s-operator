@@ -54,7 +54,7 @@ def test_ingress_app_requirer_uninitialized(requirer: IngressPerAppRequirer, har
 @pytest.mark.parametrize("strip_prefix", (True, False))
 def test_ingress_app_requirer_related(requirer: IngressPerAppRequirer, harness, strip_prefix):
     harness.set_leader(True)
-    url = "http://foo.bar"
+    url = "http://foo.bar/"
 
     assert not requirer.is_ready()
     # provider goes to ready immediately because we inited ipa with port=80.
@@ -160,5 +160,9 @@ class TestIPAEventsEmission(unittest.TestCase):
             self.harness.charm.ipa.provide_ingress_requirements(port=80)
 
             self.assertEqual(
-                self.harness.get_relation_data(self.rel_id, "ipa-requirer/0")["ip"], "null"
+                # None is default so it gets omitted
+                self.harness.get_relation_data(self.rel_id, "ipa-requirer/0").get(
+                    "ip", "<OMITTED>"
+                ),
+                "<OMITTED>",
             )

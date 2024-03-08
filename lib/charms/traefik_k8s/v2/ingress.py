@@ -72,7 +72,7 @@ LIBAPI = 2
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 10
+LIBPATCH = 11
 
 PYDEPS = ["pydantic"]
 
@@ -82,7 +82,8 @@ RELATION_INTERFACE = "ingress"
 log = logging.getLogger(__name__)
 BUILTIN_JUJU_KEYS = {"ingress-address", "private-address", "egress-subnets"}
 
-if int(pydantic.version.VERSION.split(".")[0]) < 2:
+PYDANTIC_IS_V1 = int(pydantic.version.VERSION.split(".")[0]) < 2
+if PYDANTIC_IS_V1:
 
     class DatabagModel(BaseModel):  # type: ignore
         """Base databag model."""
@@ -133,13 +134,11 @@ if int(pydantic.version.VERSION.split(".")[0]) < 2:
                 databag = {}
 
             if self._NEST_UNDER:
-                databag[self._NEST_UNDER] = self.json(by_alias=True)
+                databag[self._NEST_UNDER] = self.json(by_alias=True, exclude_defaults=True)
                 return databag
 
-            dct = self.dict()
-            for key, field in self.__fields__.items():  # type: ignore
-                value = dct[key]
-                databag[field.alias or key] = json.dumps(value)
+            for key, value in self.dict(by_alias=True, exclude_defaults=True).items():  # type: ignore
+                databag[key] = json.dumps(value)
 
             return databag
 
@@ -206,13 +205,8 @@ else:
                 )
                 return databag
 
-            dct = self.model_dump()  # type: ignore
-            for key, field in self.model_fields.items():  # type: ignore
-                value = dct[key]
-                if value == field.default:
-                    continue
-                databag[field.alias or key] = json.dumps(value)
-
+            dct = self.model_dump(mode="json", by_alias=True, exclude_defaults=True)  # type: ignore
+            databag.update({k: json.dumps(v) for k, v in dct.items()})
             return databag
 
 
@@ -244,10 +238,14 @@ class IngressRequirerAppData(DatabagModel):
 
     # fields on top of vanilla 'ingress' interface:
     strip_prefix: Optional[bool] = Field(
-        description="Whether to strip the prefix from the ingress url.", alias="strip-prefix"
+        default=False,
+        description="Whether to strip the prefix from the ingress url.",
+        alias="strip-prefix",
     )
     redirect_https: Optional[bool] = Field(
-        description="Whether to redirect http traffic to https.", alias="redirect-https"
+        default=False,
+        description="Whether to redirect http traffic to https.",
+        alias="redirect-https",
     )
 
     scheme: Optional[str] = Field(
@@ -274,8 +272,9 @@ class IngressRequirerUnitData(DatabagModel):
 
     host: str = Field(description="Hostname at which the unit is reachable.")
     ip: Optional[str] = Field(
+        None,
         description="IP at which the unit is reachable, "
-        "IP can only be None if the IP information can't be retrieved from juju."
+        "IP can only be None if the IP information can't be retrieved from juju.",
     )
 
     @validator("host", pre=True)
@@ -435,14 +434,6 @@ class IngressRequirerData:
     units: List["IngressRequirerUnitData"]
 
 
-class TlsProviderType(typing.Protocol):
-    """Placeholder."""
-
-    @property
-    def enabled(self) -> bool:  # type: ignore
-        """Placeholder."""
-
-
 class IngressPerAppProvider(_IngressPerAppBase):
     """Implementation of the provider of ingress."""
 
@@ -558,10 +549,10 @@ class IngressPerAppProvider(_IngressPerAppBase):
     def publish_url(self, relation: Relation, url: str):
         """Publish to the app databag the ingress url."""
         ingress_url = {"url": url}
-        IngressProviderAppData.parse_obj({"ingress": ingress_url}).dump(relation.data[self.app])
+        IngressProviderAppData(ingress=ingress_url).dump(relation.data[self.app])  # type: ignore
 
     @property
-    def proxied_endpoints(self) -> Dict[str, str]:
+    def proxied_endpoints(self) -> Dict[str, Dict[str, str]]:
         """Returns the ingress settings provided to applications by this IngressPerAppProvider.
 
         For example, when this IngressPerAppProvider has provided the
@@ -576,7 +567,7 @@ class IngressPerAppProvider(_IngressPerAppBase):
         }
         ```
         """
-        results = {}
+        results: Dict[str, Dict[str, str]] = {}
 
         for ingress_relation in self.relations:
             if not ingress_relation.app:
@@ -596,8 +587,10 @@ class IngressPerAppProvider(_IngressPerAppBase):
             if not ingress_data:
                 log.warning(f"relation {ingress_relation} not ready yet: try again in some time.")
                 continue
-
-            results[ingress_relation.app.name] = ingress_data.ingress.dict()
+            if PYDANTIC_IS_V1:
+                results[ingress_relation.app.name] = ingress_data.ingress.dict()
+            else:
+                results[ingress_relation.app.name] = ingress_data.ingress.model_dump(mode=json)  # type: ignore
         return results
 
 
@@ -685,7 +678,6 @@ class IngressPerAppRequirer(_IngressPerAppBase):
     def _handle_relation(self, event):
         # created, joined or changed: if we have auto data: publish it
         self._publish_auto_data()
-
         if self.is_ready():
             # Avoid spurious events, emit only when there is a NEW URL available
             new_url = (
