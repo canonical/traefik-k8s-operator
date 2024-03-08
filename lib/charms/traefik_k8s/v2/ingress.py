@@ -82,7 +82,8 @@ RELATION_INTERFACE = "ingress"
 log = logging.getLogger(__name__)
 BUILTIN_JUJU_KEYS = {"ingress-address", "private-address", "egress-subnets"}
 
-if int(pydantic.version.VERSION.split(".")[0]) < 2:
+PYDANTIC_IS_V1 = int(pydantic.version.VERSION.split(".")[0]) < 2
+if PYDANTIC_IS_V1:
 
     class DatabagModel(BaseModel):  # type: ignore
         """Base databag model."""
@@ -133,13 +134,11 @@ if int(pydantic.version.VERSION.split(".")[0]) < 2:
                 databag = {}
 
             if self._NEST_UNDER:
-                databag[self._NEST_UNDER] = self.json(by_alias=True)
+                databag[self._NEST_UNDER] = self.json(by_alias=True, exclude_defaults=True)
                 return databag
 
-            dct = self.dict(by_alias=True)
-            for key, field in self.__fields__.items():  # type: ignore
-                value = dct[key]
-                databag[field.alias or key] = json.dumps(value)
+            for key, value in self.dict(by_alias=True, exclude_defaults=True).items():  # type: ignore
+                databag[key] = json.dumps(value)
 
             return databag
 
@@ -206,13 +205,8 @@ else:
                 )
                 return databag
 
-            dct = self.model_dump(by_alias=True)  # type: ignore
-            for key, field in self.model_fields.items():  # type: ignore
-                value = dct[key]
-                if value == field.default:
-                    continue
-                databag[field.alias or key] = json.dumps(value)
-
+            dct = self.model_dump(mode="json", by_alias=True, exclude_defaults=True)  # type: ignore
+            databag.update({k: json.dumps(v) for k, v in dct.items()})
             return databag
 
 
@@ -278,8 +272,9 @@ class IngressRequirerUnitData(DatabagModel):
 
     host: str = Field(description="Hostname at which the unit is reachable.")
     ip: Optional[str] = Field(
+        None,
         description="IP at which the unit is reachable, "
-        "IP can only be None if the IP information can't be retrieved from juju."
+        "IP can only be None if the IP information can't be retrieved from juju.",
     )
 
     @validator("host", pre=True)
@@ -554,7 +549,7 @@ class IngressPerAppProvider(_IngressPerAppBase):
     def publish_url(self, relation: Relation, url: str):
         """Publish to the app databag the ingress url."""
         ingress_url = {"url": url}
-        IngressProviderAppData.parse_obj({"ingress": ingress_url}).dump(relation.data[self.app])
+        IngressProviderAppData(ingress=ingress_url).dump(relation.data[self.app])  # type: ignore
 
     @property
     def proxied_endpoints(self) -> Dict[str, Dict[str, str]]:
@@ -592,8 +587,10 @@ class IngressPerAppProvider(_IngressPerAppBase):
             if not ingress_data:
                 log.warning(f"relation {ingress_relation} not ready yet: try again in some time.")
                 continue
-
-            results[ingress_relation.app.name] = ingress_data.ingress.dict()
+            if PYDANTIC_IS_V1:
+                results[ingress_relation.app.name] = ingress_data.ingress.dict()
+            else:
+                results[ingress_relation.app.name] = ingress_data.ingress.model_dump(mode=json)  # type: ignore
         return results
 
 

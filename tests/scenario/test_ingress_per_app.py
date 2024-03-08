@@ -184,9 +184,6 @@ def test_ingress_per_app_requirer_with_auto_data(host, ip, port, model, evt_name
             "model": '"test-model"',
             "name": '"charlie"',
             "port": str(port),
-            "redirect-https": "false",
-            "scheme": '"http"',
-            "strip-prefix": "false",
         }
 
 

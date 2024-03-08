@@ -41,8 +41,8 @@ def test_io_ingress_requirer_app_data():
             "port": 10,
             "name": "foo",
             "strip-prefix": True,
-            "redirect-https": None,
-            "scheme": "http",
+            # "redirect-https": False, omitted because default
+            # "scheme": "http", omitted because default
         }.items()
     }
     assert IngressRequirerAppData.load(databag) == app_data
@@ -68,7 +68,7 @@ def test_aliases():
             "port": 10,
             "strip-prefix": True,
             "redirect-https": True,
-            "scheme": "http",
+            # "scheme": "http", omitted because default
         }.items()
     }
 
@@ -78,7 +78,7 @@ def test_aliases():
 def test_io_provider_data():
     """Round trip test: A.dump().load() == A for A = IngressProviderAppData."""
     databag = {}
-    url = {"url": "https://foo.com"}
+    url = {"url": "https://foo.com/"}
     app_data = IngressProviderAppData(ingress=url)
 
     app_data.dump(databag)
