@@ -105,7 +105,7 @@ LIBAPI = 2
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 0
+LIBPATCH = 1
 
 PYDEPS = ["pydantic"]
 
@@ -577,7 +577,7 @@ class TracingEndpointProvider(Object):
         """All v2 relations active on this endpoint."""
         return [r for r in self._charm.model.relations[self._relation_name] if self.is_v2(r)]
 
-    def publish_receivers(self, receivers: Iterable[RawReceiver]):
+    def publish_receivers(self, receivers: Sequence[RawReceiver]):
         """Let all requirers know that these receivers are active and listening."""
         if not self._charm.unit.is_leader():
             raise RuntimeError("only leader can do this")
