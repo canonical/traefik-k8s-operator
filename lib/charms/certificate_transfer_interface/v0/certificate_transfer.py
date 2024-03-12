@@ -109,7 +109,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 5
+LIBPATCH = 6
 
 PYDEPS = ["jsonschema"]
 
@@ -379,7 +379,7 @@ class CertificateTransferRequires(Object):
         )
 
     def _on_relation_broken(self, event: RelationBrokenEvent) -> None:
-        """Handler triggered on relation broken event.
+        """Handle relation broken event.
 
         Args:
             event: Juju event
