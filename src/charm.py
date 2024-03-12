@@ -178,7 +178,10 @@ class TraefikIngressCharm(CharmBase):
 
         # Observability integrations
         # tracing integration
-        self._tracing = TracingEndpointRequirer(self, protocols=["otlp_http"])
+        self._tracing = TracingEndpointRequirer(self, protocols=[
+            "otlp_http", # for charm tracing
+            "otlp_grpc" # for traefik instrumentation
+        ])
 
         # Provide grafana dashboards over a relation interface
         # dashboard to use: https://grafana.com/grafana/dashboards/4475-traefik/
@@ -431,8 +434,10 @@ class TraefikIngressCharm(CharmBase):
             logger.info("tracing not enabled: skipping tracing config")
             return
 
-        if endpoint := self._tracing.otlp_http_endpoint():
-            grpc = False
+        if endpoint := self._tracing.get_endpoint("otlp_grpc"):
+            protocol = "grpc"
+        elif endpoint := self._tracing.get_endpoint("otlp_http"):
+            protocol = "http"
         else:
             logger.error(
                 "tracing integration is active but none of the "
@@ -440,7 +445,7 @@ class TraefikIngressCharm(CharmBase):
             )
             return
 
-        self.traefik.update_tracing_configuration(endpoint, grpc=grpc)
+        self.traefik.update_tracing_configuration(endpoint, protocol=protocol)
 
     def _on_traefik_pebble_ready(self, _: PebbleReadyEvent):
         # If the Traefik container comes up, e.g., after a pod churn, we
@@ -644,7 +649,6 @@ class TraefikIngressCharm(CharmBase):
             raise IngressSetupError("traefik is not ready")
 
         provider = self._provider_from_relation(relation)
-        logger.warning(f"provider: {provider}")
 
         if not provider.is_ready(relation):
             logger.debug(f"Provider {provider} not ready; resetting ingress configurations.")
