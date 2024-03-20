@@ -21,7 +21,9 @@ Example:
 from ops.charm import CharmBase, RelationJoinedEvent
 from ops.main import main
 
-from lib.charms.certificate_transfer_interface.v0.certificate_transfer import CertificateTransferProvides  # noqa: E501 W505
+from lib.charms.certificate_transfer_interface.v0.certificate_transfer import(
+    CertificateTransferProvides,
+)
 
 
 class DummyCertificateTransferProviderCharm(CharmBase):
@@ -36,7 +38,9 @@ class DummyCertificateTransferProviderCharm(CharmBase):
         certificate = "my certificate"
         ca = "my CA certificate"
         chain = ["certificate 1", "certificate 2"]
-        self.certificate_transfer.set_certificate(certificate=certificate, ca=ca, chain=chain, relation_id=event.relation.id)
+        self.certificate_transfer.set_certificate(
+            certificate=certificate, ca=ca, chain=chain, relation_id=event.relation.id
+        )
 
 
 if __name__ == "__main__":
@@ -95,7 +99,7 @@ juju relate <certificate_transfer provider charm> <certificate_transfer requirer
 
 import json
 import logging
-from typing import List
+from typing import List, Mapping
 
 from jsonschema import exceptions, validate  # type: ignore[import-untyped]
 from ops.charm import CharmBase, CharmEvents, RelationBrokenEvent, RelationChangedEvent
@@ -109,7 +113,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 6
+LIBPATCH = 7
 
 PYDEPS = ["jsonschema"]
 
@@ -210,7 +214,7 @@ class CertificateRemovedEvent(EventBase):
         self.relation_id = snapshot["relation_id"]
 
 
-def _load_relation_data(raw_relation_data: dict) -> dict:
+def _load_relation_data(raw_relation_data: Mapping[str, str]) -> dict:
     """Load relation data from the relation data bag.
 
     Args:
@@ -313,7 +317,7 @@ class CertificateTransferProvides(Object):
 class CertificateTransferRequires(Object):
     """TLS certificates requirer class to be instantiated by TLS certificates requirers."""
 
-    on = CertificateTransferRequirerCharmEvents()
+    on = CertificateTransferRequirerCharmEvents()  # type: ignore
 
     def __init__(
         self,

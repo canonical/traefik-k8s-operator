@@ -205,9 +205,9 @@ class Traefik:
 
         if self._tls_enabled:
             # enable http -> https redirect
-            web_config["http"] = (
-                {"redirections": {"entryPoint": {"to": "websecure", "scheme": "https"}}},
-            )
+            web_config["http"] = {
+                "redirections": {"entryPoint": {"to": "websecure", "scheme": "https"}},
+            }
 
         # TODO Disable static config with telemetry and check new version
         raw_config = {
