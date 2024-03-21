@@ -72,6 +72,10 @@ from ops.pebble import PathError
 from traefik import CA, LOG_PATH, SERVER_CERT_PATH, RoutingMode, Traefik
 from utils import is_hostname
 
+# To keep a tidy debug-log, we suppress some DEBUG/INFO logs from some imported libs,
+# even when charm logging is set to a lower level.
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 _TRAEFIK_CONTAINER_NAME = "traefik"
