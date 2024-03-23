@@ -248,17 +248,20 @@ class Traefik:
 
     # wokeignore:rule=master
     # ref: https://doc.traefik.io/traefik/master/observability/tracing/opentelemetry/
-    def update_tracing_configuration(self, endpoint: str, grpc: bool):
+    def update_tracing_configuration(self, endpoint: str, protocol: str):
         """Push yaml config with opentelemetry configuration."""
+
+        tls_enabled = self._tls_enabled
+
         config = yaml.safe_dump(
             {
                 "tracing": {
-                    "openTelemetry": {
-                        "address": endpoint,
-                        **({"grpc": {}} if grpc else {}),
+                    "serviceName": "traefik-workload",
+                    "otlp": {
+                        protocol: {"endpoint": f"http{'s' if tls_enabled else ''}://{endpoint}/v1/traces"},
                         # todo: we have an option to use CA or to use CERT+KEY (available with mtls) authentication.
                         #  when we have mTLS, consider this again.
-                        **({"ca": CA_CERT_PATH} if self._tls_enabled else {"insecure": True}),
+                        **({"ca": CA_CERT_PATH} if tls_enabled else {"insecure": True}),
                     }
                 }
             }
