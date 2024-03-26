@@ -67,7 +67,7 @@ logger = logging.getLogger(__name__)
 
 LIBID = "b5cd5cd580f3428fa5f59a8876dcbe6a"
 LIBAPI = 0
-LIBPATCH = 10
+LIBPATCH = 11
 
 
 def is_ip_address(value: str) -> bool:
@@ -378,7 +378,15 @@ class CertHandler(Object):
     def _chain(self) -> str:
         if self._peer_relation:
             if chain := self._peer_relation.data[self.charm.unit].get("chain", ""):
-                return json.loads(cast(str, chain))
+                chain = json.loads(chain)
+
+                # In a previous version of this lib, chain used to be a list.
+                # Convert the List[str] to str, per
+                # https://github.com/canonical/tls-certificates-interface/pull/141
+                if isinstance(chain, list):
+                    chain = "\n\n".join(reversed(chain))
+
+                return cast(str, chain)
         return ""
 
     @_chain.setter
