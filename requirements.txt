@@ -33,6 +33,6 @@ ops >= 2.10.0
 # Keep them in sync with pydeps!
 importlib-metadata==6.0.0
 opentelemetry-exporter-otlp-proto-http==1.21.0
-pydantic<2.0
+pydantic>=2
 
 cosl
