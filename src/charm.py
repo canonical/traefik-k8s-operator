@@ -386,7 +386,7 @@ class TraefikIngressCharm(CharmBase):
     def _update_cert_configs(self):
         cert_handler = self.cert
         self.traefik.update_cert_configuration(
-            cert_handler.cert, cert_handler.key, cert_handler.ca
+            cert_handler.chain, cert_handler.key, cert_handler.ca
         )
 
     def _on_show_proxied_endpoints(self, event: ActionEvent):

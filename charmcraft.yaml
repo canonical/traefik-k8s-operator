@@ -19,7 +19,7 @@ parts:
       # From PYDEPS
       - "importlib-metadata==6.0.0"
       - "opentelemetry-exporter-otlp-proto-http==1.21.0"
-      - "pydantic<2"
+      - "pydantic>=2"
     build-packages:
       - git
 
