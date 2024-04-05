@@ -44,3 +44,16 @@ options:
       `http://my-model-my-unit-2.foo:8080`
     type: string
     default: path
+
+  ssl-ca:
+    description: |
+      CA cert used for TLS termination.
+    type: string
+  ssl-cert:
+    description: |
+      SSL cert used for TLS termination.
+    type: string
+  ssl-key:
+    description: |
+      Key used for TLS termination.
+    type: string
