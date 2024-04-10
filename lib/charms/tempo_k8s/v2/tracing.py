@@ -75,7 +75,6 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Dict,
-    Iterable,
     List,
     Literal,
     MutableMapping,
@@ -105,7 +104,7 @@ LIBAPI = 2
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 1
+LIBPATCH = 2
 
 PYDEPS = ["pydantic"]
 
@@ -818,8 +817,13 @@ class TracingEndpointRequirer(Object):
         endpoint = self._get_endpoint(relation or self._relation, protocol=protocol)
         if not endpoint:
             requested_protocols = set()
-            for relation in self.relations:
-                databag = TracingRequirerAppData.load(relation.data[self._charm.app])
+            relations = [relation] if relation else self.relations
+            for relation in relations:
+                try:
+                    databag = TracingRequirerAppData.load(relation.data[self._charm.app])
+                except DataValidationError:
+                    continue
+
                 requested_protocols.update(databag.receivers)
 
             if protocol not in requested_protocols:
