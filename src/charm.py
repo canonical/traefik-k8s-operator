@@ -899,7 +899,7 @@ class TraefikIngressCharm(CharmBase):
 
     @property
     def _scheme(self):
-        return "https" if self.cert.enabled else "http"
+        return "https" if self._is_tls_enabled() else "http"
 
     def _get_external_url(self, prefix):
         if self._routing_mode is RoutingMode.path:
