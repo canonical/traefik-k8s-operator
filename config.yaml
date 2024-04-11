@@ -45,15 +45,15 @@ options:
     type: string
     default: path
 
-  ssl-ca:
+  tls-ca:
     description: |
       CA cert used for TLS termination.
     type: string
-  ssl-cert:
+  tls-cert:
     description: |
       SSL cert used for TLS termination.
     type: string
-  ssl-key:
+  tls-key:
     description: |
       Key used for TLS termination.
     type: string

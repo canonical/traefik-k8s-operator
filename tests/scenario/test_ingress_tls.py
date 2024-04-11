@@ -58,9 +58,9 @@ def test_middleware_config(
             config={
                 "routing_mode": routing_mode,
                 "external_hostname": "testhostname",
-                "ssl-cert": "helloworld",
-                "ssl-key": "helloworld",
-                "ssl-ca": "helloworld",
+                "tls-cert": "helloworld",
+                "tls-key": "helloworld",
+                "tls-ca": "helloworld",
             },
             containers=containers,
             relations=[ipa],

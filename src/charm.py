@@ -353,9 +353,9 @@ class TraefikIngressCharm(CharmBase):
         if self.cert.enabled:
             return True
         if (
-            self.config.get("ssl-ca", None)
-            and self.config.get("ssl-cert", None)
-            and self.config.get("ssl-key", None)
+            self.config.get("tls-ca", None)
+            and self.config.get("tls-cert", None)
+            and self.config.get("tls-key", None)
         ):
             return True
         return False
@@ -404,11 +404,11 @@ class TraefikIngressCharm(CharmBase):
         if not self._is_tls_enabled():
             raise TLSNotEnabledError()
         if (
-            self.config.get("ssl-ca", None)
-            and self.config.get("ssl-cert", None)
-            and self.config.get("ssl-key", None)
+            self.config.get("tls-ca", None)
+            and self.config.get("tls-cert", None)
+            and self.config.get("tls-key", None)
         ):
-            return self.config["ssl-cert"], self.config["ssl-key"], self.config["ssl-ca"]
+            return self.config["tls-cert"], self.config["tls-key"], self.config["tls-ca"]
         return cert_handler.chain, cert_handler.key, cert_handler.ca
 
     def _on_show_proxied_endpoints(self, event: ActionEvent):
@@ -528,16 +528,16 @@ class TraefikIngressCharm(CharmBase):
 
     def _process_status_and_configurations(self):
         if (
-            self.config.get("ssl-ca", None)
-            or self.config.get("ssl-cert", None)
-            or self.config.get("ssl-key", None)
+            self.config.get("tls-ca", None)
+            or self.config.get("tls-cert", None)
+            or self.config.get("tls-key", None)
         ):
             if not (
-                self.config.get("ssl-ca", None)
-                and self.config.get("ssl-cert", None)
-                and self.config.get("ssl-key", None)
+                self.config.get("tls-ca", None)
+                and self.config.get("tls-cert", None)
+                and self.config.get("tls-key", None)
             ):
-                self.unit.status = BlockedStatus("Please set ssl-cert, ssl-key, and ssl-ca")
+                self.unit.status = BlockedStatus("Please set tls-cert, tls-key, and tls-ca")
                 return
 
         routing_mode = self.config["routing_mode"]
