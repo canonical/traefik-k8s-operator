@@ -10,7 +10,7 @@ import itertools
 import json
 import logging
 import socket
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, cast
 from urllib.parse import urlparse
 
 import yaml
@@ -946,7 +946,7 @@ class TraefikIngressCharm(CharmBase):
         returns None. Only use this directly when external_host is allowed to be None.
         """
         if external_hostname := self.model.config.get("external_hostname"):
-            return external_hostname
+            return cast(str, external_hostname)
 
         return _get_loadbalancer_status(namespace=self.model.name, service_name=self.app.name)
 
