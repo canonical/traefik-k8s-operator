@@ -22,11 +22,14 @@ def _create_tls_relation(*, app_name: str, strip_prefix: bool, redirect_https: b
 @pytest.mark.parametrize("routing_mode", ("path", "subdomain"))
 @pytest.mark.parametrize("strip_prefix", (False, True))
 @pytest.mark.parametrize("redirect_https", (False, True))
+@pytest.mark.parametrize("tls_from_configs", (True, False))
 @patch("charm.TraefikIngressCharm._external_host", PropertyMock(return_value="testhostname"))
 @patch("traefik.Traefik.is_ready", PropertyMock(return_value=True))
 @patch("charm.TraefikIngressCharm._tcp_entrypoints_changed", MagicMock(return_value=False))
 @patch("charm.TraefikIngressCharm.version", PropertyMock(return_value="0.0.0"))
-def test_middleware_config(traefik_ctx, routing_mode, strip_prefix, redirect_https):
+def test_middleware_config(
+    traefik_ctx, routing_mode, strip_prefix, redirect_https, tls_from_configs
+):
     td = tempfile.TemporaryDirectory()
     containers = [
         Container(
@@ -48,19 +51,35 @@ def test_middleware_config(traefik_ctx, routing_mode, strip_prefix, redirect_htt
         hosts=["0.0.0.42"],
     )
 
-    tls = _create_tls_relation(
-        app_name=app_name,
-        strip_prefix=strip_prefix,
-        redirect_https=redirect_https,
-    )
+    if tls_from_configs:
+        # AND GIVEN external host is set (see also decorator)
+        state = State(
+            leader=True,
+            config={
+                "routing_mode": routing_mode,
+                "external_hostname": "testhostname",
+                "tls-cert": "helloworld",
+                "tls-key": "helloworld",
+                "tls-ca": "helloworld",
+            },
+            containers=containers,
+            relations=[ipa],
+        )
 
-    # AND GIVEN external host is set (see also decorator)
-    state = State(
-        leader=True,
-        config={"routing_mode": routing_mode, "external_hostname": "testhostname"},
-        containers=containers,
-        relations=[ipa, tls],
-    )
+    else:
+        tls = _create_tls_relation(
+            app_name=app_name,
+            strip_prefix=strip_prefix,
+            redirect_https=redirect_https,
+        )
+
+        # AND GIVEN external host is set (see also decorator)
+        state = State(
+            leader=True,
+            config={"routing_mode": routing_mode, "external_hostname": "testhostname"},
+            containers=containers,
+            relations=[ipa, tls],
+        )
 
     # WHEN a `relation-changed` hook fires
     out = traefik_ctx.run(ipa.changed_event, state)
