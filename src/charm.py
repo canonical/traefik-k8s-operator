@@ -10,7 +10,7 @@ import itertools
 import json
 import logging
 import socket
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 from urllib.parse import urlparse
 
 import yaml
@@ -399,7 +399,7 @@ class TraefikIngressCharm(CharmBase):
         cert, key, ca = self._get_certs()
         self.traefik.update_cert_configuration(cert, key, ca)
 
-    def _get_certs(self) -> (str, str, str):
+    def _get_certs(self) -> Tuple[str, str, str]:
         cert_handler = self.cert
         if not self._is_tls_enabled():
             raise TLSNotEnabledError()
