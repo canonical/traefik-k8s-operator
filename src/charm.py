@@ -399,7 +399,7 @@ class TraefikIngressCharm(CharmBase):
         cert, key, ca = self._get_certs()
         self.traefik.update_cert_configuration(cert, key, ca)
 
-    def _get_certs(self) -> Tuple[str, str, str]:
+    def _get_certs(self) -> Tuple[str, Union[str, None], Union[str, None]]:
         cert_handler = self.cert
         if not self._is_tls_enabled():
             raise TLSNotEnabledError()
