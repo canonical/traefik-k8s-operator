@@ -66,7 +66,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 3
+LIBPATCH = 4
 
 RELATION_NAME = "forward-auth"
 INTERFACE_NAME = "forward_auth"
@@ -274,7 +274,7 @@ class ForwardAuthRequirer(ForwardAuthRelation):
         *,
         relation_name: str = RELATION_NAME,
         ingress_app_names: Optional[ForwardAuthRequirerConfig] = None,
-    ):
+    ) -> None:
         super().__init__(charm, relation_name)
 
         self._charm = charm
@@ -437,7 +437,7 @@ class ForwardAuthProxySet(EventBase):
 class InvalidForwardAuthConfigEvent(EventBase):
     """Event to notify the charm that the forward-auth configuration is invalid."""
 
-    def __init__(self, handle: Handle, error: str):
+    def __init__(self, handle: Handle, error: str) -> None:
         super().__init__(handle)
         self.error = error
 
