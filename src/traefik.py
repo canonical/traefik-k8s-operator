@@ -273,7 +273,12 @@ class Traefik:
         additional_static_configs = list(self._traefik_route_static_configs)
         if additional_static_configs:
             static_configs = [base_config] + additional_static_configs
-            return reduce(static_config_deep_merge, static_configs)
+            try:
+                return reduce(static_config_deep_merge, static_configs)
+            except StaticConfigMergeConflictError as e:
+                logger.exception("failed to merge static config into traefik's base config."
+                                 "Ignoring any external static configs...")
+                return base_config
         return base_config
 
     def push_static_config(self, config: Dict[str, Any]):
