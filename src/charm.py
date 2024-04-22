@@ -674,6 +674,7 @@ class TraefikIngressCharm(CharmBase):
     def _handle_traefik_route_ready(self, event: TraefikRouteRequirerReadyEvent):
         """A traefik_route charm has published some ingress data."""
         if self._static_config_changed:
+        if self._static_config_changed():
             self._clear_all_configs_and_restart_traefik()
             return
 
