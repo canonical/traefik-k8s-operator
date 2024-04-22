@@ -7,6 +7,7 @@ import pytest
 import yaml
 from charm import TraefikIngressCharm
 from ops.testing import Harness
+from traefik import Traefik
 
 MODEL_NAME = "test-model"
 REMOTE_APP_NAME = "traefikRouteApp"
@@ -141,3 +142,41 @@ def test_tls_is_added(harness: Harness[TraefikIngressCharm]):
     file = f"/opt/traefik/juju/juju_ingress_{relation.name}_{relation.id}_{relation.app.name}.yaml"
     conf = yaml.safe_load(charm.container.pull(file).read())
     assert conf == CONFIG_WITH_TLS
+
+
+def test_static_config(harness: Harness[TraefikIngressCharm]):
+    tr_relation_id, relation = initialize_and_setup_tr_relation(harness)
+    config = yaml.dump(CONFIG)
+    static = yaml.safe_dump({"foo": "bar"})
+
+    with harness.hooks_disabled():
+        # don't emit yet: we need to reinitialize Traefik first.
+        harness.update_relation_data(
+            tr_relation_id,
+            REMOTE_APP_NAME,
+            {
+                "config": config,
+                "static": static,
+            },
+        )
+
+    # reinitialize Traefik, else _traefik_route_static_configs won't be passed to Traefik on init.
+    charm = harness.charm
+    charm.traefik = Traefik(
+        container=charm.container,
+        routing_mode=charm._routing_mode,
+        tcp_entrypoints=charm._tcp_entrypoints(),
+        tls_enabled=charm._is_tls_enabled(),
+        experimental_forward_auth_enabled=charm._is_forward_auth_enabled,
+        traefik_route_static_configs=charm._traefik_route_static_configs(),
+    )
+
+    charm.traefik_route.on.ready.emit(charm.model.get_relation("traefik-route"))
+
+    assert charm.traefik._traefik_route_static_configs == [{"foo": "bar"}]
+
+    assert charm.traefik_route.is_ready(relation)
+    assert charm.traefik_route.get_static_config(relation) == static
+    file = "/etc/traefik/traefik.yaml"
+    conf = yaml.safe_load(charm.container.pull(file).read())
+    assert conf["foo"] == "bar"

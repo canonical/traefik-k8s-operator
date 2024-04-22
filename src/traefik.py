@@ -9,6 +9,7 @@ import enum
 import logging
 import re
 import socket
+from functools import reduce
 from pathlib import Path
 from string import Template
 from typing import Any, Dict, Iterable, List, Optional, Union, cast
@@ -64,6 +65,26 @@ class ContainerNotReadyError(TraefikError):
     """Raised if the caller incorrectly assumes that the traefik container is ready."""
 
 
+class StaticConfigMergeConflictError(TraefikError):
+    """Raised when static configs coming from different sources can't be merged."""
+
+
+def static_config_deep_merge(dict1: dict, dict2: dict, _path=None):
+    """In-place deep merge dict2 into dict1."""
+    _path = _path or []
+
+    for key, val in dict2.items():
+        if key in dict1:
+            val1 = dict1[key]
+            if isinstance(val, dict) and isinstance(val1, dict):
+                static_config_deep_merge(val1, val, _path + [str(key)])
+            elif val != val1:
+                raise StaticConfigMergeConflictError(f"Conflict at path {'.'.join(_path)}")
+        else:
+            dict1[key] = val
+    return dict1
+
+
 class Traefik:
     """Traefik workload representation."""
 
@@ -81,9 +102,11 @@ class Traefik:
         tls_enabled: bool,
         experimental_forward_auth_enabled: bool,
         tcp_entrypoints: Dict[str, int],
+        traefik_route_static_configs: Iterable[Dict[str, Any]],
     ):
         self._container = container
         self._tcp_entrypoints = tcp_entrypoints
+        self._traefik_route_static_configs = traefik_route_static_configs
         self._routing_mode = routing_mode
         self._tls_enabled = tls_enabled
         self._experimental_forward_auth_enabled = experimental_forward_auth_enabled
@@ -126,7 +149,9 @@ class Traefik:
     def configure(self):
         """Configure static and tls."""
         # Ensure the required basic configurations and folders exist
-        self._update_static_configuration()
+        static_config = self.generate_static_config()
+        self.push_static_config(static_config)
+
         self._setup_dynamic_config_folder()
 
         if self._tls_enabled:
@@ -194,8 +219,8 @@ class Traefik:
         # - old certs will be kept active.
         self.restart()
 
-    def _update_static_configuration(self):
-        """Generate and push Traefik's static config yaml file."""
+    def generate_static_config(self) -> Dict[str, Any]:
+        """Generate Traefik's static config yaml."""
         tcp_entrypoints = self._tcp_entrypoints
         logger.debug(f"Statically configuring traefik with tcp entrypoints: {tcp_entrypoints}.")
 
@@ -210,7 +235,7 @@ class Traefik:
             }
 
         # TODO Disable static config with telemetry and check new version
-        raw_config = {
+        base_config = {
             "log": {
                 "level": "DEBUG",
             },
@@ -241,8 +266,19 @@ class Traefik:
                 }
             },
         }
-        config = yaml.safe_dump(raw_config)
 
+        # we attempt to put together the base config with whatever the user passed via traefik_route.
+        # in case there are conflicts between the base config and some route, or between the routes themselves,
+        # we'll be forced to bail out.
+        additional_static_configs = list(self._traefik_route_static_configs)
+        if additional_static_configs:
+            static_configs = [base_config] + additional_static_configs
+            return reduce(static_config_deep_merge, static_configs)
+        return base_config
+
+    def push_static_config(self, config: Dict[str, Any]):
+        """Push static config yaml to the container."""
+        config = yaml.safe_dump(config)
         # TODO Use the Traefik user and group?
         self._container.push(STATIC_CONFIG_PATH, config, make_dirs=True)
 
@@ -534,7 +570,7 @@ class Traefik:
             }
         }
 
-    def pull_tcp_entrypoints(self) -> Dict[str, int]:
+    def pull_static_config(self) -> Dict[str, Any]:
         """Pull the currently configured tcp entrypoints from the static config."""
         try:
             static_config_raw = self._container.pull(STATIC_CONFIG_PATH).read()
@@ -542,9 +578,7 @@ class Traefik:
             logger.error(f"Could not fetch static config from container; {e}")
             return {}
 
-        static_config = yaml.safe_load(static_config_raw)
-        eps = static_config["entryPoints"]
-        return {k: v for k, v in eps.items() if k not in {"diagnostics", "web", "websecure"}}
+        return yaml.safe_load(static_config_raw)
 
     @property
     def is_ready(self):
