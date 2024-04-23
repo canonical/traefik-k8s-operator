@@ -69,7 +69,7 @@ from ops.model import (
     WaitingStatus,
 )
 from ops.pebble import PathError
-from traefik import CA, LOG_PATH, SERVER_CERT_PATH, RoutingMode, Traefik
+from traefik import CA, LOG_PATH, SERVER_CERT_PATH, RoutingMode, Traefik, StaticConfigMergeConflictError
 from utils import is_hostname
 
 # To keep a tidy debug-log, we suppress some DEBUG/INFO logs from some imported libs,
@@ -679,7 +679,6 @@ class TraefikIngressCharm(CharmBase):
 
         try:
             self._process_ingress_relation(event.relation)
-            self.unit.status = ActiveStatus()
         except IngressSetupError as e:
             err_msg = e.args[0]
             logger.error(
@@ -688,6 +687,18 @@ class TraefikIngressCharm(CharmBase):
             )
 
             self.unit.status = ActiveStatus("traefik-route relation degraded")
+
+        try:
+            self.traefik.generate_static_config(_raise=True)
+        except StaticConfigMergeConflictError:
+            # FIXME: it's pretty hard to tell which configs are conflicting
+            # FIXME: this status is lost when the next event comes in.
+            #  We should start using the collect-status OF hook.
+            self.unit.status = BlockedStatus("Failed to merge traefik-route static configs. "
+                                             "Check logs for details.")
+            return
+
+        self.unit.status = ActiveStatus()
 
     def _process_ingress_relation(self, relation: Relation):
         # There's a chance that we're processing a relation event which was deferred until after
@@ -1101,7 +1112,6 @@ def _get_loadbalancer_status(namespace: str, service_name: str) -> Optional[str]
             if ingress_addresses := load_balancer_status.ingress:
                 if ingress_address := ingress_addresses[0]:
                     return ingress_address.hostname or ingress_address.ip
-
     return None
 
 

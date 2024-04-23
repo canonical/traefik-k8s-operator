@@ -219,7 +219,7 @@ class Traefik:
         # - old certs will be kept active.
         self.restart()
 
-    def generate_static_config(self) -> Dict[str, Any]:
+    def generate_static_config(self, _raise: bool = False) -> Dict[str, Any]:
         """Generate Traefik's static config yaml."""
         tcp_entrypoints = self._tcp_entrypoints
         logger.debug(f"Statically configuring traefik with tcp entrypoints: {tcp_entrypoints}.")
@@ -276,6 +276,8 @@ class Traefik:
             try:
                 return reduce(static_config_deep_merge, static_configs)
             except StaticConfigMergeConflictError as e:
+                if _raise:
+                    raise e
                 logger.exception("failed to merge static config into traefik's base config."
                                  "Ignoring any external static configs...")
                 return base_config
