@@ -3,8 +3,8 @@
 import asyncio
 import shlex
 import urllib.error
-from subprocess import Popen, PIPE
-from urllib.request import urlopen, Request
+from subprocess import PIPE, Popen
+from urllib.request import Request, urlopen
 
 import pytest
 import yaml
@@ -21,15 +21,11 @@ APP_NAME = "traefik-k8s"
 @pytest.mark.abort_on_fail
 async def test_deployment(ops_test: OpsTest, traefik_charm, route_tester_charm):
     await asyncio.gather(
-        ops_test.model.deploy(
-            traefik_charm, application_name=APP_NAME, resources=trfk_resources
-        ),
+        ops_test.model.deploy(traefik_charm, application_name=APP_NAME, resources=trfk_resources),
         ops_test.model.deploy(route_tester_charm, "tr-tester"),
     )
 
-    await ops_test.model.wait_for_idle(
-        [APP_NAME, "tr-tester"], status="active", timeout=1000
-    )
+    await ops_test.model.wait_for_idle([APP_NAME, "tr-tester"], status="active", timeout=1000)
 
 
 @pytest.mark.abort_on_fail
@@ -40,11 +36,16 @@ async def test_relate(ops_test: OpsTest):
 
 @pytest.mark.abort_on_fail
 async def test_dynamic_config_created(ops_test: OpsTest):
-    relation = [r for r in ops_test.model.relations if r.matches("tr-tester:traefik-route",
-                                                                 "traefik-k8s:traefik-route")][0]
+    relation = [
+        r
+        for r in ops_test.model.relations
+        if r.matches("tr-tester:traefik-route", "traefik-k8s:traefik-route")
+    ][0]
     relation_id = relation.entity_id
-    cmd = (f"juju ssh -m {ops_test.model_name} --container traefik {APP_NAME}/0 "
-           f"cat /opt/traefik/juju/juju_ingress_traefik-route_{relation_id}_route.yaml")
+    cmd = (
+        f"juju ssh -m {ops_test.model_name} --container traefik {APP_NAME}/0 "
+        f"cat /opt/traefik/juju/juju_ingress_traefik-route_{relation_id}_route.yaml"
+    )
     proc = Popen(shlex.split(cmd), stdout=PIPE, text=True)
     contents = proc.stdout.read()
     contents_yaml = yaml.safe_load(contents)
