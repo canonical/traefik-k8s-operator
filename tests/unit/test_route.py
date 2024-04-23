@@ -259,6 +259,8 @@ def test_static_config_partially_broken(harness: Harness[TraefikIngressCharm]):
             {"log": {"level": "ERROR"}},
             # GOOD: this config won't conflict with any other
             {"foo": {"bar": "baz"}},
+            # GOOD: this one won't conflict with other entrypoints
+            {"entryPoints": {"shondaland": {"address": ":6767"}}},
         ],
     )
 
@@ -276,4 +278,5 @@ def test_static_config_partially_broken(harness: Harness[TraefikIngressCharm]):
     assert generated_config["log"] == {"level": "DEBUG"}
     # BUT the non-conflicting ones have.
     assert generated_config["barbaras"] == {"rhabarber": "bar"}
+    assert generated_config["entryPoints"]["shondaland"]["address"] == ":6767"
     assert generated_config["foo"] == {"bar": "baz"}
