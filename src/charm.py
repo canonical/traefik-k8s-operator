@@ -346,7 +346,9 @@ class TraefikIngressCharm(CharmBase):
     @property
     def server_cert(self) -> Optional[str]:
         """Server certificate path for tls tracing."""
-        return SERVER_CERT_PATH
+        if self._is_tls_enabled():
+            return SERVER_CERT_PATH
+        return None
 
     def _is_tls_enabled(self) -> bool:
         """Return True if TLS is enabled."""
