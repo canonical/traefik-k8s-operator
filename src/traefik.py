@@ -278,16 +278,18 @@ class Traefik:
             except StaticConfigMergeConflictError as e:
                 if _raise:
                     raise e
-                logger.exception("failed to merge static config into traefik's base config."
-                                 "Ignoring any external static configs...")
+                logger.exception(
+                    "failed to merge static config into traefik's base config."
+                    "Ignoring any external static configs..."
+                )
                 return base_config
         return base_config
 
     def push_static_config(self, config: Dict[str, Any]):
         """Push static config yaml to the container."""
-        config = yaml.safe_dump(config)
+        config_yaml = yaml.safe_dump(config)
         # TODO Use the Traefik user and group?
-        self._container.push(STATIC_CONFIG_PATH, config, make_dirs=True)
+        self._container.push(STATIC_CONFIG_PATH, config_yaml, make_dirs=True)
 
     # wokeignore:rule=master
     # ref: https://doc.traefik.io/traefik/master/observability/tracing/opentelemetry/

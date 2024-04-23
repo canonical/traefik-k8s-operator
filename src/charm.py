@@ -69,7 +69,14 @@ from ops.model import (
     WaitingStatus,
 )
 from ops.pebble import PathError
-from traefik import CA, LOG_PATH, SERVER_CERT_PATH, RoutingMode, Traefik, StaticConfigMergeConflictError
+from traefik import (
+    CA,
+    LOG_PATH,
+    SERVER_CERT_PATH,
+    RoutingMode,
+    StaticConfigMergeConflictError,
+    Traefik,
+)
 from utils import is_hostname
 
 # To keep a tidy debug-log, we suppress some DEBUG/INFO logs from some imported libs,
@@ -589,7 +596,7 @@ class TraefikIngressCharm(CharmBase):
         # traefik as the tcp entrypoints are consumed as static configuration
         # and those can only be passed on init.
 
-        if self._static_config_changed():
+        if self._static_config_changed:
             logger.debug("Static config needs to be updated. Rebooting traefik.")
             # fixme: this is kind of brutal;
             #  will kill in-flight requests and disrupt traffic.
@@ -629,6 +636,7 @@ class TraefikIngressCharm(CharmBase):
         else:
             self.unit.status = ActiveStatus()
 
+    @property
     def _static_config_changed(self):
         current = self.traefik.generate_static_config()
         traefik_static_config = self.traefik.pull_static_config()
@@ -674,19 +682,22 @@ class TraefikIngressCharm(CharmBase):
     def _handle_traefik_route_ready(self, event: TraefikRouteRequirerReadyEvent):
         """A traefik_route charm has published some ingress data."""
         if self._static_config_changed:
-            self._clear_all_configs_and_restart_traefik()
-            return
+            # This will regenerate the static configs and reevaluate all dynamic configs,
+            # including this one.
+            self._update_ingress_configurations()
 
-        try:
-            self._process_ingress_relation(event.relation)
-        except IngressSetupError as e:
-            err_msg = e.args[0]
-            logger.error(
-                f"failed processing the ingress relation for "
-                f"traefik-route ready with: {err_msg!r}"
-            )
+        else:
+            try:
+                self._process_ingress_relation(event.relation)
+            except IngressSetupError as e:
+                err_msg = e.args[0]
+                logger.error(
+                    f"failed processing the ingress relation for "
+                    f"traefik-route ready with: {err_msg!r}"
+                )
 
-            self.unit.status = ActiveStatus("traefik-route relation degraded")
+                self.unit.status = ActiveStatus("traefik-route relation degraded")
+                return
 
         try:
             self.traefik.generate_static_config(_raise=True)
@@ -694,8 +705,9 @@ class TraefikIngressCharm(CharmBase):
             # FIXME: it's pretty hard to tell which configs are conflicting
             # FIXME: this status is lost when the next event comes in.
             #  We should start using the collect-status OF hook.
-            self.unit.status = BlockedStatus("Failed to merge traefik-route static configs. "
-                                             "Check logs for details.")
+            self.unit.status = BlockedStatus(
+                "Failed to merge traefik-route static configs. " "Check logs for details."
+            )
             return
 
         self.unit.status = ActiveStatus()

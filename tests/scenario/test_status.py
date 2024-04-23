@@ -37,7 +37,7 @@ def test_start_traefik_no_hostname(traefik_ctx, *_):
 
 @patch("charm.TraefikIngressCharm._external_host", PropertyMock(return_value="foo.bar"))
 @patch("traefik.Traefik.is_ready", PropertyMock(return_value=True))
-@patch("charm.TraefikIngressCharm._tcp_entrypoints_changed", MagicMock(return_value=False))
+@patch("charm.TraefikIngressCharm._static_config_changed", MagicMock(return_value=False))
 def test_start_traefik_active(traefik_ctx, *_):
     # GIVEN external host is set (see decorator), plus additional mockery
     state = State(
