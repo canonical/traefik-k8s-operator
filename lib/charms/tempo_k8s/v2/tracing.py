@@ -104,7 +104,7 @@ LIBAPI = 2
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 2
+LIBPATCH = 3
 
 PYDEPS = ["pydantic"]
 
@@ -117,15 +117,13 @@ ReceiverProtocol = Literal[
     "zipkin",
     "kafka",
     "opencensus",
-    "tempo",  # legacy, renamed to tempo_http
     "tempo_http",
     "tempo_grpc",
     "otlp_grpc",
     "otlp_http",
-    "jaeger_grpc",
+    # "jaeger_grpc",
     "jaeger_thrift_compact",
     "jaeger_thrift_http",
-    "jaeger_http_thrift",  # legacy, renamed to jaeger_thrift_http
     "jaeger_thrift_binary",
 ]
 
@@ -302,10 +300,13 @@ class TracingProviderAppData(DatabagModel):  # noqa: D101
     """Application databag model for the tracing provider."""
 
     host: str
-    """Server hostname."""
+    """Server hostname (local fqdn)."""
 
     receivers: List[Receiver]
     """Enabled receivers and ports at which they are listening."""
+
+    external_url: Optional[str] = None
+    """Server url. If an ingress is present, it will be the ingress address."""
 
 
 class TracingRequirerAppData(DatabagModel):  # noqa: D101
@@ -492,6 +493,7 @@ class TracingEndpointProvider(Object):
         self,
         charm: CharmBase,
         host: str,
+        external_url: Optional[str] = None,
         relation_name: str = DEFAULT_RELATION_NAME,
     ):
         """Initialize.
@@ -499,6 +501,8 @@ class TracingEndpointProvider(Object):
         Args:
             charm: a `CharmBase` instance that manages this instance of the Tempo service.
             host: address of the node hosting the tempo server.
+            external_url: external address of the node hosting the tempo server,
+                if an ingress is present.
             relation_name: an optional string name of the relation between `charm`
                 and the Tempo charmed service. The default is "tracing".
 
@@ -519,6 +523,7 @@ class TracingEndpointProvider(Object):
         super().__init__(charm, relation_name + "tracing-provider-v2")
         self._charm = charm
         self._host = host
+        self._external_url = external_url
         self._relation_name = relation_name
         self.framework.observe(
             self._charm.on[relation_name].relation_joined, self._on_relation_event
@@ -585,6 +590,7 @@ class TracingEndpointProvider(Object):
             try:
                 TracingProviderAppData(
                     host=self._host,
+                    external_url=self._external_url,
                     receivers=[
                         Receiver(port=port, protocol=protocol) for protocol, port in receivers
                     ],
@@ -612,16 +618,17 @@ class EndpointRemovedEvent(RelationBrokenEvent):
 class EndpointChangedEvent(_AutoSnapshotEvent):
     """Event representing a change in one of the receiver endpoints."""
 
-    __args__ = ("host", "_ingesters")
+    __args__ = ("host", "external_url", "_receivers")
 
     if TYPE_CHECKING:
         host = ""  # type: str
-        _ingesters = []  # type: List[dict]
+        external_url = ""  # type: str
+        _receivers = []  # type: List[dict]
 
     @property
     def receivers(self) -> List[Receiver]:
         """Cast receivers back from dict."""
-        return [Receiver(**i) for i in self._ingesters]
+        return [Receiver(**i) for i in self._receivers]
 
 
 class TracingEndpointRequirerEvents(CharmEvents):
@@ -776,7 +783,9 @@ class TracingEndpointRequirer(Object):
             return
 
         data = TracingProviderAppData.load(relation.data[relation.app])
-        self.on.endpoint_changed.emit(relation, data.host, [i.dict() for i in data.receivers])  # type: ignore
+        self.on.endpoint_changed.emit(  # type: ignore
+            relation, data.host, data.external_url, [i.dict() for i in data.receivers]
+        )
 
     def _on_tracing_relation_broken(self, event: RelationBrokenEvent):
         """Notify the providers that the endpoint is broken."""
@@ -787,28 +796,43 @@ class TracingEndpointRequirer(Object):
         self, relation: Optional[Relation] = None
     ) -> Optional[TracingProviderAppData]:
         """Unmarshalled relation data."""
-        if not self.is_ready(relation or self._relation):
+        relation = relation or self._relation
+        if not self.is_ready(relation):
             return
         return TracingProviderAppData.load(relation.data[relation.app])  # type: ignore
 
     def _get_endpoint(
-        self, relation: Optional[Relation], protocol: ReceiverProtocol, ssl: bool = False
-    ):
-        ep = self.get_all_endpoints(relation)
-        if not ep:
+        self, relation: Optional[Relation], protocol: ReceiverProtocol
+    ) -> Optional[str]:
+        app_data = self.get_all_endpoints(relation)
+        if not app_data:
             return None
-        try:
-            receiver: Receiver = next(filter(lambda i: i.protocol == protocol, ep.receivers))
-            if receiver.protocol in ["otlp_grpc", "jaeger_grpc"]:
-                if ssl:
-                    logger.warning("unused ssl argument - was the right protocol called?")
-                return f"{ep.host}:{receiver.port}"
-            if ssl:
-                return f"https://{ep.host}:{receiver.port}"
-            return f"http://{ep.host}:{receiver.port}"
-        except StopIteration:
+        receivers: List[Receiver] = list(
+            filter(lambda i: i.protocol == protocol, app_data.receivers)
+        )
+        if not receivers:
             logger.error(f"no receiver found with protocol={protocol!r}")
-            return None
+            return
+        if len(receivers) > 1:
+            logger.error(
+                f"too many receivers with protocol={protocol!r}; using first one. Found: {receivers}"
+            )
+            return
+
+        receiver = receivers[0]
+        # if there's an external_url argument (v2.5+), use that. Otherwise, we use the tempo local fqdn
+        if app_data.external_url:
+            url = app_data.external_url
+        else:
+            # FIXME: if we don't get an external url but only a
+            #  hostname, we don't know what scheme we need to be using. ASSUME HTTP
+            url = f"http://{app_data.host}:{receiver.port}"
+
+        if receiver.protocol.endswith("grpc"):
+            # TCP protocols don't want an http/https scheme prefix
+            url = url.split("://")[1]
+
+        return url
 
     def get_endpoint(
         self, protocol: ReceiverProtocol, relation: Optional[Relation] = None
