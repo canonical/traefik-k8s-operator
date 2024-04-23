@@ -10,7 +10,7 @@ import itertools
 import json
 import logging
 import socket
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 from urllib.parse import urlparse
 
 import yaml
@@ -93,6 +93,10 @@ class IngressSetupError(Exception):
 
 class ExternalHostNotReadyError(Exception):
     """Raised when the ingress hostname is not ready but is assumed to be."""
+
+
+class TLSNotEnabledError(Exception):
+    """Raised when tls is not enabled."""
 
 
 @trace_charm(
@@ -348,7 +352,15 @@ class TraefikIngressCharm(CharmBase):
 
     def _is_tls_enabled(self) -> bool:
         """Return True if TLS is enabled."""
-        return self.cert.enabled
+        if self.cert.enabled:
+            return True
+        if (
+            self.config.get("tls-ca", None)
+            and self.config.get("tls-cert", None)
+            and self.config.get("tls-key", None)
+        ):
+            return True
+        return False
 
     def _is_tracing_enabled(self) -> bool:
         """Return True if tracing is enabled."""
@@ -386,10 +398,20 @@ class TraefikIngressCharm(CharmBase):
         self._process_status_and_configurations()
 
     def _update_cert_configs(self):
+        cert, key, ca = self._get_certs()
+        self.traefik.update_cert_configuration(cert, key, ca)
+
+    def _get_certs(self) -> Tuple[str, Union[str, None], Union[str, None]]:
         cert_handler = self.cert
-        self.traefik.update_cert_configuration(
-            cert_handler.chain, cert_handler.key, cert_handler.ca
-        )
+        if not self._is_tls_enabled():
+            raise TLSNotEnabledError()
+        if (
+            self.config.get("tls-ca", None)
+            and self.config.get("tls-cert", None)
+            and self.config.get("tls-key", None)
+        ):
+            return self.config["tls-cert"], self.config["tls-key"], self.config["tls-ca"]
+        return cert_handler.chain, cert_handler.key, cert_handler.ca
 
     def _on_show_proxied_endpoints(self, event: ActionEvent):
         if not self.ready:
@@ -501,7 +523,25 @@ class TraefikIngressCharm(CharmBase):
             self._stored.current_routing_mode = new_routing_mode  # type: ignore
             self._stored.current_forward_auth_mode = new_forward_auth_mode  # type: ignore
 
+        if self._is_tls_enabled():
+            self._update_cert_configs()
+            self._configure_traefik()
+            self._process_status_and_configurations()
+
     def _process_status_and_configurations(self):
+        if (
+            self.config.get("tls-ca", None)
+            or self.config.get("tls-cert", None)
+            or self.config.get("tls-key", None)
+        ):
+            if not (
+                self.config.get("tls-ca", None)
+                and self.config.get("tls-cert", None)
+                and self.config.get("tls-key", None)
+            ):
+                self.unit.status = BlockedStatus("Please set tls-cert, tls-key, and tls-ca")
+                return
+
         routing_mode = self.config["routing_mode"]
         try:
             RoutingMode(routing_mode)
@@ -861,7 +901,7 @@ class TraefikIngressCharm(CharmBase):
 
     @property
     def _scheme(self):
-        return "https" if self.cert.enabled else "http"
+        return "https" if self._is_tls_enabled() else "http"
 
     def _get_external_url(self, prefix):
         if self._routing_mode is RoutingMode.path:

@@ -7,6 +7,9 @@
 This library contains the Requires and Provides classes for handling the tls-certificates
 interface.
 
+Pre-requisites:
+  - Juju >= 3.0
+
 ## Getting Started
 From a charm directory, fetch the library using `charmcraft`:
 
@@ -16,7 +19,7 @@ charmcraft fetch-lib charms.tls_certificates_interface.v3.tls_certificates
 
 Add the following libraries to the charm's `requirements.txt` file:
 - jsonschema
-- cryptography
+- cryptography >= 42.0.0
 
 Add the following section to the charm's `charmcraft.yaml` file:
 ```yaml
@@ -134,7 +137,7 @@ from charms.tls_certificates_interface.v3.tls_certificates import (
     generate_csr,
     generate_private_key,
 )
-from ops.charm import CharmBase, RelationJoinedEvent
+from ops.charm import CharmBase, RelationCreatedEvent
 from ops.main import main
 from ops.model import ActiveStatus, WaitingStatus
 from typing import Union
@@ -148,7 +151,7 @@ class ExampleRequirerCharm(CharmBase):
         self.certificates = TLSCertificatesRequiresV3(self, "certificates")
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(
-            self.on.certificates_relation_joined, self._on_certificates_relation_joined
+            self.on.certificates_relation_created, self._on_certificates_relation_created
         )
         self.framework.observe(
             self.certificates.on.certificate_available, self._on_certificate_available
@@ -176,7 +179,7 @@ class ExampleRequirerCharm(CharmBase):
             {"private_key_password": "banana", "private_key": private_key.decode()}
         )
 
-    def _on_certificates_relation_joined(self, event: RelationJoinedEvent) -> None:
+    def _on_certificates_relation_created(self, event: RelationCreatedEvent) -> None:
         replicas_relation = self.model.get_relation("replicas")
         if not replicas_relation:
             self.unit.status = WaitingStatus("Waiting for peer relation to be created")
@@ -295,6 +298,7 @@ from ops.charm import (
     SecretExpiredEvent,
 )
 from ops.framework import EventBase, EventSource, Handle, Object
+from ops.jujuversion import JujuVersion
 from ops.model import (
     Application,
     ModelError,
@@ -312,7 +316,7 @@ LIBAPI = 3
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 6
+LIBPATCH = 10
 
 PYDEPS = ["cryptography", "jsonschema"]
 
@@ -1482,6 +1486,8 @@ class TLSCertificatesRequiresV3(Object):
                 Used to trigger the CertificateExpiring event. Default: 7 days.
         """
         super().__init__(charm, relationship_name)
+        if not JujuVersion.from_environ().has_secrets:
+            logger.warning("This version of the TLS library requires Juju secrets (Juju >= 3.0)")
         self.relationship_name = relationship_name
         self.charm = charm
         self.expiry_notification_time = expiry_notification_time
@@ -1746,9 +1752,8 @@ class TLSCertificatesRequiresV3(Object):
         If the provider certificate is revoked, emit a CertificateInvalidateEvent,
         otherwise emit a CertificateAvailableEvent.
 
-        When Juju secrets are available, remove the secret for revoked certificate,
-        or add a secret with the correct expiry time for new certificates.
-
+        Remove the secret for revoked certificate, or add a secret with the correct expiry
+        time for new certificates.
 
         Args:
             event: Juju event
