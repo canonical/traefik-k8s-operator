@@ -9,7 +9,7 @@ import enum
 import logging
 import re
 import socket
-from functools import reduce
+from copy import deepcopy
 from pathlib import Path
 from string import Template
 from typing import Any, Dict, Iterable, List, Optional, Union, cast
@@ -235,7 +235,7 @@ class Traefik:
             }
 
         # TODO Disable static config with telemetry and check new version
-        base_config = {
+        static_config = {
             "log": {
                 "level": "DEBUG",
             },
@@ -270,20 +270,24 @@ class Traefik:
         # we attempt to put together the base config with whatever the user passed via traefik_route.
         # in case there are conflicts between the base config and some route, or between the routes themselves,
         # we'll be forced to bail out.
-        additional_static_configs = list(self._traefik_route_static_configs)
-        if additional_static_configs:
-            static_configs = [base_config] + additional_static_configs
+        extra_configs = list(self._traefik_route_static_configs)
+
+        for extra_config in extra_configs:
+            # static_config_deep_merge does things in-place, so we deepcopy the base config in case things go wrong
+            previous = deepcopy(static_config)
             try:
-                return reduce(static_config_deep_merge, static_configs)
+                static_config_deep_merge(static_config, extra_config)
             except StaticConfigMergeConflictError as e:
                 if _raise:
                     raise e
                 logger.exception(
-                    "failed to merge static config into traefik's base config."
-                    "Ignoring any external static configs..."
+                    f"Failed to merge {extra_config} into Traefik's static config." "Skipping..."
                 )
-                return base_config
-        return base_config
+                # roll back any changes static_config_deep_merge might have done to static_config
+                static_config = previous
+                continue
+
+        return static_config
 
     def push_static_config(self, config: Dict[str, Any]):
         """Push static config yaml to the container."""
