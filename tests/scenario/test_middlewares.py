@@ -3,11 +3,12 @@
 
 import tempfile
 import unittest
-from unittest.mock import MagicMock, PropertyMock, patch
+from unittest.mock import PropertyMock, patch
 
+import ops
 import pytest
 import yaml
-from scenario import Container, Mount, Relation, State
+from scenario import Container, ExecOutput, Mount, Relation, State
 
 from tests.scenario._utils import _render_config, create_ingress_relation
 
@@ -63,8 +64,8 @@ def _create_relation(
 @pytest.mark.parametrize("redirect_https", (False, True))
 @pytest.mark.parametrize("scheme", ("http", "https"))
 @patch("charm.TraefikIngressCharm._external_host", PropertyMock(return_value="testhostname"))
+@patch("charm.TraefikIngressCharm._static_config_changed", PropertyMock(return_value=False))
 @patch("traefik.Traefik.is_ready", PropertyMock(return_value=True))
-@patch("charm.TraefikIngressCharm._static_config_changed", MagicMock(return_value=False))
 @patch("charm.TraefikIngressCharm.version", PropertyMock(return_value="0.0.0"))
 def test_middleware_config(
     traefik_ctx, rel_name, routing_mode, strip_prefix, redirect_https, scheme
@@ -75,6 +76,11 @@ def test_middleware_config(
             name="traefik",
             can_connect=True,
             mounts={"configurations": Mount("/opt/traefik/", td.name)},
+            exec_mock={("find", "/opt/traefik/juju", "-name", "*.yaml", "-delete"): ExecOutput()},
+            layers={
+                "traefik": ops.pebble.Layer({"services": {"traefik": {"startup": "enabled"}}})
+            },
+            service_status={"traefik": ops.pebble.ServiceStatus.ACTIVE},
         )
     ]
 

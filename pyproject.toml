@@ -25,6 +25,8 @@ target-version = ["py38"]
 [tool.ruff]
 line-length = 99
 extend-exclude = ["__pycache__", "*.egg_info"]
+
+[tool.ruff.lint]
 select = ["E", "W", "F", "C", "N", "R", "D", "I001"]
 # Ignore E501 because using black creates errors with this
 # Ignore D107 Missing docstring in __init__

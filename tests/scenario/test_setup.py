@@ -3,7 +3,7 @@
 # See LICENSE file for licensing details.
 
 
-from unittest.mock import MagicMock, PropertyMock, patch
+from unittest.mock import PropertyMock, patch
 
 from charm import TraefikIngressCharm
 from scenario import Container, Context, State
@@ -55,7 +55,7 @@ def test_start_traefik_no_hostname(*_, traefik_ctx):
 
 @patch("charm.TraefikIngressCharm._external_host", PropertyMock(return_value="foo.bar"))
 @patch("traefik.Traefik.is_ready", PropertyMock(return_value=True))
-@patch("charm.TraefikIngressCharm._static_config_changed", MagicMock(return_value=False))
+@patch("charm.TraefikIngressCharm._static_config_changed", PropertyMock(return_value=False))
 def test_start_traefik_active(*_, traefik_ctx):
     state = State(
         config={"routing_mode": "path"},

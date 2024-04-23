@@ -1,5 +1,5 @@
 import tempfile
-from unittest.mock import MagicMock, PropertyMock, patch
+from unittest.mock import PropertyMock, patch
 
 import pytest
 import yaml
@@ -44,7 +44,7 @@ def _create_tls_relation(*, app_name: str, strip_prefix: bool, redirect_https: b
 @pytest.mark.parametrize("redirect_https", (False, True))
 @patch("charm.TraefikIngressCharm._external_host", PropertyMock(return_value="testhostname"))
 @patch("traefik.Traefik.is_ready", PropertyMock(return_value=True))
-@patch("charm.TraefikIngressCharm._static_config_changed", MagicMock(return_value=False))
+@patch("charm.TraefikIngressCharm._static_config_changed", PropertyMock(return_value=False))
 @patch("charm.TraefikIngressCharm.version", PropertyMock(return_value="0.0.0"))
 def test_middleware_config(traefik_ctx, routing_mode, strip_prefix, redirect_https, caplog):
     td = tempfile.TemporaryDirectory()

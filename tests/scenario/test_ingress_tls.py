@@ -1,9 +1,10 @@
 import tempfile
 from unittest.mock import MagicMock, PropertyMock, patch
 
+import ops.pebble
 import pytest
 import yaml
-from scenario import Container, Mount, Relation, State
+from scenario import Container, ExecOutput, Mount, Relation, State
 
 from tests.scenario._utils import _render_config, create_ingress_relation
 
@@ -36,6 +37,11 @@ def test_middleware_config(
             name="traefik",
             can_connect=True,
             mounts={"configurations": Mount("/opt/traefik/", td.name)},
+            exec_mock={("find", "/opt/traefik/juju", "-name", "*.yaml", "-delete"): ExecOutput()},
+            layers={
+                "traefik": ops.pebble.Layer({"services": {"traefik": {"startup": "enabled"}}})
+            },
+            service_status={"traefik": ops.pebble.ServiceStatus.ACTIVE},
         )
     ]
 
