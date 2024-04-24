@@ -3,7 +3,7 @@
 # THEN traefik's config file's `server` section has all the units listed
 # AND WHEN the charm rescales
 # THEN the traefik config file is updated
-
+from unittest.mock import PropertyMock, patch
 
 import pytest
 import yaml
@@ -44,6 +44,7 @@ def traefik_container(tmp_path):
     )
 
 
+@patch("charm.TraefikIngressCharm._static_config_changed", PropertyMock(return_value=False))
 @pytest.mark.parametrize("port, host", ((80, "1.1.1.1"), (81, "10.1.10.1")))
 @pytest.mark.parametrize("event_name", ("joined", "changed", "created"))
 def test_ingress_per_app_created(
@@ -85,6 +86,7 @@ def test_ingress_per_app_created(
     }
 
 
+@patch("charm.TraefikIngressCharm._static_config_changed", PropertyMock(return_value=False))
 @pytest.mark.parametrize("port, host", ((80, "1.1.1.2"), (81, "10.1.10.2")))
 @pytest.mark.parametrize("n_units", (2, 3, 10))
 def test_ingress_per_app_scale(

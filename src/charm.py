@@ -69,7 +69,14 @@ from ops.model import (
     WaitingStatus,
 )
 from ops.pebble import PathError
-from traefik import CA, LOG_PATH, SERVER_CERT_PATH, RoutingMode, Traefik
+from traefik import (
+    CA,
+    LOG_PATH,
+    SERVER_CERT_PATH,
+    RoutingMode,
+    StaticConfigMergeConflictError,
+    Traefik,
+)
 from utils import is_hostname
 
 # To keep a tidy debug-log, we suppress some DEBUG/INFO logs from some imported libs,
@@ -165,6 +172,7 @@ class TraefikIngressCharm(CharmBase):
             tcp_entrypoints=self._tcp_entrypoints(),
             tls_enabled=self._is_tls_enabled(),
             experimental_forward_auth_enabled=self._is_forward_auth_enabled,
+            traefik_route_static_configs=self._traefik_route_static_configs(),
         )
 
         self.service_patch = KubernetesServicePatch(
@@ -582,15 +590,23 @@ class TraefikIngressCharm(CharmBase):
         self._update_ingress_configurations()
 
     def _update_ingress_configurations(self):
+        # step 1: determine whether the STATIC config should be changed and traefik restarted.
+
+        # if there was a static config changed requested through a traefik route interface,
+        # we need to restart traefik.
         # if there are changes in the tcp configs, we'll need to restart
         # traefik as the tcp entrypoints are consumed as static configuration
         # and those can only be passed on init.
-        if self._tcp_entrypoints_changed():
-            logger.debug("change in tcp entrypoints detected. Rebooting traefik.")
+
+        if self._static_config_changed:
+            logger.debug("Static config needs to be updated. Rebooting traefik.")
             # fixme: this is kind of brutal;
             #  will kill in-flight requests and disrupt traffic.
             self._clear_all_configs_and_restart_traefik()
             # we do this BEFORE processing the relations.
+
+        # step 2:
+        # update the dynamic configs.
 
         errors = False
 
@@ -622,10 +638,11 @@ class TraefikIngressCharm(CharmBase):
         else:
             self.unit.status = ActiveStatus()
 
-    def _tcp_entrypoints_changed(self):
-        current = self._tcp_entrypoints()
-        traefik_entrypoints = self.traefik.pull_tcp_entrypoints()
-        return current != traefik_entrypoints
+    @property
+    def _static_config_changed(self):
+        current = self.traefik.generate_static_config()
+        traefik_static_config = self.traefik.pull_static_config()
+        return current != traefik_static_config
 
     @property
     def ready(self) -> bool:
@@ -666,18 +683,36 @@ class TraefikIngressCharm(CharmBase):
 
     def _handle_traefik_route_ready(self, event: TraefikRouteRequirerReadyEvent):
         """A traefik_route charm has published some ingress data."""
+        if self._static_config_changed:
+            # This will regenerate the static configs and reevaluate all dynamic configs,
+            # including this one.
+            self._update_ingress_configurations()
+
+        else:
+            try:
+                self._process_ingress_relation(event.relation)
+            except IngressSetupError as e:
+                err_msg = e.args[0]
+                logger.error(
+                    f"failed processing the ingress relation for "
+                    f"traefik-route ready with: {err_msg!r}"
+                )
+
+                self.unit.status = ActiveStatus("traefik-route relation degraded")
+                return
+
         try:
-            self._process_ingress_relation(event.relation)
-            self.unit.status = ActiveStatus()
-
-        except IngressSetupError as e:
-            err_msg = e.args[0]
-            logger.error(
-                f"failed processing the ingress relation for "
-                f"traefik-route ready with: {err_msg!r}"
+            self.traefik.generate_static_config(_raise=True)
+        except StaticConfigMergeConflictError:
+            # FIXME: it's pretty hard to tell which configs are conflicting
+            # FIXME: this status is lost when the next event comes in.
+            #  We should start using the collect-status OF hook.
+            self.unit.status = BlockedStatus(
+                "Failed to merge traefik-route static configs. " "Check logs for details."
             )
+            return
 
-            self.unit.status = ActiveStatus("traefik-route relation degraded")
+        self.unit.status = ActiveStatus()
 
     def _process_ingress_relation(self, relation: Relation):
         # There's a chance that we're processing a relation event which was deferred until after
@@ -708,9 +743,34 @@ class TraefikIngressCharm(CharmBase):
 
         self._provide_ingress(relation, provider)  # type: ignore
 
+    def _try_load_dict(self, raw_config_yaml: str) -> Optional[Dict[str, Any]]:
+        try:
+            config = yaml.safe_load(raw_config_yaml)
+        except yaml.YAMLError:
+            logger.exception("traefik route didn't send good YAML.")
+            return None
+
+        if not isinstance(config, dict):
+            logger.error(f"traefik route sent unexpected object: {config} (expecting dict).")
+            return None
+
+        return config
+
+    def _traefik_route_static_configs(self):
+        """Fetch all static configurations passed through traefik route."""
+        configs = []
+        for relation in self.traefik_route.relations:
+            config = self.traefik_route.get_static_config(relation)
+            if config:
+                dct = self._try_load_dict(config)
+                if not dct:
+                    continue
+                configs.append(dct)
+        return configs
+
     def _provide_routed_ingress(self, relation: Relation):
         """Provide ingress to a unit related through TraefikRoute."""
-        config = self.traefik_route.get_config(relation)
+        config = self.traefik_route.get_dynamic_config(relation)
         if not config:
             logger.warning(
                 f"traefik route config could not be accessed: "
@@ -718,8 +778,14 @@ class TraefikIngressCharm(CharmBase):
             )
             return
 
-        config = yaml.safe_load(config)
+        dct = self._try_load_dict(config)
 
+        if not dct:
+            return
+
+        self._update_dynamic_config_route(relation, dct)
+
+    def _update_dynamic_config_route(self, relation: Relation, config: dict):
         if "http" in config.keys():
             route_config = config["http"].get("routers", {})
             router_name = next(iter(route_config.keys()))
@@ -1060,7 +1126,6 @@ def _get_loadbalancer_status(namespace: str, service_name: str) -> Optional[str]
             if ingress_addresses := load_balancer_status.ingress:
                 if ingress_address := ingress_addresses[0]:
                     return ingress_address.hostname or ingress_address.ip
-
     return None
 
 
