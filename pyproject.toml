@@ -12,6 +12,10 @@ show_missing = true
 minversion = "6.0"
 log_cli_level = "INFO"
 asyncio_mode = "auto"
+markers = [
+    "setup: tests that mutate the model topology by adding stuff (deselect with '-m \"not setup\"')",
+    "teardown: tests that mutate the model topology by removing stuff (deselect with '-m \"not teardown\"')",
+]
 
 [tool.pyright]
 reportTypedDictNotRequiredAccess = false
