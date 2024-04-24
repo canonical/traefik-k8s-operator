@@ -359,8 +359,9 @@ class TraefikRouteRequirer(Object):
     def submit_to_traefik(self, config: dict, static: dict=None):
         """Relay an ingress configuration data structure to traefik.
 
-        This will publish to TraefikRoute's traefik-route relation databag
-        the config traefik needs to route the units behind this charm.
+        This will publish to the traefik-route relation databag
+        a chunk of Traefik dynamic config that the traefik charm on the other end can pick
+        up and apply.
 
         Use ``static`` if you need to update traefik's **static** configuration.
         Note that this will force traefik to restart to comply.
