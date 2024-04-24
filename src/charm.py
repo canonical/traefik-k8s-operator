@@ -31,7 +31,7 @@ from charms.oathkeeper.v0.forward_auth import (
     ForwardAuthRequirer,
     ForwardAuthRequirerConfig,
 )
-from charms.observability_libs.v0.cert_handler import CertHandler
+from charms.observability_libs.v1.cert_handler import CertHandler
 from charms.observability_libs.v1.kubernetes_service_patch import (
     KubernetesServicePatch,
 )
@@ -102,10 +102,6 @@ class ExternalHostNotReadyError(Exception):
     """Raised when the ingress hostname is not ready but is assumed to be."""
 
 
-class TLSNotEnabledError(Exception):
-    """Raised when tls is not enabled."""
-
-
 @trace_charm(
     tracing_endpoint="charm_tracing_endpoint",
     server_cert="server_cert",
@@ -137,10 +133,9 @@ class TraefikIngressCharm(CharmBase):
         self.cert = CertHandler(
             self,
             key="trfk-server-cert",
-            peer_relation_name="peers",
             # Route53 complains if CN is not a hostname
-            cert_subject=sans[0] if len(sans) else None,
-            extra_sans_dns=sans,
+            cert_subject=sans[0] if sans else None,
+            sans=sans,
         )
 
         self.recv_ca_cert = CertificateTransferRequires(self, "receive-ca-cert")
@@ -406,20 +401,19 @@ class TraefikIngressCharm(CharmBase):
         self._process_status_and_configurations()
 
     def _update_cert_configs(self):
-        cert, key, ca = self._get_certs()
-        self.traefik.update_cert_configuration(cert, key, ca)
+        self.traefik.update_cert_configuration(*self._get_certs())
 
-    def _get_certs(self) -> Tuple[str, Union[str, None], Union[str, None]]:
+    def _get_certs(self) -> Tuple[Optional[str], Optional[str], Optional[str]]:
         cert_handler = self.cert
         if not self._is_tls_enabled():
-            raise TLSNotEnabledError()
+            return None, None, None
         if (
             self.config.get("tls-ca", None)
             and self.config.get("tls-cert", None)
             and self.config.get("tls-key", None)
         ):
             return self.config["tls-cert"], self.config["tls-key"], self.config["tls-ca"]
-        return cert_handler.chain, cert_handler.key, cert_handler.ca
+        return cert_handler.chain, cert_handler.private_key, cert_handler.ca_cert
 
     def _on_show_proxied_endpoints(self, event: ActionEvent):
         if not self.ready:
