@@ -63,12 +63,12 @@ async def test_static_config_updated(ops_test: OpsTest):
     contents = proc.stdout.read()
     contents_yaml = yaml.safe_load(contents)
     # the route tester charm does:
-    # static = {"entryPoints": {"testPort": {"address": ":4545"}}},
-    assert contents_yaml["entryPoints"]["testPort"] == {"address": ":4545"}
+    # static = {"entryPoints": {"test-port": {"address": ":4545"}}},
+    assert contents_yaml["entryPoints"]["test-port"] == {"address": ":4545"}
 
 
 async def test_added_entrypoint_reachable(ops_test: OpsTest):
-    traefik_ip = await get_address(ops_test, APP_NAME, unit_num=0)
+    traefik_ip = await get_address(ops_test, APP_NAME)
 
     req = Request(f"http://{traefik_ip}:4545")
 

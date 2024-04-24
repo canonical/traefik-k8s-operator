@@ -448,6 +448,17 @@ class TraefikIngressCharm(CharmBase):
                     entrypoint_name = self._get_prefix(data)  # type: ignore
                     entrypoints[entrypoint_name] = data["port"]
 
+        # for each static config sent via traefik_route add provided entryPoints to open a ServicePort
+        static_configs = self._traefik_route_static_configs()
+        for config in static_configs:
+            if "entryPoints" in config:
+                provided_entrypoints = config["entryPoints"]
+                for entrypoint_name, value in provided_entrypoints.items():
+                    # TODO names can be only lower-case alfanumeric with dashes. Should we validate and replace?
+                    # ref https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#dns-label-names
+                    if "address" in value:
+                        entrypoints[entrypoint_name] = value["address"].replace(":", "")
+
         return entrypoints
 
     def _configure_traefik(self):
