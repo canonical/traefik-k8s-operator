@@ -207,5 +207,10 @@ async def test_tls_termination_after_charm_upgrade(
     await curl_endpoints(ops_test, temp_dir, temp_dir / "local.cert", ip)
 
 
+async def test_disintegrate(ops_test: OpsTest):
+    await ops_test.juju("remove-relation", "root-ca:certificates", f"{trfk.name}:tracing-v2")
+    await ops_test.model.wait_for_idle(status="active", timeout=600, idle_period=10)
+
+
 async def test_cleanup(ops_test):
     await remove_application(ops_test, "traefik", timeout=60)

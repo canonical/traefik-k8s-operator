@@ -31,7 +31,7 @@ from charms.oathkeeper.v0.forward_auth import (
     ForwardAuthRequirer,
     ForwardAuthRequirerConfig,
 )
-from charms.observability_libs.v0.cert_handler import CertHandler
+from charms.observability_libs.v1.cert_handler import CertHandler
 from charms.observability_libs.v1.kubernetes_service_patch import (
     KubernetesServicePatch,
 )
@@ -130,10 +130,9 @@ class TraefikIngressCharm(CharmBase):
         self.cert = CertHandler(
             self,
             key="trfk-server-cert",
-            peer_relation_name="peers",
             # Route53 complains if CN is not a hostname
-            cert_subject=sans[0] if len(sans) else None,
-            extra_sans_dns=sans,
+            cert_subject=sans[0] if sans else None,
+            sans=sans,
         )
 
         self.recv_ca_cert = CertificateTransferRequires(self, "receive-ca-cert")
@@ -398,8 +397,10 @@ class TraefikIngressCharm(CharmBase):
         self._process_status_and_configurations()
 
     def _update_cert_configs(self):
-        cert, key, ca = self._get_certs()
-        self.traefik.update_cert_configuration(cert, key, ca)
+        if self._is_tls_enabled():
+            self.traefik.update_cert_configuration(*self._get_certs())
+        else:
+            self.traefik.update_cert_configuration(None, None, None)
 
     def _get_certs(self) -> Tuple[str, Union[str, None], Union[str, None]]:
         cert_handler = self.cert
