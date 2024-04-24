@@ -6,7 +6,7 @@ import pytest
 from charm import TraefikIngressCharm
 from interface_tester import InterfaceTester
 from ops.pebble import Layer
-from scenario.state import Container, State
+from scenario.state import Container, ExecOutput, State
 
 
 # Interface tests are centrally hosted at https://github.com/canonical/charm-relation-interfaces.
@@ -35,6 +35,15 @@ def interface_tester(interface_tester: InterfaceTester):
                     Container(
                         name="traefik",
                         can_connect=True,
+                        exec_mock={
+                            (
+                                "find",
+                                "/opt/traefik/juju",
+                                "-name",
+                                "*.yaml",
+                                "-delete",
+                            ): ExecOutput()
+                        },
                         layers={
                             "foo": Layer(
                                 {

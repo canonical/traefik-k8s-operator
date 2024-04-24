@@ -3,10 +3,12 @@
 """Helpers for unit testing charms which use this library."""
 from unittest.mock import Mock, patch
 
+import ops
 import pytest
 import yaml
 from charm import TraefikIngressCharm
 from ops.testing import Harness
+from traefik import StaticConfigMergeConflictError, Traefik
 
 MODEL_NAME = "test-model"
 REMOTE_APP_NAME = "traefikRouteApp"
@@ -61,7 +63,7 @@ CONFIG_WITH_TLS = {
 }
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def harness() -> Harness[TraefikIngressCharm]:
     harness = Harness(TraefikIngressCharm)
     harness.set_model_name(MODEL_NAME)
@@ -141,3 +143,140 @@ def test_tls_is_added(harness: Harness[TraefikIngressCharm]):
     file = f"/opt/traefik/juju/juju_ingress_{relation.name}_{relation.id}_{relation.app.name}.yaml"
     conf = yaml.safe_load(charm.container.pull(file).read())
     assert conf == CONFIG_WITH_TLS
+
+
+def test_static_config(harness: Harness[TraefikIngressCharm]):
+    tr_relation_id, relation = initialize_and_setup_tr_relation(harness)
+    config = yaml.dump(CONFIG)
+    static = yaml.safe_dump({"foo": "bar"})
+
+    with harness.hooks_disabled():
+        # don't emit yet: we need to reinitialize Traefik first.
+        harness.update_relation_data(
+            tr_relation_id,
+            REMOTE_APP_NAME,
+            {
+                "config": config,
+                "static": static,
+            },
+        )
+
+    # reinitialize Traefik, else _traefik_route_static_configs won't be passed to Traefik on init.
+    charm = harness.charm
+    charm.traefik = Traefik(
+        container=charm.container,
+        routing_mode=charm._routing_mode,
+        tcp_entrypoints=charm._tcp_entrypoints(),
+        tls_enabled=charm._is_tls_enabled(),
+        experimental_forward_auth_enabled=charm._is_forward_auth_enabled,
+        traefik_route_static_configs=charm._traefik_route_static_configs(),
+    )
+
+    charm.traefik_route.on.ready.emit(charm.model.get_relation("traefik-route"))
+
+    assert charm.traefik._traefik_route_static_configs == [{"foo": "bar"}]
+    assert charm.traefik_route.is_ready(relation)
+
+    # verify the static config is there
+    assert charm.traefik_route.get_static_config(relation) == static
+    file = "/etc/traefik/traefik.yaml"
+    conf = yaml.safe_load(charm.container.pull(file).read())
+    assert conf["foo"] == "bar"
+
+    # verify the dynamic config is there too
+    file = f"/opt/traefik/juju/juju_ingress_{relation.name}_{relation.id}_{relation.app.name}.yaml"
+    assert yaml.safe_load(charm.container.pull(file).read()) == CONFIG_WITH_TLS
+
+
+def test_static_config_broken(harness: Harness[TraefikIngressCharm]):
+    tr_relation_id, relation = initialize_and_setup_tr_relation(harness)
+    config = yaml.dump(CONFIG)
+
+    # IF a remote sends invalid static data via traefik-route
+
+    # the base config already has a log: level: DEBUG config.
+    # this should cause a merge error
+    static = yaml.safe_dump({"log": {"level": "ERROR"}})
+
+    with harness.hooks_disabled():
+        # don't emit yet: we need to reinitialize Traefik first.
+        harness.update_relation_data(
+            tr_relation_id,
+            REMOTE_APP_NAME,
+            {
+                "config": config,
+                "static": static,
+            },
+        )
+
+    # reinitialize Traefik, else _traefik_route_static_configs won't be passed to Traefik on init.
+    charm = harness.charm
+    charm.traefik = Traefik(
+        container=charm.container,
+        routing_mode=charm._routing_mode,
+        tcp_entrypoints=charm._tcp_entrypoints(),
+        tls_enabled=charm._is_tls_enabled(),
+        experimental_forward_auth_enabled=charm._is_forward_auth_enabled,
+        traefik_route_static_configs=charm._traefik_route_static_configs(),
+    )
+
+    # WHEN the charm receives a traefik-route ready event
+    charm.traefik_route.on.ready.emit(charm.model.get_relation("traefik-route"))
+    with pytest.raises(StaticConfigMergeConflictError):
+        charm.traefik.generate_static_config(_raise=True)
+
+    # THEN the charm status is blocked
+    assert isinstance(charm.unit.status, ops.BlockedStatus)
+    charm.on.update_status.emit()
+    assert isinstance(charm.unit.status, ops.ActiveStatus)
+
+    # THEN the static config has NOT been updated
+    file = "/etc/traefik/traefik.yaml"
+    conf = yaml.safe_load(charm.container.pull(file).read())
+    assert conf["log"] == {"level": "DEBUG"}
+
+    # THEN  the dynamic config is there too
+    file = f"/opt/traefik/juju/juju_ingress_{relation.name}_{relation.id}_{relation.app.name}.yaml"
+    assert yaml.safe_load(charm.container.pull(file).read()) == CONFIG_WITH_TLS
+
+
+def test_static_config_partially_broken(harness: Harness[TraefikIngressCharm]):
+    initialize_and_setup_tr_relation(harness)
+
+    # IF we initialize Traefik with some specially crafted
+    # _traefik_route_static_configs
+    charm = harness.charm
+    charm.traefik = Traefik(
+        container=charm.container,
+        routing_mode=charm._routing_mode,
+        tcp_entrypoints=charm._tcp_entrypoints(),
+        tls_enabled=charm._is_tls_enabled(),
+        experimental_forward_auth_enabled=charm._is_forward_auth_enabled,
+        traefik_route_static_configs=[
+            # GOOD: this config won't conflict with any other
+            {"barbaras": {"rhabarber": "bar"}},
+            # BAD: this will conflict with traefik's baseline static config
+            {"log": {"level": "ERROR"}},
+            # GOOD: this config won't conflict with any other
+            {"foo": {"bar": "baz"}},
+            # GOOD: this one won't conflict with other entrypoints
+            {"entryPoints": {"shondaland": {"address": ":6767"}}},
+        ],
+    )
+
+    # WHEN the charm receives a traefik-route ready event
+    charm.traefik_route.on.ready.emit(charm.model.get_relation("traefik-route"))
+
+    # THEN Traefik can detect that there is something wrong with the config
+    with pytest.raises(StaticConfigMergeConflictError):
+        charm.traefik.generate_static_config(_raise=True)
+
+    # BUT Traefik can still generate a static config
+    generated_config = charm.traefik.generate_static_config()
+
+    # AND the conflicting config has NOT been updated
+    assert generated_config["log"] == {"level": "DEBUG"}
+    # BUT the non-conflicting ones have.
+    assert generated_config["barbaras"] == {"rhabarber": "bar"}
+    assert generated_config["entryPoints"]["shondaland"]["address"] == ":6767"
+    assert generated_config["foo"] == {"bar": "baz"}
