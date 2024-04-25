@@ -1,7 +1,6 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 """Helpers for unit testing charms which use this library."""
-import os
 from unittest.mock import Mock, patch
 
 import ops
