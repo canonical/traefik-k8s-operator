@@ -1,6 +1,7 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 """Helpers for unit testing charms which use this library."""
+import os
 from unittest.mock import Mock, patch
 
 import ops
@@ -315,6 +316,5 @@ def test_static_config_updates_tcp_entrypoints(harness: Harness[TraefikIngressCh
     tcp_entrypoints = charm._tcp_entrypoints()
     assert tcp_entrypoints["shondaland"] == "6767"
 
-    # AND open one more service port next to web, websecure
-    service_ports = charm._service_ports
-    assert len(service_ports) == 3
+    # AND that shows up in the service ports
+    assert [p for p in charm._service_ports if p.port == 6767][0]
