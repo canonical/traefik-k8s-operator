@@ -29,7 +29,6 @@ def test_round_trip(nest_under):
         "name": "bar",
         "port": 10,
         "strip_prefix": True,
-        "redirect_https": False,
         "scheme": "https",
     }
     aliased = {k.replace("_", "-"): v for k, v in cfg.items()}

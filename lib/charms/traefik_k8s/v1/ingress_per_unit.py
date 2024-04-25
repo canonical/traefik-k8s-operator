@@ -82,7 +82,7 @@ LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 18
+LIBPATCH = 19
 
 log = logging.getLogger(__name__)
 
@@ -744,29 +744,27 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
         changed = {a for a in current_urls if current_urls[a] != previous_urls.get(a)}  # type: ignore
 
         this_unit_name = self.unit.name
+        # do not use self.relation in this context because if
+        # the event is relation-broken, self.relation might be None
+        relation = event.relation
         if self.listen_to in {"only-this-unit", "both"}:
             if this_unit_name in changed:
-                self.on.ready_for_unit.emit(  # type: ignore
-                    self.relation, current_urls[this_unit_name]
-                )
+                self.on.ready_for_unit.emit(relation, current_urls[this_unit_name])  # type: ignore
 
             if this_unit_name in removed:
-                self.on.revoked_for_unit.emit(event.relation)  # type: ignore
+                self.on.revoked_for_unit.emit(relation)  # type: ignore
 
         if self.listen_to in {"all-units", "both"}:
             for unit_name in changed:
-                self.on.ready.emit(  # type: ignore
-                    self.relation, unit_name, current_urls[unit_name]
-                )
+                self.on.ready.emit(relation, unit_name, current_urls[unit_name])  # type: ignore
 
             for unit_name in removed:
-                self.on.revoked.emit(event.relation, unit_name)  # type: ignore
+                self.on.revoked.emit(relation, unit_name)  # type: ignore
 
         self._publish_auto_data()
 
     def _handle_upgrade_or_leader(self, event):
-        if self.relations:
-            self._publish_auto_data()
+        self._publish_auto_data()
 
     def _publish_auto_data(self):
         if self._port:
