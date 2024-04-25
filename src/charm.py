@@ -454,7 +454,7 @@ class TraefikIngressCharm(CharmBase):
             if "entryPoints" in config:
                 provided_entrypoints = config["entryPoints"]
                 for entrypoint_name, value in provided_entrypoints.items():
-                    # TODO names can be only lower-case alfanumeric with dashes. Should we validate and replace?
+                    # TODO names can be only lower-case alphanumeric with dashes. Should we validate and replace?
                     # ref https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#dns-label-names
                     if "address" in value:
                         entrypoints[entrypoint_name] = value["address"].replace(":", "")
