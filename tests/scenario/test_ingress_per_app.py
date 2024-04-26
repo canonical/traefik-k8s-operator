@@ -251,3 +251,53 @@ def test_ingress_per_app_v1_upgrade_v2(
     ingress_out = state_out.get_relations("ingress")[0]
     IngressRequirerUnitData.load(ingress_out.local_unit_data)
     IngressRequirerAppData.load(ingress_out.local_app_data)
+
+
+@pytest.mark.parametrize("url1", ("http://url1.com", "https://foo.bar2.baz"))
+@pytest.mark.parametrize("url2", ("http://url2.com", "https://foo.bar2.baz"))
+@pytest.mark.parametrize("url3", ("http://url3.com", "https://foo.bar2.baz"))
+@pytest.mark.parametrize("mode", ("http", "tcp"))
+@pytest.mark.parametrize("port, host", ((80, "1.1.1.1"), (81, "10.1.10.1")))
+def test_proxied_endpoints(
+    port, host, url1, url2, url3, mode, model, traefik_ctx, traefik_container
+):
+    # GIVEN
+    requirer_data_v1 = {
+        "port": str(port),
+        "host": host,
+        "model": "test-model",
+        "name": "remote/0",
+        "mode": mode,
+    }
+    # an ipu, ipa v1 and ipa v2 relations
+    ipu = Relation("ingress-per-unit", remote_units_data={0: requirer_data_v1})
+    ipav1 = Relation("ingress", remote_app_data=requirer_data_v1)
+    ipav2 = Relation(
+        "ingress",
+        remote_app_data=IngressRequirerAppData(
+            model=model.name, name="remote/0", port=port, mode=mode
+        ).dump(),
+        remote_units_data={0: IngressRequirerUnitData(host=host, ip="0.0.0.1").dump()},
+    )
+
+    state = State(leader=True, relations=[ipav1, ipav2, ipu], containers=[traefik_container])
+
+    # WHEN we get any event
+    with traefik_ctx.manager("update-status", state) as mgr:
+        charm = mgr.charm
+
+        # populate the local app databags
+        charm.ingress_per_appv1.publish_url(
+            charm.model.get_relation("ingress", ipav1.relation_id), url1
+        )
+        charm.ingress_per_appv2.publish_url(
+            charm.model.get_relation("ingress", ipav2.relation_id), url2
+        )
+        charm.ingress_per_unit.publish_url(
+            charm.model.get_relation("ingress-per-unit", ipu.relation_id), "remote/0", url3
+        )
+
+        # THEN the charm can fetch the proxied endpoints without errors
+        assert charm.ingress_per_appv1.proxied_endpoints["remote"]["url"]
+        assert charm.ingress_per_appv2.proxied_endpoints["remote"]["url"]
+        assert charm.ingress_per_unit.proxied_endpoints["remote/0"]["url"]
