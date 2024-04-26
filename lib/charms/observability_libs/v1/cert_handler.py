@@ -65,7 +65,7 @@ logger = logging.getLogger(__name__)
 
 LIBID = "b5cd5cd580f3428fa5f59a8876dcbe6a"
 LIBAPI = 1
-LIBPATCH = 5
+LIBPATCH = 6
 
 
 def is_ip_address(value: str) -> bool:
@@ -91,6 +91,10 @@ class CertHandler(Object):
     """A wrapper for the requirer side of the TLS Certificates charm library."""
 
     on = CertHandlerEvents()  # pyright: ignore
+
+    _ca_cert_chain_secret_label = "ca-certificate-chain"
+    _csr_secret_id = "csr-secret-id"
+    _privkey_secret_id = "private-key-secret-id"
 
     def __init__(
         self,
@@ -199,7 +203,7 @@ class CertHandler(Object):
             private_key = generate_private_key()
             secret = self.charm.unit.add_secret({"private-key": private_key.decode()})
             secret.grant(relation)
-            relation.data[self.charm.unit]["private-key-secret-id"] = secret.id  # pyright: ignore
+            relation.data[self.charm.unit][self._privkey_secret_id] = secret.id  # pyright: ignore
 
     def _on_config_changed(self, _):
         relation = self.charm.model.get_relation(self.certificates_relation_name)
@@ -265,7 +269,7 @@ class CertHandler(Object):
 
         if clear_cert:
             try:
-                secret = self.model.get_secret(label="ca-certificate-chain")
+                secret = self.model.get_secret(label=self._ca_cert_chain_secret_label)
                 secret.remove_all_revisions()
             except SecretNotFoundError:
                 logger.debug("Secret with label: 'ca-certificate-chain' not found")
@@ -287,19 +291,22 @@ class CertHandler(Object):
                 "chain": event.chain_as_pem(),
                 "csr": event_csr,
             }
-            try:
-                secret = self.model.get_secret(label="ca-certificate-chain")
-            except SecretNotFoundError:
-                if not (
-                    relation := self.charm.model.get_relation(self.certificates_relation_name)
-                ):
-                    logger.error("Relation %s not found", self.certificates_relation_name)
-                    return
+            if not (relation := self.charm.model.get_relation(self.certificates_relation_name)):
+                logger.error("Relation %s not found", self.certificates_relation_name)
+                return
 
-                secret = self.charm.unit.add_secret(content, label="ca-certificate-chain")
-                secret.grant(relation)
-                relation.data[self.charm.unit]["secret-id"] = secret.id  # pyright: ignore
-                self.on.cert_changed.emit()  # pyright: ignore
+            # if we have a secret from a previous certificates relation already, keep it and reuse it.
+            try:
+                secret = self.model.get_secret(label=self._ca_cert_chain_secret_label)
+                secret.set_content(content)
+            except SecretNotFoundError:
+                secret = self.charm.unit.add_secret(
+                    content, label=self._ca_cert_chain_secret_label
+                )
+
+            secret.grant(relation)
+            relation.data[self.charm.unit]["secret-id"] = secret.id  # pyright: ignore
+            self.on.cert_changed.emit()  # pyright: ignore
 
     def _retrieve_secret_id(self, secret_id_name: str) -> Optional[str]:
         if not (relation := self.charm.model.get_relation(self.certificates_relation_name)):
@@ -323,26 +330,26 @@ class CertHandler(Object):
     @property
     def private_key(self) -> Optional[str]:
         """Private key."""
-        return self._retrieve_from_secret("private-key", "private-key-secret-id")
+        return self._retrieve_from_secret("private-key", self._privkey_secret_id)
 
     @property
     def private_key_secret_id(self) -> Optional[str]:
         """ID of the Juju Secret for the Private key."""
-        return self._retrieve_secret_id("private-key-secret-id")
+        return self._retrieve_secret_id(self._privkey_secret_id)
 
     @property
     def _csr(self) -> Optional[str]:
-        return self._retrieve_from_secret("csr", "csr-secret-id")
+        return self._retrieve_from_secret("csr", self._csr_secret_id)
 
     @_csr.setter
     def _csr(self, value: str):
         if not (relation := self.charm.model.get_relation(self.certificates_relation_name)):
             return
 
-        if not (secret_id := relation.data[self.charm.unit].get("csr-secret-id", None)):
+        if not (secret_id := relation.data[self.charm.unit].get(self._csr_secret_id, None)):
             secret = self.charm.unit.add_secret({"csr": value})
             secret.grant(relation)
-            relation.data[self.charm.unit]["csr-secret-id"] = secret.id  # pyright: ignore
+            relation.data[self.charm.unit][self._csr_secret_id] = secret.id  # pyright: ignore
             return
 
         secret = self.model.get_secret(id=secret_id)
@@ -403,12 +410,12 @@ class CertHandler(Object):
         self.on.cert_changed.emit()  # pyright: ignore
 
     def _on_certificates_relation_broken(self, _: RelationBrokenEvent) -> None:
-        """Clear the certificates data when removing the relation."""
+        """Clear all secrets data when removing the relation."""
         try:
-            secret = self.model.get_secret(label="csr-secret-id")
+            secret = self.model.get_secret(label=self._ca_cert_chain_secret_label)
             secret.remove_all_revisions()
         except SecretNotFoundError:
-            logger.debug("Secret 'csr-scret-id' not found")
+            logger.debug(f"Secret {self._ca_cert_chain_secret_label!r}' not found")
         self.on.cert_changed.emit()  # pyright: ignore
 
     def _check_juju_supports_secrets(self) -> None:
