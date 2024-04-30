@@ -730,7 +730,6 @@ class TraefikIngressCharm(CharmBase):
             raise IngressSetupError("traefik is not ready")
 
         provider = self._provider_from_relation(relation)
-        logger.warning(f"provider: {provider}")
 
         if not provider.is_ready(relation):
             logger.debug(f"Provider {provider} not ready; resetting ingress configurations.")
