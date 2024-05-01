@@ -412,7 +412,11 @@ class TraefikIngressCharm(CharmBase):
             and self.config.get("tls-cert", None)
             and self.config.get("tls-key", None)
         ):
-            return self.config["tls-cert"], self.config["tls-key"], self.config["tls-ca"]
+            return (
+                cast(str, self.config["tls-cert"]),
+                cast(str, self.config["tls-key"]),
+                cast(str, self.config["tls-ca"]),
+            )
         return cert_handler.chain, cert_handler.private_key, cert_handler.ca_cert
 
     def _on_show_proxied_endpoints(self, event: ActionEvent):
@@ -730,7 +734,6 @@ class TraefikIngressCharm(CharmBase):
             raise IngressSetupError("traefik is not ready")
 
         provider = self._provider_from_relation(relation)
-        logger.warning(f"provider: {provider}")
 
         if not provider.is_ready(relation):
             logger.debug(f"Provider {provider} not ready; resetting ingress configurations.")
