@@ -10,7 +10,7 @@ import itertools
 import json
 import logging
 import socket
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union, cast
 from urllib.parse import urlparse
 
 import yaml
@@ -412,7 +412,11 @@ class TraefikIngressCharm(CharmBase):
             and self.config.get("tls-cert", None)
             and self.config.get("tls-key", None)
         ):
-            return self.config["tls-cert"], self.config["tls-key"], self.config["tls-ca"]
+            return (
+                cast(str, self.config["tls-cert"]),
+                cast(str, self.config["tls-key"]),
+                cast(str, self.config["tls-ca"]),
+            )
         return cert_handler.chain, cert_handler.private_key, cert_handler.ca_cert
 
     def _on_show_proxied_endpoints(self, event: ActionEvent):
@@ -1058,7 +1062,7 @@ class TraefikIngressCharm(CharmBase):
         returns None. Only use this directly when external_host is allowed to be None.
         """
         if external_hostname := self.model.config.get("external_hostname"):
-            return external_hostname
+            return cast(str, external_hostname)
 
         return _get_loadbalancer_status(namespace=self.model.name, service_name=self.app.name)
 
