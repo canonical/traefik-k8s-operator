@@ -67,7 +67,7 @@ logger = logging.getLogger(__name__)
 
 LIBID = "b5cd5cd580f3428fa5f59a8876dcbe6a"
 LIBAPI = 1
-LIBPATCH = 7
+LIBPATCH = 8
 
 VAULT_SECRET_LABEL = "cert-handler-private-vault"
 
@@ -357,6 +357,7 @@ class CertHandler(Object):
         # the csr must have been signed with a privkey that is now outdated and utterly lost.
         # So we throw away the csr and generate a new one (and a new privkey along with it).
         if not has_privkey and self._csr:
+            logger.debug("CSR and privkey out of sync after vault migration... renewing CSR.")
             # this will call `self.private_key` which will generate a new privkey.
             self._generate_csr(renew=True)
 
@@ -367,10 +368,13 @@ class CertHandler(Object):
             # we are on recent juju
             if self.vault.retrieve():
                 # we already were on recent juju: nothing to migrate
+                logger.debug("vault is already populated. Nothing to migrate...")
                 return
 
             # we used to be on old juju: our secret stuff is in peer data
             if contents := peer_backend.retrieve():
+                logger.debug("some data found in relation-backed vault. "
+                             "Migrating to secret-backed vault...")
                 # move over to secret-backed storage
                 self.vault.store(contents)
 
