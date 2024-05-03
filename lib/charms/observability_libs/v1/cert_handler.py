@@ -51,7 +51,7 @@ try:
     )
 except ImportError as e:
     raise ImportError(
-        "failed to import charms.tls_certificates_interface.v2.tls_certificates; "
+        "failed to import charms.tls_certificates_interface.v3.tls_certificates; "
         "Either the library itself is missing (please get it through charmcraft fetch-lib) "
         "or one of its dependencies is unmet."
     ) from e
