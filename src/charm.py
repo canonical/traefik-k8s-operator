@@ -1141,7 +1141,6 @@ def _get_loadbalancer_status(namespace: str, service_name: str) -> Optional[str]
     return ingress_address.hostname or ingress_address.ip
 
 
-
 def _get_relation_type(relation: Relation) -> _IngressRelationType:
     if relation.name == "ingress":
         return _IngressRelationType.per_app
