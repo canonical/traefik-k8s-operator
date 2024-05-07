@@ -832,7 +832,7 @@ class TraefikIngressCharm(CharmBase):
                     logger.debug("Not enough information to generate a TLS config!")
                 else:
                     # we update existing configs allowing to pass TLS if it helps
-                    config["tcp"]["routers"][router_name]["tls"] = {"passthrough": "true"}
+                    config["tcp"]["routers"][router_name]["tls"] = {"passthrough": True}
         self._push_configurations(relation, config)
 
     def _provide_ingress(
