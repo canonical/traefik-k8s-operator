@@ -818,7 +818,7 @@ class TraefikIngressCharm(CharmBase):
                             service_name,
                             # we're behind an is_ready guard, so this is guaranteed not to raise
                             self.external_host,
-                            entrypoint
+                            entrypoint,
                         )
                     )
         if "tcp" in config.keys():
