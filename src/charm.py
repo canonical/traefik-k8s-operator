@@ -796,23 +796,36 @@ class TraefikIngressCharm(CharmBase):
     def _update_dynamic_config_route(self, relation: Relation, config: dict):
         if "http" in config.keys():
             route_config = config["http"].get("routers", {})
-            router_name = next(iter(route_config.keys()))
-            route_rule = route_config.get(router_name, {}).get("rule", "")
-            service_name = route_config.get(router_name, {}).get("service", "")
+            for router_name in route_config.copy().keys():
+                route_rule = route_config.get(router_name, {}).get("rule", "")
+                service_name = route_config.get(router_name, {}).get("service", "")
 
-            if not all([router_name, route_rule, service_name]):
-                logger.debug("Not enough information to generate a TLS config!")
-            else:
-                config["http"]["routers"].update(
-                    self.traefik.generate_tls_config_for_route(
-                        router_name,
-                        route_rule,
-                        service_name,
-                        # we're behind an is_ready guard, so this is guaranteed not to raise
-                        self.external_host,
+                if not all([router_name, route_rule, service_name]):
+                    logger.debug("Not enough information to generate a TLS config!")
+                else:
+                    config["http"]["routers"].update(
+                        self.traefik.generate_tls_config_for_route(
+                            router_name,
+                            route_rule,
+                            service_name,
+                            # we're behind an is_ready guard, so this is guaranteed not to raise
+                            self.external_host,
+                        )
                     )
-                )
-
+        if "tcp" in config.keys():
+            route_config = config["tcp"].get("routers", {})
+            for router_name in route_config.copy().keys():
+                route_config = route_config.get(router_name, {})
+                if route_config:
+                    route_rule = route_config.get(router_name, {}).get("rule", "")
+                    service_name = route_config.get(router_name, {}).get("service", "")
+                    if not all([router_name, route_rule, service_name]):
+                        logger.debug("Not enough information to generate a TLS config!")
+                    else:
+                        # we update existing configs allowing to pass TLS if it helps
+                        config["tcp"]["routers"][router_name]["tls"] = {
+                            "passthrough": "true"
+                        }
         self._push_configurations(relation, config)
 
     def _provide_ingress(
