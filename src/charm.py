@@ -797,7 +797,7 @@ class TraefikIngressCharm(CharmBase):
         if "http" in config.keys():
             route_config = config["http"].get("routers", {})
             # we want to generate and add a new router with TLS config for each routed path.
-            # as we modify the list, we need to work on a copy
+            # as we mutate the dict, we need to work on a copy
             for router_name in route_config.copy().keys():
                 route_rule = route_config.get(router_name, {}).get("rule", "")
                 service_name = route_config.get(router_name, {}).get("service", "")
