@@ -801,7 +801,7 @@ class TraefikIngressCharm(CharmBase):
             for router_name in route_config.copy().keys():
                 route_rule = route_config.get(router_name, {}).get("rule", "")
                 service_name = route_config.get(router_name, {}).get("service", "")
-                entrypoints = route_config.get(router_name, {}).get("entrypoints", [])
+                entrypoints = route_config.get(router_name, {}).get("entryPoints", [])
                 if len(entrypoints) > 0:
                     # if entrypoint exists, we check if it's a custom entrypoint to pass it to generated TLS config
                     entrypoint = entrypoints[0] if entrypoints[0] != "web" else None
