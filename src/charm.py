@@ -796,23 +796,58 @@ class TraefikIngressCharm(CharmBase):
     def _update_dynamic_config_route(self, relation: Relation, config: dict):
         if "http" in config.keys():
             route_config = config["http"].get("routers", {})
-            router_name = next(iter(route_config.keys()))
-            route_rule = route_config.get(router_name, {}).get("rule", "")
-            service_name = route_config.get(router_name, {}).get("service", "")
+            # we want to generate and add a new router with TLS config for each routed path.
+            # as we mutate the dict, we need to work on a copy
+            for router_name in route_config.copy().keys():
+                route_rule = route_config.get(router_name, {}).get("rule", "")
+                service_name = route_config.get(router_name, {}).get("service", "")
+                entrypoints = route_config.get(router_name, {}).get("entryPoints", [])
+                if len(entrypoints) > 0:
+                    # if entrypoint exists, we check if it's a custom entrypoint to pass it to generated TLS config
+                    entrypoint = entrypoints[0] if entrypoints[0] != "web" else None
+                else:
+                    entrypoint = None
 
-            if not all([router_name, route_rule, service_name]):
-                logger.debug("Not enough information to generate a TLS config!")
-            else:
-                config["http"]["routers"].update(
-                    self.traefik.generate_tls_config_for_route(
-                        router_name,
-                        route_rule,
-                        service_name,
-                        # we're behind an is_ready guard, so this is guaranteed not to raise
-                        self.external_host,
+                if not all([router_name, route_rule, service_name]):
+                    logger.debug("Not enough information to generate a TLS config!")
+                else:
+                    config["http"]["routers"].update(
+                        self.traefik.generate_tls_config_for_route(
+                            router_name,
+                            route_rule,
+                            service_name,
+                            # we're behind an is_ready guard, so this is guaranteed not to raise
+                            self.external_host,
+                            entrypoint,
+                        )
                     )
-                )
+        if "tcp" in config.keys():
+            route_config = config["tcp"].get("routers", {})
+            # we want to generate and add a new router with TLS config for each routed path.
+            # as we mutate the dict, we need to work on a copy
+            for router_name in route_config.copy().keys():
+                route_rule = route_config.get(router_name, {}).get("rule", "")
+                service_name = route_config.get(router_name, {}).get("service", "")
+                entrypoints = route_config.get(router_name, {}).get("entryPoints", [])
+                if len(entrypoints) > 0:
+                    # for grpc, all entrypoints are custom
+                    entrypoint = entrypoints[0]
+                else:
+                    entrypoint = None
 
+                if not all([router_name, route_rule, service_name]):
+                    logger.debug("Not enough information to generate a TLS config!")
+                else:
+                    config["tcp"]["routers"].update(
+                        self.traefik.generate_tls_config_for_route(
+                            router_name,
+                            route_rule,
+                            service_name,
+                            # we're behind an is_ready guard, so this is guaranteed not to raise
+                            self.external_host,
+                            entrypoint,
+                        )
+                    )
         self._push_configurations(relation, config)
 
     def _provide_ingress(
