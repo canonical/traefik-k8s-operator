@@ -1138,6 +1138,8 @@ def _get_loadbalancer_status(namespace: str, service_name: str) -> Optional[str]
     if not (ingress_address := ingress_addresses[0]):
         return None
 
+    # `return ingress_address.hostname` removed since the hostname (external hostname)
+    # is configured through juju config so it is not necessary to retrieve that from K8s.
     return ingress_address.ip
 
 
