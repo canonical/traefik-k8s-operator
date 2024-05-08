@@ -562,6 +562,7 @@ class Traefik:
         route_rule: str,
         service_name: str,
         external_host: str,
+        entrypoint: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Generate a TLS configuration segment."""
         if is_hostname(external_host):
@@ -582,7 +583,7 @@ class Traefik:
             f"{router_name}-tls": {
                 "rule": route_rule,
                 "service": service_name,
-                "entryPoints": ["websecure"],
+                "entryPoints": [entrypoint if entrypoint else "websecure"],
                 "tls": tls_entry,
             }
         }
