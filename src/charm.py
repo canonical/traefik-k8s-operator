@@ -1164,12 +1164,18 @@ def _get_loadbalancer_status(namespace: str, service_name: str) -> Optional[str]
     client = Client()  # type: ignore
     traefik_service = client.get(Service, name=service_name, namespace=namespace)
 
-    if status := traefik_service.status:  # type: ignore
-        if load_balancer_status := status.loadBalancer:
-            if ingress_addresses := load_balancer_status.ingress:
-                if ingress_address := ingress_addresses[0]:
-                    return ingress_address.hostname or ingress_address.ip
-    return None
+    if not (status := traefik_service.status):  # type: ignore
+        return None
+    if not (load_balancer_status := status.loadBalancer):
+        return None
+    if not (ingress_addresses := load_balancer_status.ingress):
+        return None
+    if not (ingress_address := ingress_addresses[0]):
+        return None
+
+    # `return ingress_address.hostname` removed since the hostname (external hostname)
+    # is configured through juju config so it is not necessary to retrieve that from K8s.
+    return ingress_address.ip
 
 
 def _get_relation_type(relation: Relation) -> _IngressRelationType:
