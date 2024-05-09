@@ -1099,7 +1099,22 @@ class TraefikIngressCharm(CharmBase):
         if external_hostname := self.model.config.get("external_hostname"):
             return cast(str, external_hostname)
 
-        return _get_loadbalancer_status(namespace=self.model.name, service_name=self.app.name)
+        return self._get_k8s_service_ip(namespace=self.model.name, service_name=self.app.name)
+
+    # we cache this so that if it's being used within the same charm execution, we won't do unnecessary
+    # work, but we don't put it in stored state, because the IP might change between events.
+    @functools.lru_cache
+    def _get_k8s_service_ip(self, namespace: str, service_name: str) -> Optional[str]:
+        client = Client()  # type: ignore
+        service = client.get(Service, name=service_name, namespace=namespace)
+
+        # the hostname (external hostname) is configured through juju config, so
+        # we don't retrieve that from K8s.
+
+        try:
+            return service.status.loadBalancer.ingress[0].ip
+        except (KeyError, AttributeError):
+            return None
 
     @property
     def external_host(self) -> str:
@@ -1157,25 +1172,6 @@ class TraefikIngressCharm(CharmBase):
 
         # If all else fails, we'd rather use the bare IP
         return [target] if target else []
-
-
-@functools.lru_cache
-def _get_loadbalancer_status(namespace: str, service_name: str) -> Optional[str]:
-    client = Client()  # type: ignore
-    traefik_service = client.get(Service, name=service_name, namespace=namespace)
-
-    if not (status := traefik_service.status):  # type: ignore
-        return None
-    if not (load_balancer_status := status.loadBalancer):
-        return None
-    if not (ingress_addresses := load_balancer_status.ingress):
-        return None
-    if not (ingress_address := ingress_addresses[0]):
-        return None
-
-    # `return ingress_address.hostname` removed since the hostname (external hostname)
-    # is configured through juju config so it is not necessary to retrieve that from K8s.
-    return ingress_address.ip
 
 
 def _get_relation_type(relation: Relation) -> _IngressRelationType:
