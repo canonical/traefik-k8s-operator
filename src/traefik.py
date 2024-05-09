@@ -162,6 +162,10 @@ class Traefik:
     ):
         """Update the server cert, ca, and key configuration files."""
         if cert:
+            # write it to the charm container too, for charm tracing.
+            local_cert_path = Path(SERVER_CERT_PATH)
+            local_cert_path.parent.mkdir(parents=True, exist_ok=True)
+            local_cert_path.write_text(cert)
             self._container.push(SERVER_CERT_PATH, cert, make_dirs=True)
         else:
             self._container.remove_path(SERVER_CERT_PATH, recursive=True)
@@ -558,6 +562,7 @@ class Traefik:
         route_rule: str,
         service_name: str,
         external_host: str,
+        entrypoint: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Generate a TLS configuration segment."""
         if is_hostname(external_host):
@@ -578,7 +583,7 @@ class Traefik:
             f"{router_name}-tls": {
                 "rule": route_rule,
                 "service": service_name,
-                "entryPoints": ["websecure"],
+                "entryPoints": [entrypoint if entrypoint else "websecure"],
                 "tls": tls_entry,
             }
         }

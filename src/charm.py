@@ -10,7 +10,7 @@ import itertools
 import json
 import logging
 import socket
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union, cast
 from urllib.parse import urlparse
 
 import yaml
@@ -413,7 +413,11 @@ class TraefikIngressCharm(CharmBase):
             and self.config.get("tls-cert", None)
             and self.config.get("tls-key", None)
         ):
-            return self.config["tls-cert"], self.config["tls-key"], self.config["tls-ca"]
+            return (
+                cast(str, self.config["tls-cert"]),
+                cast(str, self.config["tls-key"]),
+                cast(str, self.config["tls-ca"]),
+            )
         return cert_handler.chain, cert_handler.private_key, cert_handler.ca_cert
 
     def _on_show_proxied_endpoints(self, event: ActionEvent):
@@ -448,6 +452,17 @@ class TraefikIngressCharm(CharmBase):
                 if data.get("mode", "http") == "tcp":
                     entrypoint_name = self._get_prefix(data)  # type: ignore
                     entrypoints[entrypoint_name] = data["port"]
+
+        # for each static config sent via traefik_route add provided entryPoints to open a ServicePort
+        static_configs = self._traefik_route_static_configs()
+        for config in static_configs:
+            if "entryPoints" in config:
+                provided_entrypoints = config["entryPoints"]
+                for entrypoint_name, value in provided_entrypoints.items():
+                    # TODO names can be only lower-case alphanumeric with dashes. Should we validate and replace?
+                    # ref https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#dns-label-names
+                    if "address" in value:
+                        entrypoints[entrypoint_name] = value["address"].replace(":", "")
 
         return entrypoints
 
@@ -729,7 +744,6 @@ class TraefikIngressCharm(CharmBase):
             raise IngressSetupError("traefik is not ready")
 
         provider = self._provider_from_relation(relation)
-        logger.warning(f"provider: {provider}")
 
         if not provider.is_ready(relation):
             logger.debug(f"Provider {provider} not ready; resetting ingress configurations.")
@@ -792,23 +806,58 @@ class TraefikIngressCharm(CharmBase):
     def _update_dynamic_config_route(self, relation: Relation, config: dict):
         if "http" in config.keys():
             route_config = config["http"].get("routers", {})
-            router_name = next(iter(route_config.keys()))
-            route_rule = route_config.get(router_name, {}).get("rule", "")
-            service_name = route_config.get(router_name, {}).get("service", "")
+            # we want to generate and add a new router with TLS config for each routed path.
+            # as we mutate the dict, we need to work on a copy
+            for router_name in route_config.copy().keys():
+                route_rule = route_config.get(router_name, {}).get("rule", "")
+                service_name = route_config.get(router_name, {}).get("service", "")
+                entrypoints = route_config.get(router_name, {}).get("entryPoints", [])
+                if len(entrypoints) > 0:
+                    # if entrypoint exists, we check if it's a custom entrypoint to pass it to generated TLS config
+                    entrypoint = entrypoints[0] if entrypoints[0] != "web" else None
+                else:
+                    entrypoint = None
 
-            if not all([router_name, route_rule, service_name]):
-                logger.debug("Not enough information to generate a TLS config!")
-            else:
-                config["http"]["routers"].update(
-                    self.traefik.generate_tls_config_for_route(
-                        router_name,
-                        route_rule,
-                        service_name,
-                        # we're behind an is_ready guard, so this is guaranteed not to raise
-                        self.external_host,
+                if not all([router_name, route_rule, service_name]):
+                    logger.debug("Not enough information to generate a TLS config!")
+                else:
+                    config["http"]["routers"].update(
+                        self.traefik.generate_tls_config_for_route(
+                            router_name,
+                            route_rule,
+                            service_name,
+                            # we're behind an is_ready guard, so this is guaranteed not to raise
+                            self.external_host,
+                            entrypoint,
+                        )
                     )
-                )
+        if "tcp" in config.keys():
+            route_config = config["tcp"].get("routers", {})
+            # we want to generate and add a new router with TLS config for each routed path.
+            # as we mutate the dict, we need to work on a copy
+            for router_name in route_config.copy().keys():
+                route_rule = route_config.get(router_name, {}).get("rule", "")
+                service_name = route_config.get(router_name, {}).get("service", "")
+                entrypoints = route_config.get(router_name, {}).get("entryPoints", [])
+                if len(entrypoints) > 0:
+                    # for grpc, all entrypoints are custom
+                    entrypoint = entrypoints[0]
+                else:
+                    entrypoint = None
 
+                if not all([router_name, route_rule, service_name]):
+                    logger.debug("Not enough information to generate a TLS config!")
+                else:
+                    config["tcp"]["routers"].update(
+                        self.traefik.generate_tls_config_for_route(
+                            router_name,
+                            route_rule,
+                            service_name,
+                            # we're behind an is_ready guard, so this is guaranteed not to raise
+                            self.external_host,
+                            entrypoint,
+                        )
+                    )
         self._push_configurations(relation, config)
 
     def _provide_ingress(
@@ -1066,7 +1115,7 @@ class TraefikIngressCharm(CharmBase):
         returns None. Only use this directly when external_host is allowed to be None.
         """
         if external_hostname := self.model.config.get("external_hostname"):
-            return external_hostname
+            return cast(str, external_hostname)
 
         return _get_loadbalancer_status(namespace=self.model.name, service_name=self.app.name)
 
@@ -1133,12 +1182,18 @@ def _get_loadbalancer_status(namespace: str, service_name: str) -> Optional[str]
     client = Client()  # type: ignore
     traefik_service = client.get(Service, name=service_name, namespace=namespace)
 
-    if status := traefik_service.status:  # type: ignore
-        if load_balancer_status := status.loadBalancer:
-            if ingress_addresses := load_balancer_status.ingress:
-                if ingress_address := ingress_addresses[0]:
-                    return ingress_address.hostname or ingress_address.ip
-    return None
+    if not (status := traefik_service.status):  # type: ignore
+        return None
+    if not (load_balancer_status := status.loadBalancer):
+        return None
+    if not (ingress_addresses := load_balancer_status.ingress):
+        return None
+    if not (ingress_address := ingress_addresses[0]):
+        return None
+
+    # `return ingress_address.hostname` removed since the hostname (external hostname)
+    # is configured through juju config so it is not necessary to retrieve that from K8s.
+    return ingress_address.ip
 
 
 def _get_relation_type(relation: Relation) -> _IngressRelationType:

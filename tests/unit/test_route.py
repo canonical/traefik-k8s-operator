@@ -280,3 +280,40 @@ def test_static_config_partially_broken(harness: Harness[TraefikIngressCharm]):
     assert generated_config["barbaras"] == {"rhabarber": "bar"}
     assert generated_config["entryPoints"]["shondaland"]["address"] == ":6767"
     assert generated_config["foo"] == {"bar": "baz"}
+
+
+def test_static_config_updates_tcp_entrypoints(harness: Harness[TraefikIngressCharm]):
+    tr_relation_id, relation = initialize_and_setup_tr_relation(harness)
+    config = yaml.dump(CONFIG)
+    static = yaml.safe_dump({"entryPoints": {"shondaland": {"address": ":6767"}}})
+
+    with harness.hooks_disabled():
+        # don't emit yet: we need to reinitialize Traefik first.
+        harness.update_relation_data(
+            tr_relation_id,
+            REMOTE_APP_NAME,
+            {
+                "config": config,
+                "static": static,
+            },
+        )
+
+    # reinitialize Traefik, else _traefik_route_static_configs won't be passed to Traefik on init.
+    charm = harness.charm
+    charm.traefik = Traefik(
+        container=charm.container,
+        routing_mode=charm._routing_mode,
+        tcp_entrypoints=charm._tcp_entrypoints(),
+        tls_enabled=charm._is_tls_enabled(),
+        experimental_forward_auth_enabled=charm._is_forward_auth_enabled,
+        traefik_route_static_configs=charm._traefik_route_static_configs(),
+    )
+
+    charm.traefik_route.on.ready.emit(charm.model.get_relation("traefik-route"))
+
+    # THEN Traefik can list the provided entrypoints
+    tcp_entrypoints = charm._tcp_entrypoints()
+    assert tcp_entrypoints["shondaland"] == "6767"
+
+    # AND that shows up in the service ports
+    assert [p for p in charm._service_ports if p.port == 6767][0]
