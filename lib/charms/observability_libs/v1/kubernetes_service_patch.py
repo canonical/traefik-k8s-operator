@@ -109,6 +109,25 @@ class SomeCharm(CharmBase):
     # ...
 ```
 
+Creating a new k8s service instead of patching the one created by juju
+Providing a service name is mandatory as it shouldn't be the same as default one, i.e., `app_name`.
+```python
+from charms.observability_libs.v1.kubernetes_service_patch import KubernetesServicePatch
+from lightkube.models.core_v1 import ServicePort
+
+class SomeCharm(CharmBase):
+  def __init__(self, *args):
+    # ...
+    port = ServicePort(int(self.config["charm-config-port"]), name=f"{self.app.name}")
+    self.service_patcher = KubernetesServicePatch(
+        self,
+        [port],
+        is_new_service=True,
+        service_name="new_service"
+    )
+    # ...
+```
+
 Additionally, you may wish to use mocks in your charm's unit testing to ensure that the library
 does not try to make any API calls, or open any files during testing that are unlikely to be
 present, and could break your tests. The easiest way to do this is during your test `setUp`:
@@ -146,7 +165,7 @@ LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 9
+LIBPATCH = 10
 
 ServiceType = Literal["ClusterIP", "LoadBalancer"]
 
@@ -160,6 +179,7 @@ class KubernetesServicePatch(Object):
         ports: List[ServicePort],
         service_name: Optional[str] = None,
         service_type: ServiceType = "ClusterIP",
+        is_new_service: Optional[bool] = False,
         additional_labels: Optional[dict] = None,
         additional_selectors: Optional[dict] = None,
         additional_annotations: Optional[dict] = None,
@@ -173,6 +193,8 @@ class KubernetesServicePatch(Object):
             ports: a list of ServicePorts
             service_name: allows setting custom name to the patched service. If none given,
                 application name will be used.
+            is_new_service: allows creating a new service instead of patching the Kubernetes Service created
+                by Juju 
             service_type: desired type of K8s service. Default value is in line with ServiceSpec's
                 default value.
             additional_labels: Labels to be added to the kubernetes service (by default only
@@ -187,6 +209,7 @@ class KubernetesServicePatch(Object):
         super().__init__(charm, "kubernetes-service-patch")
         self.charm = charm
         self.service_name = service_name if service_name else self._app
+        self.is_new_service = is_new_service
         self.service = self._service_object(
             ports,
             service_name,
@@ -277,7 +300,10 @@ class KubernetesServicePatch(Object):
             if self._is_patched(client):
                 return
             if self.service_name != self._app:
-                self._delete_and_create_service(client)
+                if not self.is_new_service:
+                    self._delete_and_create_service(client)
+                else:
+                    self._delete_and_create_new_service(client)
             client.patch(Service, self.service_name, self.service, patch_type=PatchType.MERGE)
         except ApiError as e:
             if e.status.code == 403:
@@ -293,6 +319,16 @@ class KubernetesServicePatch(Object):
         service.metadata.resourceVersion = service.metadata.uid = None  # type: ignore[attr-defined]   # noqa: E501
         client.delete(Service, self._app, namespace=self._namespace)
         client.create(service)
+
+    def _delete_and_create_new_service(self, client: Client):
+        try:
+            service = client.get(Service, self.service_name, namespace=self._namespace)
+            service.metadata.name = self.service_name  # type: ignore[attr-defined]
+            service.metadata.resourceVersion = service.metadata.uid = None  # type: ignore[attr-defined]   # noqa: E501
+            client.delete(Service, self.service_name, namespace=self._namespace)
+            client.create(service)
+        except ApiError:
+            client.create(self.service)
 
     def is_patched(self) -> bool:
         """Reports if the service patch has been applied.

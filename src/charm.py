@@ -47,6 +47,7 @@ from charms.traefik_route_k8s.v0.traefik_route import (
 )
 from deepmerge import always_merger
 from lightkube.core.client import Client
+from lightkube.core.exceptions import ApiError
 from lightkube.models.core_v1 import ServicePort
 from lightkube.resources.core_v1 import Service
 from ops.charm import (
@@ -174,6 +175,8 @@ class TraefikIngressCharm(CharmBase):
             charm=self,
             service_type="LoadBalancer",
             ports=self._service_ports,
+            service_name="traefik-lb",
+            is_new_service=True,
             refresh_event=[
                 ipa_v1.on.data_provided,  # type: ignore
                 ipa_v2.on.data_provided,  # type: ignore
@@ -1099,7 +1102,7 @@ class TraefikIngressCharm(CharmBase):
         if external_hostname := self.model.config.get("external_hostname"):
             return cast(str, external_hostname)
 
-        return _get_loadbalancer_status(namespace=self.model.name, service_name=self.app.name)
+        return _get_loadbalancer_status(namespace=self.model.name, service_name="traefik-lb")
 
     @property
     def external_host(self) -> str:
@@ -1162,7 +1165,10 @@ class TraefikIngressCharm(CharmBase):
 @functools.lru_cache
 def _get_loadbalancer_status(namespace: str, service_name: str) -> Optional[str]:
     client = Client()  # type: ignore
-    traefik_service = client.get(Service, name=service_name, namespace=namespace)
+    try:
+        traefik_service = client.get(Service, name=service_name, namespace=namespace)
+    except ApiError:
+        return None
 
     if not (status := traefik_service.status):  # type: ignore
         return None
