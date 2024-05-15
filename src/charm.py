@@ -47,6 +47,7 @@ from charms.traefik_route_k8s.v0.traefik_route import (
 )
 from deepmerge import always_merger
 from lightkube.core.client import Client
+from lightkube.core.exceptions import ConfigError
 from lightkube.models.core_v1 import ServicePort
 from lightkube.resources.core_v1 import Service
 from ops.charm import (
@@ -1103,16 +1104,22 @@ class TraefikIngressCharm(CharmBase):
 
     # we cache this so that if it's being used within the same charm execution, we won't do unnecessary
     # work, but we don't put it in stored state, because the IP might change between events.
+    @staticmethod
     @functools.lru_cache
-    def _get_k8s_service_ip(self, namespace: str, service_name: str) -> Optional[str]:
-        client = Client()  # type: ignore
-        service = client.get(Service, name=service_name, namespace=namespace)
+    def _get_k8s_service_ip(namespace: str, service_name: str) -> Optional[str]:
+        try:
+            client = Client()  # type: ignore
+        except ConfigError:
+            logger.exception("failed to initialize lightkube client")
+            return None
+
+        service = cast(Service, client.get(Service, name=service_name, namespace=namespace))
 
         # the hostname (external hostname) is configured through juju config, so
         # we don't retrieve that from K8s.
 
         try:
-            return service.status.loadBalancer.ingress[0].ip
+            return service.status.loadBalancer.ingress[0].ip  # type: ignore
         except (KeyError, AttributeError, TypeError):
             return None
 
