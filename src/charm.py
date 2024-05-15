@@ -1113,7 +1113,7 @@ class TraefikIngressCharm(CharmBase):
 
         try:
             return service.status.loadBalancer.ingress[0].ip
-        except (KeyError, AttributeError):
+        except (KeyError, AttributeError, TypeError):
             return None
 
     @property
