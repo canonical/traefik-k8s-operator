@@ -314,4 +314,3 @@ def test_static_config_updates_tcp_entrypoints(harness: Harness[TraefikIngressCh
     # THEN Traefik can list the provided entrypoints
     tcp_entrypoints = charm._tcp_entrypoints()
     assert tcp_entrypoints["shondaland"] == "6767"
-
