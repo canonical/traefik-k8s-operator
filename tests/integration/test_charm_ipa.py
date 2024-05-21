@@ -13,7 +13,7 @@ from tests.integration.conftest import (
     get_relation_data,
     trfk_resources,
 )
-from tests.integration.helpers import dequote, get_address, remove_application
+from tests.integration.helpers import dequote, get_k8s_service_address, remove_application
 
 # FIXME Replace parts of this itest with a utest
 
@@ -87,7 +87,7 @@ async def test_relation_data_shape(ops_test: OpsTest):
     # example:
     #  ingress:
     #    url: http://foo.bar/foo-ipa-tester/0
-    traefik_address = await get_address(ops_test, "traefik-k8s")
+    traefik_address = await get_k8s_service_address(ops_test, "traefik-k8s-lb")
     provider_app_data = json.loads(data.provider.application_data["ingress"])
     assert provider_app_data == {"url": f"http://{traefik_address}/{model}-ipa-tester"}
 

@@ -13,7 +13,7 @@ from pytest_operator.plugin import OpsTest
 from tests.integration.conftest import (
     trfk_resources,
 )
-from tests.integration.helpers import get_address
+from tests.integration.helpers import get_k8s_service_address
 
 APP_NAME = "traefik"
 TESTER_APP_NAME = "route"
@@ -68,7 +68,7 @@ async def test_static_config_updated(ops_test: OpsTest):
 
 
 async def test_added_entrypoint_reachable(ops_test: OpsTest):
-    traefik_ip = await get_address(ops_test, APP_NAME)
+    traefik_ip = await get_k8s_service_address(ops_test, f"{APP_NAME}-lb")
 
     req = Request(f"http://{traefik_ip}:4545")
 
