@@ -33,6 +33,8 @@ CA_CERT_PATH = f"{CA_CERTS_PATH}/traefik-ca.crt"
 RECV_CA_TEMPLATE = Template(f"{CA_CERTS_PATH}/receive-ca-cert-$rel_id-ca.crt")
 BIN_PATH = "/usr/bin/traefik"
 LOG_PATH = "/var/log/traefik.log"
+TRAEFIK_PORT = 80
+TRAEFIK_TLS_PORT = 443
 
 _DIAGNOSTICS_PORT = 8082  # Prometheus metrics, healthcheck/ping
 
@@ -87,9 +89,6 @@ def static_config_deep_merge(dict1: dict, dict2: dict, _path=None):
 
 class Traefik:
     """Traefik workload representation."""
-
-    port = 80
-    tls_port = 443
 
     _layer_name = "traefik"
     service_name = "traefik"
@@ -229,7 +228,7 @@ class Traefik:
         logger.debug(f"Statically configuring traefik with tcp entrypoints: {tcp_entrypoints}.")
 
         web_config: Dict[str, Any] = {
-            "address": f":{self.port}",
+            "address": f":{TRAEFIK_PORT}",
         }
 
         if self._tls_enabled:
@@ -246,7 +245,7 @@ class Traefik:
             "entryPoints": {
                 "diagnostics": {"address": f":{_DIAGNOSTICS_PORT}"},
                 "web": web_config,
-                "websecure": {"address": f":{self.tls_port}"},
+                "websecure": {"address": f":{TRAEFIK_TLS_PORT}"},
                 **{
                     tcp_entrypoint_name: {"address": f":{port}"}
                     for tcp_entrypoint_name, port in tcp_entrypoints.items()

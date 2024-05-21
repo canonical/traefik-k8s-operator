@@ -74,6 +74,8 @@ from traefik import (
     CA,
     LOG_PATH,
     SERVER_CERT_PATH,
+    TRAEFIK_PORT,
+    TRAEFIK_TLS_PORT,
     RoutingMode,
     StaticConfigMergeConflictError,
     Traefik,
@@ -162,20 +164,11 @@ class TraefikIngressCharm(CharmBase):
             charm=self, external_host=self._external_host, scheme=self._scheme  # type: ignore
         )
 
-        self.traefik = Traefik(
-            container=self.container,
-            routing_mode=self._routing_mode,
-            tcp_entrypoints=self._tcp_entrypoints(),
-            tls_enabled=self._is_tls_enabled(),
-            experimental_forward_auth_enabled=self._is_forward_auth_enabled,
-            traefik_route_static_configs=self._traefik_route_static_configs(),
-        )
-
         self.service_patch = KubernetesServicePatch(
             charm=self,
             service_type="LoadBalancer",
             ports=self._service_ports,
-            service_name="traefik-lb",
+            service_name=f"{self.app.name}-lb",
             is_new_service=True,
             refresh_event=[
                 ipa_v1.on.data_provided,  # type: ignore
@@ -188,6 +181,15 @@ class TraefikIngressCharm(CharmBase):
                 self.traefik_route.on.data_removed,  # type: ignore
                 self.on.traefik_pebble_ready,  # type: ignore
             ],
+        )
+
+        self.traefik = Traefik(
+            container=self.container,
+            routing_mode=self._routing_mode,
+            tcp_entrypoints=self._tcp_entrypoints(),
+            tls_enabled=self._is_tls_enabled(),
+            experimental_forward_auth_enabled=self._is_forward_auth_enabled,
+            traefik_route_static_configs=self._traefik_route_static_configs(),
         )
 
         # Observability integrations
@@ -271,13 +273,9 @@ class TraefikIngressCharm(CharmBase):
         We cannot use ops unit.open_port here because Juju will provision a ClusterIP
         but for traefik we need LoadBalancer.
         """
-        traefik = self.traefik
-        service_name = traefik.service_name
-        web = ServicePort(traefik.port, name=f"{service_name}")
-        websecure = ServicePort(traefik.tls_port, name=f"{service_name}-tls")
-        return [web, websecure] + [
-            ServicePort(int(port), name=name) for name, port in self._tcp_entrypoints().items()
-        ]
+        web = ServicePort(TRAEFIK_PORT, name="http")
+        websecure = ServicePort(TRAEFIK_TLS_PORT, name="https")
+        return [web, websecure]
 
     @property
     def _forward_auth_config(self) -> ForwardAuthRequirerConfig:
@@ -517,6 +515,7 @@ class TraefikIngressCharm(CharmBase):
     def _on_stop(self, _):
         # If obtaining the workload version after an upgrade fails, we do not want juju to display
         # the workload version from before the upgrade.
+        _delete_loadbalancer(namespace=self.model.name, service_name=f"{self.app.name}-lb")
         self.unit.set_workload_version("")
 
     def _on_update_status(self, _: UpdateStatusEvent):
@@ -1102,7 +1101,9 @@ class TraefikIngressCharm(CharmBase):
         if external_hostname := self.model.config.get("external_hostname"):
             return cast(str, external_hostname)
 
-        return _get_loadbalancer_status(namespace=self.model.name, service_name="traefik-lb")
+        return _get_loadbalancer_status(
+            namespace=self.model.name, service_name=f"{self.app.name}-lb"
+        )
 
     @property
     def external_host(self) -> str:
@@ -1182,6 +1183,15 @@ def _get_loadbalancer_status(namespace: str, service_name: str) -> Optional[str]
     # `return ingress_address.hostname` removed since the hostname (external hostname)
     # is configured through juju config so it is not necessary to retrieve that from K8s.
     return ingress_address.ip
+
+
+def _delete_loadbalancer(namespace: str, service_name: str):
+    client = Client()  # type: ignore
+    try:
+        client.get(Service, name=service_name, namespace=namespace)
+        client.delete(Service, name=service_name, namespace=namespace)
+    except ApiError:
+        return
 
 
 def _get_relation_type(relation: Relation) -> _IngressRelationType:
