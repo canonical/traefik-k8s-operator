@@ -74,8 +74,6 @@ from traefik import (
     CA,
     LOG_PATH,
     SERVER_CERT_PATH,
-    TRAEFIK_PORT,
-    TRAEFIK_TLS_PORT,
     RoutingMode,
     StaticConfigMergeConflictError,
     Traefik,
@@ -164,6 +162,15 @@ class TraefikIngressCharm(CharmBase):
             charm=self, external_host=self._external_host, scheme=self._scheme  # type: ignore
         )
 
+        self.traefik = Traefik(
+            container=self.container,
+            routing_mode=self._routing_mode,
+            tcp_entrypoints=self._tcp_entrypoints(),
+            tls_enabled=self._is_tls_enabled(),
+            experimental_forward_auth_enabled=self._is_forward_auth_enabled,
+            traefik_route_static_configs=self._traefik_route_static_configs(),
+        )
+
         self.service_patch = KubernetesServicePatch(
             charm=self,
             service_type="LoadBalancer",
@@ -182,16 +189,6 @@ class TraefikIngressCharm(CharmBase):
                 self.on.traefik_pebble_ready,  # type: ignore
             ],
         )
-
-        self.traefik = Traefik(
-            container=self.container,
-            routing_mode=self._routing_mode,
-            tcp_entrypoints=self._tcp_entrypoints(),
-            tls_enabled=self._is_tls_enabled(),
-            experimental_forward_auth_enabled=self._is_forward_auth_enabled,
-            traefik_route_static_configs=self._traefik_route_static_configs(),
-        )
-
         # Observability integrations
         # tracing integration
         self._tracing = TracingEndpointRequirer(self, protocols=["otlp_http"])
@@ -273,9 +270,13 @@ class TraefikIngressCharm(CharmBase):
         We cannot use ops unit.open_port here because Juju will provision a ClusterIP
         but for traefik we need LoadBalancer.
         """
-        web = ServicePort(TRAEFIK_PORT, name="http")
-        websecure = ServicePort(TRAEFIK_TLS_PORT, name="https")
-        return [web, websecure]
+        traefik = self.traefik
+        service_name = traefik.service_name
+        web = ServicePort(traefik.port, name=f"{service_name}")
+        websecure = ServicePort(traefik.tls_port, name=f"{service_name}-tls")
+        return [web, websecure] + [
+            ServicePort(int(port), name=name) for name, port in self._tcp_entrypoints().items()
+        ]
 
     @property
     def _forward_auth_config(self) -> ForwardAuthRequirerConfig:

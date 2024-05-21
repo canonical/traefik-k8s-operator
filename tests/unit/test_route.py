@@ -314,3 +314,6 @@ def test_static_config_updates_tcp_entrypoints(harness: Harness[TraefikIngressCh
     # THEN Traefik can list the provided entrypoints
     tcp_entrypoints = charm._tcp_entrypoints()
     assert tcp_entrypoints["shondaland"] == "6767"
+
+    # AND that shows up in the service ports
+    assert [p for p in charm._service_ports if p.port == 6767][0]
