@@ -27,7 +27,7 @@ class TestWorkloadVersion(unittest.TestCase):
     def test_workload_version_is_set_on_update_status(self, *_):
         # GIVEN an initial state without the workload version set
         out = self.context.run("start", self.state)
-        self.assertEqual(out.unit_status, ActiveStatus(""))
+        self.assertEqual(out.unit_status, ActiveStatus("Serving at foo.bar"))
         self.assertEqual(out.workload_version, "")
 
         # WHEN update-status is triggered
@@ -40,7 +40,7 @@ class TestWorkloadVersion(unittest.TestCase):
         # GIVEN a state after update-status (which we know sets the workload version)
         # GIVEN an initial state with the workload version set
         out = self.context.run("update-status", self.state)
-        self.assertEqual(out.unit_status, ActiveStatus(""))
+        self.assertEqual(out.unit_status, ActiveStatus("Serving at foo.bar"))
         self.assertEqual(out.workload_version, "1.2.3")
 
         # WHEN the charm is stopped

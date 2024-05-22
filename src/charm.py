@@ -261,7 +261,7 @@ class TraefikIngressCharm(CharmBase):
         observe(route_events.data_removed, self._handle_ingress_data_removed)  # type: ignore
 
         # Action handlers
-        observe(self.on.show_proxied_endpoints_action, self._on_show_proxied_endpoints)  # type: ignore
+        observe(self.on.get_endpoints_action, self._on_get_endpoints)  # type: ignore
 
     @property
     def _service_ports(self) -> List[ServicePort]:
@@ -421,10 +421,13 @@ class TraefikIngressCharm(CharmBase):
             )
         return cert_handler.chain, cert_handler.private_key, cert_handler.ca_cert
 
-    def _on_show_proxied_endpoints(self, event: ActionEvent):
+    def _on_get_endpoints(self, event: ActionEvent):
         if not self.ready:
             return
         result = {}
+
+        traefik_endpoint = {self.app.name: {"url": f"{self._scheme}://{self.external_host}"}}
+        result.update(traefik_endpoint)
 
         for provider in (self.ingress_per_unit, self.ingress_per_appv1, self.ingress_per_appv2):
             try:
@@ -648,7 +651,7 @@ class TraefikIngressCharm(CharmBase):
             logger.error("The setup of some ingress relation failed, see previous logs")
 
         else:
-            self.unit.status = ActiveStatus()
+            self.unit.status = ActiveStatus(f"Serving at {self._external_host}")
 
     @property
     def _static_config_changed(self):
@@ -680,7 +683,7 @@ class TraefikIngressCharm(CharmBase):
         self._process_status_and_configurations()
 
         if isinstance(self.unit.status, MaintenanceStatus):
-            self.unit.status = ActiveStatus()
+            self.unit.status = ActiveStatus(f"Serving at {self._external_host}")
 
     def _handle_ingress_data_removed(self, event: RelationEvent):
         """A unit has removed the data we need to provide ingress."""
@@ -724,7 +727,7 @@ class TraefikIngressCharm(CharmBase):
             )
             return
 
-        self.unit.status = ActiveStatus()
+        self.unit.status = ActiveStatus(f"Serving at {self._external_host}")
 
     def _process_ingress_relation(self, relation: Relation):
         # There's a chance that we're processing a relation event which was deferred until after

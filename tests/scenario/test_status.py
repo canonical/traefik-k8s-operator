@@ -49,4 +49,4 @@ def test_start_traefik_active(traefik_ctx, *_):
     out = traefik_ctx.run("start", state)
 
     # THEN unit status is `active`
-    assert out.unit_status == ActiveStatus("")
+    assert out.unit_status == ActiveStatus("Serving at foo.bar")

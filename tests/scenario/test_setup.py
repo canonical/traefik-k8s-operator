@@ -62,4 +62,4 @@ def test_start_traefik_active(*_, traefik_ctx):
         containers=[Container(name="traefik", can_connect=False)],
     )
     out = Context(charm_type=TraefikIngressCharm).run("start", state)
-    assert out.unit_status == ("active", "")
+    assert out.unit_status == ("active", "Serving at foo.bar")

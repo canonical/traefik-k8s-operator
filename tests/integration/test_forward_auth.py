@@ -7,6 +7,7 @@ from os.path import join
 import pytest
 import requests
 import yaml
+from helpers import get_k8s_service_address
 from lightkube import Client
 from lightkube.resources.core_v1 import ConfigMap
 from pytest_operator.plugin import OpsTest
@@ -27,17 +28,11 @@ def lightkube_client(ops_test: OpsTest) -> Client:
     return client
 
 
-async def get_app_address(ops_test: OpsTest, app_name: str) -> str:
-    """Get address of an app."""
-    status = await ops_test.model.get_status()  # noqa: F821
-    return status["applications"][app_name]["public-address"]
-
-
 async def get_reverse_proxy_app_url(
     ops_test: OpsTest, ingress_app_name: str, app_name: str
 ) -> str:
     """Get the ingress address of an app."""
-    address = await get_app_address(ops_test, ingress_app_name)
+    address = await get_k8s_service_address(ops_test, f"{ingress_app_name}-lb")
     proxy_app_url = f"http://{address}/{ops_test.model.name}-{app_name}/"
     logger.debug(f"Retrieved address: {proxy_app_url}")
     return proxy_app_url

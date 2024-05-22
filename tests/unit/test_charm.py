@@ -179,7 +179,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
             }
         )
 
-        self.assertEqual(self.harness.charm.unit.status, ActiveStatus())
+        self.assertIsInstance(self.harness.charm.unit.status, ActiveStatus)
 
     @patch("charm._get_loadbalancer_status", lambda **__: None)
     @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
@@ -218,13 +218,13 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
         self.harness.container_pebble_ready("traefik")
 
-        self.assertEqual(self.harness.charm.unit.status, ActiveStatus())
+        self.assertIsInstance(self.harness.charm.unit.status, ActiveStatus)
 
         self.assertEqual(
             requirer.urls,
             {"remote/0": "http://10.0.0.1/test-model-remote-0"},
         )
-        self.assertEqual(self.harness.charm.unit.status, ActiveStatus())
+        self.assertIsInstance(self.harness.charm.unit.status, ActiveStatus)
 
     @patch("charm._get_loadbalancer_status", lambda **__: "10.0.0.1")
     @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
@@ -239,13 +239,13 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
         self.harness.container_pebble_ready("traefik")
 
-        self.assertEqual(self.harness.charm.unit.status, ActiveStatus())
+        self.assertIsInstance(self.harness.charm.unit.status, ActiveStatus)
 
         self.assertEqual(
             requirer.urls,
             {"remote/0": "http://10.0.0.1/test-model-remote-0"},
         )
-        self.assertEqual(self.harness.charm.unit.status, ActiveStatus())
+        self.assertIsInstance(self.harness.charm.unit.status, ActiveStatus)
 
         self.harness.update_config({"external_hostname": "testhostname"})
 
@@ -253,7 +253,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
             requirer.urls,
             {"remote/0": "http://testhostname/test-model-remote-0"},
         )
-        self.assertEqual(self.harness.charm.unit.status, ActiveStatus())
+        self.assertIsInstance(self.harness.charm.unit.status, ActiveStatus)
 
     @patch("charm._get_loadbalancer_status", lambda **__: None)
     @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
@@ -273,7 +273,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
             requirer.urls,
             {"remote/0": "http://testhostname/test-model-remote-0"},
         )
-        self.assertEqual(self.harness.charm.unit.status, ActiveStatus())
+        self.assertIsInstance(self.harness.charm.unit.status, ActiveStatus)
 
         self.harness.update_config(unset=["external_hostname"])
 
@@ -315,8 +315,10 @@ class TestTraefikIngressCharm(unittest.TestCase):
         self.harness.begin_with_initial_hooks()
         action_event = Mock(spec=ActionEvent)
         self.harness.update_config({"external_hostname": "foo"})
-        self.harness.charm._on_show_proxied_endpoints(action_event)
-        action_event.set_results.assert_called_once_with({"proxied-endpoints": "{}"})
+        self.harness.charm._on_get_endpoints(action_event)
+        action_event.set_results.assert_called_once_with(
+            {"proxied-endpoints": '{"traefik-k8s": {"url": "http://foo"}}'}
+        )
 
     @patch("charm._get_loadbalancer_status", lambda **__: None)
     @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
@@ -338,11 +340,14 @@ class TestTraefikIngressCharm(unittest.TestCase):
         self.harness.container_pebble_ready("traefik")
 
         action_event = Mock(spec=ActionEvent)
-        self.harness.charm._on_show_proxied_endpoints(action_event)
+        self.harness.charm._on_get_endpoints(action_event)
         action_event.set_results.assert_called_once_with(
             {
                 "proxied-endpoints": json.dumps(
-                    {"remote": {"url": "http://testhostname/test-model-remote-0"}}
+                    {
+                        "traefik-k8s": {"url": "http://testhostname"},
+                        "remote": {"url": "http://testhostname/test-model-remote-0"},
+                    }
                 )
             }
         )
@@ -362,11 +367,14 @@ class TestTraefikIngressCharm(unittest.TestCase):
         self.harness.container_pebble_ready("traefik")
 
         action_event = Mock(spec=ActionEvent)
-        self.harness.charm._on_show_proxied_endpoints(action_event)
+        self.harness.charm._on_get_endpoints(action_event)
         action_event.set_results.assert_called_once_with(
             {
                 "proxied-endpoints": json.dumps(
-                    {"remote/0": {"url": "http://testhostname/test-model-remote-0"}}
+                    {
+                        "traefik-k8s": {"url": "http://testhostname"},
+                        "remote/0": {"url": "http://testhostname/test-model-remote-0"},
+                    }
                 )
             }
         )
