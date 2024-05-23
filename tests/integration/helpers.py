@@ -33,6 +33,22 @@ async def get_k8s_service_address(ops_test: OpsTest, service_name: str) -> Optio
         return None
 
 
+async def delete_k8s_service(ops_test: OpsTest, service_name: str) -> None:
+    """Delete a Kubernetes service using kubectl.
+
+    Args:
+        ops_test: pytest-operator plugin
+        service_name: The name of the Kubernetes service to delete
+    """
+    # In CI, tests consistently timeout on `waiting: gateway address unavailable`.
+    # Just in case lb service still exists before next run, let's remove it
+    model = ops_test.model.info
+    try:
+        sh.kubectl(*f"-n {model.name} delete service/{service_name}".split())
+    except Exception:
+        return
+
+
 async def get_address(ops_test: OpsTest, app_name: str, unit_num: Optional[int] = None) -> str:
     """Find unit address for any application.
 

@@ -23,7 +23,11 @@ import pytest
 import yaml
 from pytest_operator.plugin import OpsTest
 
-from tests.integration.helpers import get_k8s_service_address, remove_application
+from tests.integration.helpers import (
+    delete_k8s_service,
+    get_k8s_service_address,
+    remove_application,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -213,4 +217,5 @@ async def test_disintegrate(ops_test: OpsTest):
 
 
 async def test_cleanup(ops_test):
+    await delete_k8s_service(ops_test, "traefik-lb")
     await remove_application(ops_test, "traefik", timeout=60)
