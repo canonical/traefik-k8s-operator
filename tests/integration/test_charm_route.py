@@ -13,7 +13,7 @@ from pytest_operator.plugin import OpsTest
 from tests.integration.conftest import (
     trfk_resources,
 )
-from tests.integration.helpers import get_k8s_service_address
+from tests.integration.helpers import get_k8s_service_address, remove_application
 
 APP_NAME = "traefik"
 TESTER_APP_NAME = "route"
@@ -82,3 +82,7 @@ async def test_remove_relation(ops_test: OpsTest):
         "remove-relation", f"{TESTER_APP_NAME}:traefik-route", f"{APP_NAME}:traefik-route"
     )
     await ops_test.model.wait_for_idle([APP_NAME], status="active")
+
+
+async def test_cleanup(ops_test):
+    await remove_application(ops_test, APP_NAME, timeout=60)

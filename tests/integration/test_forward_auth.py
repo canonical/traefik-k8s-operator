@@ -7,7 +7,7 @@ from os.path import join
 import pytest
 import requests
 import yaml
-from helpers import get_k8s_service_address
+from helpers import get_k8s_service_address, remove_application
 from lightkube import Client
 from lightkube.resources.core_v1 import ConfigMap
 from pytest_operator.plugin import OpsTest
@@ -187,3 +187,7 @@ async def test_remove_forward_auth_integration(ops_test: OpsTest):
     await ops_test.model.wait_for_idle(
         [TRAEFIK_CHARM, OATHKEEPER_CHARM, IAP_REQUIRER_CHARM], status="active"
     )
+
+
+async def test_cleanup(ops_test):
+    await remove_application(ops_test, "traefik-k8s", timeout=60)

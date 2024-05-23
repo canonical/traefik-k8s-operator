@@ -109,8 +109,8 @@ class SomeCharm(CharmBase):
     # ...
 ```
 
-Creating a new k8s service instead of patching the one created by juju
-Providing a service name is mandatory as it shouldn't be the same as default one, i.e., `app_name`.
+Creating a new k8s lb service instead of patching the one created by juju
+Providing a service name is mandatory as it shouldn't be the same as default service, i.e., `app_name`.
 ```python
 from charms.observability_libs.v1.kubernetes_service_patch import KubernetesServicePatch
 from lightkube.models.core_v1 import ServicePort
@@ -122,8 +122,8 @@ class SomeCharm(CharmBase):
     self.service_patcher = KubernetesServicePatch(
         self,
         [port],
-        is_new_service=True,
-        service_name="new_service"
+        service_type="LoadBalancer",
+        service_name="application-lb"
     )
     # ...
 ```
@@ -179,7 +179,6 @@ class KubernetesServicePatch(Object):
         ports: List[ServicePort],
         service_name: Optional[str] = None,
         service_type: ServiceType = "ClusterIP",
-        is_new_service: Optional[bool] = False,
         additional_labels: Optional[dict] = None,
         additional_selectors: Optional[dict] = None,
         additional_annotations: Optional[dict] = None,
@@ -193,8 +192,6 @@ class KubernetesServicePatch(Object):
             ports: a list of ServicePorts
             service_name: allows setting custom name to the patched service. If none given,
                 application name will be used.
-            is_new_service: allows creating a new service instead of patching the Kubernetes Service created
-                by Juju 
             service_type: desired type of K8s service. Default value is in line with ServiceSpec's
                 default value.
             additional_labels: Labels to be added to the kubernetes service (by default only
@@ -209,7 +206,7 @@ class KubernetesServicePatch(Object):
         super().__init__(charm, "kubernetes-service-patch")
         self.charm = charm
         self.service_name = service_name if service_name else self._app
-        self.is_new_service = is_new_service
+        self.service_type = service_type
         self.service = self._service_object(
             ports,
             service_name,
@@ -225,6 +222,7 @@ class KubernetesServicePatch(Object):
         self.framework.observe(charm.on.install, self._patch)
         self.framework.observe(charm.on.upgrade_charm, self._patch)
         self.framework.observe(charm.on.update_status, self._patch)
+        self.framework.observe(charm.on.remove, self._remove_service)
 
         # apply user defined events
         if refresh_event:
@@ -300,10 +298,15 @@ class KubernetesServicePatch(Object):
             if self._is_patched(client):
                 return
             if self.service_name != self._app:
-                if not self.is_new_service:
+                if not self.service_type == "LoadBalancer":
                     self._delete_and_create_service(client)
                 else:
-                    self._delete_and_create_new_service(client)
+                    self._delete_and_create_lb_service(client)
+            elif self.service_type == "LoadBalancer":
+                logger.error(
+                    "Failed to create service: cannot create a lb with the same name as the default service."
+                )
+                return
             client.patch(Service, self.service_name, self.service, patch_type=PatchType.MERGE)
         except ApiError as e:
             if e.status.code == 403:
@@ -320,7 +323,7 @@ class KubernetesServicePatch(Object):
         client.delete(Service, self._app, namespace=self._namespace)
         client.create(service)
 
-    def _delete_and_create_new_service(self, client: Client):
+    def _delete_and_create_lb_service(self, client: Client):
         try:
             service = client.get(Service, self.service_name, namespace=self._namespace)
             service.metadata.name = self.service_name  # type: ignore[attr-defined]
@@ -356,6 +359,26 @@ class KubernetesServicePatch(Object):
             (p.port, p.targetPort) for p in service.spec.ports  # type: ignore[attr-defined]
         ]  # noqa: E501
         return expected_ports == fetched_ports
+
+    def _remove_service(self, _):
+        """Remove a Kubernetes service associated with this charm.
+
+        Specifically designed to delete the load balancer service created by the charm, since Juju only deletes the
+        default ClusterIP service and not custom services.
+
+        Returns:
+            None
+
+        Raises:
+            ApiError: If there is an issue with the Kubernetes API request.
+        """
+        client = Client()  # pyright: ignore
+
+        try:
+            client.get(Service, self.service_name, namespace=self._namespace)
+            client.delete(Service, self.service_name, namespace=self._namespace)
+        except ApiError:
+            return
 
     @property
     def _app(self) -> str:

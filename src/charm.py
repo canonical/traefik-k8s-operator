@@ -176,7 +176,6 @@ class TraefikIngressCharm(CharmBase):
             service_type="LoadBalancer",
             ports=self._service_ports,
             service_name=f"{self.app.name}-lb",
-            is_new_service=True,
             refresh_event=[
                 ipa_v1.on.data_provided,  # type: ignore
                 ipa_v2.on.data_provided,  # type: ignore
@@ -519,7 +518,6 @@ class TraefikIngressCharm(CharmBase):
     def _on_stop(self, _):
         # If obtaining the workload version after an upgrade fails, we do not want juju to display
         # the workload version from before the upgrade.
-        _delete_loadbalancer(namespace=self.model.name, service_name=f"{self.app.name}-lb")
         self.unit.set_workload_version("")
 
     def _on_update_status(self, _: UpdateStatusEvent):
@@ -1187,15 +1185,6 @@ def _get_loadbalancer_status(namespace: str, service_name: str) -> Optional[str]
     # `return ingress_address.hostname` removed since the hostname (external hostname)
     # is configured through juju config so it is not necessary to retrieve that from K8s.
     return ingress_address.ip
-
-
-def _delete_loadbalancer(namespace: str, service_name: str):
-    client = Client()  # type: ignore
-    try:
-        client.get(Service, name=service_name, namespace=namespace)
-        client.delete(Service, name=service_name, namespace=namespace)
-    except ApiError:
-        return
 
 
 def _get_relation_type(relation: Relation) -> _IngressRelationType:
