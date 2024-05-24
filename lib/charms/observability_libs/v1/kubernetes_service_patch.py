@@ -205,11 +205,13 @@ class KubernetesServicePatch(Object):
         """
         super().__init__(charm, "kubernetes-service-patch")
         self.charm = charm
-        self.service_name = service_name if service_name else self._app
+        self.service_name = service_name or self._app
+        if self.service_name == self._app and service_type == "LoadBalancer":
+            self.service_name= f'{self._app}-lb'
         self.service_type = service_type
         self.service = self._service_object(
             ports,
-            service_name,
+            self.service_name,
             service_type,
             additional_labels,
             additional_selectors,
@@ -222,7 +224,7 @@ class KubernetesServicePatch(Object):
         self.framework.observe(charm.on.install, self._patch)
         self.framework.observe(charm.on.upgrade_charm, self._patch)
         self.framework.observe(charm.on.update_status, self._patch)
-        self.framework.observe(charm.on.remove, self._remove_service)
+        self.framework.observe(charm.on.stop, self._remove_service)
 
         # apply user defined events
         if refresh_event:
@@ -258,8 +260,6 @@ class KubernetesServicePatch(Object):
         Returns:
             Service: A valid representation of a Kubernetes Service with the correct ports.
         """
-        if not service_name:
-            service_name = self._app
         labels = {"app.kubernetes.io/name": self._app}
         if additional_labels:
             labels.update(additional_labels)
@@ -301,12 +301,7 @@ class KubernetesServicePatch(Object):
                 if not self.service_type == "LoadBalancer":
                     self._delete_and_create_service(client)
                 else:
-                    self._delete_and_create_lb_service(client)
-            elif self.service_type == "LoadBalancer":
-                logger.error(
-                    "Failed to create service: cannot create a lb with the same name as the default service."
-                )
-                return
+                    self._create_lb_service(client)
             client.patch(Service, self.service_name, self.service, patch_type=PatchType.MERGE)
         except ApiError as e:
             if e.status.code == 403:
@@ -323,13 +318,9 @@ class KubernetesServicePatch(Object):
         client.delete(Service, self._app, namespace=self._namespace)
         client.create(service)
 
-    def _delete_and_create_lb_service(self, client: Client):
+    def _create_lb_service(self, client: Client):
         try:
-            service = client.get(Service, self.service_name, namespace=self._namespace)
-            service.metadata.name = self.service_name  # type: ignore[attr-defined]
-            service.metadata.resourceVersion = service.metadata.uid = None  # type: ignore[attr-defined]   # noqa: E501
-            client.delete(Service, self.service_name, namespace=self._namespace)
-            client.create(service)
+            client.get(Service, self.service_name, namespace=self._namespace)
         except ApiError:
             client.create(self.service)
 

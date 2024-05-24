@@ -315,7 +315,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
         self.harness.begin_with_initial_hooks()
         action_event = Mock(spec=ActionEvent)
         self.harness.update_config({"external_hostname": "foo"})
-        self.harness.charm._on_get_endpoints(action_event)
+        self.harness.charm._on_show_proxied_endpoints(action_event)
         action_event.set_results.assert_called_once_with(
             {"proxied-endpoints": '{"traefik-k8s": {"url": "http://foo"}}'}
         )
@@ -340,7 +340,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
         self.harness.container_pebble_ready("traefik")
 
         action_event = Mock(spec=ActionEvent)
-        self.harness.charm._on_get_endpoints(action_event)
+        self.harness.charm._on_show_proxied_endpoints(action_event)
         action_event.set_results.assert_called_once_with(
             {
                 "proxied-endpoints": json.dumps(
@@ -367,7 +367,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
         self.harness.container_pebble_ready("traefik")
 
         action_event = Mock(spec=ActionEvent)
-        self.harness.charm._on_get_endpoints(action_event)
+        self.harness.charm._on_show_proxied_endpoints(action_event)
         action_event.set_results.assert_called_once_with(
             {
                 "proxied-endpoints": json.dumps(

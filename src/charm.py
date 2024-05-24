@@ -175,7 +175,6 @@ class TraefikIngressCharm(CharmBase):
             charm=self,
             service_type="LoadBalancer",
             ports=self._service_ports,
-            service_name=f"{self.app.name}-lb",
             refresh_event=[
                 ipa_v1.on.data_provided,  # type: ignore
                 ipa_v2.on.data_provided,  # type: ignore
@@ -260,7 +259,7 @@ class TraefikIngressCharm(CharmBase):
         observe(route_events.data_removed, self._handle_ingress_data_removed)  # type: ignore
 
         # Action handlers
-        observe(self.on.get_endpoints_action, self._on_get_endpoints)  # type: ignore
+        observe(self.on.show_proxied_endpoints_action, self._on_show_proxied_endpoints)  # type: ignore
 
     @property
     def _service_ports(self) -> List[ServicePort]:
@@ -420,7 +419,7 @@ class TraefikIngressCharm(CharmBase):
             )
         return cert_handler.chain, cert_handler.private_key, cert_handler.ca_cert
 
-    def _on_get_endpoints(self, event: ActionEvent):
+    def _on_show_proxied_endpoints(self, event: ActionEvent):
         if not self.ready:
             return
         result = {}

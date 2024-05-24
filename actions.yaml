@@ -1,4 +1,4 @@
-get-endpoints:
+show-proxied-endpoints:
   description: |
     Returns a list of endpoints, 
     including both the endpoints proxied by this Traefik proxy and Traefik's own endpoint.
