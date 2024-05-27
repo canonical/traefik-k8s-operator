@@ -110,7 +110,8 @@ class SomeCharm(CharmBase):
 ```
 
 Creating a new k8s lb service instead of patching the one created by juju
-Providing a service name is mandatory as it shouldn't be the same as default service, i.e., `app_name`.
+Service name is optional. If not provided, it defaults to {app_name}-lb.
+If provided and equal to app_name, it also defaults to {app_name}-lb to prevent conflicts with the Juju default service.
 ```python
 from charms.observability_libs.v1.kubernetes_service_patch import KubernetesServicePatch
 from lightkube.models.core_v1 import ServicePort
@@ -206,8 +207,10 @@ class KubernetesServicePatch(Object):
         super().__init__(charm, "kubernetes-service-patch")
         self.charm = charm
         self.service_name = service_name or self._app
+        # To avoid conflicts with the default Juju service, append "-lb" to the service name.
+        # The Juju application name is retained for the default service created by Juju.
         if self.service_name == self._app and service_type == "LoadBalancer":
-            self.service_name= f'{self._app}-lb'
+            self.service_name = f"{self._app}-lb"
         self.service_type = service_type
         self.service = self._service_object(
             ports,
@@ -260,6 +263,8 @@ class KubernetesServicePatch(Object):
         Returns:
             Service: A valid representation of a Kubernetes Service with the correct ports.
         """
+        if not service_name:
+            service_name = self._app
         labels = {"app.kubernetes.io/name": self._app}
         if additional_labels:
             labels.update(additional_labels)
@@ -361,15 +366,19 @@ class KubernetesServicePatch(Object):
             None
 
         Raises:
-            ApiError: If there is an issue with the Kubernetes API request.
+            ApiError: for deletion errors, excluding when the service is not found (404 Not Found).
         """
         client = Client()  # pyright: ignore
 
         try:
-            client.get(Service, self.service_name, namespace=self._namespace)
             client.delete(Service, self.service_name, namespace=self._namespace)
-        except ApiError:
-            return
+        except ApiError as e:
+            if e.status.code == 404:
+                # Service not found, so no action needed
+                pass
+            else:
+                # Re-raise for other statuses
+                raise
 
     @property
     def _app(self) -> str:
