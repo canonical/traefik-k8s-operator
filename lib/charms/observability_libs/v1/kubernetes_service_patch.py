@@ -109,6 +109,26 @@ class SomeCharm(CharmBase):
     # ...
 ```
 
+Creating a new k8s lb service instead of patching the one created by juju
+Service name is optional. If not provided, it defaults to {app_name}-lb.
+If provided and equal to app_name, it also defaults to {app_name}-lb to prevent conflicts with the Juju default service.
+```python
+from charms.observability_libs.v1.kubernetes_service_patch import KubernetesServicePatch
+from lightkube.models.core_v1 import ServicePort
+
+class SomeCharm(CharmBase):
+  def __init__(self, *args):
+    # ...
+    port = ServicePort(int(self.config["charm-config-port"]), name=f"{self.app.name}")
+    self.service_patcher = KubernetesServicePatch(
+        self,
+        [port],
+        service_type="LoadBalancer",
+        service_name="application-lb"
+    )
+    # ...
+```
+
 Additionally, you may wish to use mocks in your charm's unit testing to ensure that the library
 does not try to make any API calls, or open any files during testing that are unlikely to be
 present, and could break your tests. The easiest way to do this is during your test `setUp`:
@@ -146,7 +166,7 @@ LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 9
+LIBPATCH = 10
 
 ServiceType = Literal["ClusterIP", "LoadBalancer"]
 
@@ -186,10 +206,15 @@ class KubernetesServicePatch(Object):
         """
         super().__init__(charm, "kubernetes-service-patch")
         self.charm = charm
-        self.service_name = service_name if service_name else self._app
+        self.service_name = service_name or self._app
+        # To avoid conflicts with the default Juju service, append "-lb" to the service name.
+        # The Juju application name is retained for the default service created by Juju.
+        if self.service_name == self._app and service_type == "LoadBalancer":
+            self.service_name = f"{self._app}-lb"
+        self.service_type = service_type
         self.service = self._service_object(
             ports,
-            service_name,
+            self.service_name,
             service_type,
             additional_labels,
             additional_selectors,
@@ -202,6 +227,7 @@ class KubernetesServicePatch(Object):
         self.framework.observe(charm.on.install, self._patch)
         self.framework.observe(charm.on.upgrade_charm, self._patch)
         self.framework.observe(charm.on.update_status, self._patch)
+        self.framework.observe(charm.on.stop, self._remove_service)
 
         # apply user defined events
         if refresh_event:
@@ -277,7 +303,10 @@ class KubernetesServicePatch(Object):
             if self._is_patched(client):
                 return
             if self.service_name != self._app:
-                self._delete_and_create_service(client)
+                if not self.service_type == "LoadBalancer":
+                    self._delete_and_create_service(client)
+                else:
+                    self._create_lb_service(client)
             client.patch(Service, self.service_name, self.service, patch_type=PatchType.MERGE)
         except ApiError as e:
             if e.status.code == 403:
@@ -293,6 +322,12 @@ class KubernetesServicePatch(Object):
         service.metadata.resourceVersion = service.metadata.uid = None  # type: ignore[attr-defined]   # noqa: E501
         client.delete(Service, self._app, namespace=self._namespace)
         client.create(service)
+
+    def _create_lb_service(self, client: Client):
+        try:
+            client.get(Service, self.service_name, namespace=self._namespace)
+        except ApiError:
+            client.create(self.service)
 
     def is_patched(self) -> bool:
         """Reports if the service patch has been applied.
@@ -320,6 +355,30 @@ class KubernetesServicePatch(Object):
             (p.port, p.targetPort) for p in service.spec.ports  # type: ignore[attr-defined]
         ]  # noqa: E501
         return expected_ports == fetched_ports
+
+    def _remove_service(self, _):
+        """Remove a Kubernetes service associated with this charm.
+
+        Specifically designed to delete the load balancer service created by the charm, since Juju only deletes the
+        default ClusterIP service and not custom services.
+
+        Returns:
+            None
+
+        Raises:
+            ApiError: for deletion errors, excluding when the service is not found (404 Not Found).
+        """
+        client = Client()  # pyright: ignore
+
+        try:
+            client.delete(Service, self.service_name, namespace=self._namespace)
+        except ApiError as e:
+            if e.status.code == 404:
+                # Service not found, so no action needed
+                pass
+            else:
+                # Re-raise for other statuses
+                raise
 
     @property
     def _app(self) -> str:
