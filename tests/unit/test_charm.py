@@ -181,7 +181,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
         self.assertEqual(self.harness.charm.unit.status, ActiveStatus())
 
-    @patch("charm._get_loadbalancer_status", lambda **__: None)
+    @patch("charm.TraefikIngressCharm._get_k8s_service_ip", lambda *_, **__: None)
     @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
     def test_pebble_ready_without_gateway_address(self):
         """Test that requirers do not get addresses until the gateway address is available."""
@@ -205,7 +205,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
             self.harness.charm.unit.status, WaitingStatus("gateway address unavailable")
         )
 
-    @patch("charm._get_loadbalancer_status", lambda **__: "10.0.0.1")
+    @patch("charm.TraefikIngressCharm._get_k8s_service_ip", lambda *_, **__: "10.0.0.1")
     @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
     def test_pebble_ready_with_joined_relations(self):
         self.harness.set_leader(True)
@@ -226,7 +226,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
         )
         self.assertEqual(self.harness.charm.unit.status, ActiveStatus())
 
-    @patch("charm._get_loadbalancer_status", lambda **__: "10.0.0.1")
+    @patch("charm.TraefikIngressCharm._get_k8s_service_ip", lambda *_, **__: "10.0.0.1")
     @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
     def test_gateway_address_change_with_joined_relations(self):
         self.harness.set_leader(True)
@@ -255,7 +255,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
         )
         self.assertEqual(self.harness.charm.unit.status, ActiveStatus())
 
-    @patch("charm._get_loadbalancer_status", lambda **__: None)
+    @patch("charm.TraefikIngressCharm._get_k8s_service_ip", lambda *_, **__: None)
     @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
     def test_gateway_address_becomes_unavailable_after_relation_join(self):
         self.harness.update_config({"external_hostname": "testhostname"})
@@ -309,7 +309,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
         except (FileNotFoundError, PathError):
             pass
 
-    @patch("charm._get_loadbalancer_status", lambda **__: None)
+    @patch("charm.TraefikIngressCharm._get_k8s_service_ip", lambda *_, **__: None)
     @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
     def test_show_proxied_endpoints_action_no_relations(self):
         self.harness.begin_with_initial_hooks()
@@ -318,7 +318,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
         self.harness.charm._on_show_proxied_endpoints(action_event)
         action_event.set_results.assert_called_once_with({"proxied-endpoints": "{}"})
 
-    @patch("charm._get_loadbalancer_status", lambda **__: None)
+    @patch("charm.TraefikIngressCharm._get_k8s_service_ip", lambda *_, **__: None)
     @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
     def test_show_proxied_endpoints_action_only_ingress_per_app_relations(self):
         self.harness.set_leader(True)
@@ -347,7 +347,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
             }
         )
 
-    @patch("charm._get_loadbalancer_status", lambda **__: None)
+    @patch("charm.TraefikIngressCharm._get_k8s_service_ip", lambda *_, **__: None)
     @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
     def test_show_proxied_endpoints_action_only_ingress_per_unit_relations(self):
         self.harness.set_leader(True)
@@ -371,7 +371,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
             }
         )
 
-    @patch("charm._get_loadbalancer_status", lambda **__: None)
+    @patch("charm.TraefikIngressCharm._get_k8s_service_ip", lambda *_, **__: None)
     @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
     def test_base_static_config(self):
         """Verify that the static config that should always be there, is in fact there."""
@@ -396,7 +396,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
         assert cfg["providers"]["file"]["directory"]
         assert cfg["providers"]["file"]["watch"] is True
 
-    @patch("charm._get_loadbalancer_status", lambda **__: None)
+    @patch("charm.TraefikIngressCharm._get_k8s_service_ip", lambda *_, **__: None)
     @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
     def test_tcp_config(self):
         self.harness.set_leader(True)
@@ -500,7 +500,7 @@ class TestTraefikCertTransferInterface(unittest.TestCase):
         self.container_name = "traefik"
 
     @patch("ops.model.Container.exec")
-    @patch("charm._get_loadbalancer_status", lambda **__: "10.0.0.1")
+    @patch("charm.TraefikIngressCharm._get_k8s_service_ip", lambda *_, **__: "10.0.0.1")
     @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
     def test_transferred_ca_certs_are_updated(self, patch_exec):
         # Given container is ready, when receive-ca-cert relation joins,
@@ -522,7 +522,7 @@ class TestTraefikCertTransferInterface(unittest.TestCase):
         ]
 
     @patch("ops.model.Container.exec")
-    @patch("charm._get_loadbalancer_status", lambda **__: "10.0.0.1")
+    @patch("charm.TraefikIngressCharm._get_k8s_service_ip", lambda *_, **__: "10.0.0.1")
     @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
     def test_transferred_ca_certs_are_not_updated(self, patch_exec):
         # Given container is not ready, when receive-ca-cert relation joins,
@@ -540,7 +540,7 @@ class TestTraefikCertTransferInterface(unittest.TestCase):
 
 
 class TestConfigOptionsValidation(unittest.TestCase):
-    @patch("charm._get_loadbalancer_status", lambda **_: "10.0.0.1")
+    @patch("charm.TraefikIngressCharm._get_k8s_service_ip", lambda *_, **__: "10.0.0.1")
     @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
     def setUp(self):
         self.harness: Harness[TraefikIngressCharm] = Harness(TraefikIngressCharm)
@@ -564,19 +564,19 @@ class TestConfigOptionsValidation(unittest.TestCase):
             harness=self.harness, relation=self.relation, host="10.1.10.1", port=9000
         )
 
-    @patch("charm._get_loadbalancer_status", lambda **_: "10.0.0.1")
-    @patch("charm.KubernetesServicePatch", lambda **_: None)
+    @patch("charm.TraefikIngressCharm._get_k8s_service_ip", lambda *_, **__: "10.0.0.1")
+    @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
     def test_when_external_hostname_not_set_use_ip_with_port_80(self):
         self.assertEqual(requirer.urls, {"remote/0": "http://10.0.0.1/test-model-remote-0"})
 
-    @patch("charm._get_loadbalancer_status", lambda **_: "10.0.0.1")
-    @patch("charm.KubernetesServicePatch", lambda **_: None)
+    @patch("charm.TraefikIngressCharm._get_k8s_service_ip", lambda *_, **__: "10.0.0.1")
+    @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
     def test_when_external_hostname_is_set_use_it_with_port_80(self):
         self.harness.update_config({"external_hostname": "testhostname"})
         self.assertEqual(requirer.urls, {"remote/0": "http://testhostname/test-model-remote-0"})
 
-    @patch("charm._get_loadbalancer_status", lambda **_: "10.0.0.1")
-    @patch("charm.KubernetesServicePatch", lambda **_: None)
+    @patch("charm.TraefikIngressCharm._get_k8s_service_ip", lambda *_, **__: "10.0.0.1")
+    @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
     def test_when_external_hostname_is_invalid_go_into_blocked_status(self):
         for invalid_hostname in [
             "testhostname:8080",

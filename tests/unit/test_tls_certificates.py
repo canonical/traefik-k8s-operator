@@ -12,7 +12,7 @@ ops.testing.SIMULATE_CAN_CONNECT = True
 
 
 class TlsWithExternalHostname(unittest.TestCase):
-    @patch("charm._get_loadbalancer_status", lambda **_: "10.0.0.1")
+    @patch("charm.TraefikIngressCharm._get_k8s_service_ip", lambda *_, **__: "10.0.0.1")
     @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
     def setUp(self):
         self.harness: Harness[TraefikIngressCharm] = Harness(TraefikIngressCharm)
@@ -31,7 +31,7 @@ class TlsWithExternalHostname(unittest.TestCase):
         self.harness.begin_with_initial_hooks()
         self.harness.container_pebble_ready("traefik")
 
-    @patch("charm._get_loadbalancer_status", lambda **_: "10.0.0.1")
+    @patch("charm.TraefikIngressCharm._get_k8s_service_ip", lambda *_, **__: "10.0.0.1")
     @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
     def test_external_hostname_is_set_after_relation_joins(self):
         # GIVEN an external hostname is not set
@@ -54,7 +54,7 @@ class TlsWithExternalHostname(unittest.TestCase):
         unit_databag = self.harness.get_relation_data(self.rel_id, self.harness.charm.unit.name)
         self.assertIsNotNone(unit_databag.get("certificate_signing_requests"))
 
-    @patch("charm._get_loadbalancer_status", lambda **_: "10.0.0.1")
+    @patch("charm.TraefikIngressCharm._get_k8s_service_ip", lambda *_, **__: "10.0.0.1")
     @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
     def test_external_hostname_is_set_before_relation_joins(self):
         # GIVEN an external hostname is set
