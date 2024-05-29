@@ -480,7 +480,7 @@ class TraefikIngressCharm(CharmBase):
             logger.info("tracing not enabled: skipping tracing config")
             return
 
-        if endpoint := self._tracing.otlp_http_endpoint():
+        if endpoint := self._tracing.get_endpoint("otlp_http"):
             grpc = False
         else:
             logger.error(
