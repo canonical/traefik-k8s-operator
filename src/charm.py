@@ -24,7 +24,7 @@ from charms.certificate_transfer_interface.v0.certificate_transfer import (
     CertificateTransferRequires,
 )
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
-from charms.loki_k8s.v0.loki_push_api import LogProxyConsumer
+from charms.loki_k8s.v1.loki_push_api import LogProxyConsumer
 from charms.oathkeeper.v0.forward_auth import (
     AuthConfigChangedEvent,
     AuthConfigRemovedEvent,
@@ -201,7 +201,11 @@ class TraefikIngressCharm(CharmBase):
             self, relation_name="grafana-dashboard"
         )
         # Enable log forwarding for Loki and other charms that implement loki_push_api
-        self._logging = LogProxyConsumer(self, relation_name="logging", log_files=[LOG_PATH])
+        self._logging = LogProxyConsumer(
+            self,
+            logs_scheme={_TRAEFIK_CONTAINER_NAME: {"log-files": [LOG_PATH]}},
+            relation_name="logging",
+        )
         self.metrics_endpoint = MetricsEndpointProvider(
             charm=self,
             jobs=self.traefik.scrape_jobs,
