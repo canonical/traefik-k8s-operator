@@ -24,7 +24,7 @@ from charms.certificate_transfer_interface.v0.certificate_transfer import (
     CertificateTransferRequires,
 )
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
-from charms.loki_k8s.v1.loki_push_api import LogProxyConsumer
+from charms.loki_k8s.v1.loki_push_api import LokiPushApiConsumer
 from charms.oathkeeper.v0.forward_auth import (
     AuthConfigChangedEvent,
     AuthConfigRemovedEvent,
@@ -72,7 +72,6 @@ from ops.model import (
 from ops.pebble import PathError
 from traefik import (
     CA,
-    LOG_PATH,
     SERVER_CERT_PATH,
     RoutingMode,
     StaticConfigMergeConflictError,
@@ -200,12 +199,8 @@ class TraefikIngressCharm(CharmBase):
         self._grafana_dashboards = GrafanaDashboardProvider(
             self, relation_name="grafana-dashboard"
         )
-        # Enable log forwarding for Loki and other charms that implement loki_push_api
-        self._logging = LogProxyConsumer(
-            self,
-            logs_scheme={_TRAEFIK_CONTAINER_NAME: {"log-files": [LOG_PATH]}},
-            relation_name="logging",
-        )
+        # Enable logging relation for Loki and other charms that implement loki_push_api
+        self._logging = LokiPushApiConsumer(self)
         self.metrics_endpoint = MetricsEndpointProvider(
             charm=self,
             jobs=self.traefik.scrape_jobs,
