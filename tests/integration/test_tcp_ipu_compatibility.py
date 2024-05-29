@@ -10,7 +10,7 @@ from tests.integration.conftest import (
     deploy_traefik_if_not_deployed,
     safe_relate,
 )
-from tests.integration.helpers import remove_application
+from tests.integration.helpers import delete_k8s_service, remove_application
 from tests.integration.test_charm_ipa import assert_ipa_charm_has_ingress  # noqa
 from tests.integration.test_charm_ipu import assert_ipu_charm_has_ingress  # noqa
 from tests.integration.test_charm_tcp import (  # noqa
@@ -56,4 +56,5 @@ async def test_tcp_ipu_compatibility(ops_test, tcp_ipu_deployment):
 
 
 async def test_cleanup(ops_test):
+    await delete_k8s_service(ops_test, "traefik-k8s-lb")
     await remove_application(ops_test, "traefik-k8s", timeout=60)

@@ -23,7 +23,11 @@ import pytest
 import yaml
 from pytest_operator.plugin import OpsTest
 
-from tests.integration.helpers import get_address, remove_application
+from tests.integration.helpers import (
+    delete_k8s_service,
+    get_k8s_service_address,
+    remove_application,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -90,7 +94,7 @@ async def test_build_and_deploy(ops_test: OpsTest, traefik_charm):
 
 @pytest.mark.abort_on_fail
 async def test_ingressed_endpoints_reachable_after_metallb_enabled(ops_test: OpsTest):
-    ip = await get_address(ops_test, trfk.name)
+    ip = await get_k8s_service_address(ops_test, f"{trfk.name}-lb")
     for ep in get_endpoints(ops_test, scheme="http", netloc=ip):
         logger.info("Attempting to reach %s", ep)  # Traceback doesn't spell out the endpoint
         urlopen(ep)
@@ -177,7 +181,7 @@ async def test_tls_termination(ops_test: OpsTest, temp_dir):
     cert_path = temp_dir / "local.cert"
     await pull_server_cert(ops_test, cert_path)
 
-    ip = await get_address(ops_test, trfk.name)
+    ip = await get_k8s_service_address(ops_test, f"{trfk.name}-lb")
     await curl_endpoints(ops_test, temp_dir, cert_path, ip)
 
 
@@ -202,7 +206,7 @@ async def test_tls_termination_after_charm_upgrade(
     if not cert_path.exists():  # allow running this test in isolation for debugging
         await pull_server_cert(ops_test, cert_path)
 
-    ip = await get_address(ops_test, trfk.name)
+    ip = await get_k8s_service_address(ops_test, f"{trfk.name}-lb")
 
     await curl_endpoints(ops_test, temp_dir, temp_dir / "local.cert", ip)
 
@@ -213,4 +217,5 @@ async def test_disintegrate(ops_test: OpsTest):
 
 
 async def test_cleanup(ops_test):
+    await delete_k8s_service(ops_test, "traefik-lb")
     await remove_application(ops_test, "traefik", timeout=60)

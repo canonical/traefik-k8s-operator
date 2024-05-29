@@ -12,7 +12,12 @@ from tests.integration.conftest import (
     deploy_traefik_if_not_deployed,
     get_relation_data,
 )
-from tests.integration.helpers import dequote, get_address, remove_application
+from tests.integration.helpers import (
+    delete_k8s_service,
+    dequote,
+    get_k8s_service_address,
+    remove_application,
+)
 
 # FIXME Replace parts of this itest with a utest
 
@@ -77,7 +82,7 @@ async def test_relation_data_shape(ops_test: OpsTest):
     #  ingress:
     #   ipu-tester/0:
     #     url: http://foo.bar/foo-ipu-tester-0
-    traefik_address = await get_address(ops_test, "traefik-k8s")
+    traefik_address = await get_k8s_service_address(ops_test, "traefik-k8s-lb")
     assert provider_app_data == {
         "ipu-tester/0": {"url": f"http://{traefik_address}/{model}-ipu-tester-0"}
     }
@@ -90,4 +95,5 @@ async def test_remove_relation(ops_test: OpsTest):
 
 
 async def test_cleanup(ops_test):
+    await delete_k8s_service(ops_test, "traefik-k8s-lb")
     await remove_application(ops_test, "traefik-k8s", timeout=60)

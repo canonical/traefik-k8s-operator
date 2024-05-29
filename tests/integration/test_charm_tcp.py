@@ -9,7 +9,11 @@ import yaml
 from pytest_operator.plugin import OpsTest
 
 from tests.integration.conftest import deploy_traefik_if_not_deployed, get_relation_data
-from tests.integration.helpers import get_address, remove_application
+from tests.integration.helpers import (
+    delete_k8s_service,
+    get_k8s_service_address,
+    remove_application,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -63,13 +67,13 @@ async def test_relation_data_shape(ops_test: OpsTest):
     #  ingress:
     #    url: http://foo.bar:80/foo-tcp-tester/0
     provider_app_data = yaml.safe_load(data.provider.application_data["ingress"])
-    traefik_ip = await get_address(ops_test, "traefik-k8s")
+    traefik_ip = await get_k8s_service_address(ops_test, "traefik-k8s-lb")
 
     assert provider_app_data == {"tcp-tester/0": {"url": f"{traefik_ip}:{port}"}}
 
 
 async def assert_tcp_charm_has_ingress(ops_test: OpsTest):
-    traefik_ip = await get_address(ops_test, "traefik-k8s")
+    traefik_ip = await get_k8s_service_address(ops_test, "traefik-k8s-lb")
     data = get_relation_data(
         requirer_endpoint="tcp-tester/0:ingress-per-unit",
         provider_endpoint="traefik-k8s/0:ingress-per-unit",
@@ -110,4 +114,5 @@ async def test_remove_relation(ops_test: OpsTest):
 
 
 async def test_cleanup(ops_test):
+    await delete_k8s_service(ops_test, "traefik-k8s-lb")
     await remove_application(ops_test, "traefik-k8s", timeout=60)

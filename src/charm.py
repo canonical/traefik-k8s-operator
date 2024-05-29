@@ -47,6 +47,7 @@ from charms.traefik_route_k8s.v0.traefik_route import (
 )
 from deepmerge import always_merger
 from lightkube.core.client import Client
+from lightkube.core.exceptions import ApiError
 from lightkube.models.core_v1 import ServicePort
 from lightkube.resources.core_v1 import Service
 from ops.charm import (
@@ -186,7 +187,6 @@ class TraefikIngressCharm(CharmBase):
                 self.on.traefik_pebble_ready,  # type: ignore
             ],
         )
-
         # Observability integrations
         # tracing integration
         self._tracing = TracingEndpointRequirer(self, protocols=["otlp_http"])
@@ -428,6 +428,9 @@ class TraefikIngressCharm(CharmBase):
             return
         result = {}
 
+        traefik_endpoint = {self.app.name: {"url": f"{self._scheme}://{self.external_host}"}}
+        result.update(traefik_endpoint)
+
         for provider in (self.ingress_per_unit, self.ingress_per_appv1, self.ingress_per_appv2):
             try:
                 result.update(provider.proxied_endpoints)
@@ -649,7 +652,7 @@ class TraefikIngressCharm(CharmBase):
             logger.error("The setup of some ingress relation failed, see previous logs")
 
         else:
-            self.unit.status = ActiveStatus()
+            self.unit.status = ActiveStatus(f"Serving at {self._external_host}")
 
     @property
     def _static_config_changed(self):
@@ -681,7 +684,7 @@ class TraefikIngressCharm(CharmBase):
         self._process_status_and_configurations()
 
         if isinstance(self.unit.status, MaintenanceStatus):
-            self.unit.status = ActiveStatus()
+            self.unit.status = ActiveStatus(f"Serving at {self._external_host}")
 
     def _handle_ingress_data_removed(self, event: RelationEvent):
         """A unit has removed the data we need to provide ingress."""
@@ -725,7 +728,7 @@ class TraefikIngressCharm(CharmBase):
             )
             return
 
-        self.unit.status = ActiveStatus()
+        self.unit.status = ActiveStatus(f"Serving at {self._external_host}")
 
     def _process_ingress_relation(self, relation: Relation):
         # There's a chance that we're processing a relation event which was deferred until after
@@ -1103,7 +1106,9 @@ class TraefikIngressCharm(CharmBase):
         if external_hostname := self.model.config.get("external_hostname"):
             return cast(str, external_hostname)
 
-        return _get_loadbalancer_status(namespace=self.model.name, service_name=self.app.name)
+        return _get_loadbalancer_status(
+            namespace=self.model.name, service_name=f"{self.app.name}-lb"
+        )
 
     @property
     def external_host(self) -> str:
@@ -1166,7 +1171,10 @@ class TraefikIngressCharm(CharmBase):
 @functools.lru_cache
 def _get_loadbalancer_status(namespace: str, service_name: str) -> Optional[str]:
     client = Client()  # type: ignore
-    traefik_service = client.get(Service, name=service_name, namespace=namespace)
+    try:
+        traefik_service = client.get(Service, name=service_name, namespace=namespace)
+    except ApiError:
+        return None
 
     if not (status := traefik_service.status):  # type: ignore
         return None
