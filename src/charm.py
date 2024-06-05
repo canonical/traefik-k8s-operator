@@ -430,7 +430,8 @@ class TraefikIngressCharm(CharmBase):
             try:
                 result.update(provider.proxied_endpoints)
             except Exception as e:
-                msg = f"failed to fetch proxied endpoints from provider {provider} with error {e}."
+                name = provider.app.name
+                msg = f"failed to fetch proxied endpoints from {name} with error {e}."
                 event.log(msg)
 
         event.set_results({"proxied-endpoints": json.dumps(result)})
