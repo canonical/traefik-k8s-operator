@@ -663,13 +663,13 @@ class Traefik:
         """Traefik workload version."""
         version_output, _ = self._container.exec([BIN_PATH, "version"]).wait_output()
         # Output looks like this:
-        # Version:      2.9.6
-        # Codename:     banon
-        # Go version:   go1.18.9
-        # Built:        2022-12-07_04:28:37PM
+        # Version:      v2.11.0
+        # Codename:     mimolette
+        # Go version:   go1.22.1
+        # Built:        2024-03-14_05:12:45PM
         # OS/Arch:      linux/amd64
 
-        if result := re.search(r"Version:\s*(.+)", version_output):
+        if result := re.search(r"Version:\s*v?(.+)", version_output):
             return result.group(1)
         return None
 
