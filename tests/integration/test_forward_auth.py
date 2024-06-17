@@ -11,7 +11,7 @@ from helpers import delete_k8s_service, get_k8s_service_address, remove_applicat
 from lightkube import Client
 from lightkube.resources.core_v1 import ConfigMap
 from pytest_operator.plugin import OpsTest
-from tenacity import retry, stop_after_attempt, wait_exponential
+from tenacity import retry, stop_after_attempt, wait_exponential, wait_fixed
 
 from tests.integration.conftest import deploy_traefik_if_not_deployed
 
@@ -76,7 +76,7 @@ async def test_deployment(ops_test: OpsTest, traefik_charm, forward_auth_tester_
 
 
 @retry(
-    wait=wait_exponential(multiplier=3, min=1, max=20),
+    wait=wait_fixed(60),
     stop=stop_after_attempt(20),
     reraise=True,
 )
