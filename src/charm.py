@@ -37,7 +37,7 @@ from charms.observability_libs.v1.kubernetes_service_patch import (
 )
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 from charms.tempo_k8s.v1.charm_tracing import trace_charm
-from charms.tempo_k8s.v2.tracing import TracingEndpointRequirer
+from charms.tempo_k8s.v2.tracing import TracingEndpointRequirer, charm_tracing_config
 from charms.traefik_k8s.v1.ingress import IngressPerAppProvider as IPAv1
 from charms.traefik_k8s.v1.ingress_per_unit import DataValidationError, IngressPerUnitProvider
 from charms.traefik_k8s.v2.ingress import IngressPerAppProvider as IPAv2
@@ -212,6 +212,10 @@ class TraefikIngressCharm(CharmBase):
 
         self.forward_auth = ForwardAuthRequirer(self, relation_name="experimental-forward-auth")
 
+        self.charm_tracing_endpoint, self.server_cert = charm_tracing_config(
+            self._tracing, SERVER_CERT_PATH
+        )
+
         observe = self.framework.observe
 
         # TODO update init params once auto-renew is implemented
@@ -337,20 +341,6 @@ class TraefikIngressCharm(CharmBase):
     def _on_recv_ca_cert_removed(self, event: CertificateTransferRemovedEvent):
         # Assuming only one cert per relation (this is in line with the original lib design).
         self.traefik.remove_cas([event.relation_id])
-
-    @property
-    def charm_tracing_endpoint(self) -> Optional[str]:
-        """Otlp http endpoint for charm instrumentation."""
-        if self._tracing.is_ready():
-            return self._tracing.get_endpoint("otlp_http")
-        return None
-
-    @property
-    def server_cert(self) -> Optional[str]:
-        """Server certificate path for tls tracing."""
-        if self._is_tls_enabled():
-            return SERVER_CERT_PATH
-        return None
 
     def _is_tls_enabled(self) -> bool:
         """Return True if TLS is enabled."""
