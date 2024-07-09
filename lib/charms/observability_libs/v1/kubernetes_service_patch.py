@@ -145,12 +145,12 @@ def setUp(self, *unused):
 
 import logging
 from types import MethodType
-from typing import List, Literal, Optional, Union
+from typing import Any, List, Literal, Optional, Union
 
 from lightkube import ApiError, Client  # pyright: ignore
 from lightkube.core import exceptions
 from lightkube.models.core_v1 import ServicePort, ServiceSpec
-from lightkube.models.meta_v1 import LabelSelector, ObjectMeta
+from lightkube.models.meta_v1 import ObjectMeta
 from lightkube.resources.core_v1 import Service
 from lightkube.types import PatchType
 from ops import UpgradeCharmEvent
@@ -365,10 +365,10 @@ class KubernetesServicePatch(Object):
             client = Client()  # pyright: ignore
 
             # Define a label selector to find services related to the app
-            selector = LabelSelector(matchLabels={"app.kubernetes.io/name": self._app})
+            selector: dict[str, Any] = {"app.kubernetes.io/name": self._app}
 
             # Check if any service of type LoadBalancer exists
-            services = client.list(Service, namespace=self._namespace, labels=selector.to_dict())
+            services = client.list(Service, namespace=self._namespace, labels=selector)
             for service in services:
                 if (
                     not service.metadata
