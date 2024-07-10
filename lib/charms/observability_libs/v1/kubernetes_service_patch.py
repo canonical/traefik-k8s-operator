@@ -228,6 +228,8 @@ class KubernetesServicePatch(Object):
         self.framework.observe(charm.on.install, self._patch)
         self.framework.observe(charm.on.upgrade_charm, self._on_upgrade_charm)
         self.framework.observe(charm.on.update_status, self._patch)
+        # Sometimes Juju doesn't clean-up a manually created LB service,
+        # so we clean it up ourselves just in case.
         self.framework.observe(charm.on.remove, self._remove_service)
 
         # apply user defined events
@@ -359,7 +361,7 @@ class KubernetesServicePatch(Object):
 
     def _on_upgrade_charm(self, event: UpgradeCharmEvent):
         """Handle the upgrade charm event."""
-        # Handling the case when a user changes the service type from LB to ClusterIP in an upgrade, previous LB should be deleted.
+        # If a charm author changed the service type from LB to ClusterIP across an upgrade, we need to delete the previous LB.
         if self.service_type == "ClusterIP":
 
             client = Client()  # pyright: ignore
@@ -376,15 +378,15 @@ class KubernetesServicePatch(Object):
                     or not service.spec
                     or not service.spec.type
                 ):
-                    logger.warning("Skipping resource with incomplete metadata.")
+                    logger.warning(
+                        "Service patch: skipping resource with incomplete metadata: %s.", service
+                    )
                     continue
                 if service.spec.type == "LoadBalancer":
                     client.delete(Service, service.metadata.name, namespace=self._namespace)
-                    logger.info(
-                        f"LoadBalancer service {service.metadata.name} deleted successfully."
-                    )
+                    logger.info(f"LoadBalancer service {service.metadata.name} deleted.")
 
-        # CContinue the upgrade flow normally
+        # Continue the upgrade flow normally
         self._patch(event)
 
     def _remove_service(self, _):
@@ -403,12 +405,12 @@ class KubernetesServicePatch(Object):
 
         try:
             client.delete(Service, self.service_name, namespace=self._namespace)
-            logger.info(f"Service {self.service_name} deleted successfully.")
+            logger.info("The patched k8s service '%s' was deleted.", self.service_name)
         except ApiError as e:
             if e.status.code == 404:
                 # Service not found, so no action needed
                 return
-                # Re-raise for other statuses
+            # Re-raise for other statuses
             raise
 
     @property
