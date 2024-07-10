@@ -6,7 +6,7 @@
 This library is designed to enable developers to more simply patch the Kubernetes Service created
 by Juju during the deployment of a sidecar charm. When sidecar charms are deployed, Juju creates a
 service named after the application in the namespace (named after the Juju model). This service by
-default contains a "placeholder" port, which is 65536/TCP.
+default contains a "placeholder" port, which is 65535/TCP.
 
 When modifying the default set of resources managed by Juju, one must consider the lifecycle of the
 charm. In this case, any modifications to the default service (created during deployment), will be
@@ -145,7 +145,7 @@ def setUp(self, *unused):
 
 import logging
 from types import MethodType
-from typing import List, Literal, Optional, Union
+from typing import Any, List, Literal, Optional, Union
 
 from lightkube import ApiError, Client  # pyright: ignore
 from lightkube.core import exceptions
@@ -153,6 +153,7 @@ from lightkube.models.core_v1 import ServicePort, ServiceSpec
 from lightkube.models.meta_v1 import ObjectMeta
 from lightkube.resources.core_v1 import Service
 from lightkube.types import PatchType
+from ops import UpgradeCharmEvent
 from ops.charm import CharmBase
 from ops.framework import BoundEvent, Object
 
@@ -166,7 +167,7 @@ LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 10
+LIBPATCH = 12
 
 ServiceType = Literal["ClusterIP", "LoadBalancer"]
 
@@ -225,9 +226,11 @@ class KubernetesServicePatch(Object):
         assert isinstance(self._patch, MethodType)
         # Ensure this patch is applied during the 'install' and 'upgrade-charm' events
         self.framework.observe(charm.on.install, self._patch)
-        self.framework.observe(charm.on.upgrade_charm, self._patch)
+        self.framework.observe(charm.on.upgrade_charm, self._on_upgrade_charm)
         self.framework.observe(charm.on.update_status, self._patch)
-        self.framework.observe(charm.on.stop, self._remove_service)
+        # Sometimes Juju doesn't clean-up a manually created LB service,
+        # so we clean it up ourselves just in case.
+        self.framework.observe(charm.on.remove, self._remove_service)
 
         # apply user defined events
         if refresh_event:
@@ -356,6 +359,36 @@ class KubernetesServicePatch(Object):
         ]  # noqa: E501
         return expected_ports == fetched_ports
 
+    def _on_upgrade_charm(self, event: UpgradeCharmEvent):
+        """Handle the upgrade charm event."""
+        # If a charm author changed the service type from LB to ClusterIP across an upgrade, we need to delete the previous LB.
+        if self.service_type == "ClusterIP":
+
+            client = Client()  # pyright: ignore
+
+            # Define a label selector to find services related to the app
+            selector: dict[str, Any] = {"app.kubernetes.io/name": self._app}
+
+            # Check if any service of type LoadBalancer exists
+            services = client.list(Service, namespace=self._namespace, labels=selector)
+            for service in services:
+                if (
+                    not service.metadata
+                    or not service.metadata.name
+                    or not service.spec
+                    or not service.spec.type
+                ):
+                    logger.warning(
+                        "Service patch: skipping resource with incomplete metadata: %s.", service
+                    )
+                    continue
+                if service.spec.type == "LoadBalancer":
+                    client.delete(Service, service.metadata.name, namespace=self._namespace)
+                    logger.info(f"LoadBalancer service {service.metadata.name} deleted.")
+
+        # Continue the upgrade flow normally
+        self._patch(event)
+
     def _remove_service(self, _):
         """Remove a Kubernetes service associated with this charm.
 
@@ -372,13 +405,13 @@ class KubernetesServicePatch(Object):
 
         try:
             client.delete(Service, self.service_name, namespace=self._namespace)
+            logger.info("The patched k8s service '%s' was deleted.", self.service_name)
         except ApiError as e:
             if e.status.code == 404:
                 # Service not found, so no action needed
-                pass
-            else:
-                # Re-raise for other statuses
-                raise
+                return
+            # Re-raise for other statuses
+            raise
 
     @property
     def _app(self) -> str:
