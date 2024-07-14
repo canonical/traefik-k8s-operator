@@ -17,7 +17,7 @@ class RouteRequirerMock(CharmBase):
         if self.unit.is_leader() and self.traefik_route.is_ready():
             self.traefik_route.submit_to_traefik(
                 config={"some": "config"},
-                static={"entryPoints": {"test-port": {"address": ":4545"}}},
+                static={"entryPoints": {"test-port": {"address": ":4545"}, "test-udp-port": {"address": ":4646/udp"}}},
             )
         self.unit.status = ActiveStatus("ready")
 

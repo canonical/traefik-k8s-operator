@@ -2,6 +2,7 @@
 # See LICENSE file for licensing details.
 import asyncio
 import shlex
+import socket
 import urllib.error
 from subprocess import PIPE, Popen
 from urllib.request import Request, urlopen
@@ -66,12 +67,28 @@ async def test_static_config_updated(ops_test: OpsTest):
     contents = proc.stdout.read()
     contents_yaml = yaml.safe_load(contents)
     # the route tester charm does:
-    # static = {"entryPoints": {"test-port": {"address": ":4545"}}},
+    # static = {"entryPoints": {"test-port": {"address": ":4545"}},
+    # "test-udp-port": {"address": ":4646/udp"}}},
     assert contents_yaml["entryPoints"]["test-port"] == {"address": ":4545"}
+    assert contents_yaml["entryPoints"]["test-udp-port"] == {"address": ":4646/udp"}
 
 
 async def test_added_entrypoint_reachable(ops_test: OpsTest):
     traefik_ip = await get_k8s_service_address(ops_test, f"{APP_NAME}-lb")
+
+    udp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    udp_sock.settimeout(60)
+    try:
+        udp_sock.sendto(b"", (traefik_ip, 4646))
+        udp_sock.recvfrom(512)
+        udp_reachable = True
+    except socket.timeout:
+        udp_reachable = True
+    except ConnectionRefusedError:
+        udp_reachable = False
+    finally:
+        udp_sock.close()
+    assert udp_reachable
 
     req = Request(f"http://{traefik_ip}:4545")
 
