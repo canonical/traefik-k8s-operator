@@ -102,10 +102,12 @@ class Traefik:
         tls_enabled: bool,
         experimental_forward_auth_enabled: bool,
         tcp_entrypoints: Dict[str, int],
+        udp_entrypoints: Dict[str, int],
         traefik_route_static_configs: Iterable[Dict[str, Any]],
     ):
         self._container = container
         self._tcp_entrypoints = tcp_entrypoints
+        self._udp_entrypoints = udp_entrypoints
         self._traefik_route_static_configs = traefik_route_static_configs
         self._routing_mode = routing_mode
         self._tls_enabled = tls_enabled
@@ -226,6 +228,7 @@ class Traefik:
     def generate_static_config(self, _raise: bool = False) -> Dict[str, Any]:
         """Generate Traefik's static config yaml."""
         tcp_entrypoints = self._tcp_entrypoints
+        udp_entrypoints = self._udp_entrypoints
         logger.debug(f"Statically configuring traefik with tcp entrypoints: {tcp_entrypoints}.")
 
         web_config: Dict[str, Any] = {
@@ -250,6 +253,10 @@ class Traefik:
                 **{
                     tcp_entrypoint_name: {"address": f":{port}"}
                     for tcp_entrypoint_name, port in tcp_entrypoints.items()
+                },
+                **{
+                    udp_entrypoint_name: {"address": f":{port}/udp"}
+                    for udp_entrypoint_name, port in udp_entrypoints.items()
                 },
             },
             # We always start the Prometheus endpoint for simplicity
