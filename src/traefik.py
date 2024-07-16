@@ -238,8 +238,13 @@ class Traefik:
                 "redirections": {"entryPoint": {"to": "websecure", "scheme": "https"}},
             }
 
-        # TODO Disable static config with telemetry and check new version
         static_config = {
+            "global": {
+                "checknewversion": False,
+                # TODO add juju config to disable anonymous usage
+                # https://github.com/canonical/observability/blob/main/decision-records/2026-06-27--upstream-telemetry.md
+                "sendanonymoususage": True,
+            },
             "log": {
                 "level": "DEBUG",
             },

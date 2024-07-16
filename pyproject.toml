@@ -17,9 +17,6 @@ markers = [
     "teardown: tests that mutate the model topology by removing stuff (deselect with '-m \"not teardown\"')",
 ]
 
-[tool.pyright]
-reportTypedDictNotRequiredAccess = false
-
 # Formatting tools configuration
 [tool.black]
 line-length = 99
@@ -38,5 +35,14 @@ ignore = ["E501", "D107", "N818", "RET504"]
 # D100, D101, D102, D103: Ignore missing docstrings in tests
 per-file-ignores = {"*tests/*" = ["D100","D101","D102","D103","D104"]}
 
-[tool.ruff.pydocstyle]
+[tool.ruff.lint.pydocstyle]
 convention = "google"
+
+[tool.pyright]
+reportTypedDictNotRequiredAccess = false
+extraPaths = ["lib"]
+pythonVersion = "3.8"
+pythonPlatform = "All"
+
+[tool.codespell]
+skip = ".git,.tox,build,venv*"
