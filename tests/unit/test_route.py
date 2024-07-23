@@ -43,7 +43,7 @@ CONFIG = {
                 "loadBalancer": {"servers": [{"url": "http://bar.testmodel-endpoints.local:8080"}]}
             }
         },
-    }
+    },
 }
 
 CONFIG_WITH_TLS = {
@@ -100,7 +100,7 @@ CONFIG_WITH_TLS = {
                 "loadBalancer": {"servers": [{"url": "http://bar.testmodel-endpoints.local:8080"}]}
             }
         },
-    }
+    },
 }
 
 
