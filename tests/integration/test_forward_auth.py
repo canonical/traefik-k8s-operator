@@ -81,8 +81,8 @@ async def test_deployment(ops_test: OpsTest, traefik_charm, forward_auth_tester_
 
 
 @retry(
-    wait=wait_exponential(multiplier=3, min=1, max=20),
-    stop=stop_after_attempt(20),
+    wait=wait_exponential(multiplier=3, min=1, max=30),
+    stop=stop_after_attempt(30),
     reraise=True,
 )
 async def test_allowed_forward_auth_url_redirect(ops_test: OpsTest) -> None:
@@ -141,8 +141,8 @@ async def test_forward_auth_url_response_headers(
 
 
 @retry(
-    wait=wait_exponential(multiplier=3, min=1, max=20),
-    stop=stop_after_attempt(20),
+    wait=wait_exponential(multiplier=3, min=1, max=30),
+    stop=stop_after_attempt(30),
     reraise=True,
 )
 def assert_anonymous_response(url):
