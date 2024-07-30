@@ -62,7 +62,7 @@ import pydantic
 from ops.charm import CharmBase, RelationBrokenEvent, RelationEvent
 from ops.framework import EventSource, Object, ObjectEvents, StoredState
 from ops.model import ModelError, Relation, Unit
-from pydantic import AnyHttpUrl, BaseModel, Field, validator
+from pydantic import AnyHttpUrl, BaseModel, Field, field_validator
 
 # The unique Charmhub library identifier, never change it
 LIBID = "e6de2a5cd5b34422a204668f3b8f90d2"
@@ -252,14 +252,14 @@ class IngressRequirerAppData(DatabagModel):
         default="http", description="What scheme to use in the generated ingress url"
     )
 
-    @validator("scheme", pre=True)
+    @field_validator("scheme", mode="before")
     def validate_scheme(cls, scheme):  # noqa: N805  # pydantic wants 'cls' as first arg
         """Validate scheme arg."""
         if scheme not in {"http", "https", "h2c"}:
             raise ValueError("invalid scheme: should be one of `http|https|h2c`")
         return scheme
 
-    @validator("port", pre=True)
+    @field_validator("port", mode="before")
     def validate_port(cls, port):  # noqa: N805  # pydantic wants 'cls' as first arg
         """Validate port."""
         assert isinstance(port, int), type(port)
@@ -277,13 +277,13 @@ class IngressRequirerUnitData(DatabagModel):
         "IP can only be None if the IP information can't be retrieved from juju.",
     )
 
-    @validator("host", pre=True)
+    @field_validator("host", mode="before")
     def validate_host(cls, host):  # noqa: N805  # pydantic wants 'cls' as first arg
         """Validate host."""
         assert isinstance(host, str), type(host)
         return host
 
-    @validator("ip", pre=True)
+    @field_validator("ip", mode="before")
     def validate_ip(cls, ip):  # noqa: N805  # pydantic wants 'cls' as first arg
         """Validate ip."""
         if ip is None:
