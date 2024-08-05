@@ -177,7 +177,7 @@ else:
                     k: json.loads(v)
                     for k, v in databag.items()
                     # Don't attempt to parse model-external values
-                    if k in {(f.alias or n) for n, f in cls.__fields__.items()}  # type: ignore
+                    if k in {(f.alias or n) for n, f in cls.model_fields.items()}  # type: ignore
                 }
             except json.JSONDecodeError as e:
                 msg = f"invalid databag contents: expecting json. {databag}"
