@@ -1160,13 +1160,13 @@ class TraefikIngressCharm(CharmBase):
             assert isinstance(target, str), target  # for type checker
             return [target]
 
-        targets = [target]
+        targets: List[str] = [target] if target else []
         # This is an IP address. Try to look up the hostname.
         with contextlib.suppress(OSError, TypeError):
             name, _, _ = socket.gethostbyaddr(target)  # type: ignore
             # Do not return "hostname" like '10-43-8-149.kubernetes.default.svc.cluster.local'
             if is_hostname(name) and not name.endswith(".svc.cluster.local"):
-                targets.append(name)
+                targets.append(cast(str, name))
 
         # If all else fails, we'd rather use the bare IP
         return targets
