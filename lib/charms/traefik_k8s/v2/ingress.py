@@ -468,7 +468,10 @@ class IngressPerAppProvider(_IngressPerAppBase):
                 event.relation,
                 data.app.name,
                 data.app.model,
-                [unit.dict() for unit in data.units],
+                [
+                    unit.dict() if PYDANTIC_IS_V1 else unit.model_dump(mode="json")
+                    for unit in data.units
+                ],
                 data.app.strip_prefix or False,
                 data.app.redirect_https or False,
             )

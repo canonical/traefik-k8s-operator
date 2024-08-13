@@ -174,7 +174,8 @@ class AmbiguousRelationUsageError(TracingError):
     """Raised when one wrongly assumes that there can only be one relation on an endpoint."""
 
 
-if int(pydantic.version.VERSION.split(".")[0]) < 2:
+PYDANTIC_IS_V1 = int(pydantic.version.VERSION.split(".")[0]) < 2
+if PYDANTIC_IS_V1:
 
     class DatabagModel(BaseModel):  # type: ignore
         """Base databag model."""
@@ -312,7 +313,7 @@ else:
 
 
 # todo use models from charm-relation-interfaces
-if int(pydantic.version.VERSION.split(".")[0]) < 2:
+if PYDANTIC_IS_V1:
 
     class ProtocolType(BaseModel):  # type: ignore
         """Protocol Type."""
@@ -865,7 +866,10 @@ class TracingEndpointRequirer(Object):
             return
 
         data = TracingProviderAppData.load(relation.data[relation.app])
-        self.on.endpoint_changed.emit(relation, [i.dict() for i in data.receivers])  # type: ignore
+        self.on.endpoint_changed.emit(
+            relation,
+            [i.dict() if PYDANTIC_IS_V1 else i.model_dump(mode="json") for i in data.receivers],
+        )
 
     def _on_tracing_relation_broken(self, event: RelationBrokenEvent):
         """Notify the providers that the endpoint is broken."""
