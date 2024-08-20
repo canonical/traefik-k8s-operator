@@ -6,8 +6,9 @@ from unittest.mock import Mock, patch
 import ops
 import pytest
 import yaml
-from charm import TraefikIngressCharm
 from ops.testing import Harness
+
+from charm import TraefikIngressCharm
 from traefik import StaticConfigMergeConflictError, Traefik
 
 MODEL_NAME = "test-model"

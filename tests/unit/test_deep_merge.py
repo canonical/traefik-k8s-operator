@@ -1,4 +1,5 @@
 import pytest
+
 from traefik import StaticConfigMergeConflictError, static_config_deep_merge
 
 

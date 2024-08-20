@@ -4,9 +4,10 @@
 import unittest
 from unittest.mock import PropertyMock, patch
 
-from charm import TraefikIngressCharm
 from ops.model import ActiveStatus
 from scenario import Container, Context, State
+
+from charm import TraefikIngressCharm
 
 
 @patch("charm.KubernetesServicePatch")
