@@ -18,6 +18,7 @@ import yaml
 from charms.oathkeeper.v0.forward_auth import ForwardAuthConfig
 from ops import Container
 from ops.pebble import LayerDict, PathError
+
 from utils import is_hostname
 
 logger = logging.getLogger(__name__)

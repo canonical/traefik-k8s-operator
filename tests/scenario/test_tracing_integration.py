@@ -6,6 +6,7 @@ import yaml
 from charms.tempo_k8s.v1.charm_tracing import charm_tracing_disabled
 from charms.tempo_k8s.v2.tracing import ProtocolType, Receiver, TracingProviderAppData
 from scenario import Relation, State
+
 from traefik import CA_CERT_PATH, DYNAMIC_TRACING_PATH
 
 

@@ -5,8 +5,9 @@
 
 from unittest.mock import PropertyMock, patch
 
-from charm import TraefikIngressCharm
 from scenario import Container, Context, State
+
+from charm import TraefikIngressCharm
 from traefik import Traefik
 
 

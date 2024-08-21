@@ -70,6 +70,7 @@ from ops.model import (
     WaitingStatus,
 )
 from ops.pebble import PathError
+
 from traefik import (
     CA,
     SERVER_CERT_PATH,

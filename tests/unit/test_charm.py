@@ -8,12 +8,13 @@ from unittest.mock import Mock, patch
 
 import ops.testing
 import yaml
-from charm import TraefikIngressCharm
 from charms.traefik_k8s.v2.ingress import IngressRequirerAppData, IngressRequirerUnitData
 from ops.charm import ActionEvent
 from ops.model import ActiveStatus, Application, BlockedStatus, Relation, WaitingStatus
 from ops.pebble import PathError
 from ops.testing import Harness
+
+from charm import TraefikIngressCharm
 from traefik import STATIC_CONFIG_PATH
 
 ops.testing.SIMULATE_CAN_CONNECT = True
