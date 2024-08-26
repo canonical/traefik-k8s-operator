@@ -13,6 +13,7 @@ import socket
 from typing import Any, Dict, List, Optional, Tuple, Union, cast
 from urllib.parse import urlparse
 
+import pydantic
 import yaml
 from charms.certificate_transfer_interface.v0.certificate_transfer import (
     CertificateAvailableEvent as CertificateTransferAvailableEvent,
@@ -32,14 +33,15 @@ from charms.oathkeeper.v0.forward_auth import (
     ForwardAuthRequirerConfig,
 )
 from charms.observability_libs.v1.cert_handler import CertHandler
-from charms.observability_libs.v1.kubernetes_service_patch import (
-    KubernetesServicePatch,
-)
+from charms.observability_libs.v1.kubernetes_service_patch import KubernetesServicePatch
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 from charms.tempo_k8s.v1.charm_tracing import trace_charm
 from charms.tempo_k8s.v2.tracing import TracingEndpointRequirer
 from charms.traefik_k8s.v1.ingress import IngressPerAppProvider as IPAv1
-from charms.traefik_k8s.v1.ingress_per_unit import DataValidationError, IngressPerUnitProvider
+from charms.traefik_k8s.v1.ingress_per_unit import (
+    DataValidationError,
+    IngressPerUnitProvider,
+)
 from charms.traefik_k8s.v2.ingress import IngressPerAppProvider as IPAv2
 from charms.traefik_route_k8s.v0.traefik_route import (
     TraefikRouteProvider,
@@ -87,6 +89,8 @@ logging.getLogger("httpcore").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 _TRAEFIK_CONTAINER_NAME = "traefik"
+
+PYDANTIC_IS_V1 = int(pydantic.version.VERSION.split(".")[0]) < 2
 
 
 class _IngressRelationType(enum.Enum):
@@ -931,7 +935,9 @@ class TraefikIngressCharm(CharmBase):
             logger.error(f"invalid data shared through {relation}... Error: {e}.")
             return {}
 
-        prefix = self._get_prefix(data.app.dict(by_alias=True))
+        prefix = self._get_prefix(
+            data.app.dict(by_alias=True) if PYDANTIC_IS_V1 else data.app.model_dump(by_alias=True)
+        )
         config = self.traefik.get_per_app_http_config(
             prefix=prefix,
             scheme=data.app.scheme,

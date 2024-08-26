@@ -56,13 +56,14 @@ import logging
 import socket
 import typing
 from dataclasses import dataclass
+from functools import partial
 from typing import Any, Callable, Dict, List, MutableMapping, Optional, Sequence, Tuple, Union
 
 import pydantic
 from ops.charm import CharmBase, RelationBrokenEvent, RelationEvent
 from ops.framework import EventSource, Object, ObjectEvents, StoredState
 from ops.model import ModelError, Relation, Unit
-from pydantic import AnyHttpUrl, BaseModel, Field, validator
+from pydantic import AnyHttpUrl, BaseModel, Field
 
 # The unique Charmhub library identifier, never change it
 LIBID = "e6de2a5cd5b34422a204668f3b8f90d2"
@@ -72,7 +73,7 @@ LIBAPI = 2
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 13
+LIBPATCH = 14
 
 PYDEPS = ["pydantic"]
 
@@ -84,6 +85,9 @@ BUILTIN_JUJU_KEYS = {"ingress-address", "private-address", "egress-subnets"}
 
 PYDANTIC_IS_V1 = int(pydantic.version.VERSION.split(".")[0]) < 2
 if PYDANTIC_IS_V1:
+    from pydantic import validator
+
+    input_validator = partial(validator, pre=True)
 
     class DatabagModel(BaseModel):  # type: ignore
         """Base databag model."""
@@ -143,7 +147,9 @@ if PYDANTIC_IS_V1:
             return databag
 
 else:
-    from pydantic import ConfigDict
+    from pydantic import ConfigDict, field_validator
+
+    input_validator = partial(field_validator, mode="before")
 
     class DatabagModel(BaseModel):
         """Base databag model."""
@@ -171,7 +177,7 @@ else:
                     k: json.loads(v)
                     for k, v in databag.items()
                     # Don't attempt to parse model-external values
-                    if k in {(f.alias or n) for n, f in cls.__fields__.items()}  # type: ignore
+                    if k in {(f.alias or n) for n, f in cls.model_fields.items()}  # type: ignore
                 }
             except json.JSONDecodeError as e:
                 msg = f"invalid databag contents: expecting json. {databag}"
@@ -252,14 +258,14 @@ class IngressRequirerAppData(DatabagModel):
         default="http", description="What scheme to use in the generated ingress url"
     )
 
-    @validator("scheme", pre=True)
+    @input_validator("scheme")
     def validate_scheme(cls, scheme):  # noqa: N805  # pydantic wants 'cls' as first arg
         """Validate scheme arg."""
         if scheme not in {"http", "https", "h2c"}:
             raise ValueError("invalid scheme: should be one of `http|https|h2c`")
         return scheme
 
-    @validator("port", pre=True)
+    @input_validator("port")
     def validate_port(cls, port):  # noqa: N805  # pydantic wants 'cls' as first arg
         """Validate port."""
         assert isinstance(port, int), type(port)
@@ -277,13 +283,13 @@ class IngressRequirerUnitData(DatabagModel):
         "IP can only be None if the IP information can't be retrieved from juju.",
     )
 
-    @validator("host", pre=True)
+    @input_validator("host")
     def validate_host(cls, host):  # noqa: N805  # pydantic wants 'cls' as first arg
         """Validate host."""
         assert isinstance(host, str), type(host)
         return host
 
-    @validator("ip", pre=True)
+    @input_validator("ip")
     def validate_ip(cls, ip):  # noqa: N805  # pydantic wants 'cls' as first arg
         """Validate ip."""
         if ip is None:
@@ -462,7 +468,10 @@ class IngressPerAppProvider(_IngressPerAppBase):
                 event.relation,
                 data.app.name,
                 data.app.model,
-                [unit.dict() for unit in data.units],
+                [
+                    unit.dict() if PYDANTIC_IS_V1 else unit.model_dump(mode="json")
+                    for unit in data.units
+                ],
                 data.app.strip_prefix or False,
                 data.app.redirect_https or False,
             )
