@@ -96,7 +96,6 @@ juju relate <certificate_transfer provider charm> <certificate_transfer requirer
 
 """
 
-
 import json
 import logging
 from typing import List, Mapping
@@ -113,7 +112,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 7
+LIBPATCH = 8
 
 PYDEPS = ["jsonschema"]
 
