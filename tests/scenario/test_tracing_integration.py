@@ -41,8 +41,8 @@ def test_charm_trace_collection(traefik_ctx, traefik_container, caplog, tracing_
     # assert "Setting up span exporter to endpoint: foo.com:81" in caplog.text
     # assert "Starting root trace with id=" in caplog.text
     span = f.call_args_list[0].args[0][0]
-    assert span.resource.attributes["service.name"] == "traefik-k8s"
-    assert span.resource.attributes["compose_service"] == "traefik-k8s"
+    assert span.resource.attributes["service.name"] == "traefik-k8s-charm"
+    assert span.resource.attributes["compose_service"] == "traefik-k8s-charm"
     assert span.resource.attributes["charm_type"] == "TraefikIngressCharm"
 
 
