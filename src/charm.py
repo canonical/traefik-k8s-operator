@@ -304,7 +304,7 @@ class TraefikIngressCharm(CharmBase):
 
         As we can't reject it, we assume it's correctly formatted.
         """
-        return self.config.get("basic_auth_user", None)
+        return cast(Optional[str], self.config.get("basic_auth_user", None))
 
     def _on_forward_auth_config_changed(self, event: AuthConfigChangedEvent):
         if self._is_forward_auth_enabled:
