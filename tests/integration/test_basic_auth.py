@@ -3,7 +3,6 @@
 import asyncio
 import subprocess
 import urllib.request
-from contextlib import contextmanager
 from urllib.error import HTTPError
 
 import pytest
@@ -72,14 +71,6 @@ def set_basic_auth(model: str, user: str):
     subprocess.run(["juju", "config", "-m", model, APP_NAME, option])
 
 
-@contextmanager
-def keep_trying(minutes: int = 5):
-    for attempt in Retrying(stop=stop_after_delay(60 * minutes)):
-        with attempt:
-            yield
-
-
-@pytest.mark.abort_on_fail
 async def test_ipa_charm_ingress_noauth(ops_test: OpsTest):
     # GIVEN basic auth is disabled (initial condition)
     model_name = ops_test.model_full_name
@@ -88,8 +79,9 @@ async def test_ipa_charm_ingress_noauth(ops_test: OpsTest):
 
     # WHEN we GET the tester url
     # THEN we get it fine
-    with keep_trying():
-        assert get_url(tester_url) == 200
+    for attempt in Retrying(stop=stop_after_delay(60 * 5)):  # 5 minutes
+        with attempt:
+            assert get_url(tester_url) == 200
 
 
 @pytest.mark.abort_on_fail
@@ -102,9 +94,11 @@ async def test_ipa_charm_ingress_auth(ops_test: OpsTest):
     set_basic_auth(model_name, TEST_AUTH_USER)
 
     # THEN we can't GET the tester url
-    with keep_trying():  # might take a little bit to apply the new config
-        # 401 unauthorized
-        assert get_url(tester_url) == 401
+    for attempt in Retrying(stop=stop_after_delay(60 * 5)):  # 5 minutes
+        with attempt:
+            # might take a little bit to apply the new config
+            # 401 unauthorized
+            assert get_url(tester_url) == 401
 
     # UNLESS we use auth
     assert get_url(tester_url, TEST_AUTH_USER) == 401
@@ -120,5 +114,7 @@ async def test_ipa_charm_ingress_auth_disable(ops_test: OpsTest):
     set_basic_auth(model_name, "")
 
     # THEN we eventually can GET the endpoint without auth
-    with keep_trying():  # might take a little bit to apply the new config
-        assert get_url(tester_url) == 200
+    for attempt in Retrying(stop=stop_after_delay(60 * 5)):  # 5 minutes
+        with attempt:
+            # might take a little bit to apply the new config
+            assert get_url(tester_url) == 200
