@@ -51,7 +51,6 @@ def get_tester_url(ops_test: OpsTest):
     return provider_app_data["url"]
 
 
-
 @retry(stop=stop_after_delay(60 * 1))  # 5 minutes
 def get_url(url: str, expected: int, auth: str = None):
     if auth:
@@ -85,7 +84,7 @@ async def test_ipa_charm_ingress_noauth(ops_test: OpsTest):
 
     # WHEN we GET the tester url
     # THEN we get it fine
-    assert get_url(tester_url,  expected=200)
+    assert get_url(tester_url, expected=200)
 
 
 @pytest.mark.abort_on_fail
@@ -100,10 +99,10 @@ async def test_ipa_charm_ingress_auth(ops_test: OpsTest):
     # THEN we can't GET the tester url
     # might take a little bit to apply the new config
     # 401 unauthorized
-    assert get_url(tester_url,  expected=401)
+    assert get_url(tester_url, expected=401)
 
     # UNLESS we use auth
-    assert get_url(tester_url,  expected=401, auth=TEST_AUTH_USER)
+    assert get_url(tester_url, expected=401, auth=TEST_AUTH_USER)
 
 
 @pytest.mark.abort_on_fail
@@ -117,4 +116,4 @@ async def test_ipa_charm_ingress_auth_disable(ops_test: OpsTest):
 
     # THEN we eventually can GET the endpoint without auth
     # might take a little bit to apply the new config
-    assert get_url(tester_url,  expected=200)
+    assert get_url(tester_url, expected=200)
