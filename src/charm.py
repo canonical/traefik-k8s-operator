@@ -127,9 +127,7 @@ class TraefikIngressCharm(CharmBase):
         super().__init__(*args)
 
         self._stored.set_default(
-            current_external_host=None,
-            current_routing_mode=None,
-            current_forward_auth_mode=self.config["enable_experimental_forward_auth"],
+            config_hash=None,
         )
 
         self.container = self.unit.get_container(_TRAEFIK_CONTAINER_NAME)
@@ -173,6 +171,7 @@ class TraefikIngressCharm(CharmBase):
             tls_enabled=self._is_tls_enabled(),
             experimental_forward_auth_enabled=self._is_forward_auth_enabled,
             traefik_route_static_configs=self._traefik_route_static_configs(),
+            basic_auth_user=self._basic_auth_user,
         )
 
         self.service_patch = KubernetesServicePatch(
@@ -298,6 +297,14 @@ class TraefikIngressCharm(CharmBase):
         if self.config["enable_experimental_forward_auth"]:
             return True
         return False
+
+    @property
+    def _basic_auth_user(self) -> Optional[str]:
+        """A single user for the global basic auth configuration.
+
+        As we can't reject it, we assume it's correctly formatted.
+        """
+        return cast(Optional[str], self.config.get("basic_auth_user", None))
 
     def _on_forward_auth_config_changed(self, event: AuthConfigChangedEvent):
         if self._is_forward_auth_enabled:
@@ -535,29 +542,41 @@ class TraefikIngressCharm(CharmBase):
         self._process_status_and_configurations()
         self._set_workload_version()
 
+    @property
+    def _config_hash(self) -> int:
+        """A hash of the config of this application.
+
+        Only include here the config options that, should they change, should trigger a recalculation of
+        the traefik config files.
+        The main goal of this logic is to avoid recalculating status and configs on each event,
+        since it can be quite expensive.
+        """
+        return hash(
+            (
+                self._external_host,
+                self.config["routing_mode"],
+                self._is_forward_auth_enabled,
+                self._basic_auth_user,
+                self._is_tls_enabled(),
+            )
+        )
+
     def _on_config_changed(self, _: ConfigChangedEvent):
-        # If the external hostname is changed since we last processed it, we need to
-        # reconsider all data sent over the relations and all configs
-        new_external_host = self._external_host
-        new_routing_mode = self.config["routing_mode"]
-        new_forward_auth_mode = self._is_forward_auth_enabled
+        """Handle the ops.ConfigChanged event."""
+        # that we're processing a config-changed event, doesn't necessarily mean that our config has changed (duh!)
 
-        # TODO set BlockedStatus here when compound_status is introduced
-        #  https://github.com/canonical/operator/issues/665
+        # If the config hash has changed since we last calculated it, we need to
+        # recompute our state from scratch, based on all data sent over the relations and all configs
+        new_config_hash = self._config_hash
+        if self._stored.config_hash != new_config_hash:
+            self._stored.config_hash = new_config_hash
 
-        if (
-            self._stored.current_external_host != new_external_host  # type: ignore
-            or self._stored.current_routing_mode != new_routing_mode  # type: ignore
-            or self._stored.current_forward_auth_mode != new_forward_auth_mode  # type: ignore
-        ):
-            self._process_status_and_configurations()
-            self._stored.current_external_host = new_external_host  # type: ignore
-            self._stored.current_routing_mode = new_routing_mode  # type: ignore
-            self._stored.current_forward_auth_mode = new_forward_auth_mode  # type: ignore
+            if self._is_tls_enabled():
+                # we keep this nested under the hash-check because, unless the tls config has
+                # changed, we don't need to redo this.
+                self._update_cert_configs()
+                self._configure_traefik()
 
-        if self._is_tls_enabled():
-            self._update_cert_configs()
-            self._configure_traefik()
             self._process_status_and_configurations()
 
     def _process_status_and_configurations(self):
