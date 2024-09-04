@@ -18,6 +18,7 @@ import yaml
 from charms.oathkeeper.v0.forward_auth import ForwardAuthConfig
 from ops import Container
 from ops.pebble import LayerDict, PathError
+
 from utils import is_hostname
 
 logger = logging.getLogger(__name__)
@@ -103,6 +104,7 @@ class Traefik:
         experimental_forward_auth_enabled: bool,
         tcp_entrypoints: Dict[str, int],
         traefik_route_static_configs: Iterable[Dict[str, Any]],
+        basic_auth_user: Optional[str] = None,
     ):
         self._container = container
         self._tcp_entrypoints = tcp_entrypoints
@@ -110,6 +112,7 @@ class Traefik:
         self._routing_mode = routing_mode
         self._tls_enabled = tls_enabled
         self._experimental_forward_auth_enabled = experimental_forward_auth_enabled
+        self._basic_auth_user = basic_auth_user
 
     @property
     def scrape_jobs(self) -> list:
@@ -535,6 +538,14 @@ class Traefik:
           "cannot create middleware: multi-types middleware not supported, consider declaring two
           different pieces of middleware instead"
         """
+        basicauth_middleware = {}
+        if basicauth_user := self._basic_auth_user:
+            basicauth_middleware[f"juju-basic-auth-{prefix}"] = {
+                "basicAuth": {
+                    "users": [basicauth_user],
+                }
+            }
+
         forwardauth_middleware = {}
         if self._experimental_forward_auth_enabled:
             if forward_auth_app:
@@ -559,7 +570,12 @@ class Traefik:
                 "redirectScheme": {"scheme": "https", "port": 443, "permanent": True}
             }
 
-        return {**forwardauth_middleware, **no_prefix_middleware, **redir_scheme_middleware}
+        return {
+            **forwardauth_middleware,
+            **no_prefix_middleware,
+            **redir_scheme_middleware,
+            **basicauth_middleware,
+        }
 
     @staticmethod
     def generate_tls_config_for_route(

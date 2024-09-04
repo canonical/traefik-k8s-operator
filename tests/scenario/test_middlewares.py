@@ -2,15 +2,17 @@
 # See LICENSE file for licensing details.
 
 import tempfile
-import unittest
+from pathlib import Path
 from unittest.mock import PropertyMock, patch
 
 import ops
 import pytest
+import scenario
 import yaml
 from scenario import Container, ExecOutput, Mount, Relation, State
 
 from tests.scenario._utils import _render_config, create_ingress_relation
+from traefik import DYNAMIC_CONFIG_DIR
 
 
 def _create_relation(
@@ -127,5 +129,42 @@ def test_middleware_config(
     assert yaml.safe_load(config_file) == expected
 
 
-if __name__ == "__main__":
-    unittest.main()
+@patch("charm.TraefikIngressCharm.version", PropertyMock(return_value="0.0.0"))
+def test_basicauth_config(traefik_ctx: scenario.Context):
+    # GIVEN traefik is configured with a sample basicauth user
+    ingress = create_ingress_relation()
+    basicauth_user = "user:hashed-password"
+    state = State(
+        config={"basic_auth_user": basicauth_user},
+        relations=[ingress],
+        containers=[
+            Container(
+                name="traefik",
+                can_connect=True,
+                exec_mock={
+                    ("find", "/opt/traefik/juju", "-name", "*.yaml", "-delete"): ExecOutput()
+                },
+                layers={
+                    "traefik": ops.pebble.Layer({"services": {"traefik": {"startup": "enabled"}}})
+                },
+                service_status={"traefik": ops.pebble.ServiceStatus.ACTIVE},
+            )
+        ],
+    )
+
+    # WHEN we process a config-changed event
+    state_out = traefik_ctx.run("config_changed", state)
+
+    # THEN traefik writes a dynamic config file with the expected basicauth middleware
+    traefik_fs = state_out.get_container("traefik").get_filesystem(traefik_ctx)
+    dynamic_config_path = (
+        Path(str(traefik_fs) + DYNAMIC_CONFIG_DIR)
+        / f"juju_ingress_{ingress.endpoint}_{ingress.relation_id}_{ingress.remote_app_name}.yaml"
+    )
+    assert dynamic_config_path.exists()
+    http_cfg = yaml.safe_load(dynamic_config_path.read_text())["http"]
+    assert http_cfg["middlewares"]["juju-basic-auth-test-model-remote-0"] == {
+        "basicAuth": {"users": [basicauth_user]}
+    }
+    for router in http_cfg["routers"].values():
+        assert "juju-basic-auth-test-model-remote-0" in router["middlewares"]

@@ -70,14 +70,19 @@ async def test_deployment(ops_test: OpsTest, traefik_charm, forward_auth_tester_
 
     await ops_test.model.integrate(f"{TRAEFIK_CHARM}:experimental-forward-auth", OATHKEEPER_CHARM)
 
+    # The auth lib uses event deferral, so by extension it depends on the update-status hook.
+    # As a result, when we use our 60m interval from the autouse fixture, test occasionally fail.
+    # Here we override the interval just for this test.
+    await ops_test.model.set_config({"update-status-hook-interval": "5m"})
+
     await ops_test.model.wait_for_idle(
         [TRAEFIK_CHARM, OATHKEEPER_CHARM, IAP_REQUIRER_CHARM], status="active", timeout=1000
     )
 
 
 @retry(
-    wait=wait_exponential(multiplier=3, min=1, max=20),
-    stop=stop_after_attempt(20),
+    wait=wait_exponential(multiplier=3, min=1, max=30),
+    stop=stop_after_attempt(30),
     reraise=True,
 )
 async def test_allowed_forward_auth_url_redirect(ops_test: OpsTest) -> None:
@@ -136,8 +141,8 @@ async def test_forward_auth_url_response_headers(
 
 
 @retry(
-    wait=wait_exponential(multiplier=3, min=1, max=20),
-    stop=stop_after_attempt(20),
+    wait=wait_exponential(multiplier=3, min=1, max=30),
+    stop=stop_after_attempt(30),
     reraise=True,
 )
 def assert_anonymous_response(url):

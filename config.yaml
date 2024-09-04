@@ -8,6 +8,15 @@ options:
       This feature is experimental and may be unstable.
     type: boolean
     default: False
+  basic_auth_user:
+    description: |
+      Enables the `basicAuth` middleware for **all** routes on this proxy. 
+      The format of this string must be: `name:hashed-password`, generated with e.g. htpasswd.
+      Supported hashing algorithms are: MD5, SHA1, BCrypt.
+      For more documentation see https://doc.traefik.io/traefik/middlewares/http/basicauth/
+      Once this config option is set, the username/password pair will be required to authenticate 
+      http requests on all routes proxied by this traefik app.
+    type: string
   external_hostname:
     description: |
       The DNS name to be used by Traefik ingress.

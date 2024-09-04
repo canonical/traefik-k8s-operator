@@ -1,9 +1,10 @@
 from unittest.mock import PropertyMock, patch
 
 import pytest
-from charm import TraefikIngressCharm
 from ops import pebble
 from scenario import Container, Context, ExecOutput, Model, Mount
+
+from charm import TraefikIngressCharm
 
 MOCK_EXTERNAL_HOSTNAME = "testhostname"
 
