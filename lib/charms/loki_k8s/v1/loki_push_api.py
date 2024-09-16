@@ -480,6 +480,25 @@ Loki Push API and alert rules.
 
 Units of consumer charm send their alert rules over app relation data using the `alert_rules`
 key.
+
+## Charm logging
+The `charms.loki_k8s.v0.charm_logging` library can be used in conjunction with this one to configure python's
+logging module to forward all logs to Loki via the loki-push-api interface.
+
+```python
+from lib.charms.loki_k8s.v0.charm_logging import log_charm
+from lib.charms.loki_k8s.v1.loki_push_api import charm_logging_config, LokiPushApiConsumer
+
+@log_charm(logging_endpoint="my_endpoints", server_cert="cert_path")
+class MyCharm(...):
+    _cert_path = "/path/to/cert/on/charm/container.crt"
+    def __init__(self, ...):
+        self.logging = LokiPushApiConsumer(...)
+        self.my_endpoints, self.cert_path = charm_logging_config(
+            self.logging, self._cert_path)
+```
+
+Do this, and all charm logs will be forwarded to Loki as soon as a relation is formed.
 """
 
 import json
@@ -527,7 +546,7 @@ LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 12
+LIBPATCH = 13
 
 PYDEPS = ["cosl"]
 
@@ -577,7 +596,11 @@ HTTP_LISTEN_PORT_START = 9080  # even start port
 GRPC_LISTEN_PORT_START = 9095  # odd start port
 
 
-class RelationNotFoundError(ValueError):
+class LokiPushApiError(Exception):
+    """Base class for errors raised by this module."""
+
+
+class RelationNotFoundError(LokiPushApiError):
     """Raised if there is no relation with the given name."""
 
     def __init__(self, relation_name: str):
@@ -587,7 +610,7 @@ class RelationNotFoundError(ValueError):
         super().__init__(self.message)
 
 
-class RelationInterfaceMismatchError(Exception):
+class RelationInterfaceMismatchError(LokiPushApiError):
     """Raised if the relation with the given name has a different interface."""
 
     def __init__(
@@ -607,7 +630,7 @@ class RelationInterfaceMismatchError(Exception):
         super().__init__(self.message)
 
 
-class RelationRoleMismatchError(Exception):
+class RelationRoleMismatchError(LokiPushApiError):
     """Raised if the relation with the given name has a different direction."""
 
     def __init__(
@@ -2555,7 +2578,7 @@ class LogForwarder(ConsumerBase):
 
         self._update_endpoints(event.workload, loki_endpoints)
 
-    def _update_logging(self, _):
+    def _update_logging(self, event: RelationEvent):
         """Update the log forwarding to match the active Loki endpoints."""
         if not (loki_endpoints := self._retrieve_endpoints_from_relation()):
             logger.warning("No Loki endpoints available")
@@ -2565,6 +2588,8 @@ class LogForwarder(ConsumerBase):
             if container.can_connect():
                 self._update_endpoints(container, loki_endpoints)
             # else: `_update_endpoints` will be called on pebble-ready anyway.
+
+        self._handle_alert_rules(event.relation)
 
     def _retrieve_endpoints_from_relation(self) -> dict:
         loki_endpoints = {}
@@ -2750,3 +2775,49 @@ class CosTool:
         result = subprocess.run(cmd, check=True, stdout=subprocess.PIPE)
         output = result.stdout.decode("utf-8").strip()
         return output
+
+
+def charm_logging_config(
+    endpoint_requirer: LokiPushApiConsumer, cert_path: Optional[Union[Path, str]]
+) -> Tuple[Optional[List[str]], Optional[str]]:
+    """Utility function to determine the charm_logging config you will likely want.
+
+    If no endpoint is provided:
+     disable charm logging.
+    If https endpoint is provided but cert_path is not found on disk:
+     disable charm logging.
+    If https endpoint is provided and cert_path is None:
+     ERROR
+    Else:
+     proceed with charm logging (with or without tls, as appropriate)
+
+    Args:
+        endpoint_requirer: an instance of LokiPushApiConsumer.
+        cert_path: a path where a cert is stored.
+
+    Returns:
+        A tuple with (optionally) the values of the endpoints and the certificate path.
+
+    Raises:
+         LokiPushApiError: if some endpoint are http and others https.
+    """
+    endpoints = [ep["url"] for ep in endpoint_requirer.loki_endpoints]
+    if not endpoints:
+        return None, None
+
+    https = tuple(endpoint.startswith("https://") for endpoint in endpoints)
+
+    if all(https):  # all endpoints are https
+        if cert_path is None:
+            raise LokiPushApiError("Cannot send logs to https endpoints without a certificate.")
+        if not Path(cert_path).exists():
+            # if endpoints is https BUT we don't have a server_cert yet:
+            # disable charm logging until we do to prevent tls errors
+            return None, None
+        return endpoints, str(cert_path)
+
+    if all(not x for x in https):  # all endpoints are http
+        return endpoints, None
+
+    # if there's a disagreement, that's very weird:
+    raise LokiPushApiError("Some endpoints are http, some others are https. That's not good.")

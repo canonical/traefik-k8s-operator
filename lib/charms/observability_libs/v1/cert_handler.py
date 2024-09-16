@@ -67,7 +67,7 @@ logger = logging.getLogger(__name__)
 
 LIBID = "b5cd5cd580f3428fa5f59a8876dcbe6a"
 LIBAPI = 1
-LIBPATCH = 12
+LIBPATCH = 13
 
 VAULT_SECRET_LABEL = "cert-handler-private-vault"
 
@@ -584,9 +584,19 @@ class CertHandler(Object):
 
     @property
     def chain(self) -> Optional[str]:
-        """Return the ca chain bundled as a single PEM string."""
+        """Return the entire chain bundled as a single PEM string. This includes, if available, the certificate, intermediate CAs, and the root CA.
+
+        If the server certificate is not set in the chain by the provider, we'll add it
+        to the top of the chain so that it could be used by a server.
+        """
         cert = self.get_cert()
-        return cert.chain_as_pem() if cert else None
+        if not cert:
+            return None
+        chain = cert.chain_as_pem()
+        if cert.certificate not in chain:
+            # add server cert to chain
+            chain = cert.certificate + "\n\n" + chain
+        return chain
 
     def _on_certificate_expiring(
         self, event: Union[CertificateExpiringEvent, CertificateInvalidatedEvent]

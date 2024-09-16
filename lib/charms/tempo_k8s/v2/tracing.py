@@ -97,7 +97,7 @@ from ops.charm import (
 )
 from ops.framework import EventSource, Object
 from ops.model import ModelError, Relation
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
 # The unique Charmhub library identifier, never change it
 LIBID = "12977e9aa0b34367903d8afeb8c3d85d"
@@ -107,7 +107,7 @@ LIBAPI = 2
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 8
+LIBPATCH = 9
 
 PYDEPS = ["pydantic"]
 
@@ -116,14 +116,13 @@ logger = logging.getLogger(__name__)
 DEFAULT_RELATION_NAME = "tracing"
 RELATION_INTERFACE_NAME = "tracing"
 
+# Supported list rationale https://github.com/canonical/tempo-coordinator-k8s-operator/issues/8
 ReceiverProtocol = Literal[
     "zipkin",
-    "kafka",
-    "opencensus",
-    "tempo_http",
-    "tempo_grpc",
     "otlp_grpc",
     "otlp_http",
+    "jaeger_grpc",
+    "jaeger_thrift_http",
 ]
 
 RawReceiver = Tuple[ReceiverProtocol, str]
@@ -141,14 +140,12 @@ class TransportProtocolType(str, enum.Enum):
     grpc = "grpc"
 
 
-receiver_protocol_to_transport_protocol = {
+receiver_protocol_to_transport_protocol: Dict[ReceiverProtocol, TransportProtocolType] = {
     "zipkin": TransportProtocolType.http,
-    "kafka": TransportProtocolType.http,
-    "opencensus": TransportProtocolType.http,
-    "tempo_http": TransportProtocolType.http,
-    "tempo_grpc": TransportProtocolType.grpc,
     "otlp_grpc": TransportProtocolType.grpc,
     "otlp_http": TransportProtocolType.http,
+    "jaeger_thrift_http": TransportProtocolType.http,
+    "jaeger_grpc": TransportProtocolType.grpc,
 }
 """A mapping between telemetry protocols and their corresponding transport protocol.
 """
@@ -174,8 +171,7 @@ class AmbiguousRelationUsageError(TracingError):
     """Raised when one wrongly assumes that there can only be one relation on an endpoint."""
 
 
-PYDANTIC_IS_V1 = int(pydantic.version.VERSION.split(".")[0]) < 2
-if PYDANTIC_IS_V1:
+if int(pydantic.version.VERSION.split(".")[0]) < 2:
 
     class DatabagModel(BaseModel):  # type: ignore
         """Base databag model."""
@@ -313,7 +309,7 @@ else:
 
 
 # todo use models from charm-relation-interfaces
-if PYDANTIC_IS_V1:
+if int(pydantic.version.VERSION.split(".")[0]) < 2:
 
     class ProtocolType(BaseModel):  # type: ignore
         """Protocol Type."""
@@ -342,7 +338,7 @@ else:
     class ProtocolType(BaseModel):
         """Protocol Type."""
 
-        model_config = ConfigDict(
+        model_config = ConfigDict(  # type: ignore
             # Allow serializing enum values.
             use_enum_values=True
         )
@@ -866,10 +862,7 @@ class TracingEndpointRequirer(Object):
             return
 
         data = TracingProviderAppData.load(relation.data[relation.app])
-        self.on.endpoint_changed.emit(
-            relation,
-            [i.dict() if PYDANTIC_IS_V1 else i.model_dump(mode="json") for i in data.receivers],
-        )
+        self.on.endpoint_changed.emit(relation, [i.dict() for i in data.receivers])  # type: ignore
 
     def _on_tracing_relation_broken(self, event: RelationBrokenEvent):
         """Notify the providers that the endpoint is broken."""
@@ -932,7 +925,7 @@ class TracingEndpointRequirer(Object):
 def charm_tracing_config(
     endpoint_requirer: TracingEndpointRequirer, cert_path: Optional[Union[Path, str]]
 ) -> Tuple[Optional[str], Optional[str]]:
-    """Utility function to determine the charm_tracing config you will likely want.
+    """Return the charm_tracing config you likely want.
 
     If no endpoint is provided:
      disable charm tracing.
