@@ -12,5 +12,6 @@ parts:
   charm:
     charm-binary-python-packages:
       - ops
+      - pydantic-core
     build-packages:
       - git
