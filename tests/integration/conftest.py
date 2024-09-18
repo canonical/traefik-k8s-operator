@@ -72,7 +72,7 @@ def copy_traefik_library_into_tester_charms(ops_test):
         "traefik_k8s/v2/ingress.py",
         "traefik_k8s/v1/ingress_per_unit.py",
         "observability_libs/v1/kubernetes_service_patch.py",
-        "traefik_route_k8s/v0/traefik_route.py",
+        "traefik_k8s/v0/traefik_route.py",
     ]
     for tester in ["forward-auth", "ipa", "ipu", "tcp", "route"]:
         for lib in libraries:
