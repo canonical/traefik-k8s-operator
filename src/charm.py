@@ -37,16 +37,16 @@ from charms.observability_libs.v1.kubernetes_service_patch import KubernetesServ
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 from charms.tempo_k8s.v1.charm_tracing import trace_charm
 from charms.tempo_k8s.v2.tracing import TracingEndpointRequirer
+from charms.traefik_k8s.v0.traefik_route import (
+    TraefikRouteProvider,
+    TraefikRouteRequirerReadyEvent,
+)
 from charms.traefik_k8s.v1.ingress import IngressPerAppProvider as IPAv1
 from charms.traefik_k8s.v1.ingress_per_unit import (
     DataValidationError,
     IngressPerUnitProvider,
 )
 from charms.traefik_k8s.v2.ingress import IngressPerAppProvider as IPAv2
-from charms.traefik_route_k8s.v0.traefik_route import (
-    TraefikRouteProvider,
-    TraefikRouteRequirerReadyEvent,
-)
 from deepmerge import always_merger
 from lightkube.core.client import Client
 from lightkube.core.exceptions import ApiError

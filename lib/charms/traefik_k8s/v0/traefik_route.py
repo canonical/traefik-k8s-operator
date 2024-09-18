@@ -15,7 +15,7 @@ To get started using the library, you just need to fetch the library using `char
 
 ```shell
 cd some-charm
-charmcraft fetch-lib charms.traefik_route_k8s.v0.traefik_route
+charmcraft fetch-lib charms.traefik_k8s.v0.traefik_route
 ```
 
 To use the library from the provider side (Traefik):
@@ -28,7 +28,7 @@ requires:
 ```
 
 ```python
-from charms.traefik_route_k8s.v0.traefik_route import TraefikRouteProvider
+from charms.traefik_k8s.v0.traefik_route import TraefikRouteProvider
 
 class TraefikCharm(CharmBase):
   def __init__(self, *args):
@@ -56,7 +56,7 @@ requires:
 
 ```python
 # ...
-from charms.traefik_route_k8s.v0.traefik_route import TraefikRouteRequirer
+from charms.traefik_k8s.v0.traefik_route import TraefikRouteRequirer
 
 class TraefikRouteCharm(CharmBase):
   def __init__(self, *args):
@@ -88,7 +88,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 10
+LIBPATCH = 1
 
 log = logging.getLogger(__name__)
 
@@ -254,8 +254,10 @@ class TraefikRouteProvider(Object):
 
     def get_config(self, relation: Relation) -> Optional[str]:
         """Renamed to ``get_dynamic_config``."""
-        log.warning("``TraefikRouteProvider.get_config`` is deprecated. "
-                    "Use ``TraefikRouteProvider.get_dynamic_config`` instead")
+        log.warning(
+            "``TraefikRouteProvider.get_config`` is deprecated. "
+            "Use ``TraefikRouteProvider.get_dynamic_config`` instead"
+        )
         return self.get_dynamic_config(relation)
 
     def get_dynamic_config(self, relation: Relation) -> Optional[str]:
@@ -356,7 +358,7 @@ class TraefikRouteRequirer(Object):
         """Is the TraefikRouteRequirer ready to submit data to Traefik?"""
         return self._relation is not None
 
-    def submit_to_traefik(self, config: dict, static: dict=None):
+    def submit_to_traefik(self, config: dict, static: Optional[dict] = None):
         """Relay an ingress configuration data structure to traefik.
 
         This will publish to the traefik-route relation databag

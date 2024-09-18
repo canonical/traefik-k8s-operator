@@ -72,7 +72,7 @@ def copy_traefik_library_into_tester_charms(ops_test):
         "traefik_k8s/v2/ingress.py",
         "traefik_k8s/v1/ingress_per_unit.py",
         "observability_libs/v1/kubernetes_service_patch.py",
-        "traefik_route_k8s/v0/traefik_route.py",
+        "traefik_k8s/v0/traefik_route.py",
     ]
     for tester in ["forward-auth", "ipa", "ipu", "tcp", "route"]:
         for lib in libraries:
@@ -101,40 +101,85 @@ async def traefik_charm(ops_test):
 @timed_memoizer
 async def forward_auth_tester_charm(ops_test):
     charm_path = (Path(__file__).parent / "testers" / "forward-auth").absolute()
-    charm = await ops_test.build_charm(charm_path, verbosity="debug")
-    return charm
+    count = 0
+    while True:
+        try:
+            charm = await ops_test.build_charm(charm_path, verbosity="debug")
+            return charm
+        except RuntimeError:
+            logger.warning("Failed to build forward auth tester. Trying again!")
+            count += 1
+
+            if count == 3:
+                raise
 
 
 @pytest.fixture(scope="module")
 @timed_memoizer
 async def ipa_tester_charm(ops_test):
     charm_path = (Path(__file__).parent / "testers" / "ipa").absolute()
-    charm = await ops_test.build_charm(charm_path, verbosity="debug")
-    return charm
+    count = 0
+    while True:
+        try:
+            charm = await ops_test.build_charm(charm_path, verbosity="debug")
+            return charm
+        except RuntimeError:
+            logger.warning("Failed to build ipa tester. Trying again!")
+            count += 1
+
+            if count == 3:
+                raise
 
 
 @pytest.fixture(scope="module")
 @timed_memoizer
 async def ipu_tester_charm(ops_test):
     charm_path = (Path(__file__).parent / "testers" / "ipu").absolute()
-    charm = await ops_test.build_charm(charm_path, verbosity="debug")
-    return charm
+    count = 0
+    while True:
+        try:
+            charm = await ops_test.build_charm(charm_path, verbosity="debug")
+            return charm
+        except RuntimeError:
+            logger.warning("Failed to build ipu tester. Trying again!")
+            count += 1
+
+            if count == 3:
+                raise
 
 
 @pytest.fixture(scope="module")
 @timed_memoizer
 async def tcp_tester_charm(ops_test):
     charm_path = (Path(__file__).parent / "testers" / "tcp").absolute()
-    charm = await ops_test.build_charm(charm_path, verbosity="debug")
-    return charm
+    count = 0
+    while True:
+        try:
+            charm = await ops_test.build_charm(charm_path, verbosity="debug")
+            return charm
+        except RuntimeError:
+            logger.warning("Failed to build tcp tester. Trying again!")
+            count += 1
+
+            if count == 3:
+                raise
 
 
 @pytest.fixture(scope="module")
 @timed_memoizer
 async def route_tester_charm(ops_test):
     charm_path = (Path(__file__).parent / "testers" / "route").absolute()
-    charm = await ops_test.build_charm(charm_path, verbosity="debug")
-    return charm
+    count = 0
+    while True:
+        try:
+            charm = await ops_test.build_charm(charm_path, verbosity="debug")
+            return charm
+        except RuntimeError:
+            logger.warning("Failed to build route tester. Trying again!")
+            count += 1
+
+            if count == 3:
+                raise
 
 
 @pytest.fixture(scope="module")

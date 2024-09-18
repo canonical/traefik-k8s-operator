@@ -23,9 +23,7 @@ def main():
     spellbook_fetch(
         charm_name="route-tester",
         charm_root=testers_root / "route",
-        pull_libs=[
-            traefik_root / "lib" / "charms" / "traefik_route_k8s" / "v0" / "traefik_route.py"
-        ],
+        pull_libs=[traefik_root / "lib" / "charms" / "traefik_k8s" / "v0" / "traefik_route.py"],
     )
     spellbook_fetch(
         charm_name="ipa-tester",
