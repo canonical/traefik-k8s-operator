@@ -2,16 +2,75 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-r"""# [DEPRECATED!] Interface Library for traefik_route.
+r"""# Interface Library for traefik_route.
 
-This is a DEPRECATED version of the traefik_route interface library.
+This library wraps relation endpoints for traefik_route. The requirer of this
+relation is the traefik-route-k8s charm, or any charm capable of providing
+Traefik configuration files. The provider is the traefik-k8s charm, or another
+charm willing to consume Traefik configuration files.
 
-It was dropped and no longer maintained under `traefik-route-k8s-operator`, which will soon be archived.
+## Getting Started
 
-traefik_route v0 is now maintained under `traefik-k8s-operator`.
+To get started using the library, you just need to fetch the library using `charmcraft`.
 
-Please fetch the new library with `charmcraft fetch-lib charms.traefik_k8s.v0.traefik_route`.
+```shell
+cd some-charm
+charmcraft fetch-lib charms.traefik_k8s.v0.traefik_route
+```
 
+To use the library from the provider side (Traefik):
+
+```yaml
+requires:
+    traefik_route:
+        interface: traefik_route
+        limit: 1
+```
+
+```python
+from charms.traefik_k8s.v0.traefik_route import TraefikRouteProvider
+
+class TraefikCharm(CharmBase):
+  def __init__(self, *args):
+    # ...
+    self.traefik_route = TraefikRouteProvider(self)
+
+    self.framework.observe(
+        self.traefik_route.on.ready, self._handle_traefik_route_ready
+    )
+
+    def _handle_traefik_route_ready(self, event):
+        config: str = self.traefik_route.get_config(event.relation)  # yaml
+        # use config to configure Traefik
+```
+
+To use the library from the requirer side (TraefikRoute):
+
+```yaml
+requires:
+    traefik-route:
+        interface: traefik_route
+        limit: 1
+        optional: false
+```
+
+```python
+# ...
+from charms.traefik_k8s.v0.traefik_route import TraefikRouteRequirer
+
+class TraefikRouteCharm(CharmBase):
+  def __init__(self, *args):
+    # ...
+    traefik_route = TraefikRouteRequirer(
+        self, self.model.relations.get("traefik-route"),
+        "traefik-route"
+    )
+    if traefik_route.is_ready():
+        traefik_route.submit_to_traefik(
+            config={'my': {'traefik': 'configuration'}}
+        )
+
+```
 """
 import logging
 from typing import Optional
@@ -22,14 +81,14 @@ from ops.framework import EventSource, Object, StoredState
 from ops.model import Relation
 
 # The unique Charmhub library identifier, never change it
-LIBID = "fe2ac43a373949f2bf61383b9f35c83c"
+LIBID = "f0d93d2bdf354b99a527463a9c49fce3"
 
 # Increment this major API version when introducing breaking changes
 LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 11
+LIBPATCH = 1
 
 log = logging.getLogger(__name__)
 
@@ -98,12 +157,6 @@ class TraefikRouteProvider(Object):
             external_host: The external host.
             scheme: The scheme.
         """
-        log.warning(
-            "The ``traefik_route v0`` library is DEPRECATED "
-            "and no longer maintained under ``traefik-route-k8s-operator``. "
-            "``traefik_route v0`` is now maintained under ``traefik-k8s-operator``. "
-            "Please fetch the new library with ``charmcraft fetch-lib charms.traefik_k8s.v0.traefik_route``."
-        )
         super().__init__(charm, relation_name)
         self._stored.set_default(external_host=None, scheme=None)
 
@@ -239,12 +292,6 @@ class TraefikRouteRequirer(Object):
     _stored = StoredState()
 
     def __init__(self, charm: CharmBase, relation: Relation, relation_name: str = "traefik-route"):
-        log.warning(
-            "The ``traefik_route v0`` library is DEPRECATED "
-            "and no longer maintained under ``traefik-route-k8s-operator``. "
-            "``traefik_route v0`` is now maintained under ``traefik-k8s-operator``. "
-            "Please fetch the new library with ``charmcraft fetch-lib charms.traefik_k8s.v0.traefik_route``."
-        )
         super(TraefikRouteRequirer, self).__init__(charm, relation_name)
         self._stored.set_default(external_host=None, scheme=None)
 
