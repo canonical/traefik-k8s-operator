@@ -5,6 +5,7 @@
 # THEN the traefik config file is updated
 import json
 import tempfile
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -16,17 +17,22 @@ from charms.traefik_k8s.v2.ingress import (
 )
 from ops import CharmBase, Framework
 from scenario import Context, Mount, Relation, State
+from scenario.context import CharmEvents
 
 from tests.scenario._utils import create_ingress_relation
+
+on = CharmEvents()
 
 
 @pytest.mark.parametrize(
     "port, ip, host", ((80, "1.1.1.1", "1.1.1.1"), (81, "10.1.10.1", "10.1.10.1"))
 )
-@pytest.mark.parametrize("event_name", ("joined", "changed", "created"))
+@pytest.mark.parametrize(
+    "event_source", (on.relation_joined, on.relation_changed, on.relation_created)
+)
 @pytest.mark.parametrize("scheme", ("http", "https"))
 def test_ingress_per_app_created(
-    traefik_ctx, port, ip, host, model, traefik_container, event_name, tmp_path, scheme
+    traefik_ctx, port, ip, host, model, traefik_container, event_source, tmp_path, scheme
 ):
     """Check the config when a new ingress per app is created or changes (single remote unit)."""
     ipa = create_ingress_relation(port=port, scheme=scheme, hosts=[host], ips=[ip])
@@ -38,12 +44,11 @@ def test_ingress_per_app_created(
     )
 
     # WHEN any relevant event fires
-    event = getattr(ipa, f"{event_name}_event")
-    traefik_ctx.run(event, state)
+    traefik_ctx.run(event_source(ipa), state)
 
     generated_config = yaml.safe_load(
         traefik_container.get_filesystem(traefik_ctx)
-        .joinpath(f"opt/traefik/juju/juju_ingress_ingress_{ipa.relation_id}_remote.yaml")
+        .joinpath(f"opt/traefik/juju/juju_ingress_ingress_{ipa.id}_remote.yaml")
         .read_text()
     )
 
@@ -66,10 +71,10 @@ def test_ingress_per_app_created(
     "port, ip, host", ((80, "1.1.1.{}", "1.1.1.{}"), (81, "10.1.10.{}", "10.1.10.{}"))
 )
 @pytest.mark.parametrize("n_units", (2, 3, 10))
-@pytest.mark.parametrize("evt_name", ("joined", "changed"))
+@pytest.mark.parametrize("event_source", (on.relation_joined, on.relation_changed))
 @pytest.mark.parametrize("scheme", ("http", "https"))
 def test_ingress_per_app_scale(
-    traefik_ctx, host, ip, port, model, traefik_container, tmp_path, n_units, scheme, evt_name
+    traefik_ctx, host, ip, port, model, traefik_container, tmp_path, n_units, scheme, event_source
 ):
     """Check the config when a new ingress per app unit joins."""
     relation_id = 42
@@ -120,7 +125,7 @@ def test_ingress_per_app_scale(
         relations=[ipa],
     )
 
-    traefik_ctx.run(getattr(ipa, evt_name + "_event"), state)
+    traefik_ctx.run(event_source(ipa), state)
 
     new_config = yaml.safe_load(cfg_file.read_text())
     # verify that the config has changed!
@@ -143,11 +148,6 @@ def test_ingress_per_app_scale(
         # d["service"][svc_name]["loadBalancer"]["servers"][0]["url"] == leader_url
 
 
-@pytest.mark.parametrize(
-    "port, ip, host", ((80, "1.1.1.1", "1.1.1.1"), (81, "10.1.10.1", "10.1.10.1"))
-)
-@pytest.mark.parametrize("evt_name", ("joined", "changed"))
-@pytest.mark.parametrize("leader", (True, False))
 def get_requirer_ctx(host, ip, port):
     class MyRequirer(CharmBase):
         def __init__(self, framework: Framework):
@@ -164,9 +164,9 @@ def get_requirer_ctx(host, ip, port):
 @pytest.mark.parametrize(
     "port, ip, host", ((80, "1.1.1.1", "1.1.1.1"), (81, "10.1.10.1", "1.1.1.1"))
 )
-@pytest.mark.parametrize("evt_name", ("joined", "changed"))
+@pytest.mark.parametrize("event_source", (on.relation_joined, on.relation_changed))
 @pytest.mark.parametrize("leader", (True, False))
-def test_ingress_per_app_requirer_with_auto_data(host, ip, port, model, evt_name, leader):
+def test_ingress_per_app_requirer_with_auto_data(host, ip, port, model, event_source, leader):
     ipa = Relation("ingress")
     state = State(
         model=model,
@@ -174,7 +174,7 @@ def test_ingress_per_app_requirer_with_auto_data(host, ip, port, model, evt_name
         relations=[ipa],
     )
     requirer_ctx = get_requirer_ctx(host, ip, port)
-    state_out = requirer_ctx.run(getattr(ipa, evt_name + "_event"), state)
+    state_out = requirer_ctx.run(event_source(ipa), state)
 
     ipa_out = state_out.get_relations("ingress")[0]
     assert ipa_out.local_unit_data == {"host": json.dumps(host), "ip": json.dumps(ip)}
@@ -192,11 +192,13 @@ def test_ingress_per_app_cleanup_on_remove(model, traefik_ctx, traefik_container
     ipa = create_ingress_relation()
 
     td = tempfile.TemporaryDirectory()
-    filename = f"juju_ingress_ingress_{ipa.relation_id}_remote.yaml"
+    filename = f"juju_ingress_ingress_{ipa.id}_remote.yaml"
     conf_file = Path(td.name).joinpath(filename)
     conf_file.write_text("foobar")
 
-    traefik_container = traefik_container.replace(mounts={"conf": Mount("/opt/traefik/", td.name)})
+    traefik_container = replace(
+        traefik_container, mounts={"conf": Mount(location="/opt/traefik/", source=td.name)}
+    )
 
     state = State(
         model=model,
@@ -206,7 +208,7 @@ def test_ingress_per_app_cleanup_on_remove(model, traefik_ctx, traefik_container
     )
 
     # WHEN the relation goes
-    traefik_ctx.run(ipa.broken_event, state)
+    traefik_ctx.run(on.relation_broken(ipa), state)
 
     # THEN the config file was deleted
     mock_dynamic_config_folder = traefik_container.get_filesystem(traefik_ctx).joinpath(
@@ -242,7 +244,7 @@ def test_ingress_per_app_v1_upgrade_v2(
     )
 
     # WHEN a charm upgrade occurs
-    with requirer_ctx.manager("upgrade-charm", state) as mgr:
+    with requirer_ctx(on.upgrade_charm(), state) as mgr:
         assert not mgr.charm.ipa.is_ready()
         state_out = mgr.run()
         assert not mgr.charm.ipa.is_ready()
@@ -283,18 +285,14 @@ def test_proxied_endpoints(
     state = State(leader=True, relations=[ipav1, ipav2, ipu], containers=[traefik_container])
 
     # WHEN we get any event
-    with traefik_ctx.manager("update-status", state) as mgr:
+    with traefik_ctx(on.update_status(), state) as mgr:
         charm = mgr.charm
 
         # populate the local app databags
-        charm.ingress_per_appv1.publish_url(
-            charm.model.get_relation("ingress", ipav1.relation_id), url1
-        )
-        charm.ingress_per_appv2.publish_url(
-            charm.model.get_relation("ingress", ipav2.relation_id), url2
-        )
+        charm.ingress_per_appv1.publish_url(charm.model.get_relation("ingress", ipav1.id), url1)
+        charm.ingress_per_appv2.publish_url(charm.model.get_relation("ingress", ipav2.id), url2)
         charm.ingress_per_unit.publish_url(
-            charm.model.get_relation("ingress-per-unit", ipu.relation_id), "remote/0", url3
+            charm.model.get_relation("ingress-per-unit", ipu.id), "remote/0", url3
         )
 
         # THEN the charm can fetch the proxied endpoints without errors

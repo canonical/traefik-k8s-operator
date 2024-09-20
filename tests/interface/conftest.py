@@ -5,7 +5,7 @@ from unittest.mock import patch
 import pytest
 from interface_tester import InterfaceTester
 from ops.pebble import Layer
-from scenario.state import Container, ExecOutput, State
+from scenario.state import Container, Exec, State
 
 from charm import TraefikIngressCharm
 
@@ -30,20 +30,22 @@ def interface_tester(interface_tester: InterfaceTester):
                     # since we're passing a config, we have to provide all defaulted values
                     "routing_mode": "path",
                 },
-                containers=[
+                containers={
                     # unless the traefik service reports active, the
                     # charm won't publish the ingress url.
                     Container(
                         name="traefik",
                         can_connect=True,
-                        exec_mock={
-                            (
-                                "find",
-                                "/opt/traefik/juju",
-                                "-name",
-                                "*.yaml",
-                                "-delete",
-                            ): ExecOutput()
+                        execs={
+                            Exec(
+                                (
+                                    "find",
+                                    "/opt/traefik/juju",
+                                    "-name",
+                                    "*.yaml",
+                                    "-delete",
+                                )
+                            )
                         },
                         layers={
                             "foo": Layer(
@@ -61,8 +63,8 @@ def interface_tester(interface_tester: InterfaceTester):
                                 }
                             )
                         },
-                    )
-                ],
+                    ),
+                },
             ),
         )
         yield interface_tester

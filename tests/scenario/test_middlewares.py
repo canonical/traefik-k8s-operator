@@ -9,10 +9,13 @@ import ops
 import pytest
 import scenario
 import yaml
-from scenario import Container, ExecOutput, Mount, Relation, State
+from scenario import Container, Exec, Mount, Relation, State
+from scenario.context import CharmEvents
 
 from tests.scenario._utils import _render_config, create_ingress_relation
 from traefik import DYNAMIC_CONFIG_DIR
+
+on = CharmEvents()
 
 
 def _create_relation(
@@ -52,7 +55,7 @@ def _create_relation(
         return Relation(
             endpoint=rel_name,
             remote_app_name=app_name,
-            relation_id=rel_id,
+            id=rel_id,
             remote_units_data={0: unit_data},
         )
 
@@ -77,12 +80,12 @@ def test_middleware_config(
         Container(
             name="traefik",
             can_connect=True,
-            mounts={"configurations": Mount("/opt/traefik/", td.name)},
-            exec_mock={("find", "/opt/traefik/juju", "-name", "*.yaml", "-delete"): ExecOutput()},
+            mounts={"configurations": Mount(location="/opt/traefik/", source=td.name)},
+            execs={Exec(("find", "/opt/traefik/juju", "-name", "*.yaml", "-delete"))},
             layers={
                 "traefik": ops.pebble.Layer({"services": {"traefik": {"startup": "enabled"}}})
             },
-            service_status={"traefik": ops.pebble.ServiceStatus.ACTIVE},
+            service_statuses={"traefik": ops.pebble.ServiceStatus.ACTIVE},
         )
     ]
 
@@ -109,7 +112,7 @@ def test_middleware_config(
     )
 
     # WHEN a `relation-changed` hook fires
-    out = traefik_ctx.run(relation.changed_event, state)
+    out = traefik_ctx.run(on.relation_changed(relation), state)
 
     # THEN the rendered config file contains middlewares
     with out.get_container("traefik").get_filesystem(traefik_ctx).joinpath(
@@ -141,25 +144,23 @@ def test_basicauth_config(traefik_ctx: scenario.Context):
             Container(
                 name="traefik",
                 can_connect=True,
-                exec_mock={
-                    ("find", "/opt/traefik/juju", "-name", "*.yaml", "-delete"): ExecOutput()
-                },
+                execs={Exec(("find", "/opt/traefik/juju", "-name", "*.yaml", "-delete"))},
                 layers={
                     "traefik": ops.pebble.Layer({"services": {"traefik": {"startup": "enabled"}}})
                 },
-                service_status={"traefik": ops.pebble.ServiceStatus.ACTIVE},
+                service_statuses={"traefik": ops.pebble.ServiceStatus.ACTIVE},
             )
         ],
     )
 
     # WHEN we process a config-changed event
-    state_out = traefik_ctx.run("config_changed", state)
+    state_out = traefik_ctx.run(on.config_changed(), state)
 
     # THEN traefik writes a dynamic config file with the expected basicauth middleware
     traefik_fs = state_out.get_container("traefik").get_filesystem(traefik_ctx)
     dynamic_config_path = (
         Path(str(traefik_fs) + DYNAMIC_CONFIG_DIR)
-        / f"juju_ingress_{ingress.endpoint}_{ingress.relation_id}_{ingress.remote_app_name}.yaml"
+        / f"juju_ingress_{ingress.endpoint}_{ingress.id}_{ingress.remote_app_name}.yaml"
     )
     assert dynamic_config_path.exists()
     http_cfg = yaml.safe_load(dynamic_config_path.read_text())["http"]
