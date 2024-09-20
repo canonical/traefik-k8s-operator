@@ -9,6 +9,9 @@ import pytest
 import yaml
 from ops import pebble
 from scenario import Container, Model, Mount, Relation, State
+from scenario.context import CharmEvents
+
+on = CharmEvents()
 
 
 @pytest.fixture
@@ -33,22 +36,24 @@ def traefik_container(tmp_path):
         }
     )
 
-    opt = Mount("/opt/", tmp_path)
+    opt = Mount(location="/opt/", source=tmp_path)
 
     return Container(
         name="traefik",
         can_connect=True,
         layers={"traefik": layer},
-        service_status={"traefik": pebble.ServiceStatus.ACTIVE},
+        service_statuses={"traefik": pebble.ServiceStatus.ACTIVE},
         mounts={"opt": opt},
     )
 
 
 @patch("charm.TraefikIngressCharm._static_config_changed", PropertyMock(return_value=False))
 @pytest.mark.parametrize("port, host", ((80, "1.1.1.1"), (81, "10.1.10.1")))
-@pytest.mark.parametrize("event_name", ("joined", "changed", "created"))
+@pytest.mark.parametrize(
+    "event_source", (on.relation_joined, on.relation_changed, on.relation_created)
+)
 def test_ingress_per_app_created(
-    traefik_ctx, port, host, model, traefik_container, event_name, tmp_path, caplog
+    traefik_ctx, port, host, model, traefik_container, event_source, tmp_path, caplog
 ):
     """Check the config when a new ingress per leader is created or changes (single remote unit)."""
     ipa = Relation(
@@ -59,7 +64,7 @@ def test_ingress_per_app_created(
             "port": str(port),
             "host": host,
         },
-        relation_id=1,
+        id=1,
     )
     state = State(
         model=model,
@@ -69,15 +74,13 @@ def test_ingress_per_app_created(
     )
 
     # WHEN any relevant event fires
-    event = getattr(ipa, f"{event_name}_event")
-
     with caplog.at_level("WARNING"):
-        traefik_ctx.run(event, state)
+        traefik_ctx.run(event_source(ipa), state)
     assert "is using a deprecated ingress v1 protocol to talk to Traefik." in caplog.text
 
     generated_config = yaml.safe_load(
         traefik_container.get_filesystem(traefik_ctx)
-        .joinpath(f"opt/traefik/juju/juju_ingress_ingress_{ipa.relation_id}_remote.yaml")
+        .joinpath(f"opt/traefik/juju/juju_ingress_ingress_{ipa.id}_remote.yaml")
         .read_text()
     )
 
@@ -129,7 +132,7 @@ def test_ingress_per_app_scale(
             "port": str(port),
             "host": host,
         },
-        relation_id=1,
+        id=1,
     )
     state = State(
         model=model,
@@ -139,7 +142,7 @@ def test_ingress_per_app_scale(
     )
 
     with caplog.at_level("WARNING"):
-        traefik_ctx.run(ipa.changed_event, state)
+        traefik_ctx.run(on.relation_changed(ipa), state)
     assert "is using a deprecated ingress v1 protocol to talk to Traefik." in caplog.text
 
     new_config = yaml.safe_load(cfg_file.read_text())

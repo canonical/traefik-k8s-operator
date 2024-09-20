@@ -1,3 +1,4 @@
+from dataclasses import replace
 from unittest.mock import patch
 
 import opentelemetry
@@ -6,8 +7,11 @@ import yaml
 from charms.tempo_k8s.v1.charm_tracing import charm_tracing_disabled
 from charms.tempo_k8s.v2.tracing import ProtocolType, Receiver, TracingProviderAppData
 from scenario import Relation, State
+from scenario.context import CharmEvents
 
 from traefik import CA_CERT_PATH, DYNAMIC_TRACING_PATH
+
+on = CharmEvents()
 
 
 @pytest.fixture
@@ -36,7 +40,7 @@ def test_charm_trace_collection(traefik_ctx, traefik_container, caplog, tracing_
     ) as f:
         f.return_value = opentelemetry.sdk.trace.export.SpanExportResult.SUCCESS
         # WHEN traefik receives <any event>
-        traefik_ctx.run(tracing_relation.changed_event, state_in)
+        traefik_ctx.run(on.relation_changed(tracing_relation), state_in)
 
     # assert "Setting up span exporter to endpoint: foo.com:81" in caplog.text
     # assert "Starting root trace with id=" in caplog.text
@@ -50,7 +54,7 @@ def test_traefik_tracing_config(traefik_ctx, traefik_container, tracing_relation
     state_in = State(relations=[tracing_relation], containers=[traefik_container])
 
     with charm_tracing_disabled():
-        traefik_ctx.run(tracing_relation.changed_event, state_in)
+        traefik_ctx.run(on.relation_changed(tracing_relation), state_in)
 
     tracing_cfg = (
         traefik_container.get_filesystem(traefik_ctx)
@@ -75,7 +79,7 @@ def test_traefik_tracing_config_with_tls(traefik_ctx, traefik_container, tracing
         tls_enabled.return_value = "True"
 
         with charm_tracing_disabled():
-            traefik_ctx.run(tracing_relation.changed_event, state_in)
+            traefik_ctx.run(on.relation_changed(tracing_relation), state_in)
 
     tracing_cfg = (
         traefik_container.get_filesystem(traefik_ctx)
@@ -98,17 +102,20 @@ def test_traefik_tracing_config_removed_if_relation_data_invalid(
     traefik_ctx, traefik_container, tracing_relation, was_present_before
 ):
     if was_present_before:
-        dt_path = traefik_container.mounts["opt"].src.joinpath("traefik", "juju", "tracing.yaml")
+        dt_path = traefik_container.mounts["opt"].source.joinpath(
+            "traefik", "juju", "tracing.yaml"
+        )
         dt_path.parent.mkdir(parents=True)
         dt_path.write_text("foo")
 
+    tracing_relation_with_remote = replace(tracing_relation, remote_app_data={"foo": "bar"})
     state_in = State(
-        relations=[tracing_relation.replace(remote_app_data={"foo": "bar"})],
+        relations=[tracing_relation_with_remote],
         containers=[traefik_container],
     )
 
     with charm_tracing_disabled():
-        traefik_ctx.run(tracing_relation.changed_event, state_in)
+        traefik_ctx.run(on.relation_changed(tracing_relation_with_remote), state_in)
 
     # assert file is not there
     assert (
@@ -121,14 +128,16 @@ def test_traefik_tracing_config_removed_on_relation_broken(
     traefik_ctx, traefik_container, tracing_relation, was_present_before
 ):
     if was_present_before:
-        dt_path = traefik_container.mounts["opt"].src.joinpath("traefik", "juju", "tracing.yaml")
+        dt_path = traefik_container.mounts["opt"].source.joinpath(
+            "traefik", "juju", "tracing.yaml"
+        )
         dt_path.parent.mkdir(parents=True)
         dt_path.write_text("foo")
 
     state_in = State(relations=[tracing_relation], containers=[traefik_container])
 
     with charm_tracing_disabled():
-        traefik_ctx.run(tracing_relation.broken_event, state_in)
+        traefik_ctx.run(on.relation_broken(tracing_relation), state_in)
 
     # assert file is not there
     assert (

@@ -2,7 +2,7 @@ from unittest.mock import PropertyMock, patch
 
 import pytest
 from ops import pebble
-from scenario import Container, Context, ExecOutput, Model, Mount
+from scenario import Container, Context, Exec, Model, Mount
 
 from charm import TraefikIngressCharm
 
@@ -47,17 +47,17 @@ def traefik_container(tmp_path):
         }
     )
 
-    opt = Mount("/opt/", tmp_path)
+    opt = Mount(location="/opt/", source=tmp_path)
 
     return Container(
         name="traefik",
         can_connect=True,
         layers={"traefik": layer},
-        exec_mock={
-            ("update-ca-certificates", "--fresh"): ExecOutput(),
-            ("find", "/opt/traefik/juju", "-name", "*.yaml", "-delete"): ExecOutput(),
-            ("/usr/bin/traefik", "version"): ExecOutput(stdout="42.42"),
+        execs={
+            Exec(command_prefix=("update-ca-certificates", "--fresh")),
+            Exec(command_prefix=("find", "/opt/traefik/juju", "-name", "*.yaml", "-delete")),
+            Exec(command_prefix=("/usr/bin/traefik", "version"), stdout="42.42"),
         },
-        service_status={"traefik": pebble.ServiceStatus.ACTIVE},
+        service_statuses={"traefik": pebble.ServiceStatus.ACTIVE},
         mounts={"opt": opt},
     )

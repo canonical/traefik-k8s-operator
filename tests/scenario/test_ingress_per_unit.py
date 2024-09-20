@@ -1,7 +1,10 @@
 import pytest
 from scenario import Relation, State
+from scenario.context import CharmEvents
 
 from tests.scenario.conftest import MOCK_EXTERNAL_HOSTNAME
+
+on = CharmEvents()
 
 
 @pytest.mark.parametrize("leader", (True, False))
@@ -39,7 +42,7 @@ def test_ingress_unit_provider_request_response(
         containers=[traefik_container],
     )
 
-    state_out = traefik_ctx.run(ipu.changed_event, state)
+    state_out = traefik_ctx.run(on.relation_changed(ipu), state)
 
     ipu_out = state_out.get_relations(ipu.endpoint)[0]
 

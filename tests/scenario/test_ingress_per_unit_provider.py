@@ -1,11 +1,14 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
+from dataclasses import replace
 
 import pytest
 from charms.traefik_k8s.v1.ingress_per_unit import IngressPerUnitProvider
 from ops.charm import CharmBase
 from scenario import Context, Model, Relation, State
-from scenario.sequences import check_builtin_sequences
+from scenario.context import CharmEvents
+
+on = CharmEvents()
 
 
 class MockProviderCharm(CharmBase):
@@ -19,16 +22,6 @@ class MockProviderCharm(CharmBase):
         self.ipu = IngressPerUnitProvider(self)
 
 
-def test_builtin_sequences():
-    check_builtin_sequences(
-        charm_type=MockProviderCharm,
-        meta={
-            "name": "test-provider",
-            "provides": {"ingress-per-unit": {"interface": "ingress_per_unit", "limit": 1}},
-        },
-    )
-
-
 @pytest.fixture
 def model():
     return Model(name="test-model")
@@ -40,16 +33,15 @@ def ipu_empty():
         endpoint="ingress-per-unit",
         interface="ingress_per_unit",
         remote_app_name="remote",
-        relation_id=0,
+        id=0,
     )
 
 
 @pytest.mark.parametrize("leader", (True, False))
 @pytest.mark.parametrize(
-    "event_name",
-    ("update-status", "install", "start", "RELCHANGED", "config-changed"),
+    "event_source", (on.update_status, on.install, on.start, "RELCHANGED", on.config_changed)
 )
-def test_ingress_unit_provider_related_is_ready(leader, event_name, ipu_empty, model):
+def test_ingress_unit_provider_related_is_ready(leader, event_source, ipu_empty, model):
     # patch the state with leadership
 
     state = State(model=model, relations=[ipu_empty], leader=leader)
@@ -58,11 +50,11 @@ def test_ingress_unit_provider_related_is_ready(leader, event_name, ipu_empty, m
     # IPU should report ready because in this context
     # we can find remote relation data
 
-    if event_name == "RELCHANGED":
-        event = ipu_empty.changed_event
+    if event_source == "RELCHANGED":
+        event = on.relation_changed(ipu_empty)
         # relation events need some extra metadata.
     else:
-        event = event_name
+        event = event_source()
 
     Context(charm_type=MockProviderCharm, meta=MockProviderCharm.META).run(event, state)
 
@@ -84,7 +76,15 @@ def test_ingress_unit_provider_request_response(port, host, leader, url, mode, i
 
     test_url = "http://foo.com/babooz"
 
-    def callback(charm: MockProviderCharm):
+    ipu_remote_provided = replace(ipu_empty, remote_units_data={0: mock_data})
+    state = State(model=model, relations=[ipu_remote_provided], leader=leader)
+
+    with Context(charm_type=MockProviderCharm, meta=MockProviderCharm.META)(
+        on.relation_changed(ipu_remote_provided), state
+    ) as mgr:
+        out = mgr.run()
+
+        charm = mgr.charm
         ingress = charm.model.get_relation("ingress-per-unit")
         remote_unit = list(ingress.units)[0]
 
@@ -104,15 +104,8 @@ def test_ingress_unit_provider_request_response(port, host, leader, url, mode, i
             with pytest.raises(AssertionError):
                 charm.ipu.publish_url(ingress, remote_unit.name, test_url)
 
-    ipu_remote_provided = ipu_empty.replace(remote_units_data={0: mock_data})
-    state = State(model=model, relations=[ipu_remote_provided], leader=leader)
-
-    out = Context(charm_type=MockProviderCharm, meta=MockProviderCharm.META).run(
-        ipu_remote_provided.changed_event, state, post_event=callback
-    )
-
     if leader:
-        local_ipa_data = out.relations[0].local_app_data
+        local_ipa_data = out.get_relation(ipu_empty.id).local_app_data
         assert local_ipa_data["ingress"] == f"remote/0:\n  url: {test_url}\n"
     else:
-        assert not out.relations[0].local_app_data
+        assert not out.get_relation(ipu_empty.id).local_app_data

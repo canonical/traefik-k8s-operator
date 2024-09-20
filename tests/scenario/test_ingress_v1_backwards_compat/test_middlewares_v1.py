@@ -8,8 +8,11 @@ from unittest.mock import PropertyMock, patch
 import pytest
 import yaml
 from scenario import Container, Mount, Relation, State
+from scenario.context import CharmEvents
 
 from tests.scenario._utils import _render_config
+
+on = CharmEvents()
 
 
 def _create_relation(
@@ -29,7 +32,7 @@ def _create_relation(
         return Relation(
             endpoint=rel_name,
             remote_app_name=app_name,
-            relation_id=rel_id,
+            id=rel_id,
             remote_app_data=app_data,
         )
 
@@ -46,7 +49,7 @@ def _create_relation(
         return Relation(
             endpoint=rel_name,
             remote_app_name=app_name,
-            relation_id=rel_id,
+            id=rel_id,
             remote_units_data={0: unit_data},
         )
 
@@ -69,7 +72,7 @@ def test_middleware_config(
         Container(
             name="traefik",
             can_connect=True,
-            mounts={"configurations": Mount("/opt/traefik/", td.name)},
+            mounts={"configurations": Mount(location="/opt/traefik/", source=td.name)},
         )
     ]
 
@@ -94,7 +97,7 @@ def test_middleware_config(
 
     # WHEN a `relation-changed` hook fires
     with caplog.at_level("WARNING"):
-        out = traefik_ctx.run(relation.changed_event, state)
+        out = traefik_ctx.run(on.relation_changed(relation), state)
 
     if rel_name == "ingress":
         assert "is using a deprecated ingress v1 protocol to talk to Traefik." in caplog.text

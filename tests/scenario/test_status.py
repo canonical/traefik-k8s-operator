@@ -5,6 +5,9 @@ from unittest.mock import PropertyMock, patch
 
 from ops import ActiveStatus, WaitingStatus
 from scenario import Container, State
+from scenario.context import CharmEvents
+
+on = CharmEvents()
 
 
 @patch("charm.TraefikIngressCharm._external_host", PropertyMock(return_value="foo.bar"))
@@ -15,7 +18,7 @@ def test_start_traefik_is_not_running(traefik_ctx, *_):
         containers=[Container(name="traefik", can_connect=True)],
     )
     # WHEN a `start` hook fires
-    out = traefik_ctx.run("start", state)
+    out = traefik_ctx.run(on.start(), state)
 
     # THEN unit status is `waiting`
     assert out.unit_status == WaitingStatus("waiting for service: 'traefik'")
@@ -29,7 +32,7 @@ def test_start_traefik_no_hostname(traefik_ctx, *_):
         config={"routing_mode": "path"},
         containers=[Container(name="traefik", can_connect=True)],
     )
-    out = traefik_ctx.run("start", state)
+    out = traefik_ctx.run(on.start(), state)
 
     # THEN unit status is `waiting`
     assert out.unit_status == WaitingStatus("gateway address unavailable")
@@ -46,7 +49,7 @@ def test_start_traefik_active(traefik_ctx, *_):
     )
 
     # WHEN a `start` hook fires
-    out = traefik_ctx.run("start", state)
+    out = traefik_ctx.run(on.start(), state)
 
     # THEN unit status is `active`
     assert out.unit_status == ActiveStatus("Serving at foo.bar")
