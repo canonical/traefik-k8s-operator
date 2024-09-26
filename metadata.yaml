@@ -95,6 +95,14 @@ requires:
       Receive a CA cert for traefik to trust.
       This relation can be used with a local CA to obtain the CA cert that was used to sign proxied
       endpoints.
+      This is meant for applications that use the certificate-transfer-interface v0.
+  receive-ca-cert-v1:
+    interface: certificate_transfer
+    description: |
+      Receive a CA certs for traefik to trust.
+      This relation can be used with a local CA to obtain the CA certs that was used to sign proxied
+      endpoints.
+      This is meant for applications that use the certificate-transfer-interface v1.
 
     # Must limit the relation count to 1 due to
     # https://github.com/canonical/certificate-transfer-interface/issues/6

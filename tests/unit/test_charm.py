@@ -533,6 +533,28 @@ class TestTraefikCertTransferInterface(unittest.TestCase):
     @patch("ops.model.Container.exec")
     @patch("charm._get_loadbalancer_status", lambda **__: "10.0.0.1")
     @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
+    def test_transferred_ca_certs_v1_are_updated(self, patch_exec):
+        # Given container is ready, when receive-ca-cert-v1 relation joins,
+        # then ca certs are updated.
+        provider_app = "self-signed-certificates"
+        self.harness.set_leader(True)
+        self.harness.begin_with_initial_hooks()
+        self.harness.set_can_connect(container=self.container_name, val=True)
+        certificate_transfer_rel_id = self.harness.add_relation(
+            relation_name="receive-ca-cert-v1", remote_app=provider_app
+        )
+        self.harness.add_relation_unit(
+            relation_id=certificate_transfer_rel_id, remote_unit_name=f"{provider_app}/0"
+        )
+        call_list = patch_exec.call_args_list
+        assert [call.args[0] for call in call_list] == [
+            ["find", "/opt/traefik/juju", "-name", "*.yaml", "-delete"],
+            ["update-ca-certificates", "--fresh"],
+        ]
+
+    @patch("ops.model.Container.exec")
+    @patch("charm._get_loadbalancer_status", lambda **__: "10.0.0.1")
+    @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
     def test_transferred_ca_certs_are_not_updated(self, patch_exec):
         # Given container is not ready, when receive-ca-cert relation joins,
         # then not attempting to update ca certs.
