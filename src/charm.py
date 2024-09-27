@@ -16,13 +16,22 @@ from urllib.parse import urlparse
 import pydantic
 import yaml
 from charms.certificate_transfer_interface.v0.certificate_transfer import (
-    CertificateAvailableEvent as CertificateTransferAvailableEvent,
+    CertificateAvailableEvent as CertificateTransferAvailableEventV0,
 )
 from charms.certificate_transfer_interface.v0.certificate_transfer import (
-    CertificateRemovedEvent as CertificateTransferRemovedEvent,
+    CertificateRemovedEvent as CertificateTransferRemovedEventV0,
 )
 from charms.certificate_transfer_interface.v0.certificate_transfer import (
-    CertificateTransferRequires,
+    CertificateTransferRequires as CertificateTransferRequiresV0,
+)
+from charms.certificate_transfer_interface.v1.certificate_transfer import (
+    CertificatesAvailableEvent as CertificateTransferAvailableEventV1,
+)
+from charms.certificate_transfer_interface.v1.certificate_transfer import (
+    CertificatesRemovedEvent as CertificateTransferRemovedEventV1,
+)
+from charms.certificate_transfer_interface.v1.certificate_transfer import (
+    CertificateTransferRequires as CertificateTransferRequiresV1,
 )
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from charms.loki_k8s.v1.loki_push_api import LokiPushApiConsumer
@@ -141,7 +150,8 @@ class TraefikIngressCharm(CharmBase):
             sans=sans,
         )
 
-        self.recv_ca_cert = CertificateTransferRequires(self, "receive-ca-cert")
+        self.recv_ca_cert_v0 = CertificateTransferRequiresV0(self, "receive-ca-cert")
+        self.recv_ca_cert_v1 = CertificateTransferRequiresV1(self, "receive-ca-cert-v1")
 
         # FIXME: Do not move these lower. They must exist before `_tcp_ports` is called. The
         # better long-term solution is to allow dynamic modification of the object, and to try
@@ -239,16 +249,24 @@ class TraefikIngressCharm(CharmBase):
             self._on_cert_changed,
         )
         observe(
-            self.recv_ca_cert.on.certificate_available,  # pyright: ignore
+            self.recv_ca_cert_v0.on.certificate_available,  # pyright: ignore
             self._on_recv_ca_cert_available,
         )
         observe(
             # Need to observe a managed relation event because a custom wrapper is not available
             # https://github.com/canonical/mutual-tls-interface/issues/5
-            self.recv_ca_cert.on.certificate_removed,  # pyright: ignore
+            self.recv_ca_cert_v0.on.certificate_removed,  # pyright: ignore
             self._on_recv_ca_cert_removed,
         )
 
+        observe(
+            self.recv_ca_cert_v1.on.certificate_set_updated,  # pyright: ignore
+            self._on_recv_ca_cert_available,
+        )
+        observe(
+            self.recv_ca_cert_v1.on.certificates_removed,  # pyright: ignore
+            self._on_recv_ca_cert_removed,
+        )
         observe(self.forward_auth.on.auth_config_changed, self._on_forward_auth_config_changed)
         observe(self.forward_auth.on.auth_config_removed, self._on_forward_auth_config_removed)
 
@@ -318,13 +336,21 @@ class TraefikIngressCharm(CharmBase):
     def _on_forward_auth_config_removed(self, event: AuthConfigRemovedEvent):
         self._process_status_and_configurations()
 
-    def _on_recv_ca_cert_available(self, event: CertificateTransferAvailableEvent):
+    def _on_recv_ca_cert_available(
+        self,
+        event: Union[CertificateTransferAvailableEventV0, CertificateTransferAvailableEventV1],
+    ):
         # Assuming only one cert per relation (this is in line with the original lib design).
         if not self.container.can_connect():
             return
         self._update_received_ca_certs(event)
 
-    def _update_received_ca_certs(self, event: Optional[CertificateTransferAvailableEvent] = None):
+    def _update_received_ca_certs(
+        self,
+        event: Optional[
+            Union[CertificateTransferAvailableEventV0, CertificateTransferAvailableEventV1]
+        ] = None,
+    ):
         """Push the cert attached to the event, if it is given; otherwise push all certs.
 
         This function is needed because relation events are not emitted on upgrade, and because we
@@ -333,21 +359,28 @@ class TraefikIngressCharm(CharmBase):
         preferred.
         """
         cas = []
-        if event:
+        if event and isinstance(event, CertificateTransferAvailableEventV0):
             cas.append(CA(event.ca, uid=event.relation_id))
         else:
-            for relation in self.model.relations.get(self.recv_ca_cert.relationship_name, []):
+            for relation in self.model.relations.get(self.recv_ca_cert_v0.relationship_name, []):
                 # For some reason, relation.units includes our unit and app. Need to exclude them.
                 for unit in set(relation.units).difference([self.app, self.unit]):
                     # Note: this nested loop handles the case of multi-unit CA, each unit providing
                     # a different ca cert, but that is not currently supported by the lib itself.
                     if ca := relation.data[unit].get("ca"):
                         cas.append(CA(ca, uid=relation.id))
+        for relation in self.model.relations.get(self.recv_ca_cert_v1.relationship_name, []):
+            # add index to relation id to avoid conflicts in case of multiple CAs per relation
+            cas.extend(
+                CA(ca, uid=f"{relation.id}-{i}")
+                for i, ca in enumerate(self.recv_ca_cert_v1.get_all_certificates(relation.id))
+            )
 
         self.traefik.add_cas(cas)
 
-    def _on_recv_ca_cert_removed(self, event: CertificateTransferRemovedEvent):
-        # Assuming only one cert per relation (this is in line with the original lib design).
+    def _on_recv_ca_cert_removed(
+        self, event: Union[CertificateTransferRemovedEventV0, CertificateTransferRemovedEventV1]
+    ):
         self.traefik.remove_cas([event.relation_id])
 
     @property
