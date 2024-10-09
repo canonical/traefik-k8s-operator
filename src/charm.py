@@ -78,7 +78,7 @@ from traefik import (
     SERVER_CERT_PATH,
     RoutingMode,
     StaticConfigMergeConflictError,
-    Traefik, CA_CERT_PATH,
+    Traefik,
 )
 from utils import is_hostname
 
@@ -194,7 +194,9 @@ class TraefikIngressCharm(CharmBase):
         # tracing integration
         self._tracing = TracingEndpointRequirer(self, protocols=["otlp_http"])
 
-        self.charm_tracing_endpoint, self.server_cert = charm_tracing_config(self._tracing, SERVER_CERT_PATH)
+        self.charm_tracing_endpoint, self.server_cert = charm_tracing_config(
+            self._tracing, SERVER_CERT_PATH
+        )
 
         # Provide grafana dashboards over a relation interface
         # dashboard to use: https://grafana.com/grafana/dashboards/4475-traefik/
@@ -351,6 +353,7 @@ class TraefikIngressCharm(CharmBase):
     def _on_recv_ca_cert_removed(self, event: CertificateTransferRemovedEvent):
         # Assuming only one cert per relation (this is in line with the original lib design).
         self.traefik.remove_cas([event.relation_id])
+
     def _is_tls_enabled(self) -> bool:
         """Return True if TLS is enabled."""
         if self.cert.enabled:
