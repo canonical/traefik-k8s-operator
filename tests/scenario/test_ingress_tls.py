@@ -4,9 +4,12 @@ from unittest.mock import MagicMock, PropertyMock, patch
 import ops.pebble
 import pytest
 import yaml
-from scenario import Container, ExecOutput, Mount, Relation, State
+from scenario import Container, Exec, Mount, Relation, State
+from scenario.context import CharmEvents
 
 from tests.scenario._utils import _render_config, create_ingress_relation
+
+on = CharmEvents()
 
 
 def _create_tls_relation(*, app_name: str, strip_prefix: bool, redirect_https: bool):
@@ -36,12 +39,12 @@ def test_middleware_config(
         Container(
             name="traefik",
             can_connect=True,
-            mounts={"configurations": Mount("/opt/traefik/", td.name)},
-            exec_mock={("find", "/opt/traefik/juju", "-name", "*.yaml", "-delete"): ExecOutput()},
+            mounts={"configurations": Mount(location="/opt/traefik/", source=td.name)},
+            execs={Exec(("find", "/opt/traefik/juju", "-name", "*.yaml", "-delete"))},
             layers={
                 "traefik": ops.pebble.Layer({"services": {"traefik": {"startup": "enabled"}}})
             },
-            service_status={"traefik": ops.pebble.ServiceStatus.ACTIVE},
+            service_statuses={"traefik": ops.pebble.ServiceStatus.ACTIVE},
         )
     ]
 
@@ -88,7 +91,7 @@ def test_middleware_config(
         )
 
     # WHEN a `relation-changed` hook fires
-    out = traefik_ctx.run(ipa.changed_event, state)
+    out = traefik_ctx.run(on.relation_changed(ipa), state)
 
     # THEN the rendered config file contains middlewares
     with out.get_container("traefik").get_filesystem(traefik_ctx).joinpath(

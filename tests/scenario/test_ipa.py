@@ -1,32 +1,37 @@
+from dataclasses import replace
 from pathlib import Path
 from typing import List, Tuple
 
 import yaml
 from scenario import Context, Relation, State
-from scenario.state import DEFAULT_JUJU_DATABAG
+from scenario.context import CharmEvents
+from scenario.state import _DEFAULT_JUJU_DATABAG
+
+on = CharmEvents()
 
 
 def create(traefik_ctx: Context, state: State):
     """Create the ingress relation."""
     ingress = Relation("ingress")
-    return traefik_ctx.run(ingress.joined_event, state.replace(relations=[ingress]))
+    return traefik_ctx.run(on.relation_joined(ingress), replace(state, relations=[ingress]))
 
 
 def join(traefik_ctx: Context, state: State):
     """Simulate a new unit joining the ingress relation."""
     ingress = state.get_relations("ingress")[0]
-    state = traefik_ctx.run(ingress.joined_event, state)
+    state = traefik_ctx.run(on.relation_joined(ingress), state)
     remote_units_data = ingress.remote_units_data
 
     joining_unit_id = max(remote_units_data)
-    if set(remote_units_data[joining_unit_id]).difference(DEFAULT_JUJU_DATABAG):
+    if set(remote_units_data[joining_unit_id]).difference(_DEFAULT_JUJU_DATABAG):
         joining_unit_id += 1
 
     remote_units_data[joining_unit_id] = {
         "host": f'"neutron-{joining_unit_id}.neutron-endpoints.zaza-de71889d82db.svc.cluster.local"'
     }
     relations = [
-        ingress.replace(
+        replace(
+            ingress,
             remote_app_data={
                 "model": '"zaza"',
                 "name": '"neutron"',
@@ -39,8 +44,9 @@ def join(traefik_ctx: Context, state: State):
         )
     ]
 
+    state_with_remotes = replace(state, relations=relations)
     state = traefik_ctx.run(
-        state.get_relations("ingress")[0].changed_event, state.replace(relations=relations)
+        on.relation_changed(state_with_remotes.get_relations("ingress")[0]), state_with_remotes
     )
     return state
 
@@ -53,11 +59,11 @@ def depart(traefik_ctx: Context, state: State):
         remote_units_data = ingress.remote_units_data.copy()
         departing_unit_id = max(remote_units_data)
         del remote_units_data[departing_unit_id]
-        return state.replace(relations=[ingress.replace(remote_units_data=remote_units_data)])
+        return replace(state, relations=[replace(ingress, remote_units_data=remote_units_data)])
 
     state = _pop(state)
 
-    state = traefik_ctx.run(state.get_relations("ingress")[0].departed_event, state)
+    state = traefik_ctx.run(on.relation_departed(state.get_relations("ingress")[0]), state)
     return state
 
 
@@ -68,9 +74,10 @@ def break_(traefik_ctx: Context, state: State):
         depart(traefik_ctx, state)
 
     ingress = state.get_relations("ingress")[0]
+    cleared_remote_ingress = replace(ingress, remote_app_data={}, remote_units_data={})
     return traefik_ctx.run(
-        ingress.broken_event,
-        state.replace(relations=[ingress.replace(remote_app_data={}, remote_units_data={})]),
+        on.relation_broken(cleared_remote_ingress),
+        replace(state, relations=[cleared_remote_ingress]),
     )
 
 
@@ -95,7 +102,7 @@ def test_traefik_remote_app_scaledown_from_2(traefik_ctx, traefik_container):
     """
     state = State(containers=[traefik_container])
 
-    with traefik_ctx.manager(traefik_container.pebble_ready_event, state) as mgr:
+    with traefik_ctx(on.pebble_ready(traefik_container), state) as mgr:
         state = mgr.run()
         static, dynamic = get_configs(traefik_ctx, state)
 
