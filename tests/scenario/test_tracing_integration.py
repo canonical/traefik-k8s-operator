@@ -3,8 +3,8 @@ from unittest.mock import patch
 import opentelemetry
 import pytest
 import yaml
-from charms.tempo_k8s.v1.charm_tracing import charm_tracing_disabled
-from charms.tempo_k8s.v2.tracing import ProtocolType, Receiver, TracingProviderAppData
+from charms.tempo_coordinator_k8s.v0.charm_tracing import charm_tracing_disabled
+from charms.tempo_coordinator_k8s.v0.tracing import ProtocolType, Receiver, TracingProviderAppData
 from scenario import Relation, State
 
 from traefik import CA_CERT_PATH, DYNAMIC_TRACING_PATH

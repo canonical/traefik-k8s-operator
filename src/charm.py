@@ -35,8 +35,8 @@ from charms.oathkeeper.v0.forward_auth import (
 from charms.observability_libs.v1.cert_handler import CertHandler
 from charms.observability_libs.v1.kubernetes_service_patch import KubernetesServicePatch
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
-from charms.tempo_k8s.v1.charm_tracing import trace_charm
-from charms.tempo_k8s.v2.tracing import TracingEndpointRequirer
+from charms.tempo_coordinator_k8s.v0.charm_tracing import trace_charm
+from charms.tempo_coordinator_k8s.v0.tracing import TracingEndpointRequirer, charm_tracing_config
 from charms.traefik_k8s.v0.traefik_route import (
     TraefikRouteProvider,
     TraefikRouteRequirerReadyEvent,
@@ -194,6 +194,10 @@ class TraefikIngressCharm(CharmBase):
         # tracing integration
         self._tracing = TracingEndpointRequirer(self, protocols=["otlp_http"])
 
+        self.charm_tracing_endpoint, self.server_cert = charm_tracing_config(
+            self._tracing, SERVER_CERT_PATH
+        )
+
         # Provide grafana dashboards over a relation interface
         # dashboard to use: https://grafana.com/grafana/dashboards/4475-traefik/
         # TODO wishlist: I would like for the p60, p70, p80, p90, p99, min, max, and avg for
@@ -349,20 +353,6 @@ class TraefikIngressCharm(CharmBase):
     def _on_recv_ca_cert_removed(self, event: CertificateTransferRemovedEvent):
         # Assuming only one cert per relation (this is in line with the original lib design).
         self.traefik.remove_cas([event.relation_id])
-
-    @property
-    def charm_tracing_endpoint(self) -> Optional[str]:
-        """Otlp http endpoint for charm instrumentation."""
-        if self._tracing.is_ready():
-            return self._tracing.get_endpoint("otlp_http")
-        return None
-
-    @property
-    def server_cert(self) -> Optional[str]:
-        """Server certificate path for tls tracing."""
-        if self._is_tls_enabled():
-            return SERVER_CERT_PATH
-        return None
 
     def _is_tls_enabled(self) -> bool:
         """Return True if TLS is enabled."""

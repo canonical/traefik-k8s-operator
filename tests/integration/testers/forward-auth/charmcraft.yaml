@@ -13,6 +13,6 @@ parts:
     charm-binary-python-packages:
       - jsonschema
       - ops
-      - pydantic-core
+      - pydantic>=2
     build-packages:
       - git
