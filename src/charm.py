@@ -9,6 +9,7 @@ import functools
 import itertools
 import json
 import logging
+import re
 import socket
 from typing import Any, Dict, List, Optional, Tuple, Union, cast
 from urllib.parse import urlparse
@@ -125,6 +126,20 @@ class TraefikIngressCharm(CharmBase):
 
     def __init__(self, *args):
         super().__init__(*args)
+
+        # Before doing anything, validate the charm config.  If configuration is invalid, warn the user.
+        # FIXME: Invalid configuration here SHOULD halt the charm's operation until resolution, or at least make a
+        #  persistent BlockedStatus, but this charm handles events atomically rather than holistically.
+        #  This means that skipping events will result in unexpected issues, so if we halt the charm here we must
+        #  ensure the charm processes all backlogged events on resumption in the original order.  Rather than do that
+        #  and risk losing an event, we simply warn the user and continue functioning as best as possible.  The charm
+        #  will operate correctly except that it will not publish ingress urls to related applications, instead
+        #  leaving the ingress relation data empty and logging an error.
+        #  If we refactor this charm to handle events holistically (and thus we can skip events without issue), we
+        #  should refactor this validation truly halt the charm.
+        #  If we refactor this charm to use collect_unit_status, we could raise a persistent BlockedStatus message when
+        #  this configuration is invalid.
+        self._validate_config()
 
         self._stored.set_default(
             config_hash=None,
@@ -1186,13 +1201,60 @@ class TraefikIngressCharm(CharmBase):
         # If all else fails, we'd rather use the bare IP
         return [target] if target else []
 
+    def _validate_config(self):
+        """Validate the charm configuration, emitting warning messages on misconfigurations.
+
+        In scope for this validation is:
+        * validating the combination of external_hostname and routing_mode
+        """
+        # FIXME: This will false positive in cases where the LoadBalancer provides an external host rather than an IP.
+        #  The warning will occur, but the charm will function normally.  We could better validate the LoadBalancer if
+        #  we want to avoid this, but it probably isn't worth the effort until someone notices.
+        invalid_hostname_and_routing_mode_message = (
+            "Likely configuration error: When using routing_mode=='subdomain', external_hostname should be "
+            "set.  This is because when external_hostname is unset, Traefik uses the LoadBalancer's address as the "
+            "hostname for all provided URLS and that hostname is typically an IP address.  This leads to invalid urls "
+            "like `model-app.1.2.3.4`.  The charm will continue to operate as currently set, but will not provide urls"
+            " to any related applications if they would be invalid."
+        )
+
+        if self.config.get("routing_mode", "") == "subdomain":
+            # subdomain mode can only be used if an external_hostname is set and is not an IP address
+            external_hostname = self.config.get("external_hostname", "")
+            if not isinstance(external_hostname, str) or not is_valid_hostname(external_hostname):
+                logger.warning(invalid_hostname_and_routing_mode_message)
+
+
+def is_valid_hostname(hostname: str) -> bool:
+    """Check if a hostname is valid.
+
+    Modified from https://stackoverflow.com/a/33214423
+    """
+    if len(hostname) == 0:
+        return False
+    if hostname[-1] == ".":
+        # strip exactly one dot from the right, if present
+        hostname = hostname[:-1]
+    if len(hostname) > 253:
+        return False
+
+    labels = hostname.split(".")
+
+    # the TLD must be not all-numeric
+    if re.match(r"[0-9]+$", labels[-1]):
+        return False
+
+    allowed = re.compile(r"(?!-)[a-z0-9-]{1,63}(?<!-)$", re.IGNORECASE)
+    return all(allowed.match(label) for label in labels)
+
 
 @functools.lru_cache
 def _get_loadbalancer_status(namespace: str, service_name: str) -> Optional[str]:
     client = Client()  # type: ignore
     try:
         traefik_service = client.get(Service, name=service_name, namespace=namespace)
-    except ApiError:
+    except ApiError as e:
+        logger.warning(f"Got ApiError when trying to get Loadbalancer status: {e}")
         return None
 
     if not (status := traefik_service.status):  # type: ignore

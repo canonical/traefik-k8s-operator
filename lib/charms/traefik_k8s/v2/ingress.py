@@ -226,7 +226,7 @@ class IngressUrl(BaseModel):
 class IngressProviderAppData(DatabagModel):
     """Ingress application databag schema."""
 
-    ingress: IngressUrl
+    ingress: Optional[IngressUrl] = None
 
 
 class ProviderSchema(BaseModel):
@@ -558,7 +558,16 @@ class IngressPerAppProvider(_IngressPerAppBase):
     def publish_url(self, relation: Relation, url: str):
         """Publish to the app databag the ingress url."""
         ingress_url = {"url": url}
-        IngressProviderAppData(ingress=ingress_url).dump(relation.data[self.app])  # type: ignore
+        try:
+            IngressProviderAppData(ingress=ingress_url).dump(relation.data[self.app])  # type: ignore
+        except pydantic.ValidationError as e:
+            # If we cannot validate the url as valid, publish an empty databag and log the error.
+            log.error(f"Failed to validate ingress url '{url}' - got ValidationError {e}")
+            log.error(
+                "url was not published to ingress relation for {relation.app}.  This error is likely due to an"
+                " error or misconfiguration of the charm calling this library."
+            )
+            IngressProviderAppData(ingress=None).dump(relation.data[self.app])  # type: ignore
 
     @property
     def proxied_endpoints(self) -> Dict[str, Dict[str, str]]:

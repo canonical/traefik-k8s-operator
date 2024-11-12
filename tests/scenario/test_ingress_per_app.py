@@ -15,9 +15,10 @@ from charms.traefik_k8s.v2.ingress import (
     IngressRequirerUnitData,
 )
 from ops import CharmBase, Framework
-from scenario import Context, Mount, Relation, State
+from scenario import Context, Model, Mount, Relation, State
 
 from tests.scenario._utils import create_ingress_relation
+from tests.scenario.conftest import MOCK_LB_ADDRESS
 
 
 @pytest.mark.parametrize(
@@ -301,3 +302,53 @@ def test_proxied_endpoints(
         assert charm.ingress_per_appv1.proxied_endpoints["remote"]["url"]
         assert charm.ingress_per_appv2.proxied_endpoints["remote"]["url"]
         assert charm.ingress_per_unit.proxied_endpoints["remote/0"]["url"]
+
+
+MODEL_NAME = "test-model"
+UNIT_NAME = "nms"
+
+
+@pytest.mark.parametrize(
+    "external_hostname, routing_mode, expected_local_app_data",
+    [
+        # Valid configurations
+        (
+            "foo.com",
+            "path",
+            {"ingress": json.dumps({"url": f"http://foo.com/{MODEL_NAME}-{UNIT_NAME}"})},
+        ),
+        (
+            "foo.com",
+            "subdomain",
+            {"ingress": json.dumps({"url": f"http://{MODEL_NAME}-{UNIT_NAME}.foo.com/"})},
+        ),
+        (
+            "",
+            "path",
+            {"ingress": json.dumps({"url": f"http://{MOCK_LB_ADDRESS}/{MODEL_NAME}-{UNIT_NAME}"})},
+        ),
+        # Invalid configuration, resulting in empty local_app_data
+        ("", "subdomain", {}),
+    ],
+)
+def test_ingress_with_hostname_and_routing_mode(
+    external_hostname,
+    routing_mode,
+    expected_local_app_data,
+    traefik_ctx,
+    traefik_container,
+    tmp_path,
+):
+    """Tests that the ingress relation provides a URL for valid external hostname and routing mode combinations."""
+    ipa = create_ingress_relation(strip_prefix=True, unit_name=UNIT_NAME)
+    state = State(
+        model=Model(name=MODEL_NAME),
+        config={"routing_mode": routing_mode, "external_hostname": external_hostname},
+        containers=[traefik_container],
+        relations=[ipa],
+        leader=True,
+    )
+
+    # event = getattr(ipa, f"changed_event")
+    state_out = traefik_ctx.run("config-changed", state)
+    assert state_out.relations[0].local_app_data == expected_local_app_data
