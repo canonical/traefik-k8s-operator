@@ -21,7 +21,7 @@ def tracing_relation():
             )
         ]
     ).dump(db)
-    tracing = Relation("tracing", remote_app_data=db)
+    tracing = Relation("charm-tracing", remote_app_data=db)
     return tracing
 
 
