@@ -57,7 +57,18 @@ import socket
 import typing
 from dataclasses import dataclass
 from functools import partial
-from typing import Any, Callable, Dict, List, MutableMapping, Optional, Sequence, Tuple, Union
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    MutableMapping,
+    Optional,
+    Sequence,
+    Tuple,
+    Union,
+    cast,
+)
 
 import pydantic
 from ops.charm import CharmBase, RelationBrokenEvent, RelationEvent
@@ -605,10 +616,14 @@ class IngressPerAppProvider(_IngressPerAppBase):
             if not ingress_data:
                 log.warning(f"relation {ingress_relation} not ready yet: try again in some time.")
                 continue
+
+            # Validation above means ingress cannot be None, but type checker doesn't know that.
+            ingress = ingress_data.ingress
+            ingress = cast(IngressProviderAppData, ingress)
             if PYDANTIC_IS_V1:
-                results[ingress_relation.app.name] = ingress_data.ingress.dict()
+                results[ingress_relation.app.name] = ingress.dict()
             else:
-                results[ingress_relation.app.name] = ingress_data.ingress.model_dump(mode="json")
+                results[ingress_relation.app.name] = ingress.model_dump(mode="json")
         return results
 
 
@@ -843,7 +858,11 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         if not databag:  # not ready yet
             return None
 
-        return str(IngressProviderAppData.load(databag).ingress.url)
+        ingress = IngressProviderAppData.load(databag).ingress
+        if ingress is None:
+            return None
+
+        return str(ingress.url)
 
     @property
     def url(self) -> Optional[str]:
