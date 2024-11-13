@@ -9,7 +9,6 @@ output "endpoints" {
     experimental_forward_auth = "experimental-forward-auth",
     logging                   = "logging",
     tracing                   = "tracing",
-    
     # Provides
     grafana_dashboard = "grafana-dashboard",
     ingress           = "ingress",
