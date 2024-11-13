@@ -4,14 +4,17 @@ output "app_name" {
 
 output "endpoints" {
   value = {
+    # Requires
     certificates              = "certificates",
     experimental_forward_auth = "experimental-forward-auth",
-    grafana_dashboard         = "grafana-dashboard",
-    ingress                   = "ingress",
-    ingress_per_unit          = "ingress-per-unit",
     logging                   = "logging",
-    metrics_endpoint          = "metrics-endpoint",
     tracing                   = "tracing",
-    traefik_route             = "traefik-route",
+    
+    # Provides
+    grafana_dashboard = "grafana-dashboard",
+    ingress           = "ingress",
+    ingress_per_unit  = "ingress-per-unit",
+    metrics_endpoint  = "metrics-endpoint",
+    traefik_route     = "traefik-route",
   }
 }
