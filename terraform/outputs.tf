@@ -2,17 +2,14 @@ output "app_name" {
   value = juju_application.traefik.name
 }
 
-output "requires" {
+output "endpoints" {
   value = {
+    # Requires
     certificates              = "certificates",
     experimental_forward_auth = "experimental-forward-auth",
     logging                   = "logging",
     tracing                   = "tracing",
-  }
-}
-
-output "provides" {
-  value = {
+    # Provides
     grafana_dashboard = "grafana-dashboard",
     ingress           = "ingress",
     ingress_per_unit  = "ingress-per-unit",
