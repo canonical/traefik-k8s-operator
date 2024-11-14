@@ -19,6 +19,7 @@ from ops import Container
 from ops.pebble import LayerDict, PathError
 
 from utils import is_hostname
+from cosl import JujuTopology
 
 logger = logging.getLogger(__name__)
 DYNAMIC_CONFIG_DIR = "/opt/traefik/juju"
@@ -104,7 +105,9 @@ class Traefik:
         experimental_forward_auth_enabled: bool,
         tcp_entrypoints: Dict[str, int],
         traefik_route_static_configs: Iterable[Dict[str, Any]],
+        topology: JujuTopology,
         basic_auth_user: Optional[str] = None,
+        tracing_endpoint: Optional[str] = None,
     ):
         self._container = container
         self._tcp_entrypoints = tcp_entrypoints
@@ -112,7 +115,9 @@ class Traefik:
         self._routing_mode = routing_mode
         self._tls_enabled = tls_enabled
         self._experimental_forward_auth_enabled = experimental_forward_auth_enabled
+        self._topology = topology
         self._basic_auth_user = basic_auth_user
+        self._tracing_endpoint = tracing_endpoint
 
     @property
     def scrape_jobs(self) -> list:
@@ -280,6 +285,9 @@ class Traefik:
         }
 
         if self._tracing_endpoint:
+            # ref: https://github.com/traefik/traefik/blob/v2.11/docs/content/observability/tracing/jaeger.md
+            # TODO once we bump to Traefik v3, Jaeger needs to be replaced with otlp and config needs to be updated
+            # see https://doc.traefik.io/traefik/observability/tracing/opentelemetry/ for more reference
             static_config["tracing"] = {
                 "jaeger": {
                     "collector": {
@@ -315,17 +323,6 @@ class Traefik:
         config_yaml = yaml.safe_dump(config)
         # TODO Use the Traefik user and group?
         self._container.push(STATIC_CONFIG_PATH, config_yaml, make_dirs=True)
-
-    # ref: https://github.com/traefik/traefik/blob/v2.11/docs/content/observability/tracing/jaeger.md
-    # TODO once we bump to Traefik v3, Jaeger needs to be replaced with otlp and config needs to be updated
-    # see https://doc.traefik.io/traefik/observability/tracing/opentelemetry/ for more reference
-    def set_tracing_endpoint(self, endpoint: str):
-        """Set tracing endpoint."""
-        self._tracing_endpoint = endpoint
-
-    def delete_tracing_endpoint(self):
-        """Remove tracing endpoint."""
-        self._tracing_endpoint = None
 
     def get_per_unit_http_config(
         self,
@@ -627,6 +624,12 @@ class Traefik:
 
     def restart(self):
         """Restart the pebble service."""
+        environment = {}
+        if self._tracing_endpoint:
+            environment = {
+                "JAEGER_TAGS": f"juju_application={self._topology.application},juju_model={self._topology.model},juju_model_uuid={self._topology.model_uuid},juju_unit={self._topology.unit},juju_charm={self._topology.charm_name}"
+            }
+
         layer = {
             "summary": "Traefik layer",
             "description": "Pebble config layer for Traefik",
@@ -637,6 +640,7 @@ class Traefik:
                     # trick to drop the logs to a file but also keep them available in the pod logs
                     "command": '/bin/sh -c "{} | tee {}"'.format(BIN_PATH, LOG_PATH),
                     "startup": "enabled",
+                    "environment": environment
                 },
             },
         }

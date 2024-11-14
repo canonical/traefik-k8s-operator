@@ -81,6 +81,7 @@ from traefik import (
     Traefik,
 )
 from utils import is_hostname
+from cosl import JujuTopology
 
 # To keep a tidy debug-log, we suppress some DEBUG/INFO logs from some imported libs,
 # even when charm logging is set to a lower level.
@@ -164,6 +165,20 @@ class TraefikIngressCharm(CharmBase):
             charm=self, external_host=self._external_host, scheme=self._scheme  # type: ignore
         )
 
+        self._topology = JujuTopology.from_charm(self)
+
+        # tracing integration
+        self._charm_tracing = TracingEndpointRequirer(
+            self, relation_name="charm-tracing", protocols=["otlp_http"]
+        )
+        self._workload_tracing = TracingEndpointRequirer(
+            self, relation_name="workload-tracing", protocols=["jaeger_thrift_http"]
+        )
+
+        self.charm_tracing_endpoint, self.server_cert = charm_tracing_config(
+            self._charm_tracing, SERVER_CERT_PATH
+        )
+
         self.traefik = Traefik(
             container=self.container,
             routing_mode=self._routing_mode,
@@ -172,6 +187,8 @@ class TraefikIngressCharm(CharmBase):
             experimental_forward_auth_enabled=self._is_forward_auth_enabled,
             traefik_route_static_configs=self._traefik_route_static_configs(),
             basic_auth_user=self._basic_auth_user,
+            topology=self._topology,
+            tracing_endpoint=self._workload_tracing.get_endpoint("jaeger_thrift_http") if self._is_workload_tracing_enabled() else None
         )
 
         self.service_patch = KubernetesServicePatch(
@@ -191,17 +208,6 @@ class TraefikIngressCharm(CharmBase):
             ],
         )
         # Observability integrations
-        # tracing integration
-        self._charm_tracing = TracingEndpointRequirer(
-            self, relation_name="charm-tracing", protocols=["otlp_http"]
-        )
-        self._workload_tracing = TracingEndpointRequirer(
-            self, relation_name="workload-tracing", protocols=["jaeger_thrift_http"]
-        )
-
-        self.charm_tracing_endpoint, self.server_cert = charm_tracing_config(
-            self._charm_tracing, SERVER_CERT_PATH
-        )
 
         # Provide grafana dashboards over a relation interface
         # dashboard to use: https://grafana.com/grafana/dashboards/4475-traefik/
@@ -229,14 +235,6 @@ class TraefikIngressCharm(CharmBase):
 
         # TODO update init params once auto-renew is implemented
         # https://github.com/canonical/tls-certificates-interface/issues/24
-        observe(
-            self._workload_tracing.on.endpoint_changed,  # type: ignore
-            self._on_workload_tracing_endpoint_changed,
-        )
-        observe(
-            self._workload_tracing.on.endpoint_removed,  # type: ignore
-            self._on_workload_tracing_endpoint_removed,
-        )
 
         observe(self.on.traefik_pebble_ready, self._on_traefik_pebble_ready)  # type: ignore
         observe(self.on.start, self._on_start)
@@ -377,22 +375,6 @@ class TraefikIngressCharm(CharmBase):
             return False
         return True
 
-    def _on_workload_tracing_endpoint_removed(self, event) -> None:
-        if not self.container.can_connect():
-            # this probably means we're being torn down, so we don't really need to
-            # clear anything up. We could defer, but again, we're being torn down and the unit db
-            # will
-            return
-        self.traefik.delete_tracing_endpoint()
-
-    def _on_workload_tracing_endpoint_changed(self, event) -> None:
-        # On slow machines, this event may come up before pebble is ready
-        if not self.container.can_connect():
-            event.defer()
-            return
-
-        self._configure_tracing()
-
     def _on_cert_changed(self, event) -> None:
         # On slow machines, this event may come up before pebble is ready
         if not self.container.can_connect():
@@ -480,21 +462,7 @@ class TraefikIngressCharm(CharmBase):
         return entrypoints
 
     def _configure_traefik(self):
-        self._configure_tracing()
         self.traefik.configure()
-
-    def _configure_tracing(self):
-        if not self._is_workload_tracing_enabled():
-            logger.info("workload tracing not enabled: skipping tracing config")
-            return
-
-        if endpoint := self._workload_tracing.get_endpoint("jaeger_thrift_http"):
-            self.traefik.set_tracing_endpoint(endpoint)
-        else:
-            logger.error(
-                "workload tracing integration is active but none of the "
-                "protocols traefik supports is available."
-            )
 
     def _on_traefik_pebble_ready(self, _: PebbleReadyEvent):
         # If the Traefik container comes up, e.g., after a pod churn, we
