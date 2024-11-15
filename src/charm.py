@@ -47,6 +47,7 @@ from charms.traefik_k8s.v1.ingress_per_unit import (
     IngressPerUnitProvider,
 )
 from charms.traefik_k8s.v2.ingress import IngressPerAppProvider as IPAv2
+from cosl import JujuTopology
 from deepmerge import always_merger
 from lightkube.core.client import Client
 from lightkube.core.exceptions import ApiError
@@ -81,7 +82,6 @@ from traefik import (
     Traefik,
 )
 from utils import is_hostname
-from cosl import JujuTopology
 
 # To keep a tidy debug-log, we suppress some DEBUG/INFO logs from some imported libs,
 # even when charm logging is set to a lower level.
@@ -188,7 +188,11 @@ class TraefikIngressCharm(CharmBase):
             traefik_route_static_configs=self._traefik_route_static_configs(),
             basic_auth_user=self._basic_auth_user,
             topology=self._topology,
-            tracing_endpoint=self._workload_tracing.get_endpoint("jaeger_thrift_http") if self._is_workload_tracing_enabled() else None
+            tracing_endpoint=(
+                self._workload_tracing.get_endpoint("jaeger_thrift_http")
+                if self._is_workload_tracing_enabled()
+                else None
+            ),
         )
 
         self.service_patch = KubernetesServicePatch(

@@ -15,11 +15,11 @@ from typing import Any, Dict, Iterable, List, Optional, Union, cast
 
 import yaml
 from charms.oathkeeper.v0.forward_auth import ForwardAuthConfig
+from cosl import JujuTopology
 from ops import Container
 from ops.pebble import LayerDict, PathError
 
 from utils import is_hostname
-from cosl import JujuTopology
 
 logger = logging.getLogger(__name__)
 DYNAMIC_CONFIG_DIR = "/opt/traefik/juju"
@@ -640,16 +640,16 @@ class Traefik:
                     # trick to drop the logs to a file but also keep them available in the pod logs
                     "command": '/bin/sh -c "{} | tee {}"'.format(BIN_PATH, LOG_PATH),
                     "startup": "enabled",
-                    "environment": environment
+                    "environment": environment,
                 },
             },
         }
 
-        if not self.is_ready:
-            self._container.add_layer(self._layer_name, cast(LayerDict, layer), combine=True)
-            logger.debug(f"replanning {self.service_name!r} after a service update")
-            self._container.replan()
-        else:
+        self._container.add_layer(self._layer_name, cast(LayerDict, layer), combine=True)
+        logger.debug(f"replanning {self.service_name!r} after a service update")
+        self._container.replan()
+
+        if self.is_ready:
             logger.debug(f"restarting {self.service_name!r}")
             self._container.restart(self.service_name)
 

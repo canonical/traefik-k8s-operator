@@ -24,6 +24,7 @@ def charm_tracing_relation():
     tracing = Relation("charm-tracing", remote_app_data=db)
     return tracing
 
+
 @pytest.fixture
 def workload_tracing_relation():
     workload_db = {}
@@ -31,7 +32,7 @@ def workload_tracing_relation():
         receivers=[
             Receiver(
                 url="http://foo.com:14238",
-                protocol=ProtocolType(name="jaeger_thrift_http", type="http")
+                protocol=ProtocolType(name="jaeger_thrift_http", type="http"),
             )
         ]
     ).dump(workload_db)
@@ -67,9 +68,7 @@ def test_traefik_tracing_config(traefik_ctx, traefik_container, workload_tracing
         traefik_ctx.run(workload_tracing_relation.changed_event, state_in)
 
     tracing_cfg = (
-        traefik_container.get_filesystem(traefik_ctx)
-        .joinpath(STATIC_CONFIG_PATH[1:])
-        .read_text()
+        traefik_container.get_filesystem(traefik_ctx).joinpath(STATIC_CONFIG_PATH[1:]).read_text()
     )
     cfg = yaml.safe_load(tracing_cfg)
     assert cfg["tracing"] == {
@@ -79,7 +78,9 @@ def test_traefik_tracing_config(traefik_ctx, traefik_container, workload_tracing
     }
 
 
-def test_traefik_tracing_config_with_tls(traefik_ctx, traefik_container, workload_tracing_relation):
+def test_traefik_tracing_config_with_tls(
+    traefik_ctx, traefik_container, workload_tracing_relation
+):
     state_in = State(relations=[workload_tracing_relation], containers=[traefik_container])
 
     with patch("charm.TraefikIngressCharm._is_tls_enabled") as tls_enabled:
@@ -89,9 +90,7 @@ def test_traefik_tracing_config_with_tls(traefik_ctx, traefik_container, workloa
             traefik_ctx.run(workload_tracing_relation.changed_event, state_in)
 
     tracing_cfg = (
-        traefik_container.get_filesystem(traefik_ctx)
-        .joinpath(STATIC_CONFIG_PATH[1:])
-        .read_text()
+        traefik_container.get_filesystem(traefik_ctx).joinpath(STATIC_CONFIG_PATH[1:]).read_text()
     )
     cfg = yaml.safe_load(tracing_cfg)
     assert cfg == {
@@ -122,9 +121,7 @@ def test_traefik_tracing_config_removed_if_relation_data_invalid(
         traefik_ctx.run(workload_tracing_relation.changed_event, state_in)
 
     tracing_cfg = (
-        traefik_container.get_filesystem(traefik_ctx)
-        .joinpath(STATIC_CONFIG_PATH[1:])
-        .read_text()
+        traefik_container.get_filesystem(traefik_ctx).joinpath(STATIC_CONFIG_PATH[1:]).read_text()
     )
     cfg = yaml.safe_load(tracing_cfg)
     # assert tracing config is removed
@@ -146,9 +143,7 @@ def test_traefik_tracing_config_removed_on_relation_broken(
         traefik_ctx.run(workload_tracing_relation.broken_event, state_in)
 
     tracing_cfg = (
-        traefik_container.get_filesystem(traefik_ctx)
-        .joinpath(STATIC_CONFIG_PATH[1:])
-        .read_text()
+        traefik_container.get_filesystem(traefik_ctx).joinpath(STATIC_CONFIG_PATH[1:]).read_text()
     )
     cfg = yaml.safe_load(tracing_cfg)
     # assert tracing config is removed
