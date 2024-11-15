@@ -239,6 +239,14 @@ class TraefikIngressCharm(CharmBase):
 
         # TODO update init params once auto-renew is implemented
         # https://github.com/canonical/tls-certificates-interface/issues/24
+        observe(
+            self._workload_tracing.on.endpoint_changed,  # type: ignore
+            self._on_workload_tracing_endpoint_changed,
+        )
+        observe(
+            self._workload_tracing.on.endpoint_removed,  # type: ignore
+            self._on_workload_tracing_endpoint_removed,
+        )
 
         observe(self.on.traefik_pebble_ready, self._on_traefik_pebble_ready)  # type: ignore
         observe(self.on.start, self._on_start)
@@ -372,6 +380,12 @@ class TraefikIngressCharm(CharmBase):
         ):
             return True
         return False
+
+    def _on_workload_tracing_endpoint_removed(self, _) -> None:
+        self._update_config_if_changed()
+
+    def _on_workload_tracing_endpoint_changed(self, _) -> None:
+        self._update_config_if_changed()
 
     def _is_workload_tracing_enabled(self) -> bool:
         """Return True if tracing is enabled."""
@@ -522,8 +536,10 @@ class TraefikIngressCharm(CharmBase):
 
     def _on_config_changed(self, _: ConfigChangedEvent):
         """Handle the ops.ConfigChanged event."""
-        # that we're processing a config-changed event, doesn't necessarily mean that our config has changed (duh!)
+        self._update_config_if_changed()
 
+    def _update_config_if_changed(self):
+        # that we're processing a config-changed event, doesn't necessarily mean that our config has changed (duh!)
         # If the config hash has changed since we last calculated it, we need to
         # recompute our state from scratch, based on all data sent over the relations and all configs
         new_config_hash = self._config_hash

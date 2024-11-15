@@ -1,11 +1,13 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 """Helpers for unit testing charms which use this library."""
+import uuid
 from unittest.mock import Mock, patch
 
 import ops
 import pytest
 import yaml
+from cosl import JujuTopology
 from ops.testing import Harness
 
 from charm import TraefikIngressCharm
@@ -80,6 +82,17 @@ def harness() -> Harness[TraefikIngressCharm]:
     harness.cleanup()
 
 
+@pytest.fixture(scope="function")
+def topology(harness):
+    topology = JujuTopology(
+        model="model",
+        model_uuid=str(uuid.uuid4()),
+        application="app",
+        charm_name="charm",
+    )
+    return topology
+
+
 @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
 def initialize_and_setup_tr_relation(harness):
     harness.update_config({"external_hostname": "testhostname"})
@@ -146,7 +159,7 @@ def test_tls_is_added(harness: Harness[TraefikIngressCharm]):
     assert conf == CONFIG_WITH_TLS
 
 
-def test_static_config(harness: Harness[TraefikIngressCharm]):
+def test_static_config(harness: Harness[TraefikIngressCharm], topology: JujuTopology):
     tr_relation_id, relation = initialize_and_setup_tr_relation(harness)
     config = yaml.dump(CONFIG)
     static = yaml.safe_dump({"foo": "bar"})
@@ -171,6 +184,7 @@ def test_static_config(harness: Harness[TraefikIngressCharm]):
         tls_enabled=charm._is_tls_enabled(),
         experimental_forward_auth_enabled=charm._is_forward_auth_enabled,
         traefik_route_static_configs=charm._traefik_route_static_configs(),
+        topology=topology,
     )
 
     charm.traefik_route.on.ready.emit(charm.model.get_relation("traefik-route"))
@@ -189,7 +203,7 @@ def test_static_config(harness: Harness[TraefikIngressCharm]):
     assert yaml.safe_load(charm.container.pull(file).read()) == CONFIG_WITH_TLS
 
 
-def test_static_config_broken(harness: Harness[TraefikIngressCharm]):
+def test_static_config_broken(harness: Harness[TraefikIngressCharm], topology: JujuTopology):
     tr_relation_id, relation = initialize_and_setup_tr_relation(harness)
     config = yaml.dump(CONFIG)
 
@@ -219,6 +233,7 @@ def test_static_config_broken(harness: Harness[TraefikIngressCharm]):
         tls_enabled=charm._is_tls_enabled(),
         experimental_forward_auth_enabled=charm._is_forward_auth_enabled,
         traefik_route_static_configs=charm._traefik_route_static_configs(),
+        topology=topology,
     )
 
     # WHEN the charm receives a traefik-route ready event
@@ -241,7 +256,9 @@ def test_static_config_broken(harness: Harness[TraefikIngressCharm]):
     assert yaml.safe_load(charm.container.pull(file).read()) == CONFIG_WITH_TLS
 
 
-def test_static_config_partially_broken(harness: Harness[TraefikIngressCharm]):
+def test_static_config_partially_broken(
+    harness: Harness[TraefikIngressCharm], topology: JujuTopology
+):
     initialize_and_setup_tr_relation(harness)
 
     # IF we initialize Traefik with some specially crafted
@@ -263,6 +280,7 @@ def test_static_config_partially_broken(harness: Harness[TraefikIngressCharm]):
             # GOOD: this one won't conflict with other entrypoints
             {"entryPoints": {"shondaland": {"address": ":6767"}}},
         ],
+        topology=topology,
     )
 
     # WHEN the charm receives a traefik-route ready event
@@ -283,7 +301,9 @@ def test_static_config_partially_broken(harness: Harness[TraefikIngressCharm]):
     assert generated_config["foo"] == {"bar": "baz"}
 
 
-def test_static_config_updates_tcp_entrypoints(harness: Harness[TraefikIngressCharm]):
+def test_static_config_updates_tcp_entrypoints(
+    harness: Harness[TraefikIngressCharm], topology: JujuTopology
+):
     tr_relation_id, relation = initialize_and_setup_tr_relation(harness)
     config = yaml.dump(CONFIG)
     static = yaml.safe_dump({"entryPoints": {"shondaland": {"address": ":6767"}}})
@@ -308,6 +328,7 @@ def test_static_config_updates_tcp_entrypoints(harness: Harness[TraefikIngressCh
         tls_enabled=charm._is_tls_enabled(),
         experimental_forward_auth_enabled=charm._is_forward_auth_enabled,
         traefik_route_static_configs=charm._traefik_route_static_configs(),
+        topology=topology,
     )
 
     charm.traefik_route.on.ready.emit(charm.model.get_relation("traefik-route"))

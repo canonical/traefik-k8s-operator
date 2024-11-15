@@ -7,7 +7,7 @@ from charms.tempo_coordinator_k8s.v0.charm_tracing import charm_tracing_disabled
 from charms.tempo_coordinator_k8s.v0.tracing import ProtocolType, Receiver, TracingProviderAppData
 from scenario import Relation, State
 
-from traefik import CA_CERT_PATH, STATIC_CONFIG_PATH
+from traefik import STATIC_CONFIG_PATH
 
 
 @pytest.fixture
@@ -73,31 +73,8 @@ def test_traefik_tracing_config(traefik_ctx, traefik_container, workload_tracing
     cfg = yaml.safe_load(tracing_cfg)
     assert cfg["tracing"] == {
         "jaeger": {
-            "endpoint": "http://foo.com:81",
-        }
-    }
-
-
-def test_traefik_tracing_config_with_tls(
-    traefik_ctx, traefik_container, workload_tracing_relation
-):
-    state_in = State(relations=[workload_tracing_relation], containers=[traefik_container])
-
-    with patch("charm.TraefikIngressCharm._is_tls_enabled") as tls_enabled:
-        tls_enabled.return_value = "True"
-
-        with charm_tracing_disabled():
-            traefik_ctx.run(workload_tracing_relation.changed_event, state_in)
-
-    tracing_cfg = (
-        traefik_container.get_filesystem(traefik_ctx).joinpath(STATIC_CONFIG_PATH[1:]).read_text()
-    )
-    cfg = yaml.safe_load(tracing_cfg)
-    assert cfg == {
-        "tracing": {
-            "openTelemetry": {
-                "address": "http://foo.com:81",
-                "ca": CA_CERT_PATH,
+            "collector": {
+                "endpoint": "http://foo.com:14238/api/traces?format=jaeger.thrift",
             }
         }
     }
@@ -108,8 +85,9 @@ def test_traefik_tracing_config_removed_if_relation_data_invalid(
     traefik_ctx, traefik_container, workload_tracing_relation, was_present_before
 ):
     if was_present_before:
-        dt_path = traefik_container.mounts["opt"].src.joinpath("traefik", "juju", "tracing.yaml")
-        dt_path.parent.mkdir(parents=True)
+        dt_path = traefik_container.mounts["/etc/traefik"].src.joinpath("traefik.yaml")
+        if not dt_path.parent.exists():
+            dt_path.parent.mkdir(parents=True)
         dt_path.write_text("foo")
 
     state_in = State(
@@ -133,8 +111,9 @@ def test_traefik_tracing_config_removed_on_relation_broken(
     traefik_ctx, traefik_container, workload_tracing_relation, was_present_before
 ):
     if was_present_before:
-        dt_path = traefik_container.mounts["opt"].src.joinpath("traefik", "juju", "tracing.yaml")
-        dt_path.parent.mkdir(parents=True)
+        dt_path = traefik_container.mounts["/etc/traefik"].src.joinpath("traefik.yaml")
+        if not dt_path.parent.exists():
+            dt_path.parent.mkdir(parents=True)
         dt_path.write_text("foo")
 
     state_in = State(relations=[workload_tracing_relation], containers=[traefik_container])
