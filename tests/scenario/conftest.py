@@ -1,4 +1,4 @@
-from unittest.mock import PropertyMock, patch
+from unittest.mock import patch
 
 import pytest
 from ops import pebble
@@ -6,7 +6,7 @@ from scenario import Container, Context, ExecOutput, Model, Mount
 
 from charm import TraefikIngressCharm
 
-MOCK_EXTERNAL_HOSTNAME = "testhostname"
+MOCK_LB_ADDRESS = "1.2.3.4"
 
 
 @pytest.fixture
@@ -14,8 +14,8 @@ def traefik_charm():
     with patch("charm.KubernetesServicePatch"):
         with patch("lightkube.core.client.GenericSyncClient"):
             with patch(
-                "charm.TraefikIngressCharm._external_host",
-                PropertyMock(return_value=MOCK_EXTERNAL_HOSTNAME),
+                "charm._get_loadbalancer_status",
+                return_value=MOCK_LB_ADDRESS,
             ):
                 yield TraefikIngressCharm
 
