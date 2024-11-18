@@ -48,6 +48,7 @@ from charms.traefik_k8s.v1.ingress_per_unit import (
     IngressPerUnitProvider,
 )
 from charms.traefik_k8s.v2.ingress import IngressPerAppProvider as IPAv2
+from cosl import JujuTopology
 from deepmerge import always_merger
 from lightkube.core.client import Client
 from lightkube.core.exceptions import ApiError
@@ -179,6 +180,20 @@ class TraefikIngressCharm(CharmBase):
             charm=self, external_host=self._external_host, scheme=self._scheme  # type: ignore
         )
 
+        self._topology = JujuTopology.from_charm(self)
+
+        # tracing integration
+        self._charm_tracing = TracingEndpointRequirer(
+            self, relation_name="charm-tracing", protocols=["otlp_http"]
+        )
+        self._workload_tracing = TracingEndpointRequirer(
+            self, relation_name="workload-tracing", protocols=["jaeger_thrift_http"]
+        )
+
+        self.charm_tracing_endpoint, self.server_cert = charm_tracing_config(
+            self._charm_tracing, SERVER_CERT_PATH
+        )
+
         self.traefik = Traefik(
             container=self.container,
             routing_mode=self._routing_mode,
@@ -187,6 +202,12 @@ class TraefikIngressCharm(CharmBase):
             experimental_forward_auth_enabled=self._is_forward_auth_enabled,
             traefik_route_static_configs=self._traefik_route_static_configs(),
             basic_auth_user=self._basic_auth_user,
+            topology=self._topology,
+            tracing_endpoint=(
+                self._workload_tracing.get_endpoint("jaeger_thrift_http")
+                if self._is_workload_tracing_ready()
+                else None
+            ),
         )
 
         self.service_patch = KubernetesServicePatch(
@@ -206,12 +227,6 @@ class TraefikIngressCharm(CharmBase):
             ],
         )
         # Observability integrations
-        # tracing integration
-        self._tracing = TracingEndpointRequirer(self, protocols=["otlp_http"])
-
-        self.charm_tracing_endpoint, self.server_cert = charm_tracing_config(
-            self._tracing, SERVER_CERT_PATH
-        )
 
         # Provide grafana dashboards over a relation interface
         # dashboard to use: https://grafana.com/grafana/dashboards/4475-traefik/
@@ -240,12 +255,12 @@ class TraefikIngressCharm(CharmBase):
         # TODO update init params once auto-renew is implemented
         # https://github.com/canonical/tls-certificates-interface/issues/24
         observe(
-            self._tracing.on.endpoint_changed,  # type: ignore
-            self._on_tracing_endpoint_changed,
+            self._workload_tracing.on.endpoint_changed,  # type: ignore
+            self._on_workload_tracing_endpoint_changed,
         )
         observe(
-            self._tracing.on.endpoint_removed,  # type: ignore
-            self._on_tracing_endpoint_removed,
+            self._workload_tracing.on.endpoint_removed,  # type: ignore
+            self._on_workload_tracing_endpoint_removed,
         )
 
         observe(self.on.traefik_pebble_ready, self._on_traefik_pebble_ready)  # type: ignore
@@ -381,30 +396,17 @@ class TraefikIngressCharm(CharmBase):
             return True
         return False
 
-    def _is_tracing_enabled(self) -> bool:
-        """Return True if tracing is enabled."""
-        if not self._tracing.is_ready():
+    def _on_workload_tracing_endpoint_removed(self, _) -> None:
+        self._update_config_if_changed()
+
+    def _on_workload_tracing_endpoint_changed(self, _) -> None:
+        self._update_config_if_changed()
+
+    def _is_workload_tracing_ready(self) -> bool:
+        """Return True if workload tracing is enabled and ready."""
+        if not self._workload_tracing.is_ready():
             return False
         return True
-
-    def _on_tracing_endpoint_removed(self, event) -> None:
-        if not self.container.can_connect():
-            # this probably means we're being torn down, so we don't really need to
-            # clear anything up. We could defer, but again, we're being torn down and the unit db
-            # will
-            return
-        self.traefik.delete_tracing_config()
-
-    def _on_tracing_endpoint_changed(self, event) -> None:
-        # On slow machines, this event may come up before pebble is ready
-        if not self.container.can_connect():
-            event.defer()
-            return
-
-        if not self._tracing.is_ready():
-            self.traefik.delete_tracing_config()
-
-        self._configure_tracing()
 
     def _on_cert_changed(self, event) -> None:
         # On slow machines, this event may come up before pebble is ready
@@ -494,25 +496,6 @@ class TraefikIngressCharm(CharmBase):
 
     def _configure_traefik(self):
         self.traefik.configure()
-        self._configure_tracing()
-
-    def _configure_tracing(self):
-        # wokeignore:rule=master
-        # ref: https://doc.traefik.io/traefik/master/observability/tracing/opentelemetry/
-        if not self._is_tracing_enabled():
-            logger.info("tracing not enabled: skipping tracing config")
-            return
-
-        if endpoint := self._tracing.get_endpoint("otlp_http"):
-            grpc = False
-        else:
-            logger.error(
-                "tracing integration is active but none of the "
-                "protocols traefik supports is available."
-            )
-            return
-
-        self.traefik.update_tracing_configuration(endpoint, grpc=grpc)
 
     def _on_traefik_pebble_ready(self, _: PebbleReadyEvent):
         # If the Traefik container comes up, e.g., after a pod churn, we
@@ -568,8 +551,10 @@ class TraefikIngressCharm(CharmBase):
 
     def _on_config_changed(self, _: ConfigChangedEvent):
         """Handle the ops.ConfigChanged event."""
-        # that we're processing a config-changed event, doesn't necessarily mean that our config has changed (duh!)
+        self._update_config_if_changed()
 
+    def _update_config_if_changed(self):
+        # that we're processing a config-changed event, doesn't necessarily mean that our config has changed (duh!)
         # If the config hash has changed since we last calculated it, we need to
         # recompute our state from scratch, based on all data sent over the relations and all configs
         new_config_hash = self._config_hash

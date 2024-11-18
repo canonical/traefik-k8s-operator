@@ -7,11 +7,11 @@ from charms.tempo_coordinator_k8s.v0.charm_tracing import charm_tracing_disabled
 from charms.tempo_coordinator_k8s.v0.tracing import ProtocolType, Receiver, TracingProviderAppData
 from scenario import Relation, State
 
-from traefik import CA_CERT_PATH, DYNAMIC_TRACING_PATH
+from traefik import STATIC_CONFIG_PATH
 
 
 @pytest.fixture
-def tracing_relation():
+def charm_tracing_relation():
     db = {}
     TracingProviderAppData(
         receivers=[
@@ -21,14 +21,29 @@ def tracing_relation():
             )
         ]
     ).dump(db)
-    tracing = Relation("tracing", remote_app_data=db)
+    tracing = Relation("charm-tracing", remote_app_data=db)
     return tracing
 
 
-def test_charm_trace_collection(traefik_ctx, traefik_container, caplog, tracing_relation):
+@pytest.fixture
+def workload_tracing_relation():
+    workload_db = {}
+    TracingProviderAppData(
+        receivers=[
+            Receiver(
+                url="http://foo.com:14238",
+                protocol=ProtocolType(name="jaeger_thrift_http", type="http"),
+            )
+        ]
+    ).dump(workload_db)
+    workload_tracing = Relation("workload-tracing", remote_app_data=workload_db)
+    return workload_tracing
+
+
+def test_charm_trace_collection(traefik_ctx, traefik_container, caplog, charm_tracing_relation):
     # GIVEN the presence of a tracing relation
 
-    state_in = State(relations=[tracing_relation], containers=[traefik_container])
+    state_in = State(relations=[charm_tracing_relation], containers=[traefik_container])
 
     # THEN we get some traces
     with patch(
@@ -36,7 +51,7 @@ def test_charm_trace_collection(traefik_ctx, traefik_container, caplog, tracing_
     ) as f:
         f.return_value = opentelemetry.sdk.trace.export.SpanExportResult.SUCCESS
         # WHEN traefik receives <any event>
-        traefik_ctx.run(tracing_relation.changed_event, state_in)
+        traefik_ctx.run(charm_tracing_relation.changed_event, state_in)
 
     # assert "Setting up span exporter to endpoint: foo.com:81" in caplog.text
     # assert "Starting root trace with id=" in caplog.text
@@ -46,48 +61,20 @@ def test_charm_trace_collection(traefik_ctx, traefik_container, caplog, tracing_
     assert span.resource.attributes["charm_type"] == "TraefikIngressCharm"
 
 
-def test_traefik_tracing_config(traefik_ctx, traefik_container, tracing_relation):
-    state_in = State(relations=[tracing_relation], containers=[traefik_container])
+def test_traefik_tracing_config(traefik_ctx, traefik_container, workload_tracing_relation):
+    state_in = State(relations=[workload_tracing_relation], containers=[traefik_container])
 
     with charm_tracing_disabled():
-        traefik_ctx.run(tracing_relation.changed_event, state_in)
+        traefik_ctx.run(workload_tracing_relation.changed_event, state_in)
 
     tracing_cfg = (
-        traefik_container.get_filesystem(traefik_ctx)
-        .joinpath(DYNAMIC_TRACING_PATH[1:])
-        .read_text()
+        traefik_container.get_filesystem(traefik_ctx).joinpath(STATIC_CONFIG_PATH[1:]).read_text()
     )
     cfg = yaml.safe_load(tracing_cfg)
-    assert cfg == {
-        "tracing": {
-            "openTelemetry": {
-                "address": "http://foo.com:81",
-                "insecure": True,
-            }
-        }
-    }
-
-
-def test_traefik_tracing_config_with_tls(traefik_ctx, traefik_container, tracing_relation):
-    state_in = State(relations=[tracing_relation], containers=[traefik_container])
-
-    with patch("charm.TraefikIngressCharm._is_tls_enabled") as tls_enabled:
-        tls_enabled.return_value = "True"
-
-        with charm_tracing_disabled():
-            traefik_ctx.run(tracing_relation.changed_event, state_in)
-
-    tracing_cfg = (
-        traefik_container.get_filesystem(traefik_ctx)
-        .joinpath(DYNAMIC_TRACING_PATH[1:])
-        .read_text()
-    )
-    cfg = yaml.safe_load(tracing_cfg)
-    assert cfg == {
-        "tracing": {
-            "openTelemetry": {
-                "address": "http://foo.com:81",
-                "ca": CA_CERT_PATH,
+    assert cfg["tracing"] == {
+        "jaeger": {
+            "collector": {
+                "endpoint": "http://foo.com:14238/api/traces?format=jaeger.thrift",
             }
         }
     }
@@ -95,42 +82,48 @@ def test_traefik_tracing_config_with_tls(traefik_ctx, traefik_container, tracing
 
 @pytest.mark.parametrize("was_present_before", (True, False))
 def test_traefik_tracing_config_removed_if_relation_data_invalid(
-    traefik_ctx, traefik_container, tracing_relation, was_present_before
+    traefik_ctx, traefik_container, workload_tracing_relation, was_present_before
 ):
     if was_present_before:
-        dt_path = traefik_container.mounts["opt"].src.joinpath("traefik", "juju", "tracing.yaml")
-        dt_path.parent.mkdir(parents=True)
+        dt_path = traefik_container.mounts["/etc/traefik"].src.joinpath("traefik.yaml")
+        if not dt_path.parent.exists():
+            dt_path.parent.mkdir(parents=True)
         dt_path.write_text("foo")
 
     state_in = State(
-        relations=[tracing_relation.replace(remote_app_data={"foo": "bar"})],
+        relations=[workload_tracing_relation.replace(remote_app_data={"foo": "bar"})],
         containers=[traefik_container],
     )
 
     with charm_tracing_disabled():
-        traefik_ctx.run(tracing_relation.changed_event, state_in)
+        traefik_ctx.run(workload_tracing_relation.changed_event, state_in)
 
-    # assert file is not there
-    assert (
-        not traefik_container.get_filesystem(traefik_ctx).joinpath(DYNAMIC_TRACING_PATH).exists()
+    tracing_cfg = (
+        traefik_container.get_filesystem(traefik_ctx).joinpath(STATIC_CONFIG_PATH[1:]).read_text()
     )
+    cfg = yaml.safe_load(tracing_cfg)
+    # assert tracing config is removed
+    assert "tracing" not in cfg
 
 
 @pytest.mark.parametrize("was_present_before", (True, False))
 def test_traefik_tracing_config_removed_on_relation_broken(
-    traefik_ctx, traefik_container, tracing_relation, was_present_before
+    traefik_ctx, traefik_container, workload_tracing_relation, was_present_before
 ):
     if was_present_before:
-        dt_path = traefik_container.mounts["opt"].src.joinpath("traefik", "juju", "tracing.yaml")
-        dt_path.parent.mkdir(parents=True)
+        dt_path = traefik_container.mounts["/etc/traefik"].src.joinpath("traefik.yaml")
+        if not dt_path.parent.exists():
+            dt_path.parent.mkdir(parents=True)
         dt_path.write_text("foo")
 
-    state_in = State(relations=[tracing_relation], containers=[traefik_container])
+    state_in = State(relations=[workload_tracing_relation], containers=[traefik_container])
 
     with charm_tracing_disabled():
-        traefik_ctx.run(tracing_relation.broken_event, state_in)
+        traefik_ctx.run(workload_tracing_relation.broken_event, state_in)
 
-    # assert file is not there
-    assert (
-        not traefik_container.get_filesystem(traefik_ctx).joinpath(DYNAMIC_TRACING_PATH).exists()
+    tracing_cfg = (
+        traefik_container.get_filesystem(traefik_ctx).joinpath(STATIC_CONFIG_PATH[1:]).read_text()
     )
+    cfg = yaml.safe_load(tracing_cfg)
+    # assert tracing config is removed
+    assert "tracing" not in cfg
