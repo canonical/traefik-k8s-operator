@@ -86,12 +86,12 @@ requires:
       Receives Loki's push api endpoint address to push logs to, and forwards charm's built-in alert rules to Loki.
   charm-tracing:
     description: |
-      Tracing endpoint for sending charm traces to the tracing backend.
+      Enables sending charm traces to a distributed tracing backend such as Tempo.
     limit: 1
     interface: tracing
   workload-tracing:
     description: |
-      Tracing endpoint for sending workload traces to the tracing backend.
+      Enables sending workload traces to a distributed tracing backend such as Tempo.
     limit: 1
     interface: tracing
   receive-ca-cert:

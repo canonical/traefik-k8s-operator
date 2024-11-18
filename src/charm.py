@@ -205,7 +205,7 @@ class TraefikIngressCharm(CharmBase):
             topology=self._topology,
             tracing_endpoint=(
                 self._workload_tracing.get_endpoint("jaeger_thrift_http")
-                if self._is_workload_tracing_enabled()
+                if self._is_workload_tracing_ready()
                 else None
             ),
         )
@@ -402,8 +402,8 @@ class TraefikIngressCharm(CharmBase):
     def _on_workload_tracing_endpoint_changed(self, _) -> None:
         self._update_config_if_changed()
 
-    def _is_workload_tracing_enabled(self) -> bool:
-        """Return True if tracing is enabled."""
+    def _is_workload_tracing_ready(self) -> bool:
+        """Return True if workload tracing is enabled and ready."""
         if not self._workload_tracing.is_ready():
             return False
         return True
