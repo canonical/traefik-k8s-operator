@@ -15,7 +15,7 @@ from charms.traefik_k8s.v2.ingress import (
     IngressRequirerUnitData,
 )
 from ops import CharmBase, Framework
-from scenario import Context, Model, Mount, Relation, State
+from scenario import Context, Model, Mount, Network, Relation, State
 
 from tests.scenario._utils import create_ingress_relation
 from tests.scenario.conftest import MOCK_LB_ADDRESS
@@ -186,6 +186,23 @@ def test_ingress_per_app_requirer_with_auto_data(host, ip, port, model, evt_name
             "name": '"charlie"',
             "port": str(port),
         }
+
+
+@pytest.mark.parametrize("evt_name", ("joined", "changed"))
+@pytest.mark.parametrize("leader", (True, False))
+def test_ingress_per_app_requirer_retry_without_ip(model, evt_name, leader):
+    ipa = Relation("ingress")
+    state = State(
+        model=model,
+        leader=leader,
+        relations=[ipa],
+        networks={"ingress": Network(bind_addresses=[], egress_subnets=[], ingress_addresses=[])},
+    )
+    requirer_ctx = get_requirer_ctx("10.0.0.1", None, 80)
+    state_out = requirer_ctx.run(getattr(ipa, evt_name + "_event"), state)
+
+    assert len(state_out.deferred) == 1
+    assert state_out.deferred[0].name == f"ingress_relation_{evt_name}"
 
 
 def test_ingress_per_app_cleanup_on_remove(model, traefik_ctx, traefik_container):
