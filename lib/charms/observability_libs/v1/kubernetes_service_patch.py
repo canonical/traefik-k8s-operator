@@ -367,8 +367,12 @@ class KubernetesServicePatch(Object):
         ports_match = expected_ports == fetched_ports
 
         # Construct expected and fetched annotations
-        expected_annotations = self.service.metadata.annotations or {} # pyright: ignore[reportOptionalMemberAccess]
-        fetched_annotations = service.metadata.annotations or {} # pyright: ignore[reportOptionalMemberAccess]
+        expected_annotations = (
+            self.service.metadata.annotations or {}  # pyright: ignore[reportOptionalMemberAccess]
+        )
+        fetched_annotations = (
+            service.metadata.annotations or {}  # pyright: ignore[reportOptionalMemberAccess]
+        )
 
         # Validate annotations
         annotations_match = expected_annotations == fetched_annotations
