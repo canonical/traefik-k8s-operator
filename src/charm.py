@@ -440,7 +440,7 @@ class TraefikIngressCharm(CharmBase):
         Returns:
             A dictionary of valid annotations if the config is valid, otherwise None.
         """
-        annotations = cast(Optional[str], self.config.get("basic_auth_user", None))
+        annotations = cast(Optional[str], self.config.get("loadbalancer_annotations", None))
         return self._parse_annotations(annotations)
 
     def _on_forward_auth_config_changed(self, event: AuthConfigChangedEvent):
