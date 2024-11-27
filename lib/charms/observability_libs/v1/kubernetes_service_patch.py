@@ -167,7 +167,7 @@ LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 12
+LIBPATCH = 13
 
 ServiceType = Literal["ClusterIP", "LoadBalancer"]
 
@@ -310,7 +310,13 @@ class KubernetesServicePatch(Object):
                     self._delete_and_create_service(client)
                 else:
                     self._create_lb_service(client)
-            client.patch(Service, self.service_name, self.service, patch_type=PatchType.MERGE)
+            client.patch(
+                Service,
+                self.service_name,
+                self.service,
+                patch_type=PatchType.APPLY,
+                field_manager=self.charm.app.name,
+            )
         except ApiError as e:
             if e.status.code == 403:
                 logger.error("Kubernetes service patch failed: `juju trust` this application.")
@@ -357,7 +363,18 @@ class KubernetesServicePatch(Object):
         fetched_ports = [
             (p.port, p.targetPort) for p in service.spec.ports  # type: ignore[attr-defined]
         ]  # noqa: E501
-        return expected_ports == fetched_ports
+        # Validate ports
+        ports_match = expected_ports == fetched_ports
+
+        # Construct expected and fetched annotations
+        expected_annotations = self.service.metadata.annotations or {} # pyright: ignore[reportOptionalMemberAccess]
+        fetched_annotations = service.metadata.annotations or {} # pyright: ignore[reportOptionalMemberAccess]
+
+        # Validate annotations
+        annotations_match = expected_annotations == fetched_annotations
+
+        # Return True only if both ports and annotations match
+        return ports_match and annotations_match
 
     def _on_upgrade_charm(self, event: UpgradeCharmEvent):
         """Handle the upgrade charm event."""

@@ -94,6 +94,34 @@ _TRAEFIK_CONTAINER_NAME = "traefik"
 
 PYDANTIC_IS_V1 = int(pydantic.version.VERSION.split(".")[0]) < 2
 
+# Regex for Kubernetes annotation values:
+# - Allows alphanumeric characters, dots (.), dashes (-), and underscores (_)
+# - Matches the entire string
+# - Does not allow empty strings
+# - Example valid: "value1", "my-value", "value.name", "value_name"
+# - Example invalid: "value@", "value#", "value space"
+ANNOTATION_VALUE_PATTERN = re.compile(r"^[\w.\-_]+$")
+
+
+# Regex for DNS1123 subdomains:
+# - Starts with a lowercase letter or number ([a-z0-9])
+# - May contain dashes (-), but not consecutively, and must not start or end with them
+# - Segments can be separated by dots (.)
+# - Example valid: "example.com", "my-app.io", "sub.domain"
+# - Example invalid: "-example.com", "example..com", "example-.com"
+DNS1123_SUBDOMAIN_PATTERN = re.compile(
+    r"^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$"
+)
+
+# Regex for Kubernetes qualified names:
+# - Starts with an alphanumeric character ([A-Za-z0-9])
+# - Can include dashes (-), underscores (_), dots (.), or alphanumeric characters in the middle
+# - Ends with an alphanumeric character
+# - Must not be empty
+# - Example valid: "annotation", "my.annotation", "annotation-name"
+# - Example invalid: ".annotation", "annotation.", "-annotation", "annotation@key"
+QUALIFIED_NAME_PATTERN = re.compile(r"^[A-Za-z0-9]([-A-Za-z0-9_.]*[A-Za-z0-9])?$")
+
 
 class _IngressRelationType(enum.Enum):
     per_app = "per_app"
@@ -214,6 +242,7 @@ class TraefikIngressCharm(CharmBase):
             charm=self,
             service_type="LoadBalancer",
             ports=self._service_ports,
+            additional_annotations=self._loadbalancer_annotations,
             refresh_event=[
                 ipa_v1.on.data_provided,  # type: ignore
                 ipa_v2.on.data_provided,  # type: ignore
@@ -224,6 +253,7 @@ class TraefikIngressCharm(CharmBase):
                 self.traefik_route.on.ready,  # type: ignore
                 self.traefik_route.on.data_removed,  # type: ignore
                 self.on.traefik_pebble_ready,  # type: ignore
+                self.on.config_changed,  # type: ignore
             ],
         )
         # Observability integrations
@@ -339,6 +369,79 @@ class TraefikIngressCharm(CharmBase):
         As we can't reject it, we assume it's correctly formatted.
         """
         return cast(Optional[str], self.config.get("basic_auth_user", None))
+
+    def _validate_annotation_key(self, key: str) -> bool:
+        """Validate the annotation key."""
+        if len(key) > 253:
+            logger.error(f"Invalid annotation key: '{key}'. Key length exceeds 253 characters.")
+            return False
+
+        if not is_qualified_name(key.lower()):
+            logger.error(
+                f"Invalid annotation key: '{key}'. Must follow Kubernetes annotation syntax."
+            )
+            return False
+
+        if key.startswith(("kubernetes.io/", "k8s.io/")):
+            logger.error(f"Invalid annotation: Key '{key}' uses a reserved prefix.")
+            return False
+
+        return True
+
+    def _validate_annotation_value(self, value: str) -> bool:
+        """Validate the annotation value."""
+        if not ANNOTATION_VALUE_PATTERN.match(value):
+            logger.error(
+                f"Invalid annotation value: '{value}'. Must follow Kubernetes annotation syntax."
+            )
+            return False
+
+        return True
+
+    def _parse_annotations(self, annotations: Optional[str]) -> Optional[Dict[str, str]]:
+        """Parse and validate annotations from a string.
+
+        logic is based on Kubernetes annotation validation as described here:
+        https://github.com/kubernetes/apimachinery/blob/v0.31.3/pkg/api/validation/objectmeta.go#L44
+        """
+        if not annotations:
+            return None
+
+        annotations = annotations.strip().rstrip(",")  # Trim spaces and trailing commas
+
+        try:
+            parsed_annotations = {
+                key.strip(): value.strip()
+                for key, value in (pair.split("=", 1) for pair in annotations.split(",") if pair)
+            }
+        except ValueError:
+            logger.error(
+                "Invalid format for 'loadbalancer_annotations'. "
+                "Expected format: key1=value1,key2=value2."
+            )
+            return None
+
+        # Validate each key-value pair
+        for key, value in parsed_annotations.items():
+            if not self._validate_annotation_key(key) or not self._validate_annotation_value(
+                value
+            ):
+                return None
+
+        return parsed_annotations
+
+    @property
+    def _loadbalancer_annotations(self) -> Optional[dict]:
+        """Parse the loadbalancer annotations from the config.
+
+        The input string is expected to be in the format:
+        "key1=value1,key2=value2,key3=value3".
+
+        Returns:
+            A dictionary of valid annotations if the config is valid, otherwise None.
+        """
+        annotations = cast(Optional[str], self.config.get("basic_auth_user", None))
+        return self._parse_annotations(annotations)
 
     def _on_forward_auth_config_changed(self, event: AuthConfigChangedEvent):
         if self._is_forward_auth_enabled:
@@ -1208,6 +1311,25 @@ class TraefikIngressCharm(CharmBase):
             external_hostname = self.config.get("external_hostname", "")
             if not isinstance(external_hostname, str) or not is_valid_hostname(external_hostname):
                 logger.warning(invalid_hostname_and_routing_mode_message)
+
+
+def is_qualified_name(value: str) -> bool:
+    """Check if a value is a valid Kubernetes qualified name."""
+    parts = value.split("/")
+    if len(parts) > 2:
+        return False  # Invalid if more than one '/'
+
+    if len(parts) == 2:  # If prefixed
+        prefix, name = parts
+        if not prefix or not DNS1123_SUBDOMAIN_PATTERN.match(prefix):
+            return False
+    else:
+        name = parts[0]  # No prefix
+
+    if not name or len(name) > 63 or not QUALIFIED_NAME_PATTERN.match(name):
+        return False
+
+    return True
 
 
 def is_valid_hostname(hostname: str) -> bool:

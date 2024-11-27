@@ -598,3 +598,50 @@ class TestConfigOptionsValidation(unittest.TestCase):
                     self.harness.charm.unit.status, BlockedStatus, invalid_hostname
                 )
                 self.assertEqual(requirer.urls, {})
+
+    def test_lb_annotations(self):
+        test_cases = [
+            ("key1=value1,key2=value2", {"key1": "value1", "key2": "value2"}),
+            ("key1=value1,key2", None),
+            ("", None),
+            (
+                "key1=value1,key_2=value2,key-3=value3,",
+                {"key1": "value1", "key_2": "value2", "key-3": "value3"},
+            ),
+            (
+                "key1=value1,key2=value2,key3=value3",
+                {"key1": "value1", "key2": "value2", "key3": "value3"},
+            ),
+            ("example.com/key=value", {"example.com/key": "value"}),
+            (
+                "prefix1/key=value1,prefix2/another-key=value2",
+                {"prefix1/key": "value1", "prefix2/another-key": "value2"},
+            ),
+            (
+                "key=value,key.sub-key=value-with-hyphen",
+                {"key": "value", "key.sub-key": "value-with-hyphen"},
+            ),
+            # Invalid cases
+            ("key1=value1,key2=value2,key=value3,key4=", None),  # Missing value for key4
+            (
+                "kubernetes.io/description=this-is-valid,custom.io/key=value",
+                None,
+            ),  # Reserved prefix used
+            ("key1=value1,example..com/key2=value2", None),  # Invalid domain format (double dot)
+            ("key1=value1,key=value2,key3=", None),  # Trailing equals for key3
+            ("key1=value1,=value2", None),  # Missing key
+            ("key1=value1,key=val=ue2", None),  # Extra equals in value
+            ("a" * 256 + "=value", None),  # Key exceeds max length (256 characters)
+            ("key@=value", None),  # Invalid character in key
+            ("key. =value", None),  # Space in key
+            ("key,value", None),  # Missing '=' delimiter
+            ("kubernetes/description=", None),  # Key with no value
+        ]
+
+        for annotations, expected_result in test_cases:
+            with self.subTest(annotations=annotations, expected_result=expected_result):
+                # Update the config with the test annotation string
+                self.harness.update_config({"loadbalancer_annotations": annotations})
+
+                # Check if the _loadbalancer_annotations property returns the expected result
+                self.assertEqual(self.harness.charm._loadbalancer_annotations, expected_result)
