@@ -599,6 +599,8 @@ class TestConfigOptionsValidation(unittest.TestCase):
                 )
                 self.assertEqual(requirer.urls, {})
 
+    @patch("charm._get_loadbalancer_status", lambda **_: "10.0.0.1")
+    @patch("charm.KubernetesServicePatch", lambda **_: None)
     def test_lb_annotations(self):
         test_cases = [
             ("key1=value1,key2=value2", {"key1": "value1", "key2": "value2"}),
