@@ -826,10 +826,10 @@ class TraefikIngressCharm(CharmBase):
                 entrypoints = router_details.get("entryPoints", [])
                 tls_config = router_details.get("tls", {})
 
-                # Skip generating new routes if passthrough is already set
+                # Skip generating new routes if passthrough is True
                 if tls_config.get("passthrough", False):
                     logger.debug(
-                        f"Skipping TLS generation for {protocol} router {router_name} (passthrough already set)."
+                        f"Skipping TLS generation for {protocol} router {router_name} (passthrough True)."
                     )
                     continue
 
