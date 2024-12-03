@@ -54,6 +54,7 @@ from lightkube.core.client import Client
 from lightkube.core.exceptions import ApiError
 from lightkube.models.core_v1 import ServicePort
 from lightkube.resources.core_v1 import Service
+from ops import main
 from ops.charm import (
     ActionEvent,
     CharmBase,
@@ -65,7 +66,6 @@ from ops.charm import (
     UpdateStatusEvent,
 )
 from ops.framework import StoredState
-from ops.main import main
 from ops.model import (
     ActiveStatus,
     BlockedStatus,
@@ -238,24 +238,42 @@ class TraefikIngressCharm(CharmBase):
             ),
         )
 
-        self.service_patch = KubernetesServicePatch(
-            charm=self,
-            service_type="LoadBalancer",
-            ports=self._service_ports,
-            additional_annotations=self._loadbalancer_annotations,
-            refresh_event=[
-                ipa_v1.on.data_provided,  # type: ignore
-                ipa_v2.on.data_provided,  # type: ignore
-                ipa_v1.on.data_removed,  # type: ignore
-                ipa_v2.on.data_removed,  # type: ignore
-                self.ingress_per_unit.on.data_provided,  # type: ignore
-                self.ingress_per_unit.on.data_removed,  # type: ignore
-                self.traefik_route.on.ready,  # type: ignore
-                self.traefik_route.on.data_removed,  # type: ignore
-                self.on.traefik_pebble_ready,  # type: ignore
-                self.on.config_changed,  # type: ignore
-            ],
-        )
+        if self._loadbalancer_annotations is None:
+            self.service_patch = KubernetesServicePatch(
+                charm=self,
+                ports=self._service_ports,
+                refresh_event=[
+                    ipa_v1.on.data_provided,  # type: ignore
+                    ipa_v2.on.data_provided,  # type: ignore
+                    ipa_v1.on.data_removed,  # type: ignore
+                    ipa_v2.on.data_removed,  # type: ignore
+                    self.ingress_per_unit.on.data_provided,  # type: ignore
+                    self.ingress_per_unit.on.data_removed,  # type: ignore
+                    self.traefik_route.on.ready,  # type: ignore
+                    self.traefik_route.on.data_removed,  # type: ignore
+                    self.on.traefik_pebble_ready,  # type: ignore
+                    self.on.config_changed,  # type: ignore
+                ],
+            )
+        else:
+            self.service_patch = KubernetesServicePatch(
+                charm=self,
+                service_type="LoadBalancer",
+                ports=self._service_ports,
+                additional_annotations=self._loadbalancer_annotations,
+                refresh_event=[
+                    ipa_v1.on.data_provided,  # type: ignore
+                    ipa_v2.on.data_provided,  # type: ignore
+                    ipa_v1.on.data_removed,  # type: ignore
+                    ipa_v2.on.data_removed,  # type: ignore
+                    self.ingress_per_unit.on.data_provided,  # type: ignore
+                    self.ingress_per_unit.on.data_removed,  # type: ignore
+                    self.traefik_route.on.ready,  # type: ignore
+                    self.traefik_route.on.data_removed,  # type: ignore
+                    self.on.traefik_pebble_ready,  # type: ignore
+                    self.on.config_changed,  # type: ignore
+                ],
+            )
         # Observability integrations
 
         # Provide grafana dashboards over a relation interface
@@ -405,7 +423,7 @@ class TraefikIngressCharm(CharmBase):
         https://github.com/kubernetes/apimachinery/blob/v0.31.3/pkg/api/validation/objectmeta.go#L44
         """
         if not annotations:
-            return None
+            return {}
 
         annotations = annotations.strip().rstrip(",")  # Trim spaces and trailing commas
 

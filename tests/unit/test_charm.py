@@ -605,7 +605,7 @@ class TestConfigOptionsValidation(unittest.TestCase):
         test_cases = [
             ("key1=value1,key2=value2", {"key1": "value1", "key2": "value2"}),
             ("key1=value1,key2", None),
-            ("", None),
+            ("", {}),
             (
                 "key1=value1,key_2=value2,key-3=value3,",
                 {"key1": "value1", "key_2": "value2", "key-3": "value3"},

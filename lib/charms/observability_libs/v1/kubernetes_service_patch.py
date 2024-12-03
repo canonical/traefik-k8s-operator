@@ -145,7 +145,7 @@ def setUp(self, *unused):
 
 import logging
 from types import MethodType
-from typing import Any, List, Literal, Optional, Union
+from typing import Any, Dict, List, Literal, Optional, Union
 
 from lightkube import ApiError, Client  # pyright: ignore
 from lightkube.core import exceptions
@@ -305,11 +305,10 @@ class KubernetesServicePatch(Object):
         try:
             if self._is_patched(client):
                 return
-            if self.service_name != self._app:
-                if not self.service_type == "LoadBalancer":
-                    self._delete_and_create_service(client)
-                else:
-                    self._create_lb_service(client)
+            if self.service_type == "LoadBalancer":
+                self._create_lb_service(client)
+            else:
+                self._delete_and_create_service(client)
             client.patch(
                 Service,
                 self.service_name,
@@ -326,6 +325,10 @@ class KubernetesServicePatch(Object):
             logger.info("Kubernetes service '%s' patched successfully", self._app)
 
     def _delete_and_create_service(self, client: Client):
+        
+        lb_selector = {"app.kubernetes.io/name": self._app}
+        self._delete_loadbalancer_services(client, lb_selector)
+
         service = client.get(Service, self._app, namespace=self._namespace)
         service.metadata.name = self.service_name  # type: ignore[attr-defined]
         service.metadata.resourceVersion = service.metadata.uid = None  # type: ignore[attr-defined]   # noqa: E501
@@ -384,31 +387,32 @@ class KubernetesServicePatch(Object):
         """Handle the upgrade charm event."""
         # If a charm author changed the service type from LB to ClusterIP across an upgrade, we need to delete the previous LB.
         if self.service_type == "ClusterIP":
-
             client = Client()  # pyright: ignore
-
-            # Define a label selector to find services related to the app
-            selector: dict[str, Any] = {"app.kubernetes.io/name": self._app}
-
-            # Check if any service of type LoadBalancer exists
-            services = client.list(Service, namespace=self._namespace, labels=selector)
-            for service in services:
-                if (
-                    not service.metadata
-                    or not service.metadata.name
-                    or not service.spec
-                    or not service.spec.type
-                ):
-                    logger.warning(
-                        "Service patch: skipping resource with incomplete metadata: %s.", service
-                    )
-                    continue
-                if service.spec.type == "LoadBalancer":
-                    client.delete(Service, service.metadata.name, namespace=self._namespace)
-                    logger.info(f"LoadBalancer service {service.metadata.name} deleted.")
+            lb_selector = {"app.kubernetes.io/name": self._app}
+            self._delete_loadbalancer_services(client, lb_selector)
 
         # Continue the upgrade flow normally
         self._patch(event)
+
+    def _delete_loadbalancer_services(self, client: Client, selector: Dict[str, Any]):
+        """List and delete LoadBalancer services associated with the charm."""
+
+        # Check if any service of type LoadBalancer exists
+        services = client.list(Service, namespace=self._namespace, labels=selector)
+        for service in services:
+            if (
+                not service.metadata
+                or not service.metadata.name
+                or not service.spec
+                or not service.spec.type
+            ):
+                logger.warning(
+                    "Service patch: skipping resource with incomplete metadata: %s.", service
+                )
+                continue
+            if service.spec.type == "LoadBalancer":
+                client.delete(Service, service.metadata.name, namespace=self._namespace)
+                logger.info(f"LoadBalancer service {service.metadata.name} deleted.")
 
     def _remove_service(self, _):
         """Remove a Kubernetes service associated with this charm.
