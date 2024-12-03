@@ -604,7 +604,6 @@ class TestConfigOptionsValidation(unittest.TestCase):
     def test_lb_annotations(self):
         test_cases = [
             ("key1=value1,key2=value2", {"key1": "value1", "key2": "value2"}),
-            ("key1=value1,key2", None),
             ("", {}),
             (
                 "key1=value1,key_2=value2,key-3=value3,",
@@ -629,6 +628,7 @@ class TestConfigOptionsValidation(unittest.TestCase):
                 "kubernetes.io/description=this-is-valid,custom.io/key=value",
                 None,
             ),  # Reserved prefix used
+            ("key1=value1,key2", None),
             ("key1=value1,example..com/key2=value2", None),  # Invalid domain format (double dot)
             ("key1=value1,key=value2,key3=", None),  # Trailing equals for key3
             ("key1=value1,=value2", None),  # Missing key
