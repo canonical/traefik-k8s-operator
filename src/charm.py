@@ -239,22 +239,23 @@ class TraefikIngressCharm(CharmBase):
             ),
         )
 
+        lb_refresh_events = [
+            ipa_v1.on.data_provided,  # type: ignore
+            ipa_v2.on.data_provided,  # type: ignore
+            ipa_v1.on.data_removed,  # type: ignore
+            ipa_v2.on.data_removed,  # type: ignore
+            self.ingress_per_unit.on.data_provided,  # type: ignore
+            self.ingress_per_unit.on.data_removed,  # type: ignore
+            self.traefik_route.on.ready,  # type: ignore
+            self.traefik_route.on.data_removed,  # type: ignore
+            self.on.traefik_pebble_ready,  # type: ignore
+            self.on.config_changed,  # type: ignore
+        ]
         if self._loadbalancer_annotations is None:
             self.service_patch = KubernetesServicePatch(
                 charm=self,
                 ports=self._service_ports,
-                refresh_event=[
-                    ipa_v1.on.data_provided,  # type: ignore
-                    ipa_v2.on.data_provided,  # type: ignore
-                    ipa_v1.on.data_removed,  # type: ignore
-                    ipa_v2.on.data_removed,  # type: ignore
-                    self.ingress_per_unit.on.data_provided,  # type: ignore
-                    self.ingress_per_unit.on.data_removed,  # type: ignore
-                    self.traefik_route.on.ready,  # type: ignore
-                    self.traefik_route.on.data_removed,  # type: ignore
-                    self.on.traefik_pebble_ready,  # type: ignore
-                    self.on.config_changed,  # type: ignore
-                ],
+                refresh_event=lb_refresh_events,
             )
         else:
             self.service_patch = KubernetesServicePatch(
@@ -262,18 +263,7 @@ class TraefikIngressCharm(CharmBase):
                 service_type="LoadBalancer",
                 ports=self._service_ports,
                 additional_annotations=self._loadbalancer_annotations,
-                refresh_event=[
-                    ipa_v1.on.data_provided,  # type: ignore
-                    ipa_v2.on.data_provided,  # type: ignore
-                    ipa_v1.on.data_removed,  # type: ignore
-                    ipa_v2.on.data_removed,  # type: ignore
-                    self.ingress_per_unit.on.data_provided,  # type: ignore
-                    self.ingress_per_unit.on.data_removed,  # type: ignore
-                    self.traefik_route.on.ready,  # type: ignore
-                    self.traefik_route.on.data_removed,  # type: ignore
-                    self.on.traefik_pebble_ready,  # type: ignore
-                    self.on.config_changed,  # type: ignore
-                ],
+                refresh_event=lb_refresh_events,
             )
         # Observability integrations
 
