@@ -9,6 +9,7 @@ import functools
 import itertools
 import json
 import logging
+import re
 import socket
 from typing import Any, Dict, List, Optional, Tuple, Union, cast
 from urllib.parse import urlparse
@@ -44,8 +45,8 @@ from charms.oathkeeper.v0.forward_auth import (
 from charms.observability_libs.v1.cert_handler import CertHandler
 from charms.observability_libs.v1.kubernetes_service_patch import KubernetesServicePatch
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
-from charms.tempo_k8s.v1.charm_tracing import trace_charm
-from charms.tempo_k8s.v2.tracing import TracingEndpointRequirer
+from charms.tempo_coordinator_k8s.v0.charm_tracing import trace_charm
+from charms.tempo_coordinator_k8s.v0.tracing import TracingEndpointRequirer, charm_tracing_config
 from charms.traefik_k8s.v0.traefik_route import (
     TraefikRouteProvider,
     TraefikRouteRequirerReadyEvent,
@@ -56,6 +57,7 @@ from charms.traefik_k8s.v1.ingress_per_unit import (
     IngressPerUnitProvider,
 )
 from charms.traefik_k8s.v2.ingress import IngressPerAppProvider as IPAv2
+from cosl import JujuTopology
 from deepmerge import always_merger
 from lightkube.core.client import Client
 from lightkube.core.exceptions import ApiError
@@ -135,6 +137,20 @@ class TraefikIngressCharm(CharmBase):
     def __init__(self, *args):
         super().__init__(*args)
 
+        # Before doing anything, validate the charm config.  If configuration is invalid, warn the user.
+        # FIXME: Invalid configuration here SHOULD halt the charm's operation until resolution, or at least make a
+        #  persistent BlockedStatus, but this charm handles events atomically rather than holistically.
+        #  This means that skipping events will result in unexpected issues, so if we halt the charm here we must
+        #  ensure the charm processes all backlogged events on resumption in the original order.  Rather than do that
+        #  and risk losing an event, we simply warn the user and continue functioning as best as possible.  The charm
+        #  will operate correctly except that it will not publish ingress urls to related applications, instead
+        #  leaving the ingress relation data empty and logging an error.
+        #  If we refactor this charm to handle events holistically (and thus we can skip events without issue), we
+        #  should refactor this validation truly halt the charm.
+        #  If we refactor this charm to use collect_unit_status, we could raise a persistent BlockedStatus message when
+        #  this configuration is invalid.
+        self._validate_config()
+
         self._stored.set_default(
             config_hash=None,
         )
@@ -174,6 +190,20 @@ class TraefikIngressCharm(CharmBase):
             charm=self, external_host=self._external_host, scheme=self._scheme  # type: ignore
         )
 
+        self._topology = JujuTopology.from_charm(self)
+
+        # tracing integration
+        self._charm_tracing = TracingEndpointRequirer(
+            self, relation_name="charm-tracing", protocols=["otlp_http"]
+        )
+        self._workload_tracing = TracingEndpointRequirer(
+            self, relation_name="workload-tracing", protocols=["jaeger_thrift_http"]
+        )
+
+        self.charm_tracing_endpoint, self.server_cert = charm_tracing_config(
+            self._charm_tracing, SERVER_CERT_PATH
+        )
+
         self.traefik = Traefik(
             container=self.container,
             routing_mode=self._routing_mode,
@@ -182,6 +212,12 @@ class TraefikIngressCharm(CharmBase):
             experimental_forward_auth_enabled=self._is_forward_auth_enabled,
             traefik_route_static_configs=self._traefik_route_static_configs(),
             basic_auth_user=self._basic_auth_user,
+            topology=self._topology,
+            tracing_endpoint=(
+                self._workload_tracing.get_endpoint("jaeger_thrift_http")
+                if self._is_workload_tracing_ready()
+                else None
+            ),
         )
 
         self.service_patch = KubernetesServicePatch(
@@ -201,8 +237,6 @@ class TraefikIngressCharm(CharmBase):
             ],
         )
         # Observability integrations
-        # tracing integration
-        self._tracing = TracingEndpointRequirer(self, protocols=["otlp_http"])
 
         # Provide grafana dashboards over a relation interface
         # dashboard to use: https://grafana.com/grafana/dashboards/4475-traefik/
@@ -231,12 +265,12 @@ class TraefikIngressCharm(CharmBase):
         # TODO update init params once auto-renew is implemented
         # https://github.com/canonical/tls-certificates-interface/issues/24
         observe(
-            self._tracing.on.endpoint_changed,  # type: ignore
-            self._on_tracing_endpoint_changed,
+            self._workload_tracing.on.endpoint_changed,  # type: ignore
+            self._on_workload_tracing_endpoint_changed,
         )
         observe(
-            self._tracing.on.endpoint_removed,  # type: ignore
-            self._on_tracing_endpoint_removed,
+            self._workload_tracing.on.endpoint_removed,  # type: ignore
+            self._on_workload_tracing_endpoint_removed,
         )
 
         observe(self.on.traefik_pebble_ready, self._on_traefik_pebble_ready)  # type: ignore
@@ -383,20 +417,6 @@ class TraefikIngressCharm(CharmBase):
     ):
         self.traefik.remove_cas([event.relation_id])
 
-    @property
-    def charm_tracing_endpoint(self) -> Optional[str]:
-        """Otlp http endpoint for charm instrumentation."""
-        if self._tracing.is_ready():
-            return self._tracing.get_endpoint("otlp_http")
-        return None
-
-    @property
-    def server_cert(self) -> Optional[str]:
-        """Server certificate path for tls tracing."""
-        if self._is_tls_enabled():
-            return SERVER_CERT_PATH
-        return None
-
     def _is_tls_enabled(self) -> bool:
         """Return True if TLS is enabled."""
         if self.cert.enabled:
@@ -409,30 +429,17 @@ class TraefikIngressCharm(CharmBase):
             return True
         return False
 
-    def _is_tracing_enabled(self) -> bool:
-        """Return True if tracing is enabled."""
-        if not self._tracing.is_ready():
+    def _on_workload_tracing_endpoint_removed(self, _) -> None:
+        self._update_config_if_changed()
+
+    def _on_workload_tracing_endpoint_changed(self, _) -> None:
+        self._update_config_if_changed()
+
+    def _is_workload_tracing_ready(self) -> bool:
+        """Return True if workload tracing is enabled and ready."""
+        if not self._workload_tracing.is_ready():
             return False
         return True
-
-    def _on_tracing_endpoint_removed(self, event) -> None:
-        if not self.container.can_connect():
-            # this probably means we're being torn down, so we don't really need to
-            # clear anything up. We could defer, but again, we're being torn down and the unit db
-            # will
-            return
-        self.traefik.delete_tracing_config()
-
-    def _on_tracing_endpoint_changed(self, event) -> None:
-        # On slow machines, this event may come up before pebble is ready
-        if not self.container.can_connect():
-            event.defer()
-            return
-
-        if not self._tracing.is_ready():
-            self.traefik.delete_tracing_config()
-
-        self._configure_tracing()
 
     def _on_cert_changed(self, event) -> None:
         # On slow machines, this event may come up before pebble is ready
@@ -522,25 +529,6 @@ class TraefikIngressCharm(CharmBase):
 
     def _configure_traefik(self):
         self.traefik.configure()
-        self._configure_tracing()
-
-    def _configure_tracing(self):
-        # wokeignore:rule=master
-        # ref: https://doc.traefik.io/traefik/master/observability/tracing/opentelemetry/
-        if not self._is_tracing_enabled():
-            logger.info("tracing not enabled: skipping tracing config")
-            return
-
-        if endpoint := self._tracing.get_endpoint("otlp_http"):
-            grpc = False
-        else:
-            logger.error(
-                "tracing integration is active but none of the "
-                "protocols traefik supports is available."
-            )
-            return
-
-        self.traefik.update_tracing_configuration(endpoint, grpc=grpc)
 
     def _on_traefik_pebble_ready(self, _: PebbleReadyEvent):
         # If the Traefik container comes up, e.g., after a pod churn, we
@@ -596,8 +584,10 @@ class TraefikIngressCharm(CharmBase):
 
     def _on_config_changed(self, _: ConfigChangedEvent):
         """Handle the ops.ConfigChanged event."""
-        # that we're processing a config-changed event, doesn't necessarily mean that our config has changed (duh!)
+        self._update_config_if_changed()
 
+    def _update_config_if_changed(self):
+        # that we're processing a config-changed event, doesn't necessarily mean that our config has changed (duh!)
         # If the config hash has changed since we last calculated it, we need to
         # recompute our state from scratch, based on all data sent over the relations and all configs
         new_config_hash = self._config_hash
@@ -861,60 +851,47 @@ class TraefikIngressCharm(CharmBase):
         self._update_dynamic_config_route(relation, dct)
 
     def _update_dynamic_config_route(self, relation: Relation, config: dict):
-        if "http" in config.keys():
-            route_config = config["http"].get("routers", {})
-            # we want to generate and add a new router with TLS config for each routed path.
-            # as we mutate the dict, we need to work on a copy
-            for router_name in route_config.copy().keys():
-                route_rule = route_config.get(router_name, {}).get("rule", "")
-                service_name = route_config.get(router_name, {}).get("service", "")
-                entrypoints = route_config.get(router_name, {}).get("entryPoints", [])
-                if len(entrypoints) > 0:
-                    # if entrypoint exists, we check if it's a custom entrypoint to pass it to generated TLS config
-                    entrypoint = entrypoints[0] if entrypoints[0] != "web" else None
-                else:
-                    entrypoint = None
+        def _process_routes(route_config, protocol):
+            for router_name in list(route_config.keys()):  # Work on a copy of the keys
+                router_details = route_config[router_name]
+                route_rule = router_details.get("rule", "")
+                service_name = router_details.get("service", "")
+                entrypoints = router_details.get("entryPoints", [])
+                tls_config = router_details.get("tls", {})
+
+                # Skip generating new routes if passthrough is True
+                if tls_config.get("passthrough", False):
+                    logger.debug(
+                        f"Skipping TLS generation for {protocol} router {router_name} (passthrough True)."
+                    )
+                    continue
+
+                entrypoint = entrypoints[0] if entrypoints else None
+                if protocol == "http" and entrypoint == "web":
+                    entrypoint = None  # Ignore "web" entrypoint for HTTP
 
                 if not all([router_name, route_rule, service_name]):
-                    logger.debug("Not enough information to generate a TLS config!")
-                else:
-                    config["http"]["routers"].update(
-                        self.traefik.generate_tls_config_for_route(
-                            router_name,
-                            route_rule,
-                            service_name,
-                            # we're behind an is_ready guard, so this is guaranteed not to raise
-                            self.external_host,
-                            entrypoint,
-                        )
+                    logger.debug(
+                        f"Not enough information to generate a TLS config for {protocol} router {router_name}!"
                     )
-        if "tcp" in config.keys():
-            route_config = config["tcp"].get("routers", {})
-            # we want to generate and add a new router with TLS config for each routed path.
-            # as we mutate the dict, we need to work on a copy
-            for router_name in route_config.copy().keys():
-                route_rule = route_config.get(router_name, {}).get("rule", "")
-                service_name = route_config.get(router_name, {}).get("service", "")
-                entrypoints = route_config.get(router_name, {}).get("entryPoints", [])
-                if len(entrypoints) > 0:
-                    # for grpc, all entrypoints are custom
-                    entrypoint = entrypoints[0]
-                else:
-                    entrypoint = None
+                    continue
 
-                if not all([router_name, route_rule, service_name]):
-                    logger.debug("Not enough information to generate a TLS config!")
-                else:
-                    config["tcp"]["routers"].update(
-                        self.traefik.generate_tls_config_for_route(
-                            router_name,
-                            route_rule,
-                            service_name,
-                            # we're behind an is_ready guard, so this is guaranteed not to raise
-                            self.external_host,
-                            entrypoint,
-                        )
+                config[protocol]["routers"].update(
+                    self.traefik.generate_tls_config_for_route(
+                        router_name,
+                        route_rule,
+                        service_name,
+                        self.external_host,
+                        entrypoint,
                     )
+                )
+
+        if "http" in config:
+            _process_routes(config["http"].get("routers", {}), protocol="http")
+
+        if "tcp" in config:
+            _process_routes(config["tcp"].get("routers", {}), protocol="tcp")
+
         self._push_configurations(relation, config)
 
     def _provide_ingress(
@@ -1229,13 +1206,60 @@ class TraefikIngressCharm(CharmBase):
         # If all else fails, we'd rather use the bare IP
         return [target] if target else []
 
+    def _validate_config(self):
+        """Validate the charm configuration, emitting warning messages on misconfigurations.
+
+        In scope for this validation is:
+        * validating the combination of external_hostname and routing_mode
+        """
+        # FIXME: This will false positive in cases where the LoadBalancer provides an external host rather than an IP.
+        #  The warning will occur, but the charm will function normally.  We could better validate the LoadBalancer if
+        #  we want to avoid this, but it probably isn't worth the effort until someone notices.
+        invalid_hostname_and_routing_mode_message = (
+            "Likely configuration error: When using routing_mode=='subdomain', external_hostname should be "
+            "set.  This is because when external_hostname is unset, Traefik uses the LoadBalancer's address as the "
+            "hostname for all provided URLS and that hostname is typically an IP address.  This leads to invalid urls "
+            "like `model-app.1.2.3.4`.  The charm will continue to operate as currently set, but will not provide urls"
+            " to any related applications if they would be invalid."
+        )
+
+        if self.config.get("routing_mode", "") == "subdomain":
+            # subdomain mode can only be used if an external_hostname is set and is not an IP address
+            external_hostname = self.config.get("external_hostname", "")
+            if not isinstance(external_hostname, str) or not is_valid_hostname(external_hostname):
+                logger.warning(invalid_hostname_and_routing_mode_message)
+
+
+def is_valid_hostname(hostname: str) -> bool:
+    """Check if a hostname is valid.
+
+    Modified from https://stackoverflow.com/a/33214423
+    """
+    if len(hostname) == 0:
+        return False
+    if hostname[-1] == ".":
+        # strip exactly one dot from the right, if present
+        hostname = hostname[:-1]
+    if len(hostname) > 253:
+        return False
+
+    labels = hostname.split(".")
+
+    # the TLD must be not all-numeric
+    if re.match(r"[0-9]+$", labels[-1]):
+        return False
+
+    allowed = re.compile(r"(?!-)[a-z0-9-]{1,63}(?<!-)$", re.IGNORECASE)
+    return all(allowed.match(label) for label in labels)
+
 
 @functools.lru_cache
 def _get_loadbalancer_status(namespace: str, service_name: str) -> Optional[str]:
     client = Client()  # type: ignore
     try:
         traefik_service = client.get(Service, name=service_name, namespace=namespace)
-    except ApiError:
+    except ApiError as e:
+        logger.warning(f"Got ApiError when trying to get Loadbalancer status: {e}")
         return None
 
     if not (status := traefik_service.status):  # type: ignore

@@ -51,6 +51,9 @@ options:
       will provide to the unit `my-unit/2` in the `my-model` model the following URL:
 
       `http://my-model-my-unit-2.foo:8080`
+      
+      Note that, for 'subdomain' routing mode, the external_hostname must be set and not be set to an IP address.  This
+      is because subdomains are not supported for IP addresses.
     type: string
     default: path
 

@@ -84,9 +84,14 @@ requires:
     interface: loki_push_api
     description: |
       Receives Loki's push api endpoint address to push logs to, and forwards charm's built-in alert rules to Loki.
-  tracing:
+  charm-tracing:
     description: |
-      Tracing endpoint for integrating with tempo.
+      Enables sending charm traces to a distributed tracing backend such as Tempo.
+    limit: 1
+    interface: tracing
+  workload-tracing:
+    description: |
+      Enables sending workload traces to a distributed tracing backend such as Tempo.
     limit: 1
     interface: tracing
   receive-ca-cert:

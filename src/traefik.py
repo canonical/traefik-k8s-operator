@@ -3,7 +3,6 @@
 # See LICENSE file for licensing details.
 
 """Traefik workload interface."""
-import contextlib
 import dataclasses
 import enum
 import logging
@@ -16,6 +15,7 @@ from typing import Any, Dict, Iterable, List, Optional, Union, cast
 
 import yaml
 from charms.oathkeeper.v0.forward_auth import ForwardAuthConfig
+from cosl import JujuTopology
 from ops import Container
 from ops.pebble import LayerDict, PathError
 
@@ -94,6 +94,7 @@ class Traefik:
 
     _layer_name = "traefik"
     service_name = "traefik"
+    _tracing_endpoint = None
 
     def __init__(
         self,
@@ -104,7 +105,9 @@ class Traefik:
         experimental_forward_auth_enabled: bool,
         tcp_entrypoints: Dict[str, int],
         traefik_route_static_configs: Iterable[Dict[str, Any]],
+        topology: JujuTopology,
         basic_auth_user: Optional[str] = None,
+        tracing_endpoint: Optional[str] = None,
     ):
         self._container = container
         self._tcp_entrypoints = tcp_entrypoints
@@ -112,7 +115,9 @@ class Traefik:
         self._routing_mode = routing_mode
         self._tls_enabled = tls_enabled
         self._experimental_forward_auth_enabled = experimental_forward_auth_enabled
+        self._topology = topology
         self._basic_auth_user = basic_auth_user
+        self._tracing_endpoint = tracing_endpoint
 
     @property
     def scrape_jobs(self) -> list:
@@ -280,6 +285,18 @@ class Traefik:
             },
         }
 
+        if self._tracing_endpoint:
+            # ref: https://github.com/traefik/traefik/blob/v2.11/docs/content/observability/tracing/jaeger.md
+            # TODO once we bump to Traefik v3, Jaeger needs to be replaced with otlp and config needs to be updated
+            # see https://doc.traefik.io/traefik/observability/tracing/opentelemetry/ for more reference
+            static_config["tracing"] = {
+                "jaeger": {
+                    "collector": {
+                        "endpoint": f"{self._tracing_endpoint}/api/traces?format=jaeger.thrift"
+                    },
+                }
+            }
+
         # we attempt to put together the base config with whatever the user passed via traefik_route.
         # in case there are conflicts between the base config and some route, or between the routes themselves,
         # we'll be forced to bail out.
@@ -307,27 +324,6 @@ class Traefik:
         config_yaml = yaml.safe_dump(config)
         # TODO Use the Traefik user and group?
         self._container.push(STATIC_CONFIG_PATH, config_yaml, make_dirs=True)
-
-    # wokeignore:rule=master
-    # ref: https://doc.traefik.io/traefik/master/observability/tracing/opentelemetry/
-    def update_tracing_configuration(self, endpoint: str, grpc: bool):
-        """Push yaml config with opentelemetry configuration."""
-        config = yaml.safe_dump(
-            {
-                "tracing": {
-                    "openTelemetry": {
-                        "address": endpoint,
-                        **({"grpc": {}} if grpc else {}),
-                        # todo: we have an option to use CA or to use CERT+KEY (available with mtls) authentication.
-                        #  when we have mTLS, consider this again.
-                        **({"ca": CA_CERT_PATH} if self._tls_enabled else {"insecure": True}),
-                    }
-                }
-            }
-        )
-        logger.debug(f"dumping tracing config to {DYNAMIC_TRACING_PATH}")
-
-        self._container.push(DYNAMIC_TRACING_PATH, config, make_dirs=True)
 
     def get_per_unit_http_config(
         self,
@@ -629,6 +625,12 @@ class Traefik:
 
     def restart(self):
         """Restart the pebble service."""
+        environment = {}
+        if self._tracing_endpoint:
+            environment = {
+                "JAEGER_TAGS": f"juju_application={self._topology.application},juju_model={self._topology.model},juju_model_uuid={self._topology.model_uuid},juju_unit={self._topology.unit},juju_charm={self._topology.charm_name}"
+            }
+
         layer = {
             "summary": "Traefik layer",
             "description": "Pebble config layer for Traefik",
@@ -639,15 +641,16 @@ class Traefik:
                     # trick to drop the logs to a file but also keep them available in the pod logs
                     "command": '/bin/sh -c "{} | tee {}"'.format(BIN_PATH, LOG_PATH),
                     "startup": "enabled",
+                    "environment": environment,
                 },
             },
         }
 
-        if not self.is_ready:
-            self._container.add_layer(self._layer_name, cast(LayerDict, layer), combine=True)
-            logger.debug(f"replanning {self.service_name!r} after a service update")
-            self._container.replan()
-        else:
+        self._container.add_layer(self._layer_name, cast(LayerDict, layer), combine=True)
+        logger.debug(f"replanning {self.service_name!r} after a service update")
+        self._container.replan()
+
+        if self.is_ready:
             logger.debug(f"restarting {self.service_name!r}")
             self._container.restart(self.service_name)
 
@@ -674,11 +677,6 @@ class Traefik:
         self._container.push(Path(DYNAMIC_CONFIG_DIR) / file_name, config, make_dirs=True)
 
         logger.debug("Updated dynamic configuration file: %s", file_name)
-
-    def delete_tracing_config(self):
-        """Delete the tracing config yaml."""
-        with contextlib.suppress(PathError):
-            self._container.remove_path(DYNAMIC_TRACING_PATH)
 
     @property
     def version(self):
