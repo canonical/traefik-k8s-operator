@@ -100,6 +100,7 @@ logging.getLogger("httpcore").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 _TRAEFIK_CONTAINER_NAME = "traefik"
+_RECV_CA_CERT_RELATION_NAME = "receive-ca-cert"
 
 PYDANTIC_IS_V1 = int(pydantic.version.VERSION.split(".")[0]) < 2
 
@@ -166,8 +167,8 @@ class TraefikIngressCharm(CharmBase):
             sans=sans,
         )
 
-        self.recv_ca_cert_v0 = CertificateTransferRequiresV0(self, "receive-ca-cert")
-        self.recv_ca_cert_v1 = CertificateTransferRequiresV1(self, "receive-ca-cert-v1")
+        self.recv_ca_cert_v0 = CertificateTransferRequiresV0(self, _RECV_CA_CERT_RELATION_NAME)
+        self.recv_ca_cert_v1 = CertificateTransferRequiresV1(self, _RECV_CA_CERT_RELATION_NAME)
 
         # FIXME: Do not move these lower. They must exist before `_tcp_ports` is called. The
         # better long-term solution is to allow dynamic modification of the object, and to try
@@ -301,6 +302,7 @@ class TraefikIngressCharm(CharmBase):
             self.recv_ca_cert_v1.on.certificates_removed,  # pyright: ignore
             self._on_recv_ca_cert_removed,
         )
+
         observe(self.forward_auth.on.auth_config_changed, self._on_forward_auth_config_changed)
         observe(self.forward_auth.on.auth_config_removed, self._on_forward_auth_config_removed)
 
@@ -396,20 +398,23 @@ class TraefikIngressCharm(CharmBase):
         if event and isinstance(event, CertificateTransferAvailableEventV0):
             cas.append(CA(event.ca, uid=event.relation_id))
         else:
-            for relation in self.model.relations.get(self.recv_ca_cert_v0.relationship_name, []):
-                # For some reason, relation.units includes our unit and app. Need to exclude them.
-                for unit in set(relation.units).difference([self.app, self.unit]):
-                    # Note: this nested loop handles the case of multi-unit CA, each unit providing
-                    # a different ca cert, but that is not currently supported by the lib itself.
-                    if ca := relation.data[unit].get("ca"):
-                        cas.append(CA(ca, uid=relation.id))
-        for relation in self.model.relations.get(self.recv_ca_cert_v1.relationship_name, []):
-            # add index to relation id to avoid conflicts in case of multiple CAs per relation
-            cas.extend(
-                CA(ca, uid=f"{relation.id}-{i}")
-                for i, ca in enumerate(self.recv_ca_cert_v1.get_all_certificates(relation.id))
-            )
-
+            for relation in self.model.relations.get(_RECV_CA_CERT_RELATION_NAME, []):
+                recv_ca_cert_requirer = self._recv_ca_cert_requirer_from_relation(relation)
+                if recv_ca_cert_requirer is self.recv_ca_cert_v0:
+                    # For some reason, relation.units includes our unit and app. Need to exclude them.
+                    for unit in set(relation.units).difference([self.app, self.unit]):
+                        # Note: this nested loop handles the case of multi-unit CA, each unit providing
+                        # a different ca cert, but that is not currently supported by the lib itself.
+                        if ca := relation.data[unit].get("ca"):
+                            cas.append(CA(ca, uid=relation.id))
+                elif recv_ca_cert_requirer is self.recv_ca_cert_v1:
+                    # add index to relation id to avoid conflicts in case of multiple CAs per relation
+                    cas.extend(
+                        CA(ca, uid=f"{relation.id}-{i}")
+                        for i, ca in enumerate(
+                            self.recv_ca_cert_v1.get_all_certificates(relation.id)
+                        )
+                    )
         self.traefik.add_cas(cas)
 
     def _on_recv_ca_cert_removed(
@@ -1131,6 +1136,14 @@ class TraefikIngressCharm(CharmBase):
         if relation_type is _IngressRelationType.routed:
             return self.traefik_route
         raise RuntimeError(f"Invalid relation type: {relation_type} ({relation.name})")
+
+    def _recv_ca_cert_requirer_from_relation(self, relation: Relation):
+        """Returns the correct CertificateTransferRequirer based on a relation."""
+        if self.recv_ca_cert_v0.is_ready(relation):
+            return self.recv_ca_cert_v0
+        if self.recv_ca_cert_v1.is_ready(relation):
+            return self.recv_ca_cert_v1
+        return None
 
     @property
     def _external_host(self) -> Optional[str]:

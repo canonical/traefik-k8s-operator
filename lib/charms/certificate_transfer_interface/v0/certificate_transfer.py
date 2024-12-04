@@ -101,6 +101,7 @@ import logging
 from typing import List, Mapping
 
 from jsonschema import exceptions, validate  # type: ignore[import-untyped]
+from ops import Relation
 from ops.charm import CharmBase, CharmEvents, RelationBrokenEvent, RelationChangedEvent
 from ops.framework import EventBase, EventSource, Handle, Object
 
@@ -112,7 +113,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 8
+LIBPATCH = 9
 
 PYDEPS = ["jsonschema"]
 
@@ -391,3 +392,11 @@ class CertificateTransferRequires(Object):
             None
         """
         self.on.certificate_removed.emit(relation_id=event.relation.id)
+
+    def is_ready(self, relation: Relation) -> bool:
+        """Check if the relation is ready by checking that it has valid relation data."""
+        relation_data = _load_relation_data(relation.data[relation.app])
+        if not self._relation_data_is_valid(relation_data):
+            logger.warning("Provider relation data did not pass JSON Schema validation: ")
+            return False
+        return True

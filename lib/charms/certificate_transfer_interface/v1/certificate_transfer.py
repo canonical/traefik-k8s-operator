@@ -115,7 +115,7 @@ LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 1
+LIBPATCH = 2
 
 logger = logging.getLogger(__name__)
 
@@ -212,7 +212,7 @@ class CertificateTransferProvides(Object):
     """Certificate Transfer provider class to be instantiated by charms sending certificates."""
 
     def __init__(self, charm: CharmBase, relationship_name: str):
-        super().__init__(charm, relationship_name)
+        super().__init__(charm, relationship_name + "_v1")
         self.charm = charm
         self.relationship_name = relationship_name
 
@@ -376,7 +376,7 @@ class CertificateTransferRequires(Object):
             charm: Charm object
             relationship_name: Juju relation name
         """
-        super().__init__(charm, relationship_name)
+        super().__init__(charm, relationship_name + "_v1")
         self.relationship_name = relationship_name
         self.charm = charm
         self.framework.observe(
@@ -427,6 +427,15 @@ class CertificateTransferRequires(Object):
             data = self._get_relation_data(relation)
             result = result.union(data)
         return result
+
+    def is_ready(self, relation: Relation) -> bool:
+        """Check if the relation is ready by checking that it has valid relation data."""
+        databag = relation.data[relation.app]
+        try:
+            ProviderApplicationData().load(databag)
+            return True
+        except DataValidationError:
+            return False
 
     def _get_relation_data(self, relation: Relation) -> Set[str]:
         """Get the given relation data."""
