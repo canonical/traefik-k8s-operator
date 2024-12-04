@@ -65,7 +65,7 @@ from ops.charm import (
     UpdateStatusEvent,
 )
 from ops.framework import StoredState
-from ops.main import main
+from ops import main
 from ops.model import (
     ActiveStatus,
     BlockedStatus,
