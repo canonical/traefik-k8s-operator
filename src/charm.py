@@ -102,7 +102,7 @@ PYDANTIC_IS_V1 = int(pydantic.version.VERSION.split(".")[0]) < 2
 # - Example invalid: "value@", "value#", "value space"
 ANNOTATION_VALUE_PATTERN = re.compile(r"^[\w.\-_]+$")
 
-# Based on https://github.com/kubernetes/apimachinery/blob/master/pkg/util/validation/validation.go#L206
+# Based on https://github.com/kubernetes/apimachinery/blob/v0.31.3/pkg/util/validation/validation.go#L204
 # Regex for DNS1123 subdomains:
 # - Starts with a lowercase letter or number ([a-z0-9])
 # - May contain dashes (-), but not consecutively, and must not start or end with them
@@ -113,7 +113,7 @@ DNS1123_SUBDOMAIN_PATTERN = re.compile(
     r"^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$"
 )
 
-# Based on https://github.com/kubernetes/apimachinery/blob/master/pkg/util/validation/validation.go#L32
+# Based on https://github.com/kubernetes/apimachinery/blob/v0.31.3/pkg/util/validation/validation.go#L32
 # Regex for Kubernetes qualified names:
 # - Starts with an alphanumeric character ([A-Za-z0-9])
 # - Can include dashes (-), underscores (_), dots (.), or alphanumeric characters in the middle
