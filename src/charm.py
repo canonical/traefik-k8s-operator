@@ -54,6 +54,7 @@ from lightkube.core.client import Client
 from lightkube.core.exceptions import ApiError
 from lightkube.models.core_v1 import ServicePort
 from lightkube.resources.core_v1 import Service
+from ops import main
 from ops.charm import (
     ActionEvent,
     CharmBase,
@@ -65,7 +66,6 @@ from ops.charm import (
     UpdateStatusEvent,
 )
 from ops.framework import StoredState
-from ops import main
 from ops.model import (
     ActiveStatus,
     BlockedStatus,
