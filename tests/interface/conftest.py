@@ -18,7 +18,7 @@ from charm import TraefikIngressCharm
 # to include the new identifier/location.
 @pytest.fixture
 def interface_tester(interface_tester: InterfaceTester):
-    with patch("charm.KubernetesServicePatch", lambda **unused: None):
+    with patch("charm.KubernetesLoadBalancer", lambda **unused: None):
         interface_tester.configure(
             charm_type=TraefikIngressCharm,
             state_template=State(
