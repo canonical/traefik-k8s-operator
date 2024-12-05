@@ -30,6 +30,23 @@ def relate(harness: Harness, per_app_relation: bool = False) -> Relation:
     return relation
 
 
+def _cert_transfer_provider_requirements(
+    harness: Harness, relation: Relation, app_name: str, v1: bool = False
+):
+    if v1:
+        app_data = { "certificates": '["ca1", "ca2"]' }
+        with harness.hooks_disabled():
+            harness.update_relation_data(relation.id, app_name, app_data)
+    else:
+        unit_data = {
+            "ca": "ca1",
+            "certificate": "cert1",
+            "chain": "chain",
+        }
+        with harness.hooks_disabled():
+            harness.update_relation_data(relation.id, f"{app_name}/0", unit_data)
+
+
 def _requirer_provide_ingress_requirements(
     harness: Harness,
     port: int,
@@ -511,7 +528,7 @@ class TestTraefikCertTransferInterface(unittest.TestCase):
     @patch("ops.model.Container.exec")
     @patch("charm._get_loadbalancer_status", lambda **__: "10.0.0.1")
     @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
-    def test_transferred_ca_certs_are_updated(self, patch_exec):
+    def test_transferred_ca_certs_v0_are_updated(self, patch_exec):
         # Given container is ready, when receive-ca-cert relation joins,
         # then ca certs are updated.
         provider_app = "self-signed-certificates"
@@ -523,6 +540,12 @@ class TestTraefikCertTransferInterface(unittest.TestCase):
         )
         self.harness.add_relation_unit(
             relation_id=certificate_transfer_rel_id, remote_unit_name=f"{provider_app}/0"
+        )
+        relation = self.harness.model.get_relation(
+            relation_name="receive-ca-cert", relation_id=certificate_transfer_rel_id
+        )
+        _cert_transfer_provider_requirements(
+            harness=self.harness, relation=relation, app_name=provider_app, v1=False
         )
         call_list = patch_exec.call_args_list
         assert [call.args[0] for call in call_list] == [
@@ -541,10 +564,16 @@ class TestTraefikCertTransferInterface(unittest.TestCase):
         self.harness.begin_with_initial_hooks()
         self.harness.set_can_connect(container=self.container_name, val=True)
         certificate_transfer_rel_id = self.harness.add_relation(
-            relation_name="receive-ca-cert-v1", remote_app=provider_app
+            relation_name="receive-ca-cert", remote_app=provider_app
         )
         self.harness.add_relation_unit(
             relation_id=certificate_transfer_rel_id, remote_unit_name=f"{provider_app}/0"
+        )
+        relation = self.harness.model.get_relation(
+            relation_name="receive-ca-cert", relation_id=certificate_transfer_rel_id
+        )
+        _cert_transfer_provider_requirements(
+            harness=self.harness, relation=relation, app_name=provider_app, v1=True
         )
         call_list = patch_exec.call_args_list
         assert [call.args[0] for call in call_list] == [
