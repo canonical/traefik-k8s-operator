@@ -3,10 +3,6 @@
 # See LICENSE file for licensing details.
 from pathlib import Path
 
-from charms.observability_libs.v1.kubernetes_service_patch import (
-    KubernetesServicePatch,
-    ServicePort,
-)
 from charms.traefik_k8s.v1.ingress_per_unit import IngressPerUnitRequirer
 from ops.charm import CharmBase, PebbleReadyEvent
 from ops.model import ActiveStatus, Container, WaitingStatus
@@ -14,16 +10,10 @@ from ops.pebble import Layer
 
 
 class TCPRequirerMock(CharmBase):
-    _tcp_port = 9999  # port is hard-coded in workload.py
-
     def __init__(self, framework):
         super().__init__(framework)
 
-        self.service_patch = KubernetesServicePatch(
-            charm=self,
-            ports=[ServicePort(self._tcp_port, name=f"{self.app.name}")],
-        )
-
+        self.unit.open_port("tcp", 9999)
         self.unit.status = ActiveStatus("ready")
 
         # dummy charm: only create the relation AFTER pebble ready has fired.
