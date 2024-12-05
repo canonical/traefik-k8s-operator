@@ -5,7 +5,6 @@
 
 import logging
 import re
-import time
 from typing import Dict, List, Optional
 
 from lightkube import ApiError, Client
@@ -114,11 +113,11 @@ class KubernetesLoadBalancer:
             existing_service = self.client.get(Service, name=self.name, namespace=self.namespace)
 
             # Patch if differences exist
-            if existing_service != service:
+            if not self._is_patched(old_service=existing_service, new_service=service):
                 self.client.patch(Service, name=self.name, obj=service, patch_type=PatchType.APPLY)
                 logger.info(f"Patched LoadBalancer {self.name} in namespace {self.namespace}")
             else:
-                logger.info(f"No changes for LoadBalancer {self.name}")
+                logger.debug(f"No changes for LoadBalancer {self.name}")
         except ApiError as e:
             # Create the service if it doesn't exist
             if e.status.code == 404:
@@ -126,6 +125,28 @@ class KubernetesLoadBalancer:
                 logger.info(f"Created LoadBalancer {self.name} in namespace {self.namespace}")
             else:
                 logger.info(f"Failed to create LoadBalancer {self.name}: {e}")
+
+    def _is_patched(self, old_service: Service, new_service: Service) -> bool:
+        """Reports if the service has already been patched.
+
+        Returns:
+            bool: A boolean indicating if the service patch has been applied.
+        """
+        new_ports = [(p.port, p.targetPort) for p in new_service.spec.ports]  # type: ignore[attr-defined]
+        old_ports = [
+            (p.port, p.targetPort) for p in old_service.spec.ports  # type: ignore[attr-defined]
+        ]
+        ports_match = new_ports == old_ports
+
+        new_annotations = (
+            new_service.metadata.annotations or {}  # pyright: ignore[reportOptionalMemberAccess]
+        )
+        old_annotations = (
+            old_service.metadata.annotations or {}  # pyright: ignore[reportOptionalMemberAccess]
+        )
+        annotations_match = new_annotations == old_annotations
+
+        return ports_match and annotations_match
 
     def _annotations_valid(self) -> bool:
         """Check if the annotations are valid.
@@ -135,53 +156,7 @@ class KubernetesLoadBalancer:
         if self.additional_annotations is None:
             logger.error("Annotations are invalid or could not be parsed.")
             return False
-
-        logger.info("Annotations are valid.")
         return True
-
-    def is_loadbalancer_ready(self) -> bool:
-        """Wait for the LoadBalancer to be ready and return its status.
-
-        :return: True if the LoadBalancer is ready within the timeout period, False otherwise.
-        """
-        timeout = 60  # Default timeout of 300 seconds
-        check_interval = 10
-        attempts = timeout // check_interval
-
-        for _ in range(attempts):
-            lb_status = self._get_lb_external_address
-            if lb_status:
-                logger.info(f"LoadBalancer {self.name} is ready with address: {lb_status}")
-                return True
-
-            logger.warning(f"LoadBalancer {self.name} not ready, retrying...")
-            time.sleep(check_interval)
-
-        logger.error(f"LoadBalancer {self.name} is not ready after {timeout} seconds.")
-        return False
-
-    @property
-    def _get_lb_external_address(self) -> Optional[str]:
-        """Get the external address of the LoadBalancer.
-
-        :return: The external hostname or IP address of the LoadBalancer if available, None otherwise.
-        """
-        try:
-            lb = self.client.get(Service, name=self.name, namespace=self.namespace)
-        except ApiError as e:
-            logger.error(f"Failed to fetch LoadBalancer {self.name}: {e}")
-            return None
-
-        if not (status := getattr(lb, "status", None)):
-            return None
-        if not (load_balancer_status := getattr(status, "loadBalancer", None)):
-            return None
-        if not (ingress_addresses := getattr(load_balancer_status, "ingress", None)):
-            return None
-        if not (ingress_address := ingress_addresses[0]):
-            return None
-
-        return ingress_address.hostname or ingress_address.ip
 
 
 def validate_annotation_key(key: str) -> bool:

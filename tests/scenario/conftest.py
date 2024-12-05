@@ -11,7 +11,7 @@ MOCK_LB_ADDRESS = "1.2.3.4"
 
 @pytest.fixture
 def traefik_charm():
-    with patch("charm.KubernetesServicePatch"):
+    with patch("charm.KubernetesLoadBalancer"):
         with patch("lightkube.core.client.GenericSyncClient"):
             with patch(
                 "charm._get_loadbalancer_status",

@@ -10,11 +10,12 @@ import ops.testing
 import yaml
 from charms.traefik_k8s.v2.ingress import IngressRequirerAppData, IngressRequirerUnitData
 from ops.charm import ActionEvent
-from ops.model import ActiveStatus, Application, BlockedStatus, Relation, WaitingStatus
+from ops.model import ActiveStatus, Application, BlockedStatus, Relation
 from ops.pebble import PathError
 from ops.testing import Harness
 
 from charm import TraefikIngressCharm
+from k8s_lb_manager import parse_annotations
 from traefik import STATIC_CONFIG_PATH
 
 ops.testing.SIMULATE_CAN_CONNECT = True
@@ -144,7 +145,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
         self.mock_version = patcher.start()
         self.addCleanup(patcher.stop)
 
-    @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
+    @patch("charm.KubernetesLoadBalancer", lambda *_, **__: None)
     def test_service_get(self):
         self.harness.update_config({"external_hostname": "testhostname"})
         self.harness.set_leader(True)
@@ -153,7 +154,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
         self.assertTrue(self.harness.charm.traefik.is_ready)
 
-    @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
+    @patch("charm.KubernetesLoadBalancer", lambda *_, **__: None)
     def test_bad_routing_mode_config_and_recovery(self):
         """Test round-trip bootstrap and relation with a consumer."""
         self.harness.update_config({"external_hostname": "testhostname"})
@@ -183,14 +184,17 @@ class TestTraefikIngressCharm(unittest.TestCase):
         self.assertIsInstance(self.harness.charm.unit.status, ActiveStatus)
 
     @patch("charm._get_loadbalancer_status", lambda **__: None)
-    @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
+    @patch("charm.KubernetesLoadBalancer", lambda *_, **__: None)
     def test_pebble_ready_without_gateway_address(self):
         """Test that requirers do not get addresses until the gateway address is available."""
         self.harness.set_leader(True)
         self.harness.begin_with_initial_hooks()
 
         self.assertEqual(
-            self.harness.charm.unit.status, WaitingStatus("gateway address unavailable")
+            self.harness.charm.unit.status,
+            BlockedStatus(
+                "Traefik load balancer is unable to obtain an IP or hostname from the cluster."
+            ),
         )
 
         self.harness.container_pebble_ready("traefik")
@@ -203,11 +207,14 @@ class TestTraefikIngressCharm(unittest.TestCase):
         assert not requirer.is_ready()
 
         self.assertEqual(
-            self.harness.charm.unit.status, WaitingStatus("gateway address unavailable")
+            self.harness.charm.unit.status,
+            BlockedStatus(
+                "Traefik load balancer is unable to obtain an IP or hostname from the cluster."
+            ),
         )
 
     @patch("charm._get_loadbalancer_status", lambda **__: "10.0.0.1")
-    @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
+    @patch("charm.KubernetesLoadBalancer", lambda *_, **__: None)
     def test_pebble_ready_with_joined_relations(self):
         self.harness.set_leader(True)
         self.harness.begin_with_initial_hooks()
@@ -228,7 +235,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
         self.assertIsInstance(self.harness.charm.unit.status, ActiveStatus)
 
     @patch("charm._get_loadbalancer_status", lambda **__: "10.0.0.1")
-    @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
+    @patch("charm.KubernetesLoadBalancer", lambda *_, **__: None)
     def test_gateway_address_change_with_joined_relations(self):
         self.harness.set_leader(True)
         self.harness.begin_with_initial_hooks()
@@ -257,7 +264,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
         self.assertIsInstance(self.harness.charm.unit.status, ActiveStatus)
 
     @patch("charm._get_loadbalancer_status", lambda **__: None)
-    @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
+    @patch("charm.KubernetesLoadBalancer", lambda *_, **__: None)
     def test_gateway_address_becomes_unavailable_after_relation_join(self):
         self.harness.update_config({"external_hostname": "testhostname"})
         self.harness.set_leader(True)
@@ -279,12 +286,15 @@ class TestTraefikIngressCharm(unittest.TestCase):
         self.harness.update_config(unset=["external_hostname"])
 
         self.assertEqual(
-            self.harness.charm.unit.status, WaitingStatus("gateway address unavailable")
+            self.harness.charm.unit.status,
+            BlockedStatus(
+                "Traefik load balancer is unable to obtain an IP or hostname from the cluster."
+            ),
         )
 
         self.assertEqual(requirer.urls, {})
 
-    @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
+    @patch("charm.KubernetesLoadBalancer", lambda *_, **__: None)
     def test_relation_broken(self):
         self.harness.update_config({"external_hostname": "testhostname"})
         self.harness.set_leader(True)
@@ -311,7 +321,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
             pass
 
     @patch("charm._get_loadbalancer_status", lambda **__: None)
-    @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
+    @patch("charm.KubernetesLoadBalancer", lambda *_, **__: None)
     def test_show_proxied_endpoints_action_no_relations(self):
         self.harness.begin_with_initial_hooks()
         action_event = Mock(spec=ActionEvent)
@@ -322,7 +332,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
         )
 
     @patch("charm._get_loadbalancer_status", lambda **__: None)
-    @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
+    @patch("charm.KubernetesLoadBalancer", lambda *_, **__: None)
     def test_show_proxied_endpoints_action_only_ingress_per_app_relations(self):
         self.harness.set_leader(True)
         self.harness.update_config({"external_hostname": "testhostname"})
@@ -354,7 +364,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
         )
 
     @patch("charm._get_loadbalancer_status", lambda **__: None)
-    @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
+    @patch("charm.KubernetesLoadBalancer", lambda *_, **__: None)
     def test_show_proxied_endpoints_action_only_ingress_per_unit_relations(self):
         self.harness.set_leader(True)
         self.harness.update_config({"external_hostname": "testhostname"})
@@ -381,7 +391,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
         )
 
     @patch("charm._get_loadbalancer_status", lambda **__: None)
-    @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
+    @patch("charm.KubernetesLoadBalancer", lambda *_, **__: None)
     def test_base_static_config(self):
         """Verify that the static config that should always be there, is in fact there."""
         self.harness.set_leader(True)
@@ -406,7 +416,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
         assert cfg["providers"]["file"]["watch"] is True
 
     @patch("charm._get_loadbalancer_status", lambda **__: None)
-    @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
+    @patch("charm.KubernetesLoadBalancer", lambda *_, **__: None)
     def test_tcp_config(self):
         self.harness.set_leader(True)
         self.harness.update_config({"external_hostname": "testhostname"})
@@ -445,7 +455,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
         return relation_id
 
-    @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
+    @patch("charm.KubernetesLoadBalancer", lambda *_, **__: None)
     def test_forward_auth_relation_databag(self):
         self.harness.update_config({"enable_experimental_forward_auth": True})
         self.harness.set_leader(True)
@@ -468,7 +478,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
         assert expected_provider_info.app_names == provider_info["app_names"]
         assert expected_provider_info.headers == provider_info["headers"]
 
-    @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
+    @patch("charm.KubernetesLoadBalancer", lambda *_, **__: None)
     def test_forward_auth_relation_changed(self):
         self.harness.update_config({"enable_experimental_forward_auth": True})
         self.harness.set_leader(True)
@@ -482,7 +492,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
         _ = self.setup_forward_auth_relation()
         assert mocked_handle.called
 
-    @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
+    @patch("charm.KubernetesLoadBalancer", lambda *_, **__: None)
     def test_forward_auth_relation_removed(self):
         self.harness.set_leader(True)
         self.harness.update_config({"external_hostname": "testhostname"})
@@ -510,7 +520,7 @@ class TestTraefikCertTransferInterface(unittest.TestCase):
 
     @patch("ops.model.Container.exec")
     @patch("charm._get_loadbalancer_status", lambda **__: "10.0.0.1")
-    @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
+    @patch("charm.KubernetesLoadBalancer", lambda *_, **__: None)
     def test_transferred_ca_certs_are_updated(self, patch_exec):
         # Given container is ready, when receive-ca-cert relation joins,
         # then ca certs are updated.
@@ -532,7 +542,7 @@ class TestTraefikCertTransferInterface(unittest.TestCase):
 
     @patch("ops.model.Container.exec")
     @patch("charm._get_loadbalancer_status", lambda **__: "10.0.0.1")
-    @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
+    @patch("charm.KubernetesLoadBalancer", lambda *_, **__: None)
     def test_transferred_ca_certs_are_not_updated(self, patch_exec):
         # Given container is not ready, when receive-ca-cert relation joins,
         # then not attempting to update ca certs.
@@ -550,7 +560,7 @@ class TestTraefikCertTransferInterface(unittest.TestCase):
 
 class TestConfigOptionsValidation(unittest.TestCase):
     @patch("charm._get_loadbalancer_status", lambda **_: "10.0.0.1")
-    @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
+    @patch("charm.KubernetesLoadBalancer", lambda *_, **__: None)
     def setUp(self):
         self.harness: Harness[TraefikIngressCharm] = Harness(TraefikIngressCharm)
         self.harness.set_model_name("test-model")
@@ -574,18 +584,18 @@ class TestConfigOptionsValidation(unittest.TestCase):
         )
 
     @patch("charm._get_loadbalancer_status", lambda **_: "10.0.0.1")
-    @patch("charm.KubernetesServicePatch", lambda **_: None)
+    @patch("charm.KubernetesLoadBalancer", lambda **_: None)
     def test_when_external_hostname_not_set_use_ip_with_port_80(self):
         self.assertEqual(requirer.urls, {"remote/0": "http://10.0.0.1/test-model-remote-0"})
 
     @patch("charm._get_loadbalancer_status", lambda **_: "10.0.0.1")
-    @patch("charm.KubernetesServicePatch", lambda **_: None)
+    @patch("charm.KubernetesLoadBalancer", lambda **_: None)
     def test_when_external_hostname_is_set_use_it_with_port_80(self):
         self.harness.update_config({"external_hostname": "testhostname"})
         self.assertEqual(requirer.urls, {"remote/0": "http://testhostname/test-model-remote-0"})
 
     @patch("charm._get_loadbalancer_status", lambda **_: "10.0.0.1")
-    @patch("charm.KubernetesServicePatch", lambda **_: None)
+    @patch("charm.KubernetesLoadBalancer", lambda **_: None)
     def test_when_external_hostname_is_invalid_go_into_blocked_status(self):
         for invalid_hostname in [
             "testhostname:8080",
@@ -600,7 +610,7 @@ class TestConfigOptionsValidation(unittest.TestCase):
                 self.assertEqual(requirer.urls, {})
 
     @patch("charm._get_loadbalancer_status", lambda **_: "10.0.0.1")
-    @patch("charm.KubernetesServicePatch", lambda **_: None)
+    @patch("charm.KubernetesLoadBalancer", lambda **_: None)
     def test_lb_annotations(self):
         test_cases = [
             ("key1=value1,key2=value2", {"key1": "value1", "key2": "value2"}),
@@ -644,6 +654,8 @@ class TestConfigOptionsValidation(unittest.TestCase):
             with self.subTest(annotations=annotations, expected_result=expected_result):
                 # Update the config with the test annotation string
                 self.harness.update_config({"loadbalancer_annotations": annotations})
-
+                parsed_annotations = parse_annotations(
+                    self.harness.charm._loadbalancer_annotations
+                )
                 # Check if the _loadbalancer_annotations property returns the expected result
-                self.assertEqual(self.harness.charm._loadbalancer_annotations, expected_result)
+                self.assertEqual(parsed_annotations, expected_result)

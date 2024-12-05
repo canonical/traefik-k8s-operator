@@ -19,7 +19,7 @@ options:
         "external-dns.alpha.kubernetes.io/hostname=example.com,service.beta.kubernetes.io/aws-load-balancer-type=nlb"
 
       Ensure the annotations are correctly formatted and adhere to Kubernetes' syntax and character set : https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/#syntax-and-character-set
-      invalid values will result in the annotations being reset to None, removed from the LoadBalancer, and all previously set annotations will be lost.
+      Invalid values will result in LoadBalancer being removed and all previously set annotations will be lost.
     type: string
   basic_auth_user:
     description: |

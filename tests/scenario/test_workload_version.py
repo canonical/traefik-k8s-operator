@@ -10,7 +10,7 @@ from scenario import Container, Context, State
 from charm import TraefikIngressCharm
 
 
-@patch("charm.KubernetesServicePatch")
+@patch("charm.KubernetesLoadBalancer")
 @patch("lightkube.core.client.GenericSyncClient")
 @patch("charm.TraefikIngressCharm._static_config_changed", PropertyMock(return_value=False))
 @patch("charm.TraefikIngressCharm._external_host", PropertyMock(return_value="foo.bar"))

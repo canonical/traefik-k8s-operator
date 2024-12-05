@@ -209,13 +209,12 @@ class TraefikIngressCharm(CharmBase):
             ),
         )
 
-        annotations = cast(Optional[str], self.config.get("loadbalancer_annotations", None))
         self.lb_patch = KubernetesLoadBalancer(
             name=f"{self.app.name}-lb",
             namespace=self.model.name,
             field_manager=self.app.name,
             ports=self._service_ports,
-            additional_annotations=annotations,
+            additional_annotations=self._loadbalancer_annotations,
             additional_labels={"app.kubernetes.io/name": self.app.name},
             additional_selectors={"app.kubernetes.io/name": self.app.name},
         )
@@ -334,6 +333,14 @@ class TraefikIngressCharm(CharmBase):
         As we can't reject it, we assume it's correctly formatted.
         """
         return cast(Optional[str], self.config.get("basic_auth_user", None))
+
+    @property
+    def _loadbalancer_annotations(self) -> Optional[str]:
+        """A comma-separated list of annotations to apply to the LoadBalancer service.
+
+        The input string is expected to be in the format: "key1=value1,key2=value2,key3=value3".
+        """
+        return cast(Optional[str], self.config.get("loadbalancer_annotations", None))
 
     def _on_forward_auth_config_changed(self, event: AuthConfigChangedEvent):
         if self._is_forward_auth_enabled:
