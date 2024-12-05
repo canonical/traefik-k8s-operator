@@ -34,7 +34,7 @@ def _cert_transfer_provider_requirements(
     harness: Harness, relation: Relation, app_name: str, v1: bool = False
 ):
     if v1:
-        app_data = { "certificates": '["ca1", "ca2"]' }
+        app_data = {"certificates": '["ca1", "ca2"]'}
         with harness.hooks_disabled():
             harness.update_relation_data(relation.id, app_name, app_data)
     else:
