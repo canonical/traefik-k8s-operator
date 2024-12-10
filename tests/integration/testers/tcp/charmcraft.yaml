@@ -12,7 +12,6 @@ parts:
   charm:
     charm-binary-python-packages:
       - ops
-      - lightkube
       - pydantic>=2
     build-packages:
       - git

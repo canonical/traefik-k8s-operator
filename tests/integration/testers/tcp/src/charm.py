@@ -10,10 +10,12 @@ from ops.pebble import Layer
 
 
 class TCPRequirerMock(CharmBase):
+    _tcp_port = 9999
+
     def __init__(self, framework):
         super().__init__(framework)
 
-        self.unit.open_port("tcp", 9999)
+        self.unit.open_port("tcp", self._tcp_port)
         self.unit.status = ActiveStatus("ready")
 
         # dummy charm: only create the relation AFTER pebble ready has fired.
