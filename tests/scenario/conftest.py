@@ -1,4 +1,4 @@
-from unittest.mock import patch
+from unittest.mock import PropertyMock, patch
 
 import pytest
 from ops import pebble
@@ -11,13 +11,13 @@ MOCK_LB_ADDRESS = "1.2.3.4"
 
 @pytest.fixture
 def traefik_charm():
-    with patch("charm.KubernetesLoadBalancer"):
-        with patch("lightkube.core.client.GenericSyncClient"):
-            with patch(
-                "charm._get_loadbalancer_status",
-                return_value=MOCK_LB_ADDRESS,
-            ):
-                yield TraefikIngressCharm
+    with patch("lightkube.core.client.GenericSyncClient"):
+        with patch(
+            "charm.TraefikIngressCharm._get_loadbalancer_status",
+            new_callable=PropertyMock,
+            return_value=MOCK_LB_ADDRESS,
+        ):
+            yield TraefikIngressCharm
 
 
 @pytest.fixture

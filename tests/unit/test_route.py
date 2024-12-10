@@ -129,7 +129,6 @@ def topology(harness):
     return topology
 
 
-@patch("charm.KubernetesLoadBalancer", lambda *_, **__: None)
 def initialize_and_setup_tr_relation(harness):
     harness.update_config({"external_hostname": "testhostname"})
     harness.set_leader(True)

@@ -2,7 +2,7 @@
 # See LICENSE file for licensing details.
 
 import unittest
-from unittest.mock import patch
+from unittest.mock import PropertyMock, patch
 
 import ops.testing
 from ops.testing import Harness
@@ -13,9 +13,12 @@ ops.testing.SIMULATE_CAN_CONNECT = True
 
 
 class TlsWithExternalHostname(unittest.TestCase):
-    @patch("charm._get_loadbalancer_status", lambda **_: "10.0.0.1")
-    @patch("charm.KubernetesLoadBalancer", lambda *_, **__: None)
-    def setUp(self):
+    @patch(
+        "charm.TraefikIngressCharm._get_loadbalancer_status",
+        new_callable=PropertyMock,
+        return_value="10.0.0.1",
+    )
+    def setUp(self, mock_get_loadbalancer_status):
         self.harness: Harness[TraefikIngressCharm] = Harness(TraefikIngressCharm)
         self.harness.set_model_name("test-model")
         self.addCleanup(self.harness.cleanup)
@@ -32,9 +35,12 @@ class TlsWithExternalHostname(unittest.TestCase):
         self.harness.begin_with_initial_hooks()
         self.harness.container_pebble_ready("traefik")
 
-    @patch("charm._get_loadbalancer_status", lambda **_: "10.0.0.1")
-    @patch("charm.KubernetesLoadBalancer", lambda *_, **__: None)
-    def test_external_hostname_is_set_after_relation_joins(self):
+    @patch(
+        "charm.TraefikIngressCharm._get_loadbalancer_status",
+        new_callable=PropertyMock,
+        return_value="10.0.0.1",
+    )
+    def test_external_hostname_is_set_after_relation_joins(self, mock_get_loadbalancer_status):
         # GIVEN an external hostname is not set
         self.assertFalse(self.harness.charm.config.get("external_hostname"))
         self.assertEqual(self.harness.charm.external_host, "10.0.0.1")
@@ -55,8 +61,6 @@ class TlsWithExternalHostname(unittest.TestCase):
         unit_databag = self.harness.get_relation_data(self.rel_id, self.harness.charm.unit.name)
         self.assertIsNotNone(unit_databag.get("certificate_signing_requests"))
 
-    @patch("charm._get_loadbalancer_status", lambda **_: "10.0.0.1")
-    @patch("charm.KubernetesLoadBalancer", lambda *_, **__: None)
     def test_external_hostname_is_set_before_relation_joins(self):
         # GIVEN an external hostname is set
         self.harness.update_config({"external_hostname": "testhostname"})
