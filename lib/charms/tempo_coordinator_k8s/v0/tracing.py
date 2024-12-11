@@ -34,7 +34,7 @@ any point in time by calling the
 `TracingEndpointRequirer.request_protocols(*protocol:str, relation:Optional[Relation])` method.
 Using this method also allows you to use per-relation protocols.
 
-Units of provider charms obtain the tempo endpoint to which they will push their traces by calling
+Units of requirer charms obtain the tempo endpoint to which they will push their traces by calling
 `TracingEndpointRequirer.get_endpoint(protocol: str)`, where `protocol` is, for example:
 - `otlp_grpc`
 - `otlp_http`
@@ -44,7 +44,10 @@ Units of provider charms obtain the tempo endpoint to which they will push their
 If the `protocol` is not in the list of protocols that the charm requested at endpoint set-up time,
 the library will raise an error.
 
-## Requirer Library Usage
+We recommend that you scale up your tracing provider and relate it to an ingress so that your tracing requests
+go through the ingress and get load balanced across all units. Otherwise, if the provider's leader goes down, your tracing goes down.
+
+## Provider Library Usage
 
 The `TracingEndpointProvider` object may be used by charms to manage relations with their
 trace sources. For this purposes a Tempo-like charm needs to do two things
@@ -107,7 +110,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 1
+LIBPATCH = 3
 
 PYDEPS = ["pydantic"]
 
@@ -985,11 +988,16 @@ def charm_tracing_config(
     is_https = endpoint.startswith("https://")
 
     if is_https:
-        if cert_path is None:
-            raise TracingError("Cannot send traces to an https endpoint without a certificate.")
-        elif not Path(cert_path).exists():
-            # if endpoint is https BUT we don't have a server_cert yet:
-            # disable charm tracing until we do to prevent tls errors
+        if cert_path is None or not Path(cert_path).exists():
+            # disable charm tracing until we obtain a cert to prevent tls errors
+            logger.error(
+                "Tracing endpoint is https, but no server_cert has been passed."
+                "Please point @trace_charm to a `server_cert` attr. "
+                "This might also mean that the tracing provider is related to a "
+                "certificates provider, but this application is not (yet). "
+                "In that case, you might just have to wait a bit for the certificates "
+                "integration to settle. "
+            )
             return None, None
         return endpoint, str(cert_path)
     else:
