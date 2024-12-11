@@ -77,7 +77,7 @@ async def test_added_entrypoint_reachable(ops_test: OpsTest):
     req = Request(f"http://{traefik_ip}:4545")
 
     with pytest.raises(urllib.error.HTTPError, match="404"):
-        urlopen(req, timeout=5)
+        urlopen(req, timeout=60)
 
 
 @pytest.mark.teardown

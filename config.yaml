@@ -8,6 +8,19 @@ options:
       This feature is experimental and may be unstable.
     type: boolean
     default: False
+  loadbalancer_annotations:
+    description: |
+      A comma-separated list of annotations to apply to the LoadBalancer service.
+      The format should be: `key1=value1,key2=value2,key3=value3`.
+      These annotations are passed directly to the Kubernetes LoadBalancer service, 
+      enabling customization for specific cloud provider settings or integrations.
+      
+      Example:
+        "external-dns.alpha.kubernetes.io/hostname=example.com,service.beta.kubernetes.io/aws-load-balancer-type=nlb"
+
+      Ensure the annotations are correctly formatted and adhere to Kubernetes' syntax and character set : https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/#syntax-and-character-set
+      Invalid values will result in LoadBalancer being removed and all previously set annotations will be lost.
+    type: string
   basic_auth_user:
     description: |
       Enables the `basicAuth` middleware for **all** routes on this proxy. 

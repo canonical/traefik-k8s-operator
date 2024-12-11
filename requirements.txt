@@ -23,6 +23,11 @@ jsonschema
 lightkube >= 0.8.1
 lightkube-models >= 1.22.0.4
 
+# A collection of helpers and shared code for using Lightkube
+# Code: https://github.com/canonical/lightkube-extensions
+# Deps: charm
+lightkube-extensions @ git+https://github.com/canonical/lightkube-extensions.git@main
+
 # Operator Framework
 # Code: https://github.com/canonical/operator/
 # Docs: https://ops.rtfd.io/

@@ -51,7 +51,10 @@ def test_start_traefik_no_hostname(*_, traefik_ctx):
         containers=[Container(name="traefik", can_connect=False)],
     )
     out = Context(charm_type=TraefikIngressCharm).run("start", state)
-    assert out.unit_status == ("waiting", "gateway address unavailable")
+    assert out.unit_status == (
+        "blocked",
+        "Traefik load balancer is unable to obtain an IP or hostname from the cluster.",
+    )
 
 
 @patch("charm.TraefikIngressCharm._external_host", PropertyMock(return_value="foo.bar"))
