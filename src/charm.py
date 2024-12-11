@@ -361,9 +361,14 @@ class TraefikIngressCharm(CharmBase):
 
     @property
     def _loadbalancer_annotations(self) -> Optional[Dict[str, str]]:
-        """A comma-separated list of annotations to apply to the LoadBalancer service.
+        """Parses and returns annotations to apply to the LoadBalancer service.
 
-        The input string is expected to be in the format: "key1=value1,key2=value2,key3=value3".
+        The annotations are expected as a string in the configuration,
+        formatted as: "key1=value1,key2=value2,key3=value3". This string is
+        parsed into a dictionary where each key-value pair corresponds to an annotation.
+
+        Returns:
+            Optional[Dict[str, str]]: A dictionary of annotations if provided in the Juju config and valid, otherwise None.
         """
         lb_annotations = cast(Optional[str], self.config.get("loadbalancer_annotations", None))
         return parse_annotations(lb_annotations)
@@ -404,13 +409,9 @@ class TraefikIngressCharm(CharmBase):
         """Reconcile the LoadBalancer's state."""
         klm = self._get_lb_resource_manager()
 
-        if not self._annotations_valid:
-            klm.delete()
-            return
-
         resources_list = []
-        resource_to_append = self._construct_lb()
-        resources_list.append(resource_to_append)
+        if self._annotations_valid:
+            resources_list.append(self._construct_lb())
         klm.reconcile(resources_list)
 
     @property
@@ -462,6 +463,7 @@ class TraefikIngressCharm(CharmBase):
         if not self.container.can_connect():
             return
         self._update_received_ca_certs(event)
+        self._reconcile_lb()
 
     def _update_received_ca_certs(self, event: Optional[CertificateTransferAvailableEvent] = None):
         """Push the cert attached to the event, if it is given; otherwise push all certs.
@@ -488,6 +490,7 @@ class TraefikIngressCharm(CharmBase):
     def _on_recv_ca_cert_removed(self, event: CertificateTransferRemovedEvent):
         # Assuming only one cert per relation (this is in line with the original lib design).
         self.traefik.remove_cas([event.relation_id])
+        self._reconcile_lb()
 
     def _is_tls_enabled(self) -> bool:
         """Return True if TLS is enabled."""
@@ -652,7 +655,6 @@ class TraefikIngressCharm(CharmBase):
             (
                 self._external_host,
                 self.config["routing_mode"],
-                self.config.get("loadbalancer_annotations", None),
                 self._is_forward_auth_enabled,
                 self._basic_auth_user,
                 self._is_tls_enabled(),
@@ -667,6 +669,7 @@ class TraefikIngressCharm(CharmBase):
         # that we're processing a config-changed event, doesn't necessarily mean that our config has changed (duh!)
         # If the config hash has changed since we last calculated it, we need to
         # recompute our state from scratch, based on all data sent over the relations and all configs
+        self._reconcile_lb()
         new_config_hash = self._config_hash
         if self._stored.config_hash != new_config_hash:
             self._stored.config_hash = new_config_hash
@@ -828,6 +831,7 @@ class TraefikIngressCharm(CharmBase):
         #  self._process_status_and_configurations(). For this reason, the static config in
         #  traefik.STATIC_CONFIG_PATH will be updated only on update-status.
         #  https://github.com/canonical/operator/issues/888
+        self._reconcile_lb()
 
     def _handle_traefik_route_ready(self, event: TraefikRouteRequirerReadyEvent):
         """A traefik_route charm has published some ingress data."""
@@ -859,7 +863,7 @@ class TraefikIngressCharm(CharmBase):
                 "Failed to merge traefik-route static configs. " "Check logs for details."
             )
             return
-
+        self._reconcile_lb()
         self.unit.status = ActiveStatus(f"Serving at {self._external_host}")
 
     def _process_ingress_relation(self, relation: Relation):
