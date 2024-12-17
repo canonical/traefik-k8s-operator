@@ -1278,6 +1278,11 @@ class TraefikIngressCharm(CharmBase):
 
         if is_hostname(target):
             assert isinstance(target, str), target  # for type checker
+
+            # in case of subdomain routing we need a wildcard for *.domain 
+            if self._routing_mode == "subdomain":
+                return [target, f"*.{target}"]
+            
             return [target]
 
         # This is an IP address. Try to look up the hostname.
