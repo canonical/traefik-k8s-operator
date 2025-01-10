@@ -52,7 +52,7 @@ def _requirer_provide_ingress_requirements(
     port: int,
     relation: Relation,
     host=socket.getfqdn(),
-    ip=socket.gethostbyname(socket.gethostname()),
+    ip="127.0.0.1",
     mode="http",
     strip_prefix: bool = False,
     redirect_https: bool = False,
@@ -562,9 +562,12 @@ class TestTraefikCertTransferInterface(unittest.TestCase):
         self.container_name = "traefik"
 
     @patch("ops.model.Container.exec")
-    @patch("charm._get_loadbalancer_status", lambda **__: "10.0.0.1")
-    @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
-    def test_transferred_ca_certs_v0_are_updated(self, patch_exec):
+    @patch(
+        "charm.TraefikIngressCharm._get_loadbalancer_status",
+        new_callable=PropertyMock,
+        return_value="10.0.0.1",
+    )
+    def test_transferred_ca_certs_v0_are_updated(self, mock_get_loadbalancer_status, patch_exec):
         # Given container is ready, when receive-ca-cert relation joins,
         # then ca certs are updated.
         provider_app = "self-signed-certificates"
@@ -590,9 +593,12 @@ class TestTraefikCertTransferInterface(unittest.TestCase):
         ]
 
     @patch("ops.model.Container.exec")
-    @patch("charm._get_loadbalancer_status", lambda **__: "10.0.0.1")
-    @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
-    def test_transferred_ca_certs_v1_are_updated(self, patch_exec):
+    @patch(
+        "charm.TraefikIngressCharm._get_loadbalancer_status",
+        new_callable=PropertyMock,
+        return_value="10.0.0.1",
+    )
+    def test_transferred_ca_certs_v1_are_updated(self, mock_get_loadbalancer_status, patch_exec):
         # Given container is ready, when receive-ca-cert-v1 relation joins,
         # then ca certs are updated.
         provider_app = "self-signed-certificates"
