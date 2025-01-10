@@ -3,7 +3,7 @@
 
 from unittest.mock import PropertyMock, patch
 
-from ops import ActiveStatus, WaitingStatus
+from ops import ActiveStatus, BlockedStatus, WaitingStatus
 from scenario import Container, State
 
 
@@ -32,7 +32,9 @@ def test_start_traefik_no_hostname(traefik_ctx, *_):
     out = traefik_ctx.run("start", state)
 
     # THEN unit status is `waiting`
-    assert out.unit_status == WaitingStatus("gateway address unavailable")
+    assert out.unit_status == BlockedStatus(
+        "Traefik load balancer is unable to obtain an IP or hostname from the cluster."
+    )
 
 
 @patch("charm.TraefikIngressCharm._external_host", PropertyMock(return_value="foo.bar"))
