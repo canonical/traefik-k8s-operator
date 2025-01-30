@@ -503,25 +503,30 @@ class TraefikIngressCharm(CharmBase):
         """
         cas = []
         if event and isinstance(event, CertificateTransferAvailableEventV0):
-            cas.append(CA(event.ca, uid=event.relation_id))
+            cas.append(CA(event.ca, uid=f"{event.relation_id}-0"))
         else:
             for relation in self.model.relations.get(_RECV_CA_CERT_RELATION_NAME, []):
                 recv_ca_cert_requirer = self._recv_ca_cert_requirer_from_relation(relation)
+                relation_certificates = []
                 if recv_ca_cert_requirer is self.recv_ca_cert_v0:
                     # For some reason, relation.units includes our unit and app. Need to exclude them.
                     for unit in set(relation.units).difference([self.app, self.unit]):
                         # Note: this nested loop handles the case of multi-unit CA, each unit providing
                         # a different ca cert, but that is not currently supported by the lib itself.
                         if ca := relation.data[unit].get("ca"):
-                            cas.append(CA(ca, uid=relation.id))
+                            relation_certificates.append(ca)
                 elif recv_ca_cert_requirer is self.recv_ca_cert_v1:
                     # add index to relation id to avoid conflicts in case of multiple CAs per relation
-                    cas.extend(
-                        CA(ca, uid=f"{relation.id}-{i}")
-                        for i, ca in enumerate(
-                            self.recv_ca_cert_v1.get_all_certificates(relation.id)
-                        )
+                    relation_certificates.extend(
+                        self.recv_ca_cert_v1.get_all_certificates(relation.id)
                     )
+                else:
+                    raise ValueError(
+                        f"unknown cert transfer relation type: {recv_ca_cert_requirer}"
+                    )
+                cas.extend(
+                    CA(ca, uid=f"{relation.id}-{i}") for i, ca in enumerate(relation_certificates)
+                )
         self.traefik.add_cas(cas)
 
     def _on_recv_ca_cert_removed(

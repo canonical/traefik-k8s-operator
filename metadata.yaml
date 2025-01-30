@@ -100,6 +100,7 @@ requires:
       Receive a CA cert for traefik to trust.
       This relation can be used with a local CA to obtain the CA cert that was used to sign proxied
       endpoints.
+
     # Must limit the relation count to 1 due to
     # https://github.com/canonical/certificate-transfer-interface/issues/6
     limit: 1

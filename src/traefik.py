@@ -217,7 +217,7 @@ class Traefik:
         Calls update-ca-certificates once done.
         """
         for uid in uids:
-            files = self._container.list_files(CA_CERTS_PATH, pattern=f"receive-ca-cert-{uid}-*")
+            files = self._container.list_files(CA_CERTS_PATH, pattern=f"receive-ca-cert-{uid}*")
             for file in files:
                 self._container.remove_path(file.path)
         self.update_ca_certs()

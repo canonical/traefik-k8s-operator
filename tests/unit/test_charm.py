@@ -52,7 +52,7 @@ def _requirer_provide_ingress_requirements(
     port: int,
     relation: Relation,
     host=socket.getfqdn(),
-    ip="127.0.0.1",
+    ip=socket.gethostbyname(socket.gethostname()),
     mode="http",
     strip_prefix: bool = False,
     redirect_https: bool = False,
