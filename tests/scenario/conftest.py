@@ -1,6 +1,7 @@
 from unittest.mock import PropertyMock, patch
 
 import pytest
+from charms.tempo_coordinator_k8s.v0.charm_tracing import charm_tracing_disabled
 from ops import pebble
 from scenario import Container, Context, ExecOutput, Model, Mount
 
@@ -11,13 +12,14 @@ MOCK_LB_ADDRESS = "1.2.3.4"
 
 @pytest.fixture
 def traefik_charm():
-    with patch("lightkube.core.client.GenericSyncClient"):
-        with patch(
-            "charm.TraefikIngressCharm._get_loadbalancer_status",
-            new_callable=PropertyMock,
-            return_value=MOCK_LB_ADDRESS,
-        ):
-            yield TraefikIngressCharm
+    with charm_tracing_disabled():
+        with patch("lightkube.core.client.GenericSyncClient"):
+            with patch(
+                "charm.TraefikIngressCharm._get_loadbalancer_status",
+                new_callable=PropertyMock,
+                return_value=MOCK_LB_ADDRESS,
+            ):
+                yield TraefikIngressCharm
 
 
 @pytest.fixture
