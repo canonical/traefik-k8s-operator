@@ -5,7 +5,6 @@
 """Charmed traefik operator."""
 import contextlib
 import enum
-import functools
 import itertools
 import json
 import logging
@@ -34,7 +33,6 @@ from charms.oathkeeper.v0.forward_auth import (
     ForwardAuthRequirerConfig,
 )
 from charms.observability_libs.v1.cert_handler import CertHandler
-from charms.observability_libs.v1.kubernetes_service_patch import KubernetesServicePatch
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 from charms.tempo_coordinator_k8s.v0.charm_tracing import trace_charm
 from charms.tempo_coordinator_k8s.v0.tracing import TracingEndpointRequirer, charm_tracing_config
@@ -52,8 +50,11 @@ from cosl import JujuTopology
 from deepmerge import always_merger
 from lightkube.core.client import Client
 from lightkube.core.exceptions import ApiError
-from lightkube.models.core_v1 import ServicePort
+from lightkube.models.core_v1 import ServicePort, ServiceSpec
+from lightkube.models.meta_v1 import ObjectMeta
 from lightkube.resources.core_v1 import Service
+from lightkube_extensions.batch import KubernetesResourceManager, create_charm_default_labels
+from ops import main
 from ops.charm import (
     ActionEvent,
     CharmBase,
@@ -65,7 +66,6 @@ from ops.charm import (
     UpdateStatusEvent,
 )
 from ops.framework import StoredState
-from ops.main import main
 from ops.model import (
     ActiveStatus,
     BlockedStatus,
@@ -92,6 +92,38 @@ logger = logging.getLogger(__name__)
 
 _TRAEFIK_CONTAINER_NAME = "traefik"
 
+
+# Regex for Kubernetes annotation values:
+# - Allows alphanumeric characters, dots (.), dashes (-), and underscores (_)
+# - Matches the entire string
+# - Does not allow empty strings
+# - Example valid: "value1", "my-value", "value.name", "value_name"
+# - Example invalid: "value@", "value#", "value space"
+ANNOTATION_VALUE_PATTERN = re.compile(r"^[\w.\-_]+$")
+
+# Based on https://github.com/kubernetes/apimachinery/blob/v0.31.3/pkg/util/validation/validation.go#L204
+# Regex for DNS1123 subdomains:
+# - Starts with a lowercase letter or number ([a-z0-9])
+# - May contain dashes (-), but not consecutively, and must not start or end with them
+# - Segments can be separated by dots (.)
+# - Example valid: "example.com", "my-app.io", "sub.domain"
+# - Example invalid: "-example.com", "example..com", "example-.com"
+DNS1123_SUBDOMAIN_PATTERN = re.compile(
+    r"^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$"
+)
+
+# Based on https://github.com/kubernetes/apimachinery/blob/v0.31.3/pkg/util/validation/validation.go#L32
+# Regex for Kubernetes qualified names:
+# - Starts with an alphanumeric character ([A-Za-z0-9])
+# - Can include dashes (-), underscores (_), dots (.), or alphanumeric characters in the middle
+# - Ends with an alphanumeric character
+# - Must not be empty
+# - Example valid: "annotation", "my.annotation", "annotation-name"
+# - Example invalid: ".annotation", "annotation.", "-annotation", "annotation@key"
+QUALIFIED_NAME_PATTERN = re.compile(r"^[A-Za-z0-9]([-A-Za-z0-9_.]*[A-Za-z0-9])?$")
+
+LB_LABEL = "traefik-loadbalancer"
+
 PYDANTIC_IS_V1 = int(pydantic.version.VERSION.split(".")[0]) < 2
 
 
@@ -117,7 +149,6 @@ class ExternalHostNotReadyError(Exception):
         IPAv1,
         IngressPerUnitProvider,
         TraefikRouteProvider,
-        KubernetesServicePatch,
     ),
 )
 class TraefikIngressCharm(CharmBase):
@@ -148,6 +179,9 @@ class TraefikIngressCharm(CharmBase):
 
         self.container = self.unit.get_container(_TRAEFIK_CONTAINER_NAME)
 
+        self._lightkube_client = None
+        self._lightkube_field_manager: str = self.app.name
+        self._lb_name: str = f"{self.app.name}-lb"
         sans = self.server_cert_sans_dns
         self.cert = CertHandler(
             self,
@@ -171,8 +205,8 @@ class TraefikIngressCharm(CharmBase):
         # FIXME
         # stored.tcp_entrypoints would be used for this list instead, but it's never accessed.
         # intentional or can it be used so we don't need to worry about ordering?
-        self.ingress_per_appv1 = ipa_v1 = IPAv1(charm=self)
-        self.ingress_per_appv2 = ipa_v2 = IPAv2(charm=self)
+        self.ingress_per_appv1 = IPAv1(charm=self)
+        self.ingress_per_appv2 = IPAv2(charm=self)
 
         self.ingress_per_unit = IngressPerUnitProvider(charm=self)
 
@@ -210,22 +244,6 @@ class TraefikIngressCharm(CharmBase):
             ),
         )
 
-        self.service_patch = KubernetesServicePatch(
-            charm=self,
-            service_type="LoadBalancer",
-            ports=self._service_ports,
-            refresh_event=[
-                ipa_v1.on.data_provided,  # type: ignore
-                ipa_v2.on.data_provided,  # type: ignore
-                ipa_v1.on.data_removed,  # type: ignore
-                ipa_v2.on.data_removed,  # type: ignore
-                self.ingress_per_unit.on.data_provided,  # type: ignore
-                self.ingress_per_unit.on.data_removed,  # type: ignore
-                self.traefik_route.on.ready,  # type: ignore
-                self.traefik_route.on.data_removed,  # type: ignore
-                self.on.traefik_pebble_ready,  # type: ignore
-            ],
-        )
         # Observability integrations
 
         # Provide grafana dashboards over a relation interface
@@ -266,6 +284,7 @@ class TraefikIngressCharm(CharmBase):
         observe(self.on.traefik_pebble_ready, self._on_traefik_pebble_ready)  # type: ignore
         observe(self.on.start, self._on_start)
         observe(self.on.stop, self._on_stop)
+        observe(self.on.remove, self._on_remove)
         observe(self.on.update_status, self._on_update_status)
         observe(self.on.config_changed, self._on_config_changed)
         observe(
@@ -340,6 +359,93 @@ class TraefikIngressCharm(CharmBase):
         """
         return cast(Optional[str], self.config.get("basic_auth_user", None))
 
+    @property
+    def _loadbalancer_annotations(self) -> Optional[Dict[str, str]]:
+        """Parses and returns annotations to apply to the LoadBalancer service.
+
+        The annotations are expected as a string in the configuration,
+        formatted as: "key1=value1,key2=value2,key3=value3". This string is
+        parsed into a dictionary where each key-value pair corresponds to an annotation.
+
+        Returns:
+            Optional[Dict[str, str]]: A dictionary of annotations if provided in the Juju config and valid, otherwise None.
+        """
+        lb_annotations = cast(Optional[str], self.config.get("loadbalancer_annotations", None))
+        return parse_annotations(lb_annotations)
+
+    @property
+    def lightkube_client(self):
+        """Returns a lightkube client configured for this charm."""
+        if self._lightkube_client is None:
+            self._lightkube_client = Client(
+                namespace=self.model.name, field_manager=self._lightkube_field_manager
+            )
+        return self._lightkube_client
+
+    def _get_lb_resource_manager(self):
+        return KubernetesResourceManager(
+            labels=create_charm_default_labels(self.app.name, self.model.name, scope=LB_LABEL),
+            resource_types={Service},
+            lightkube_client=self.lightkube_client,
+            logger=logger,
+        )
+
+    def _construct_lb(self) -> Service:
+        return Service(
+            metadata=ObjectMeta(
+                name=f"{self.app.name}-lb",
+                namespace=self.model.name,
+                labels={"app.kubernetes.io/name": self.app.name},
+                annotations=self._loadbalancer_annotations,
+            ),
+            spec=ServiceSpec(
+                ports=self._service_ports,
+                selector={"app.kubernetes.io/name": self.app.name},
+                type="LoadBalancer",
+            ),
+        )
+
+    def _reconcile_lb(self):
+        """Reconcile the LoadBalancer's state."""
+        klm = self._get_lb_resource_manager()
+
+        resources_list = []
+        if self._annotations_valid:
+            resources_list.append(self._construct_lb())
+        klm.reconcile(resources_list)
+
+    @property
+    def _get_loadbalancer_status(self) -> Optional[str]:
+        try:
+            traefik_service = self.lightkube_client.get(
+                Service, name=self._lb_name, namespace=self.model.name
+            )
+        except ApiError as e:
+            logger.error(f"Failed to fetch LoadBalancer {self._lb_name}: {e}")
+            return None
+
+        if not (status := getattr(traefik_service, "status", None)):
+            return None
+        if not (load_balancer_status := getattr(status, "loadBalancer", None)):
+            return None
+        if not (ingress_addresses := getattr(load_balancer_status, "ingress", None)):
+            return None
+        if not (ingress_address := ingress_addresses[0]):
+            return None
+
+        return ingress_address.hostname or ingress_address.ip
+
+    @property
+    def _annotations_valid(self) -> bool:
+        """Check if the annotations are valid.
+
+        :return: True if the annotations are valid, False otherwise.
+        """
+        if self._loadbalancer_annotations is None:
+            logger.error("Annotations are invalid or could not be parsed.")
+            return False
+        return True
+
     def _on_forward_auth_config_changed(self, event: AuthConfigChangedEvent):
         if self._is_forward_auth_enabled:
             if self.forward_auth.is_ready():
@@ -357,6 +463,7 @@ class TraefikIngressCharm(CharmBase):
         if not self.container.can_connect():
             return
         self._update_received_ca_certs(event)
+        self._reconcile_lb()
 
     def _update_received_ca_certs(self, event: Optional[CertificateTransferAvailableEvent] = None):
         """Push the cert attached to the event, if it is given; otherwise push all certs.
@@ -383,6 +490,7 @@ class TraefikIngressCharm(CharmBase):
     def _on_recv_ca_cert_removed(self, event: CertificateTransferRemovedEvent):
         # Assuming only one cert per relation (this is in line with the original lib design).
         self.traefik.remove_cas([event.relation_id])
+        self._reconcile_lb()
 
     def _is_tls_enabled(self) -> bool:
         """Return True if TLS is enabled."""
@@ -526,6 +634,10 @@ class TraefikIngressCharm(CharmBase):
         # the workload version from before the upgrade.
         self.unit.set_workload_version("")
 
+    def _on_remove(self, _):
+        klm = self._get_lb_resource_manager()
+        klm.delete()
+
     def _on_update_status(self, _: UpdateStatusEvent):
         self._process_status_and_configurations()
         self._set_workload_version()
@@ -557,6 +669,7 @@ class TraefikIngressCharm(CharmBase):
         # that we're processing a config-changed event, doesn't necessarily mean that our config has changed (duh!)
         # If the config hash has changed since we last calculated it, we need to
         # recompute our state from scratch, based on all data sent over the relations and all configs
+        self._reconcile_lb()
         new_config_hash = self._config_hash
         if self._stored.config_hash != new_config_hash:
             self._stored.config_hash = new_config_hash
@@ -570,6 +683,7 @@ class TraefikIngressCharm(CharmBase):
             self._process_status_and_configurations()
 
     def _process_status_and_configurations(self):
+        self._reconcile_lb()
         if (
             self.config.get("tls-ca", None)
             or self.config.get("tls-cert", None)
@@ -601,7 +715,9 @@ class TraefikIngressCharm(CharmBase):
 
         if not hostname:
             self._wipe_ingress_for_all_relations()
-            self.unit.status = WaitingStatus("gateway address unavailable")
+            self.unit.status = BlockedStatus(
+                "Traefik load balancer is unable to obtain an IP or hostname from the cluster."
+            )
             return
 
         if hostname != urlparse(f"scheme://{hostname}").hostname:
@@ -682,7 +798,9 @@ class TraefikIngressCharm(CharmBase):
         """Check whether we have an external host set, and traefik is running."""
         if not self._external_host:
             self._wipe_ingress_for_all_relations()  # fixme: no side-effects in prop
-            self.unit.status = WaitingStatus("gateway address unavailable")
+            self.unit.status = BlockedStatus(
+                "Traefik load balancer is unable to obtain an IP or hostname from the cluster."
+            )
             return False
         if not self.traefik.is_ready:
             self.unit.status = WaitingStatus(f"waiting for service: '{self.traefik.service_name}'")
@@ -713,6 +831,7 @@ class TraefikIngressCharm(CharmBase):
         #  self._process_status_and_configurations(). For this reason, the static config in
         #  traefik.STATIC_CONFIG_PATH will be updated only on update-status.
         #  https://github.com/canonical/operator/issues/888
+        self._reconcile_lb()
 
     def _handle_traefik_route_ready(self, event: TraefikRouteRequirerReadyEvent):
         """A traefik_route charm has published some ingress data."""
@@ -744,7 +863,7 @@ class TraefikIngressCharm(CharmBase):
                 "Failed to merge traefik-route static configs. " "Check logs for details."
             )
             return
-
+        self._reconcile_lb()
         self.unit.status = ActiveStatus(f"Serving at {self._external_host}")
 
     def _process_ingress_relation(self, relation: Relation):
@@ -818,60 +937,47 @@ class TraefikIngressCharm(CharmBase):
         self._update_dynamic_config_route(relation, dct)
 
     def _update_dynamic_config_route(self, relation: Relation, config: dict):
-        if "http" in config.keys():
-            route_config = config["http"].get("routers", {})
-            # we want to generate and add a new router with TLS config for each routed path.
-            # as we mutate the dict, we need to work on a copy
-            for router_name in route_config.copy().keys():
-                route_rule = route_config.get(router_name, {}).get("rule", "")
-                service_name = route_config.get(router_name, {}).get("service", "")
-                entrypoints = route_config.get(router_name, {}).get("entryPoints", [])
-                if len(entrypoints) > 0:
-                    # if entrypoint exists, we check if it's a custom entrypoint to pass it to generated TLS config
-                    entrypoint = entrypoints[0] if entrypoints[0] != "web" else None
-                else:
-                    entrypoint = None
+        def _process_routes(route_config, protocol):
+            for router_name in list(route_config.keys()):  # Work on a copy of the keys
+                router_details = route_config[router_name]
+                route_rule = router_details.get("rule", "")
+                service_name = router_details.get("service", "")
+                entrypoints = router_details.get("entryPoints", [])
+                tls_config = router_details.get("tls", {})
+
+                # Skip generating new routes if passthrough is True
+                if tls_config.get("passthrough", False):
+                    logger.debug(
+                        f"Skipping TLS generation for {protocol} router {router_name} (passthrough True)."
+                    )
+                    continue
+
+                entrypoint = entrypoints[0] if entrypoints else None
+                if protocol == "http" and entrypoint == "web":
+                    entrypoint = None  # Ignore "web" entrypoint for HTTP
 
                 if not all([router_name, route_rule, service_name]):
-                    logger.debug("Not enough information to generate a TLS config!")
-                else:
-                    config["http"]["routers"].update(
-                        self.traefik.generate_tls_config_for_route(
-                            router_name,
-                            route_rule,
-                            service_name,
-                            # we're behind an is_ready guard, so this is guaranteed not to raise
-                            self.external_host,
-                            entrypoint,
-                        )
+                    logger.debug(
+                        f"Not enough information to generate a TLS config for {protocol} router {router_name}!"
                     )
-        if "tcp" in config.keys():
-            route_config = config["tcp"].get("routers", {})
-            # we want to generate and add a new router with TLS config for each routed path.
-            # as we mutate the dict, we need to work on a copy
-            for router_name in route_config.copy().keys():
-                route_rule = route_config.get(router_name, {}).get("rule", "")
-                service_name = route_config.get(router_name, {}).get("service", "")
-                entrypoints = route_config.get(router_name, {}).get("entryPoints", [])
-                if len(entrypoints) > 0:
-                    # for grpc, all entrypoints are custom
-                    entrypoint = entrypoints[0]
-                else:
-                    entrypoint = None
+                    continue
 
-                if not all([router_name, route_rule, service_name]):
-                    logger.debug("Not enough information to generate a TLS config!")
-                else:
-                    config["tcp"]["routers"].update(
-                        self.traefik.generate_tls_config_for_route(
-                            router_name,
-                            route_rule,
-                            service_name,
-                            # we're behind an is_ready guard, so this is guaranteed not to raise
-                            self.external_host,
-                            entrypoint,
-                        )
+                config[protocol]["routers"].update(
+                    self.traefik.generate_tls_config_for_route(
+                        router_name,
+                        route_rule,
+                        service_name,
+                        self.external_host,
+                        entrypoint,
                     )
+                )
+
+        if "http" in config:
+            _process_routes(config["http"].get("routers", {}), protocol="http")
+
+        if "tcp" in config:
+            _process_routes(config["tcp"].get("routers", {}), protocol="tcp")
+
         self._push_configurations(relation, config)
 
     def _provide_ingress(
@@ -1125,9 +1231,7 @@ class TraefikIngressCharm(CharmBase):
         if external_hostname := self.model.config.get("external_hostname"):
             return cast(str, external_hostname)
 
-        return _get_loadbalancer_status(
-            namespace=self.model.name, service_name=f"{self.app.name}-lb"
-        )
+        return self._get_loadbalancer_status
 
     @property
     def external_host(self) -> str:
@@ -1233,25 +1337,82 @@ def is_valid_hostname(hostname: str) -> bool:
     return all(allowed.match(label) for label in labels)
 
 
-@functools.lru_cache
-def _get_loadbalancer_status(namespace: str, service_name: str) -> Optional[str]:
-    client = Client()  # type: ignore
+def validate_annotation_key(key: str) -> bool:
+    """Validate the annotation key."""
+    if len(key) > 253:
+        logger.error(f"Invalid annotation key: '{key}'. Key length exceeds 253 characters.")
+        return False
+
+    if not is_qualified_name(key.lower()):
+        logger.error(f"Invalid annotation key: '{key}'. Must follow Kubernetes annotation syntax.")
+        return False
+
+    if key.startswith(("kubernetes.io/", "k8s.io/")):
+        logger.error(f"Invalid annotation: Key '{key}' uses a reserved prefix.")
+        return False
+
+    return True
+
+
+def validate_annotation_value(value: str) -> bool:
+    """Validate the annotation value."""
+    if not ANNOTATION_VALUE_PATTERN.match(value):
+        logger.error(
+            f"Invalid annotation value: '{value}'. Must follow Kubernetes annotation syntax."
+        )
+        return False
+
+    return True
+
+
+def parse_annotations(annotations: Optional[str]) -> Optional[Dict[str, str]]:
+    """Parse and validate annotations from a string.
+
+    logic is based on Kubernetes annotation validation as described here:
+    https://github.com/kubernetes/apimachinery/blob/v0.31.3/pkg/api/validation/objectmeta.go#L44
+    """
+    if not annotations:
+        return {}
+
+    annotations = annotations.strip().rstrip(",")  # Trim spaces and trailing commas
+
     try:
-        traefik_service = client.get(Service, name=service_name, namespace=namespace)
-    except ApiError as e:
-        logger.warning(f"Got ApiError when trying to get Loadbalancer status: {e}")
+        parsed_annotations = {
+            key.strip(): value.strip()
+            for key, value in (pair.split("=", 1) for pair in annotations.split(",") if pair)
+        }
+    except ValueError:
+        logger.error(
+            "Invalid format for 'loadbalancer_annotations'. "
+            "Expected format: key1=value1,key2=value2."
+        )
         return None
 
-    if not (status := traefik_service.status):  # type: ignore
-        return None
-    if not (load_balancer_status := status.loadBalancer):
-        return None
-    if not (ingress_addresses := load_balancer_status.ingress):
-        return None
-    if not (ingress_address := ingress_addresses[0]):
-        return None
+    # Validate each key-value pair
+    for key, value in parsed_annotations.items():
+        if not validate_annotation_key(key) or not validate_annotation_value(value):
+            return None
 
-    return ingress_address.hostname or ingress_address.ip
+    return parsed_annotations
+
+
+def is_qualified_name(value: str) -> bool:
+    """Check if a value is a valid Kubernetes qualified name."""
+    parts = value.split("/")
+    if len(parts) > 2:
+        return False  # Invalid if more than one '/'
+
+    if len(parts) == 2:  # If prefixed
+        prefix, name = parts
+        if not prefix or not DNS1123_SUBDOMAIN_PATTERN.match(prefix):
+            return False
+    else:
+        name = parts[0]  # No prefix
+
+    if not name or len(name) > 63 or not QUALIFIED_NAME_PATTERN.match(name):
+        return False
+
+    return True
 
 
 def _get_relation_type(relation: Relation) -> _IngressRelationType:

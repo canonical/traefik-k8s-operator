@@ -35,6 +35,42 @@ CONFIG = {
     }
 }
 
+TCP_CONFIG_WITH_PASSTHROUGH = {
+    "tcp": {
+        "routers": {
+            "juju-foo-router": {
+                "entryPoints": ["websecure"],
+                "rule": "HostSNI(`*`)",
+                "service": "juju-foo-service",
+                "tls": {"passthrough": True},  # Passthrough enabled
+            }
+        },
+        "services": {
+            "juju-foo-service": {
+                "loadBalancer": {"servers": [{"address": "foo.testmodel-endpoints.local:8080"}]}
+            }
+        },
+    }
+}
+
+HTTP_CONFIG_WITH_PASSTHROUGH = {
+    "http": {
+        "routers": {
+            "juju-foo-router": {
+                "entryPoints": ["web"],
+                "rule": "PathPrefix(`/path`)",
+                "service": "juju-foo-service",
+                "tls": {"passthrough": True},  # Passthrough enabled
+            }
+        },
+        "services": {
+            "juju-foo-service": {
+                "loadBalancer": {"servers": [{"url": "http://foo.testmodel-endpoints.local:8080"}]}
+            }
+        },
+    }
+}
+
 CONFIG_WITH_TLS = {
     "http": {
         "routers": {
@@ -93,7 +129,6 @@ def topology(harness):
     return topology
 
 
-@patch("charm.KubernetesServicePatch", lambda *_, **__: None)
 def initialize_and_setup_tr_relation(harness):
     harness.update_config({"external_hostname": "testhostname"})
     harness.set_leader(True)
@@ -339,3 +374,51 @@ def test_static_config_updates_tcp_entrypoints(
 
     # AND that shows up in the service ports
     assert [p for p in charm._service_ports if p.port == 6767][0]
+
+
+def test_tls_http_passthrough_no_tls_added(harness: Harness[TraefikIngressCharm]):
+    """Ensure no TLS configuration is generated for routes with tls.passthrough."""
+    tr_relation_id, relation = initialize_and_setup_tr_relation(harness)
+    charm = harness.charm
+
+    # Update relation with the passthrough configuration
+    config = yaml.dump(HTTP_CONFIG_WITH_PASSTHROUGH)
+    harness.update_relation_data(tr_relation_id, REMOTE_APP_NAME, {"config": config})
+
+    # Verify the relation is ready and the configuration is loaded
+    assert charm.traefik_route.is_ready(relation)
+    assert charm.traefik_route.get_config(relation) == config
+
+    # Check the dynamic configuration written to the container
+    file = f"/opt/traefik/juju/juju_ingress_{relation.name}_{relation.id}_{relation.app.name}.yaml"
+    dynamic_config = yaml.safe_load(charm.container.pull(file).read())
+
+    # Ensure the passthrough configuration is preserved
+    assert dynamic_config == HTTP_CONFIG_WITH_PASSTHROUGH
+
+    # Check no additional TLS configurations are added
+    assert "juju-foo-router-tls" not in dynamic_config["http"]["routers"]
+
+
+def test_tls_tcp_passthrough_no_tls_added(harness: Harness[TraefikIngressCharm]):
+    """Ensure no TLS configuration is generated for routes with tls.passthrough."""
+    tr_relation_id, relation = initialize_and_setup_tr_relation(harness)
+    charm = harness.charm
+
+    # Update relation with the passthrough configuration
+    config = yaml.dump(TCP_CONFIG_WITH_PASSTHROUGH)
+    harness.update_relation_data(tr_relation_id, REMOTE_APP_NAME, {"config": config})
+
+    # Verify the relation is ready and the configuration is loaded
+    assert charm.traefik_route.is_ready(relation)
+    assert charm.traefik_route.get_config(relation) == config
+
+    # Check the dynamic configuration written to the container
+    file = f"/opt/traefik/juju/juju_ingress_{relation.name}_{relation.id}_{relation.app.name}.yaml"
+    dynamic_config = yaml.safe_load(charm.container.pull(file).read())
+
+    # Ensure the passthrough configuration is preserved
+    assert dynamic_config == TCP_CONFIG_WITH_PASSTHROUGH
+
+    # Check no additional TLS configurations are added
+    assert "juju-foo-router-tls" not in dynamic_config["tcp"]["routers"]

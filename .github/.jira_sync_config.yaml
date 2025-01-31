@@ -1,5 +1,5 @@
 settings:
-  jira_project_key: "OPENG"
+  jira_project_key: "SMS"
   status_mapping:
     opened: Untriaged
     closed: done
@@ -7,8 +7,7 @@ settings:
     
   components:
     - traefik
-    - team-mesh
-      
+
   add_gh_comment: false
   sync_description: false
   sync_comments: false
