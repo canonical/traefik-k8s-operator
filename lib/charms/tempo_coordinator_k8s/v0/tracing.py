@@ -110,7 +110,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 3
+LIBPATCH = 5
 
 PYDEPS = ["pydantic"]
 
@@ -891,13 +891,15 @@ class TracingEndpointRequirer(Object):
             filter(lambda i: i.protocol.name == protocol, app_data.receivers)
         )
         if not receivers:
-            logger.error(f"no receiver found with protocol={protocol!r}")
+            # it can happen if the charm requests tracing protocols, but the relay (such as grafana-agent) isn't yet
+            # connected to the tracing backend. In this case, it's not an error the charm author can do anything about
+            logger.warning(f"no receiver found with protocol={protocol!r}.")
             return
         if len(receivers) > 1:
-            logger.error(
+            # if we have more than 1 receiver that matches, it shouldn't matter which receiver we'll be using.
+            logger.warning(
                 f"too many receivers with protocol={protocol!r}; using first one. Found: {receivers}"
             )
-            return
 
         receiver = receivers[0]
         return receiver.url
@@ -949,7 +951,6 @@ def charm_tracing_config(
      proceed with charm tracing (with or without tls, as appropriate)
 
     Usage:
-      If you are using charm_tracing >= v1.9:
     >>> from lib.charms.tempo_coordinator_k8s.v0.charm_tracing import trace_charm
     >>> from lib.charms.tempo_coordinator_k8s.v0.tracing import charm_tracing_config
     >>> @trace_charm(tracing_endpoint="my_endpoint", cert_path="cert_path")
@@ -959,24 +960,6 @@ def charm_tracing_config(
     >>>         self.tracing = TracingEndpointRequirer(...)
     >>>         self.my_endpoint, self.cert_path = charm_tracing_config(
     ...             self.tracing, self._cert_path)
-
-      If you are using charm_tracing < v1.9:
-    >>> from lib.charms.tempo_coordinator_k8s.v0.charm_tracing import trace_charm
-    >>> from lib.charms.tempo_coordinator_k8s.v0.tracing import charm_tracing_config
-    >>> @trace_charm(tracing_endpoint="my_endpoint", cert_path="cert_path")
-    >>> class MyCharm(...):
-    >>>     _cert_path = "/path/to/cert/on/charm/container.crt"
-    >>>     def __init__(self, ...):
-    >>>         self.tracing = TracingEndpointRequirer(...)
-    >>>         self._my_endpoint, self._cert_path = charm_tracing_config(
-    ...             self.tracing, self._cert_path)
-    >>>     @property
-    >>>     def my_endpoint(self):
-    >>>         return self._my_endpoint
-    >>>     @property
-    >>>     def cert_path(self):
-    >>>         return self._cert_path
-
     """
     if not endpoint_requirer.is_ready():
         return None, None
