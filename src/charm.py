@@ -213,7 +213,7 @@ class TraefikIngressCharm(CharmBase):
 
         self.traefik_route = TraefikRouteProvider(
             charm=self,
-            external_host=self._external_host,
+            external_host=self._external_host,  # type: ignore
             scheme=self._scheme,  # type: ignore
         )
 
@@ -1290,7 +1290,7 @@ class TraefikIngressCharm(CharmBase):
             if is_hostname(name) and not name.endswith(".svc.cluster.local"):
                 # In case we can do a DNS lookup on that IP address,
                 #  return the resolved hostname as well as the IP address to be both included in the certificate SANS.
-                return [name, target]
+                return [name, target] if target else [name]
 
         # If all else fails, we'd rather use the bare IP
         return [target] if target else []
