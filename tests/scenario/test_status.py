@@ -38,7 +38,7 @@ def test_start_traefik_no_hostname(traefik_ctx, *_):
 
 
 @patch("charm.TraefikIngressCharm._external_host", PropertyMock(return_value="1.1.1.1"))
-def test_start_traefik_no_hostname(traefik_ctx, *_):
+def test_start_traefik_subdomain_without_hostname(traefik_ctx, *_):
     # GIVEN external_hostname is not set but routing_mode is set to subdomain
     # WHEN a `start` hook fires
     state = State(
