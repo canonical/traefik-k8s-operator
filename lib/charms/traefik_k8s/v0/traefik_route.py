@@ -21,7 +21,7 @@ charmcraft fetch-lib charms.traefik_k8s.v0.traefik_route
 To use the library from the provider side (Traefik):
 
 ```yaml
-requires:
+provides:
     traefik_route:
         interface: traefik_route
         limit: 1
@@ -54,6 +54,8 @@ requires:
         optional: false
 ```
 
+Example usage without raw flag (default behavior):
+
 ```python
 # ...
 from charms.traefik_k8s.v0.traefik_route import TraefikRouteRequirer
@@ -63,13 +65,43 @@ class TraefikRouteCharm(CharmBase):
     # ...
     traefik_route = TraefikRouteRequirer(
         self, self.model.relations.get("traefik-route"),
-        "traefik-route"
+        "traefik-route",
+        raw_config=False  # Default: Traefik may append TLS configs
     )
     if traefik_route.is_ready():
         traefik_route.submit_to_traefik(
             config={'my': {'traefik': 'configuration'}}
         )
+```
 
+Example usage with raw flag enabled (full control over TLS configuration):
+
+```python
+# ...
+from charms.traefik_k8s.v0.traefik_route import TraefikRouteRequirer
+
+class TraefikRouteCharm(CharmBase):
+  def __init__(self, *args):
+    # ...
+    traefik_route = TraefikRouteRequirer(
+        self, self.model.relations.get("traefik-route"),
+        "traefik-route",
+        raw_config=True  # Traefik will not modify TLS settings
+    )
+    if self.traefik_route.is_ready():
+        self.traefik_route.submit_to_traefik(
+            config={
+                'http': {
+                    'routers': {
+                        'secure-route': {
+                            'rule': 'Host(`secure.example.com`)',
+                            'service': 'my-service',
+                            'tls': {'certResolver': 'myresolver'}
+                        }
+                    }
+                }
+            }
+        )
 ```
 """
 import logging
