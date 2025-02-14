@@ -934,7 +934,48 @@ class TraefikIngressCharm(CharmBase):
         if not dct:
             return
 
-        self._push_configurations(relation, dct)
+        is_raw = self.traefik_route.is_raw_enabled(relation)
+
+        if is_raw:
+            self._push_configurations(relation, config)
+        else:
+            self._update_dynamic_config_route(relation, dct)
+
+    def _update_dynamic_config_route(self, relation: Relation, config: dict):
+        def _process_routes(route_config, protocol):
+            for router_name in list(route_config.keys()):  # Work on a copy of the keys
+                router_details = route_config[router_name]
+                route_rule = router_details.get("rule", "")
+                service_name = router_details.get("service", "")
+                entrypoints = router_details.get("entryPoints", [])
+
+                entrypoint = entrypoints[0] if entrypoints else None
+                if protocol == "http" and entrypoint == "web":
+                    entrypoint = None  # Ignore "web" entrypoint for HTTP
+
+                if not all([router_name, route_rule, service_name]):
+                    logger.debug(
+                        f"Not enough information to generate a TLS config for {protocol} router {router_name}!"
+                    )
+                    continue
+
+                config[protocol]["routers"].update(
+                    self.traefik.generate_tls_config_for_route(
+                        router_name,
+                        route_rule,
+                        service_name,
+                        self.external_host,
+                        entrypoint,
+                    )
+                )
+
+        if "http" in config:
+            _process_routes(config["http"].get("routers", {}), protocol="http")
+
+        if "tcp" in config:
+            _process_routes(config["tcp"].get("routers", {}), protocol="tcp")
+
+        self._push_configurations(relation, config)
 
     def _provide_ingress(
         self,

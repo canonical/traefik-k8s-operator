@@ -88,7 +88,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 1
+LIBPATCH = 2
 
 log = logging.getLogger(__name__)
 
@@ -266,6 +266,12 @@ class TraefikRouteProvider(Object):
             return None
         return relation.data[relation.app].get("config")
 
+    def is_raw_enabled(self, relation: Relation) -> bool:
+        """Check if the raw config mode is enabled by the remote application."""
+        if not self.is_ready(relation):
+            return False
+        return relation.data[relation.app].get("raw") == "True"
+
     def get_static_config(self, relation: Relation) -> Optional[str]:
         """Retrieve the static config published by the remote application."""
         if not self.is_ready(relation):
@@ -274,29 +280,48 @@ class TraefikRouteProvider(Object):
 
 
 class TraefikRouteRequirer(Object):
-    """Wrapper for the requirer side of traefik-route.
+    """Handles the requirer side of the traefik-route interface.
 
-    The traefik_route requirer will publish to the application databag an object like:
+    This class provides an API for publishing dynamic and static configurations
+    to the Traefik charm through the `traefik-route` relation. It does not perform
+    validation on the provided configurations, assuming that Traefik will handle
+    valid YAML-encoded data.
+
+    The application databag follows the structure:
+
+    ```json
     {
-        'config': <Traefik_config>
-        'static': <Traefik_config>  # optional
+        "config": "<Traefik dynamic config YAML>",
+        "static": "<Traefik static config YAML>",  # Optional, requires Traefik restart
+        "raw": "<bool>"  # Determines if Traefik should append TLS config for routes
     }
+    ```
 
-    NB: TraefikRouteRequirer does no validation; it assumes that the
-    traefik-route-k8s charm will provide valid yaml-encoded config.
-    The TraefikRouteRequirer provides api to store this config in the
-    application databag.
+    **Deprecation Notice:**
+    The functionality where Traefik automatically upgrades dynamic configurations
+    to include TLS routes is **deprecated**. Users should now pass the full
+    Traefik configuration, including any required TLS settings.
+
+    The `raw` flag remains for backward compatibility to avoid breaking
+    existing charms that rely on the previous behavior.
     """
 
     on = TraefikRouteRequirerEvents()  # pyright: ignore
     _stored = StoredState()
 
-    def __init__(self, charm: CharmBase, relation: Relation, relation_name: str = "traefik-route"):
+    def __init__(
+        self,
+        charm: CharmBase,
+        relation: Relation,
+        relation_name: str = "traefik-route",
+        raw: Optional[bool] = False,
+    ):
         super(TraefikRouteRequirer, self).__init__(charm, relation_name)
         self._stored.set_default(external_host=None, scheme=None)
 
         self._charm = charm
         self._relation = relation
+        self._raw = raw
 
         self.framework.observe(
             self._charm.on[relation_name].relation_changed, self._on_relation_changed
@@ -359,21 +384,32 @@ class TraefikRouteRequirer(Object):
         return self._relation is not None
 
     def submit_to_traefik(self, config: dict, static: Optional[dict] = None):
-        """Relay an ingress configuration data structure to traefik.
+        """Submit an ingress configuration to Traefik.
 
-        This will publish to the traefik-route relation databag
-        a chunk of Traefik dynamic config that the traefik charm on the other end can pick
-        up and apply.
+        This method publishes dynamic and static configuration data to the
+        `traefik-route` relation, allowing Traefik to pick up and apply the settings.
 
-        Use ``static`` if you need to update traefik's **static** configuration.
-        Note that this will force traefik to restart to comply.
+        - **Dynamic config (`config`)**: Defines routing rules for Traefik.
+        - **Static config (`static`)**: Requires a Traefik restart to take effect.
+
+        Raises:
+            UnauthorizedError: If the unit is not the leader.
         """
         if not self._charm.unit.is_leader():
             raise UnauthorizedError()
 
         app_databag = self._relation.data[self._charm.app]
 
-        # Traefik thrives on yaml, feels pointless to talk json to Route
+        log.warning(
+            "Deprecation Notice: The automatic TLS upgrade for dynamic configurations"
+            "is deprecated. Please provide the full Traefik configuration, including"
+            "any required TLS settings. The `raw` flag is maintained for backward"
+            "compatibility and to prevent disruptions in existing charms."
+        )
+
+        app_databag["raw"] = str(self._raw)
+
+        # Traefik thrives on YAML, feels pointless to talk JSON to Route
         app_databag["config"] = yaml.safe_dump(config)
 
         if static:
