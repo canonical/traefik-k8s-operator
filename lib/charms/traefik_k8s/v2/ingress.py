@@ -84,7 +84,7 @@ LIBAPI = 2
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 14
+LIBPATCH = 15
 
 PYDEPS = ["pydantic"]
 
@@ -336,6 +336,10 @@ class NotReadyError(IngressError):
 
 class DataValidationError(IngressError):
     """Raised when data validation fails on IPU relation data."""
+
+
+class IpNotAvailableError(IngressError):
+    """Raised when retrieving ip information from juju failed."""
 
 
 class _IngressPerAppBase(Object):
@@ -710,7 +714,12 @@ class IngressPerAppRequirer(_IngressPerAppBase):
 
     def _handle_relation(self, event):
         # created, joined or changed: if we have auto data: publish it
-        self._publish_auto_data()
+        try:
+            self._publish_auto_data()
+        except IpNotAvailableError as e:
+            log.error(e)
+            event.defer()
+            return
         if self.is_ready():
             # Avoid spurious events, emit only when there is a NEW URL available
             new_url = (
@@ -728,7 +737,12 @@ class IngressPerAppRequirer(_IngressPerAppBase):
 
     def _handle_upgrade_or_leader(self, event):
         """On upgrade/leadership change: ensure we publish the data we have."""
-        self._publish_auto_data()
+        try:
+            self._publish_auto_data()
+        except IpNotAvailableError as e:
+            log.error(e)
+            event.defer()
+            return
 
     def is_ready(self):
         """The Requirer is ready if the Provider has sent valid data."""
@@ -794,7 +808,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
             ):
                 ip = str(bind_address)
             else:
-                log.error("failed to retrieve ip information from juju")
+                raise IpNotAvailableError("failed to retrieve ip information from juju")
 
         unit_databag = relation.data[self.unit]
         try:

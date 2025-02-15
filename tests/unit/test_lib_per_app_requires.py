@@ -12,6 +12,7 @@ from charms.traefik_k8s.v2.ingress import (
     IngressPerAppReadyEvent,
     IngressPerAppRequirer,
     IngressPerAppRevokedEvent,
+    IpNotAvailableError,
 )
 from ops.charm import CharmBase
 from ops.testing import Harness
@@ -157,12 +158,5 @@ class TestIPAEventsEmission(unittest.TestCase):
             self.harness.begin_with_initial_hooks()
             self.rel_id = self.harness.add_relation("ingress", "traefik-app")
             self.harness.add_relation_unit(self.rel_id, "traefik-app/0")
-            self.harness.charm.ipa.provide_ingress_requirements(port=80)
-
-            self.assertEqual(
-                # None is default so it gets omitted
-                self.harness.get_relation_data(self.rel_id, "ipa-requirer/0").get(
-                    "ip", "<OMITTED>"
-                ),
-                "<OMITTED>",
-            )
+            with self.assertRaises(IpNotAvailableError):
+                self.harness.charm.ipa.provide_ingress_requirements(port=80)
