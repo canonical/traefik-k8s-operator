@@ -927,7 +927,12 @@ class TraefikIngressCharm(CharmBase):
         if not dct:
             return
 
-        self._update_dynamic_config_route(relation, dct)
+        is_raw = self.traefik_route.is_raw_enabled(relation)
+
+        if is_raw:
+            self._push_configurations(relation, config)
+        else:
+            self._update_dynamic_config_route(relation, dct)
 
     def _update_dynamic_config_route(self, relation: Relation, config: dict):
         def _process_routes(route_config, protocol):
@@ -936,14 +941,6 @@ class TraefikIngressCharm(CharmBase):
                 route_rule = router_details.get("rule", "")
                 service_name = router_details.get("service", "")
                 entrypoints = router_details.get("entryPoints", [])
-                tls_config = router_details.get("tls", {})
-
-                # Skip generating new routes if passthrough is True
-                if tls_config.get("passthrough", False):
-                    logger.debug(
-                        f"Skipping TLS generation for {protocol} router {router_name} (passthrough True)."
-                    )
-                    continue
 
                 entrypoint = entrypoints[0] if entrypoints else None
                 if protocol == "http" and entrypoint == "web":

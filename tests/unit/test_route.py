@@ -71,36 +71,6 @@ HTTP_CONFIG_WITH_PASSTHROUGH = {
     }
 }
 
-CONFIG_WITH_TLS = {
-    "http": {
-        "routers": {
-            "juju-foo-router": {
-                "entryPoints": ["web"],
-                "rule": "PathPrefix(`/path`)",
-                "service": "juju-foo-service",
-            },
-            "juju-foo-router-tls": {
-                "entryPoints": ["websecure"],
-                "rule": "PathPrefix(`/path`)",
-                "service": "juju-foo-service",
-                "tls": {
-                    "domains": [
-                        {
-                            "main": "testhostname",
-                            "sans": ["*.testhostname"],
-                        },
-                    ],
-                },
-            },
-        },
-        "services": {
-            "juju-foo-service": {
-                "loadBalancer": {"servers": [{"url": "http://foo.testmodel-endpoints.local:8080"}]}
-            }
-        },
-    }
-}
-
 
 @pytest.fixture(scope="function")
 def harness() -> Harness[TraefikIngressCharm]:
@@ -181,19 +151,6 @@ def test_tr_ready_handler_called(harness: Harness[TraefikIngressCharm]):
     assert mocked_handle.called
 
 
-def test_tls_is_added(harness: Harness[TraefikIngressCharm]):
-    tr_relation_id, relation = initialize_and_setup_tr_relation(harness)
-    charm = harness.charm
-    config = yaml.dump(CONFIG)
-    harness.update_relation_data(tr_relation_id, REMOTE_APP_NAME, {"config": config})
-
-    assert charm.traefik_route.is_ready(relation)
-    assert charm.traefik_route.get_config(relation) == config
-    file = f"/opt/traefik/juju/juju_ingress_{relation.name}_{relation.id}_{relation.app.name}.yaml"
-    conf = yaml.safe_load(charm.container.pull(file).read())
-    assert conf == CONFIG_WITH_TLS
-
-
 def test_static_config(harness: Harness[TraefikIngressCharm], topology: JujuTopology):
     tr_relation_id, relation = initialize_and_setup_tr_relation(harness)
     config = yaml.dump(CONFIG)
@@ -235,7 +192,7 @@ def test_static_config(harness: Harness[TraefikIngressCharm], topology: JujuTopo
 
     # verify the dynamic config is there too
     file = f"/opt/traefik/juju/juju_ingress_{relation.name}_{relation.id}_{relation.app.name}.yaml"
-    assert yaml.safe_load(charm.container.pull(file).read()) == CONFIG_WITH_TLS
+    assert yaml.safe_load(charm.container.pull(file).read()) == CONFIG
 
 
 def test_static_config_broken(harness: Harness[TraefikIngressCharm], topology: JujuTopology):
@@ -288,7 +245,7 @@ def test_static_config_broken(harness: Harness[TraefikIngressCharm], topology: J
 
     # THEN  the dynamic config is there too
     file = f"/opt/traefik/juju/juju_ingress_{relation.name}_{relation.id}_{relation.app.name}.yaml"
-    assert yaml.safe_load(charm.container.pull(file).read()) == CONFIG_WITH_TLS
+    assert yaml.safe_load(charm.container.pull(file).read()) == CONFIG
 
 
 def test_static_config_partially_broken(
