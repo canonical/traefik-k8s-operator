@@ -49,3 +49,6 @@ override.tf.json
 .terraformrc
 terraform.rc
 .terraform.lock.hcl
+
+# Tests generate this file
+.charm_tracing_buffer.raw
