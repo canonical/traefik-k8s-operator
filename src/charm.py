@@ -957,7 +957,7 @@ class TraefikIngressCharm(CharmBase):
                         entrypoint,
                     )
                 )
-        
+
         if "http" in config:
             _process_routes(config["http"].get("routers", {}), protocol="http")
 

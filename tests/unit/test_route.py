@@ -35,14 +35,43 @@ CONFIG = {
     }
 }
 
-TCP_CONFIG_WITH_PASSTHROUGH = {
+CONFIG_WITH_TLS = {
+    "http": {
+        "routers": {
+            "juju-foo-router": {
+                "entryPoints": ["web"],
+                "rule": "PathPrefix(`/path`)",
+                "service": "juju-foo-service",
+            },
+            "juju-foo-router-tls": {
+                "entryPoints": ["websecure"],
+                "rule": "PathPrefix(`/path`)",
+                "service": "juju-foo-service",
+                "tls": {
+                    "domains": [
+                        {
+                            "main": "testhostname",
+                            "sans": ["*.testhostname"],
+                        },
+                    ],
+                },
+            },
+        },
+        "services": {
+            "juju-foo-service": {
+                "loadBalancer": {"servers": [{"url": "http://foo.testmodel-endpoints.local:8080"}]}
+            }
+        },
+    }
+}
+
+TCP_CONFIG = {
     "tcp": {
         "routers": {
             "juju-foo-router": {
-                "entryPoints": ["websecure"],
+                "entryPoints": ["test-tcp"],
                 "rule": "HostSNI(`*`)",
                 "service": "juju-foo-service",
-                "tls": {"passthrough": True},  # Passthrough enabled
             }
         },
         "services": {
@@ -53,19 +82,31 @@ TCP_CONFIG_WITH_PASSTHROUGH = {
     }
 }
 
-HTTP_CONFIG_WITH_PASSTHROUGH = {
-    "http": {
+TCP_CONFIG_WITH_TLS = {
+    "tcp": {
         "routers": {
             "juju-foo-router": {
-                "entryPoints": ["web"],
-                "rule": "PathPrefix(`/path`)",
+                "entryPoints": ["test-tcp"],
+                "rule": "HostSNI(`*`)",
                 "service": "juju-foo-service",
-                "tls": {"passthrough": True},  # Passthrough enabled
-            }
+            },
+            "juju-foo-router-tls": {
+                "entryPoints": ["test-tcp"],
+                "rule": "HostSNI(`*`)",
+                "service": "juju-foo-service",
+                "tls": {
+                    "domains": [
+                        {
+                            "main": "testhostname",
+                            "sans": ["*.testhostname"],
+                        },
+                    ],
+                },
+            },
         },
         "services": {
             "juju-foo-service": {
-                "loadBalancer": {"servers": [{"url": "http://foo.testmodel-endpoints.local:8080"}]}
+                "loadBalancer": {"servers": [{"address": "foo.testmodel-endpoints.local:8080"}]}
             }
         },
     }
@@ -192,7 +233,7 @@ def test_static_config(harness: Harness[TraefikIngressCharm], topology: JujuTopo
 
     # verify the dynamic config is there too
     file = f"/opt/traefik/juju/juju_ingress_{relation.name}_{relation.id}_{relation.app.name}.yaml"
-    assert yaml.safe_load(charm.container.pull(file).read()) == CONFIG
+    assert yaml.safe_load(charm.container.pull(file).read()) == CONFIG_WITH_TLS
 
 
 def test_static_config_broken(harness: Harness[TraefikIngressCharm], topology: JujuTopology):
@@ -245,7 +286,7 @@ def test_static_config_broken(harness: Harness[TraefikIngressCharm], topology: J
 
     # THEN  the dynamic config is there too
     file = f"/opt/traefik/juju/juju_ingress_{relation.name}_{relation.id}_{relation.app.name}.yaml"
-    assert yaml.safe_load(charm.container.pull(file).read()) == CONFIG
+    assert yaml.safe_load(charm.container.pull(file).read()) == CONFIG_WITH_TLS
 
 
 def test_static_config_partially_broken(
@@ -333,49 +374,41 @@ def test_static_config_updates_tcp_entrypoints(
     assert [p for p in charm._service_ports if p.port == 6767][0]
 
 
-def test_tls_http_passthrough_no_tls_added(harness: Harness[TraefikIngressCharm]):
-    """Ensure no TLS configuration is generated for routes with tls.passthrough."""
+@pytest.mark.parametrize(
+    "input_config, raw_flag, expected_config",
+    [
+        # Scenario 1: HTTP config should always have TLS routes appended.
+        (CONFIG, str(False), CONFIG_WITH_TLS),
+        # Scenario 2: HTTP config with raw True still gets TLS routes appended.
+        (CONFIG, str(True), CONFIG_WITH_TLS),
+        # Scenario 3: TCP config, raw False adds TLS configuration.
+        (TCP_CONFIG, str(False), TCP_CONFIG_WITH_TLS),
+        # Scenario 4: TCP config, raw True does not add TLS configuration.
+        (TCP_CONFIG, str(True), TCP_CONFIG),
+    ],
+)
+def test_tls_configuration_parametrized(
+    harness: Harness[TraefikIngressCharm], input_config, raw_flag, expected_config
+):
+    # Setup relation and charm
     tr_relation_id, relation = initialize_and_setup_tr_relation(harness)
     charm = harness.charm
 
-    # Update relation with the passthrough configuration
-    config = yaml.dump(HTTP_CONFIG_WITH_PASSTHROUGH)
-    harness.update_relation_data(tr_relation_id, REMOTE_APP_NAME, {"config": config})
+    # Update the relation with the provided configuration and raw flag.
+    config_yaml = yaml.dump(input_config)
+    harness.update_relation_data(
+        tr_relation_id, REMOTE_APP_NAME, {"config": config_yaml, "raw": raw_flag}
+    )
 
-    # Verify the relation is ready and the configuration is loaded
+    # Verify that the relation is ready and the config is correctly loaded.
     assert charm.traefik_route.is_ready(relation)
-    assert charm.traefik_route.get_config(relation) == config
+    assert charm.traefik_route.get_config(relation) == config_yaml
 
-    # Check the dynamic configuration written to the container
-    file = f"/opt/traefik/juju/juju_ingress_{relation.name}_{relation.id}_{relation.app.name}.yaml"
-    dynamic_config = yaml.safe_load(charm.container.pull(file).read())
+    # Pull the dynamic configuration written to the container.
+    file_path = (
+        f"/opt/traefik/juju/juju_ingress_{relation.name}_{relation.id}_{relation.app.name}.yaml"
+    )
+    dynamic_config = yaml.safe_load(charm.container.pull(file_path).read())
 
-    # Ensure the passthrough configuration is preserved
-    assert dynamic_config == HTTP_CONFIG_WITH_PASSTHROUGH
-
-    # Check no additional TLS configurations are added
-    assert "juju-foo-router-tls" not in dynamic_config["http"]["routers"]
-
-
-def test_tls_tcp_passthrough_no_tls_added(harness: Harness[TraefikIngressCharm]):
-    """Ensure no TLS configuration is generated for routes with tls.passthrough."""
-    tr_relation_id, relation = initialize_and_setup_tr_relation(harness)
-    charm = harness.charm
-
-    # Update relation with the passthrough configuration
-    config = yaml.dump(TCP_CONFIG_WITH_PASSTHROUGH)
-    harness.update_relation_data(tr_relation_id, REMOTE_APP_NAME, {"config": config})
-
-    # Verify the relation is ready and the configuration is loaded
-    assert charm.traefik_route.is_ready(relation)
-    assert charm.traefik_route.get_config(relation) == config
-
-    # Check the dynamic configuration written to the container
-    file = f"/opt/traefik/juju/juju_ingress_{relation.name}_{relation.id}_{relation.app.name}.yaml"
-    dynamic_config = yaml.safe_load(charm.container.pull(file).read())
-
-    # Ensure the passthrough configuration is preserved
-    assert dynamic_config == TCP_CONFIG_WITH_PASSTHROUGH
-
-    # Check no additional TLS configurations are added
-    assert "juju-foo-router-tls" not in dynamic_config["tcp"]["routers"]
+    # Validate that the dynamic config matches the expected configuration.
+    assert dynamic_config == expected_config
