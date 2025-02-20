@@ -37,6 +37,22 @@ def test_start_traefik_no_hostname(traefik_ctx, *_):
     )
 
 
+@patch("charm.TraefikIngressCharm._external_host", PropertyMock(return_value="1.1.1.1"))
+def test_start_traefik_subdomain_without_hostname(traefik_ctx, *_):
+    # GIVEN external_hostname is not set but routing_mode is set to subdomain
+    # WHEN a `start` hook fires
+    state = State(
+        config={"routing_mode": "subdomain"},
+        containers=[Container(name="traefik", can_connect=True)],
+    )
+    out = traefik_ctx.run("start", state)
+
+    # THEN unit status is `waiting`
+    assert out.unit_status == BlockedStatus(
+        '"external_hostname" must be set while using routing mode "subdomain"'
+    )
+
+
 @patch("charm.TraefikIngressCharm._external_host", PropertyMock(return_value="foo.bar"))
 @patch("traefik.Traefik.is_ready", PropertyMock(return_value=True))
 @patch("charm.TraefikIngressCharm._static_config_changed", PropertyMock(return_value=False))
