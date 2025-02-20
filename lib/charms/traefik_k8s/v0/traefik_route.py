@@ -66,7 +66,7 @@ class TraefikRouteCharm(CharmBase):
     traefik_route = TraefikRouteRequirer(
         self, self.model.relations.get("traefik-route"),
         "traefik-route",
-        raw_config=False  # Default: Traefik may append TLS configs
+        raw_config=False  # Default: Traefik will append TLS configs
     )
     if traefik_route.is_ready():
         traefik_route.submit_to_traefik(
@@ -86,12 +86,12 @@ class TraefikRouteCharm(CharmBase):
     traefik_route = TraefikRouteRequirer(
         self, self.model.relations.get("traefik-route"),
         "traefik-route",
-        raw_config=True  # Traefik will not modify TLS settings
+        raw_config=True  # Traefik will not modify TLS settings on non HTTP routes
     )
     if self.traefik_route.is_ready():
         self.traefik_route.submit_to_traefik(
             config={
-                'http': {
+                'tcp': {
                     'routers': {
                         'secure-route': {
                             'rule': 'Host(`secure.example.com`)',
@@ -325,17 +325,10 @@ class TraefikRouteRequirer(Object):
     {
         "config": "<Traefik dynamic config YAML>",
         "static": "<Traefik static config YAML>",  # Optional, requires Traefik restart
-        "raw": "<bool>"  # Determines if Traefik should append TLS config for routes
+        "raw": "<bool>"  # Determines if Traefik should append TLS config for non HTTP routes
     }
     ```
 
-    **Deprecation Notice:**
-    The functionality where Traefik automatically upgrades dynamic configurations
-    to include TLS routes is **deprecated**. Users should now pass the full
-    Traefik configuration, including any required TLS settings.
-
-    The `raw` flag remains for backward compatibility to avoid breaking
-    existing charms that rely on the previous behavior.
     """
 
     on = TraefikRouteRequirerEvents()  # pyright: ignore
@@ -354,6 +347,15 @@ class TraefikRouteRequirer(Object):
         self._charm = charm
         self._relation = relation
         self._raw = raw
+
+        if self._raw:
+            log.warning(
+                "WARNING: 'raw' flag is set.\n"
+                "This will prevent Traefik from generating TLS routes for non-HTTP protocols,\n"
+                "even if a TLS provider is configured.\n"
+                "Charm authors should only use this option if they fully understand the implications\n"
+                "and intentionally do not require the appended TLS routes."
+            )
 
         self.framework.observe(
             self._charm.on[relation_name].relation_changed, self._on_relation_changed
@@ -431,13 +433,6 @@ class TraefikRouteRequirer(Object):
             raise UnauthorizedError()
 
         app_databag = self._relation.data[self._charm.app]
-
-        log.warning(
-            "Deprecation Notice: The automatic TLS upgrade for dynamic configurations"
-            "is deprecated. Please provide the full Traefik configuration, including"
-            "any required TLS settings. The `raw` flag is maintained for backward"
-            "compatibility and to prevent disruptions in existing charms."
-        )
 
         app_databag["raw"] = str(self._raw)
 

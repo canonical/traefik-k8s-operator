@@ -935,13 +935,9 @@ class TraefikIngressCharm(CharmBase):
             return
 
         is_raw = self.traefik_route.is_raw_enabled(relation)
+        self._update_dynamic_config_route(relation, dct, is_raw)
 
-        if is_raw:
-            self._push_configurations(relation, config)
-        else:
-            self._update_dynamic_config_route(relation, dct)
-
-    def _update_dynamic_config_route(self, relation: Relation, config: dict):
+    def _update_dynamic_config_route(self, relation: Relation, config: dict, is_raw: bool):
         def _process_routes(route_config, protocol):
             for router_name in list(route_config.keys()):  # Work on a copy of the keys
                 router_details = route_config[router_name]
@@ -968,12 +964,13 @@ class TraefikIngressCharm(CharmBase):
                         entrypoint,
                     )
                 )
-
+        
         if "http" in config:
             _process_routes(config["http"].get("routers", {}), protocol="http")
 
-        if "tcp" in config:
-            _process_routes(config["tcp"].get("routers", {}), protocol="tcp")
+        if not is_raw:
+            if "tcp" in config:
+                _process_routes(config["tcp"].get("routers", {}), protocol="tcp")
 
         self._push_configurations(relation, config)
 
