@@ -66,7 +66,7 @@ class TraefikRouteCharm(CharmBase):
     traefik_route = TraefikRouteRequirer(
         self, self.model.relations.get("traefik-route"),
         "traefik-route",
-        raw_config=False  # Default: Traefik will append TLS configs
+        raw=False  # Default: Traefik will append TLS configs
     )
     if traefik_route.is_ready():
         traefik_route.submit_to_traefik(
@@ -86,7 +86,7 @@ class TraefikRouteCharm(CharmBase):
     traefik_route = TraefikRouteRequirer(
         self, self.model.relations.get("traefik-route"),
         "traefik-route",
-        raw_config=True  # Traefik will not modify TLS settings on non HTTP routes
+        raw=True  # Traefik will not modify TLS settings on non HTTP routes
     )
     if self.traefik_route.is_ready():
         self.traefik_route.submit_to_traefik(
@@ -350,11 +350,8 @@ class TraefikRouteRequirer(Object):
 
         if self._raw:
             log.warning(
-                "WARNING: 'raw' flag is set.\n"
-                "This will prevent Traefik from generating TLS routes for non-HTTP protocols,\n"
-                "even if a TLS provider is configured.\n"
-                "Charm authors should only use this option if they fully understand the implications\n"
-                "and intentionally do not require the appended TLS routes."
+                "Raw mode enabled: TLS routes for non-HTTP protocols will not be auto-generated. "
+                "Enable this only if you fully understand and intend to bypass the additional TLS configuration."
             )
 
         self.framework.observe(
