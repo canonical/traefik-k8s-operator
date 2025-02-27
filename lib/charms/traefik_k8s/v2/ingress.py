@@ -84,7 +84,7 @@ LIBAPI = 2
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 14
+LIBPATCH = 15
 
 PYDEPS = ["pydantic"]
 
@@ -252,6 +252,9 @@ class IngressRequirerAppData(DatabagModel):
     model: str = Field(description="The model the application is in.")
     name: str = Field(description="the name of the app requesting ingress.")
     port: int = Field(description="The port the app wishes to be exposed.")
+    healthcheck_params: Optional[Dict[str, str]] = Field(
+        default=None, description="The path, interval, and timeout used by healthcheck."
+    )
 
     # fields on top of vanilla 'ingress' interface:
     strip_prefix: Optional[bool] = Field(
@@ -663,6 +666,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         host: Optional[str] = None,
         ip: Optional[str] = None,
         port: Optional[int] = None,
+        healthcheck_params: Optional[Dict[str, str]] = None,
         strip_prefix: bool = False,
         redirect_https: bool = False,
         # fixme: this is horrible UX.
@@ -684,6 +688,8 @@ class IngressPerAppRequirer(_IngressPerAppBase):
                 application; if unspecified, the default Kubernetes service name will be used.
             ip: Alternative addressing method other than host to be used by the ingress provider;
                 if unspecified, binding address from juju network API will be used.
+            healthcheck_params: optional dictionary of healthcheck path, interval and timeout;
+                if provided, path is required while interval and timeout will use traefik defaults.
             strip_prefix: configure Traefik to strip the path prefix.
             redirect_https: redirect incoming requests to HTTPS.
             scheme: callable returning the scheme to use when constructing the ingress url.
@@ -694,6 +700,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         """
         super().__init__(charm, relation_name)
         self.charm: CharmBase = charm
+        self.healthcheck_params = healthcheck_params
         self.relation_name = relation_name
         self._strip_prefix = strip_prefix
         self._redirect_https = redirect_https
@@ -822,6 +829,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
                 model=self.model.name,
                 name=self.app.name,
                 scheme=scheme,
+                healthcheck_params=self.healthcheck_params,
                 port=port,
                 strip_prefix=self._strip_prefix,  # type: ignore  # pyright does not like aliases
                 redirect_https=self._redirect_https,  # type: ignore  # pyright does not like aliases
