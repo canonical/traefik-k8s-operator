@@ -362,6 +362,7 @@ class Traefik:
         external_host: str,
         forward_auth_app: bool,
         forward_auth_config: Optional[ForwardAuthConfig],
+        healthcheck_params: Optional[dict],
     ) -> dict:
         """Generate a config dict for Ingress(PerApp)."""
         # purge potential Nones
@@ -376,6 +377,7 @@ class Traefik:
             external_host=external_host,
             forward_auth_app=forward_auth_app,
             forward_auth_config=forward_auth_config,
+            healthcheck_params=healthcheck_params,
         )
 
     def get_per_leader_http_config(
@@ -414,6 +416,7 @@ class Traefik:
         external_host: str,
         forward_auth_app: bool,
         forward_auth_config: Optional[ForwardAuthConfig],
+        healthcheck_params: Optional[dict] = None,
     ) -> Dict[str, Any]:
         """Generate a configuration segment.
 
@@ -467,6 +470,12 @@ class Traefik:
         service_def = {
             "loadBalancer": lb_def,
         }
+
+        if healthcheck_params and "path" in healthcheck_params:
+            # Path is a mandatory parameter for traefik healthcheck
+            service_def["loadBalancer"]["healthCheck"] = {
+                key: value for key, value in healthcheck_params.items() if value is not None
+            }
 
         if is_reverse_termination:
             # i.e. traefik itself is not related to tls certificates, but the ingress requirer is

@@ -1061,6 +1061,7 @@ class TraefikIngressCharm(CharmBase):
             port=data.app.port,
             external_host=self.external_host,
             hosts=[udata.host for udata in data.units],
+            healthcheck_params=data.app.healthcheck_params,
             forward_auth_app=self.forward_auth.is_protected_app(app=data.app.name),
             forward_auth_config=self.forward_auth.get_provider_info(),
         )
