@@ -8,9 +8,9 @@ on:
 jobs:
   pull-request:
     name: PR
-    uses: canonical/observability/.github/workflows/charm-pull-request.yaml@main
+    uses: canonical/observability/.github/workflows/charm-pull-request.yaml@v0
     secrets: inherit
 
   terraform-checks:
     name: Terraform
-    uses: canonical/observability/.github/workflows/terraform-quality-checks.yaml@main
+    uses: canonical/observability/.github/workflows/terraform-quality-checks.yaml@v0

@@ -1,8 +1,6 @@
 import pytest
 from scenario import Relation, State
 
-from tests.scenario.conftest import MOCK_LB_ADDRESS
-
 
 @pytest.mark.parametrize("leader", (True, False))
 @pytest.mark.parametrize("url", ("url.com", "http://foo.bar.baz"))
@@ -35,7 +33,7 @@ def test_ingress_unit_provider_request_response(
     state = State(
         relations=[ipu],
         leader=leader,
-        config={"routing_mode": routing_mode},
+        config={"routing_mode": routing_mode, "external_hostname": "example.com"},
         containers=[traefik_container],
     )
 
@@ -48,12 +46,12 @@ def test_ingress_unit_provider_request_response(
         assert not local_app_data
     else:
         if mode == "tcp":
-            expected_url = f"{MOCK_LB_ADDRESS}:{port}"
+            expected_url = f"example.com:{port}"
         else:
             prefix = f"{model}-{remote_unit_name.replace('/', '-')}"
             if routing_mode == "path":
-                expected_url = f"http://{MOCK_LB_ADDRESS}/{prefix}"
+                expected_url = f"http://example.com/{prefix}"
             else:
-                expected_url = f"http://{prefix}.{MOCK_LB_ADDRESS}/"
+                expected_url = f"http://{prefix}.example.com/"
 
         assert local_app_data == {"ingress": f"{remote_unit_name}:\n  url: {expected_url}\n"}

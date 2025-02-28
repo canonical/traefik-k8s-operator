@@ -1,9 +1,13 @@
+import os
 from unittest.mock import patch
 
 import opentelemetry
 import pytest
 import yaml
-from charms.tempo_coordinator_k8s.v0.charm_tracing import charm_tracing_disabled
+from charms.tempo_coordinator_k8s.v0.charm_tracing import (
+    CHARM_TRACING_ENABLED,
+    charm_tracing_disabled,
+)
 from charms.tempo_coordinator_k8s.v0.tracing import ProtocolType, Receiver, TracingProviderAppData
 from scenario import Relation, State
 
@@ -50,6 +54,7 @@ def test_charm_trace_collection(traefik_ctx, traefik_container, caplog, charm_tr
         "opentelemetry.exporter.otlp.proto.http.trace_exporter.OTLPSpanExporter.export"
     ) as f:
         f.return_value = opentelemetry.sdk.trace.export.SpanExportResult.SUCCESS
+        os.environ[CHARM_TRACING_ENABLED] = "1"
         # WHEN traefik receives <any event>
         traefik_ctx.run(charm_tracing_relation.changed_event, state_in)
 
