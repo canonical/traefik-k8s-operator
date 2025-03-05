@@ -3,6 +3,7 @@
 # See LICENSE file for licensing details.
 
 """Charmed traefik operator."""
+
 import contextlib
 import enum
 import itertools
@@ -197,7 +198,9 @@ class TraefikIngressCharm(CharmBase):
         self.ingress_per_unit = IngressPerUnitProvider(charm=self)
 
         self.traefik_route = TraefikRouteProvider(
-            charm=self, external_host=self._external_host, scheme=self._scheme  # type: ignore
+            charm=self,
+            external_host=self._external_host,  # type: ignore
+            scheme=self._scheme,  # type: ignore
         )
 
         self._topology = JujuTopology.from_charm(self)
@@ -1273,7 +1276,9 @@ class TraefikIngressCharm(CharmBase):
             name, _, _ = socket.gethostbyaddr(target)  # type: ignore
             # Do not return "hostname" like '10-43-8-149.kubernetes.default.svc.cluster.local'
             if is_hostname(name) and not name.endswith(".svc.cluster.local"):
-                return [name]
+                # In case we can do a DNS lookup on that IP address,
+                #  return the resolved hostname as well as the IP address to be both included in the certificate SANS.
+                return [name, target] if target else [name]
 
         # If all else fails, we'd rather use the bare IP
         return [target] if target else []
