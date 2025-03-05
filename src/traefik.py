@@ -378,7 +378,6 @@ class Traefik:
             forward_auth_app=forward_auth_app,
             forward_auth_config=forward_auth_config,
             healthcheck_params=healthcheck_params,
-            healthcheck_params=healthcheck_params,
         )
 
     def get_per_leader_http_config(
