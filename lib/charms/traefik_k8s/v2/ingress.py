@@ -683,7 +683,6 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         host: Optional[str] = None,
         ip: Optional[str] = None,
         port: Optional[int] = None,
-        healthcheck_params: Optional[Dict[str, str]] = None,
         strip_prefix: bool = False,
         redirect_https: bool = False,
         # fixme: this is horrible UX.
