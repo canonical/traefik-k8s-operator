@@ -1053,7 +1053,11 @@ class TraefikIngressCharm(CharmBase):
             hosts=[udata.host for udata in data.units],
             forward_auth_app=self.forward_auth.is_protected_app(app=data.app.name),
             forward_auth_config=self.forward_auth.get_provider_info(),
-            healthcheck_params=data.app.healthcheck_params.model_dump(exclude_none=True),  # type: ignore
+            healthcheck_params=(
+                data.app.healthcheck_params.model_dump(exclude_none=True)
+                if data.app.healthcheck_params is not None
+                else {}
+            ),
         )
 
         if self.unit.is_leader():
