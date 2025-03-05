@@ -84,7 +84,7 @@ LIBAPI = 2
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 14
+LIBPATCH = 15
 
 PYDEPS = ["pydantic"]
 
@@ -246,14 +246,31 @@ class ProviderSchema(BaseModel):
     app: IngressProviderAppData
 
 
+class IngressHealthCheck(BaseModel):
+    """HealthCheck schema for Ingress."""
+
+    path: str = Field(description="The health check endpoint path (required).")
+    scheme: Optional[str] = Field(
+        default=None, description="Replaces the server URL scheme for the health check endpoint."
+    )
+    hostname: Optional[str] = Field(
+        default=None, description="Hostname to be set in the health check request."
+    )
+    port: Optional[int] = Field(
+        default=None, description="Replaces the server URL port for the health check endpoint."
+    )
+    interval: str = Field(default="30s", description="Frequency of the health check calls.")
+    timeout: str = Field(default="5s", description="Maximum duration for a health check request.")
+
+
 class IngressRequirerAppData(DatabagModel):
     """Ingress requirer application databag model."""
 
     model: str = Field(description="The model the application is in.")
     name: str = Field(description="the name of the app requesting ingress.")
     port: int = Field(description="The port the app wishes to be exposed.")
-    healthcheck_params: Optional[dict] = Field(
-        default=None, description="The path, interval, and timeout used by healthcheck."
+    healthcheck_params: Optional[IngressHealthCheck] = Field(
+        default=None, description="Optional health check configuration for ingress."
     )
 
     # fields on top of vanilla 'ingress' interface:
@@ -666,12 +683,12 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         host: Optional[str] = None,
         ip: Optional[str] = None,
         port: Optional[int] = None,
-        healthcheck_params: Optional[dict] = None,
         strip_prefix: bool = False,
         redirect_https: bool = False,
         # fixme: this is horrible UX.
         #  shall we switch to manually calling provide_ingress_requirements with all args when ready?
         scheme: Union[Callable[[], str], str] = lambda: "http",
+        healthcheck_params: Optional[Dict[str, Any]] = None,
     ):
         """Constructor for IngressRequirer.
 
@@ -829,10 +846,14 @@ class IngressPerAppRequirer(_IngressPerAppBase):
                 model=self.model.name,
                 name=self.app.name,
                 scheme=scheme,
-                healthcheck_params=self.healthcheck_params,
                 port=port,
                 strip_prefix=self._strip_prefix,  # type: ignore  # pyright does not like aliases
                 redirect_https=self._redirect_https,  # type: ignore  # pyright does not like aliases
+                healthcheck_params=(
+                    IngressHealthCheck(**self.healthcheck_params)
+                    if self.healthcheck_params
+                    else None
+                ),
             ).dump(app_databag)
         except pydantic.ValidationError as e:
             msg = "failed to validate app data"

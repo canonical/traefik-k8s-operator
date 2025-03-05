@@ -182,6 +182,23 @@ async def route_tester_charm(ops_test):
 
 
 @pytest.fixture(scope="module")
+@timed_memoizer
+async def health_tester_charm(ops_test: OpsTest):
+    charm_path = (Path(__file__).parent / "testers" / "health").absolute()
+    count = 0
+    while True:
+        try:
+            charm = await ops_test.build_charm(charm_path, verbosity="debug")
+            return charm
+        except RuntimeError:
+            logger.warning("Failed to build health tester. Trying again!")
+            count += 1
+
+            if count == 3:
+                raise
+
+
+@pytest.fixture(scope="module")
 def temp_dir(tmp_path_factory):
     return tmp_path_factory.mktemp("data")
 
