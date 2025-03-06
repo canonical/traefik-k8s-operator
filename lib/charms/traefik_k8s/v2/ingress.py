@@ -698,19 +698,27 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         All request args must be given as keyword args.
 
         Args:
-            charm: the charm that is instantiating the library.
-            relation_name: the name of the relation endpoint to bind to (defaults to `ingress`);
-                relation must be of interface type `ingress` and have "limit: 1")
+            charm: The charm that is instantiating the library.
+            relation_name: The name of the relation endpoint to bind to (defaults to "ingress");
+                the relation must be of interface type "ingress" and have a limit of 1.
             host: Hostname to be used by the ingress provider to address the requiring
                 application; if unspecified, the default Kubernetes service name will be used.
             ip: Alternative addressing method other than host to be used by the ingress provider;
-                if unspecified, binding address from juju network API will be used.
-            healthcheck_params: optional dictionary of healthcheck path, interval and timeout;
-                if provided, path is required while interval and timeout will use traefik defaults.
-            strip_prefix: configure Traefik to strip the path prefix.
-            redirect_https: redirect incoming requests to HTTPS.
-            scheme: callable returning the scheme to use when constructing the ingress url.
-                Or a string, if the scheme is known and stable at charm-init-time.
+                if unspecified, the binding address from the Juju network API will be used.
+            healthcheck_params: Optional dictionary containing health check 
+                configuration parameters conforming to the IngressHealthCheck schema. The dictionary must include:
+                    - "path" (str): The health check endpoint path (required).
+                It may also include:
+                    - "scheme" (Optional[str]): Replaces the server URL scheme for the health check endpoint.
+                    - "hostname" (Optional[str]): Hostname to be set in the health check request.
+                    - "port" (Optional[int]): Replaces the server URL port for the health check endpoint.
+                    - "interval" (str): Frequency of the health check calls (defaults to "30s" if omitted).
+                    - "timeout" (str): Maximum duration for a health check request (defaults to "5s" if omitted).
+                If provided, "path" is required while "interval" and "timeout" will use Traefik's defaults when not specified.
+            strip_prefix: Configure Traefik to strip the path prefix.
+            redirect_https: Redirect incoming requests to HTTPS.
+            scheme: Either a callable that returns the scheme to use when constructing the ingress URL,
+                or a string if the scheme is known and stable at charm initialization.
 
         Request Args:
             port: the port of the service
