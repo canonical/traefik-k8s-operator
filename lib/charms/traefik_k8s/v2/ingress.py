@@ -705,7 +705,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
                 application; if unspecified, the default Kubernetes service name will be used.
             ip: Alternative addressing method other than host to be used by the ingress provider;
                 if unspecified, the binding address from the Juju network API will be used.
-            healthcheck_params: Optional dictionary containing health check 
+            healthcheck_params: Optional dictionary containing health check
                 configuration parameters conforming to the IngressHealthCheck schema. The dictionary must include:
                     - "path" (str): The health check endpoint path (required).
                 It may also include:
