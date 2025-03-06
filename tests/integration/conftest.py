@@ -73,7 +73,7 @@ def copy_traefik_library_into_tester_charms(ops_test):
         "traefik_k8s/v1/ingress_per_unit.py",
         "traefik_k8s/v0/traefik_route.py",
     ]
-    for tester in ["forward-auth", "ipa", "ipu", "tcp", "route"]:
+    for tester in ["forward-auth", "ipa", "ipu", "tcp", "route", "health"]:
         for lib in libraries:
             install_path = f"tests/integration/testers/{tester}/lib/charms/{lib}"
             os.makedirs(os.path.dirname(install_path), exist_ok=True)
