@@ -22,8 +22,8 @@ RESOURCES = {
 async def test_setup_env(ops_test):
     await ops_test.model.set_config({"logging-config": "<root>=WARNING; unit=DEBUG"})
 
-
-@pytest.mark.abort_on_fail
+# TODO: Unskip this when https://github.com/canonical/tempo-coordinator-k8s-operator/pull/132 is merged
+@pytest.mark.skip
 async def test_workload_tracing_is_present(ops_test, traefik_charm):
     logger.info("deploying tempo cluster")
     await deploy_tempo_cluster(ops_test)
