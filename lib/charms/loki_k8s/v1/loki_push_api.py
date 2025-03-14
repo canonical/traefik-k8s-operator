@@ -9,7 +9,7 @@ r"""## Overview.
 This document explains how to use the two principal objects this library provides:
 
 - `LokiPushApiProvider`: This object is meant to be used by any Charmed Operator that needs to
-implement the provider side of the `loki_push_api` relation interface: for instance, a Loki charm.
+implement the provider side of the `loki_push_api` relation interface. For instance, a Loki charm.
 The provider side of the relation represents the server side, to which logs are being pushed.
 
 - `LokiPushApiConsumer`: This object is meant to be used by any Charmed Operator that needs to
@@ -546,7 +546,7 @@ LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 15
+LIBPATCH = 16
 
 PYDEPS = ["cosl"]
 
@@ -1756,8 +1756,11 @@ class LokiPushApiConsumer(ConsumerBase):
 
         self.on.loki_push_api_endpoint_joined.emit()
 
-    def _reinitialize_alert_rules(self):
+    def reload_alerts(self) -> None:
         """Reloads alert rules and updates all relations."""
+        self._reinitialize_alert_rules()
+
+    def _reinitialize_alert_rules(self):
         for relation in self._charm.model.relations[self._relation_name]:
             self._handle_alert_rules(relation)
 
