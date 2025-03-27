@@ -70,11 +70,13 @@ requires:
   certificates:
     interface: tls-certificates
     limit: 1
+    optional: true
     description: |
       Send a CSR to- and obtain a signed certificate from an external CA.
   experimental-forward-auth:
     interface: forward_auth
     limit: 1
+    optional: true
     description: |
       Receive config from e.g. oathkeeper, for rendering the forwardAuth middleware.
       The same middleware is applied to all proxied endpoints that requested Identity and Access Proxy (IAP) protection.
@@ -82,20 +84,24 @@ requires:
       This feature is experimental and may be unstable. In order to enable it, run `juju config enable_experimental_forward_auth=True`.
   logging:
     interface: loki_push_api
+    optional: true
     description: |
       Receives Loki's push api endpoint address to push logs to, and forwards charm's built-in alert rules to Loki.
   charm-tracing:
     description: |
       Enables sending charm traces to a distributed tracing backend such as Tempo.
     limit: 1
+    optional: true
     interface: tracing
   workload-tracing:
     description: |
       Enables sending workload traces to a distributed tracing backend such as Tempo.
     limit: 1
+    optional: true
     interface: tracing
   receive-ca-cert:
     interface: certificate_transfer
+    optional: true
     description: |
       Receive a CA cert for traefik to trust.
       This relation can be used with a local CA to obtain the CA cert that was used to sign proxied
