@@ -456,11 +456,16 @@ class IngressPerAppDataRemovedEvent(RelationEvent):
     """Event representing that ingress data has been removed for an app."""
 
 
+class IngressPerAppEndpointsUpdatedEvent(RelationEvent):
+    """Event representing that the proxied endpoints have been updated."""
+
+
 class IngressPerAppProviderEvents(ObjectEvents):
     """Container for IPA Provider events."""
 
     data_provided = EventSource(IngressPerAppDataProvidedEvent)
     data_removed = EventSource(IngressPerAppDataRemovedEvent)
+    endpoints_updated = EventSource(IngressPerAppEndpointsUpdatedEvent)
 
 
 @dataclass
@@ -523,6 +528,7 @@ class IngressPerAppProvider(_IngressPerAppBase):
             )
             return
         del relation.data[self.app]["ingress"]
+        self.on.endpoints_updated.emit(relation=relation)
 
     def _get_requirer_units_data(self, relation: Relation) -> List["IngressRequirerUnitData"]:
         """Fetch and validate the requirer's unit databag."""
@@ -591,6 +597,7 @@ class IngressPerAppProvider(_IngressPerAppBase):
         ingress_url = {"url": url}
         try:
             IngressProviderAppData(ingress=ingress_url).dump(relation.data[self.app])  # type: ignore
+            self.on.endpoints_updated.emit(relation=relation)
         except pydantic.ValidationError as e:
             # If we cannot validate the url as valid, publish an empty databag and log the error.
             log.error(f"Failed to validate ingress url '{url}' - got ValidationError {e}")
