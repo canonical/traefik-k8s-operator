@@ -311,11 +311,16 @@ class IngressDataRemovedEvent(RelationEvent):
     """
 
 
+class IngressEndpointsUpdatedEvent(RelationEvent):
+    """Event triggered when the proxied endpoints change."""
+
+
 class IngressPerUnitProviderEvents(ObjectEvents):
     """Container for events for IngressPerUnit."""
 
     data_provided = EventSource(IngressDataReadyEvent)
     data_removed = EventSource(IngressDataRemovedEvent)
+    endpoints_updated = EventSource(IngressEndpointsUpdatedEvent)
 
 
 class IngressPerUnitProvider(_IngressPerUnitBase):
@@ -431,6 +436,8 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
         _validate_data(ingress, INGRESS_PROVIDES_APP_SCHEMA)
         relation.data[self.app]["ingress"] = yaml.safe_dump(data)
 
+        self.on.endpoints_updated.emit(relation=relation)
+
     def wipe_ingress_data(self, relation):
         """Remove all published ingress data.
 
@@ -447,6 +454,7 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
             )
             return
         del relation.data[self.app]["ingress"]
+        self.on.endpoints_updated.emit(relation=relation)
 
     def _requirer_units_data(self, relation: Relation) -> RequirerUnitData:
         """Fetch and validate the requirer's units databag."""
