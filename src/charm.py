@@ -320,6 +320,8 @@ class TraefikIngressCharm(CharmBase):
         }
         csrs = []
         for addr in addrs:
+            sans_dns = []  # Needed for pyright
+            sans_ip = []  # Needed for pyright
             if is_hostname(addr):
                 sans_dns = [addr]
                 sans_ip = []
@@ -340,7 +342,7 @@ class TraefikIngressCharm(CharmBase):
             elif sans_ip:
                 common_name = sans_ip[0]
             else:
-                common_name = None
+                common_name = ""
             csrs.append(
                 CertificateRequestAttributes(
                     common_name=common_name,
