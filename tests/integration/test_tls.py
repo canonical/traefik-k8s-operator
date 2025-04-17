@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 
 idle_period = 90
 
-METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
+METADATA = yaml.safe_load(Path("./charmcraft.yaml").read_text())
 resources = {"traefik-image": METADATA["resources"]["traefik-image"]["upstream-source"]}
 trfk = SimpleNamespace(name="traefik", resources=resources)
 mock_hostname = "juju.local"  # For TLS

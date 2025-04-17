@@ -15,7 +15,7 @@ from traefik import Traefik
 def test_start_traefik_is_not_running(*_, traefik_ctx):
     #
     # equivalent to:
-    # META = yaml.safe_load((Path(__file__).parent.parent.parent / "metadata.yaml").read_text())
+    # META = yaml.safe_load((Path(__file__).parent.parent.parent / "charmcraft.yaml").read_text())
     # ACTIONS = yaml.safe_load((Path(__file__).parent.parent.parent / "actions.yaml").read_text())
     # CONFIG = yaml.safe_load((Path(__file__).parent.parent.parent / "config.yaml").read_text())
     # charm_spec = CharmSpec(TraefikIngressCharm, meta=META, config=CONFIG, actions=ACTIONS))

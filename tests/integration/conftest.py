@@ -19,7 +19,7 @@ from juju.errors import JujuError
 from pytest_operator.plugin import OpsTest
 
 trfk_root = Path(__file__).parent.parent.parent
-trfk_meta = yaml.safe_load((trfk_root / "metadata.yaml").read_text())
+trfk_meta = yaml.safe_load((trfk_root / "charmcraft.yaml").read_text())
 trfk_resources = {name: val["upstream-source"] for name, val in trfk_meta["resources"].items()}
 
 _JUJU_DATA_CACHE = {}

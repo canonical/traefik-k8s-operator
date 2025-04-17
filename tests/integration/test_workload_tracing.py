@@ -11,7 +11,7 @@ from helpers import deploy_tempo_cluster, get_application_ip, get_traces_patient
 
 logger = logging.getLogger(__name__)
 
-METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
+METADATA = yaml.safe_load(Path("./charmcraft.yaml").read_text())
 APP_NAME = "traefik"
 TEMPO_APP_NAME = "tempo"
 RESOURCES = {
