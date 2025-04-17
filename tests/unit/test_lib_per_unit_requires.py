@@ -72,6 +72,7 @@ def test_ingress_unit_requirer_uninitialized(requirer):
 def test_ingress_unit_requirer_related(requirer, harness, url, leader):
     harness.set_leader(leader)
     relation = relate(harness)
+    assert relation
     with capture_events(harness.charm) as captured:
         _requirer_provide_ingress(harness, harness.charm.unit.name, url, relation)
 
@@ -88,10 +89,12 @@ def test_ingress_unit_requirer_related(requirer, harness, url, leader):
 
 
 @pytest.mark.parametrize("url", ("http://url/", "http://url2/"))
-def test_unit_joining_does_not_trigger_ingress_changed(requirer, harness, url):
-    requirer: IngressPerUnitRequirer
+def test_unit_joining_does_not_trigger_ingress_changed(
+    requirer: IngressPerUnitRequirer, harness, url
+):
     relation = relate(harness)
 
+    assert relation
     with capture(harness.charm, IngressPerUnitReadyForUnitEvent):
         _requirer_provide_ingress(harness, harness.charm.unit.name, url, relation)
 

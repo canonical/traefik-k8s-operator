@@ -57,6 +57,7 @@ def get_endpoints(ops_test: OpsTest, *, scheme: str, netloc: str) -> list:
 
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy(ops_test: OpsTest, traefik_charm):
+    assert ops_test.model
     await asyncio.gather(
         ops_test.model.deploy(traefik_charm, resources=trfk.resources, application_name=trfk.name),
         ops_test.model.deploy(
@@ -95,7 +96,7 @@ async def test_build_and_deploy(ops_test: OpsTest, traefik_charm):
 @pytest.mark.abort_on_fail
 async def test_ingressed_endpoints_reachable_after_metallb_enabled(ops_test: OpsTest):
     ip = await get_k8s_service_address(ops_test, f"{trfk.name}-lb")
-    for ep in get_endpoints(ops_test, scheme="http", netloc=ip):
+    for ep in get_endpoints(ops_test, scheme="http", netloc=ip):  # type: ignore
         logger.info("Attempting to reach %s", ep)  # Traceback doesn't spell out the endpoint
         urlopen(ep)
 
@@ -161,6 +162,7 @@ async def pull_server_cert(ops_test, path):
 
 @pytest.mark.abort_on_fail
 async def test_tls_termination(ops_test: OpsTest, temp_dir):
+    assert ops_test.model
     # TODO move this to the bundle tests
     await ops_test.model.applications[trfk.name].set_config({"external_hostname": mock_hostname})
 
@@ -196,6 +198,7 @@ async def test_tls_termination_after_charm_upgrade(
         "Refreshing charm to test TLS termination still works with the same certificate after"
         " charm upgrade..."
     )
+    assert ops_test.model
     await ops_test.model.applications[trfk.name].refresh(
         path=traefik_charm, resources=trfk.resources
     )
@@ -212,6 +215,7 @@ async def test_tls_termination_after_charm_upgrade(
 
 
 async def test_disintegrate(ops_test: OpsTest):
+    assert ops_test.model
     await ops_test.juju("remove-relation", "root-ca:certificates", f"{trfk.name}:tracing-v2")
     await ops_test.model.wait_for_idle(status="active", timeout=600, idle_period=10)
 

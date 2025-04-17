@@ -26,6 +26,7 @@ TESTER_APP_NAME = "route"
 @pytest.mark.abort_on_fail
 @pytest.mark.setup
 async def test_deployment(ops_test: OpsTest, traefik_charm, route_tester_charm):
+    assert ops_test.model
     await asyncio.gather(
         ops_test.model.deploy(traefik_charm, application_name=APP_NAME, resources=trfk_resources),
         ops_test.model.deploy(route_tester_charm, TESTER_APP_NAME),
@@ -36,6 +37,7 @@ async def test_deployment(ops_test: OpsTest, traefik_charm, route_tester_charm):
 
 @pytest.mark.setup
 async def test_relate(ops_test: OpsTest):
+    assert ops_test.model
     await ops_test.model.add_relation(
         f"{TESTER_APP_NAME}:traefik-route", f"{APP_NAME}:traefik-route"
     )
@@ -43,6 +45,7 @@ async def test_relate(ops_test: OpsTest):
 
 
 async def test_dynamic_config_created(ops_test: OpsTest):
+    assert ops_test.model
     relation = [
         r
         for r in ops_test.model.relations
@@ -54,7 +57,7 @@ async def test_dynamic_config_created(ops_test: OpsTest):
         f"cat /opt/traefik/juju/juju_ingress_traefik-route_{relation_id}_route.yaml"
     )
     proc = Popen(shlex.split(cmd), stdout=PIPE, text=True)
-    contents = proc.stdout.read()
+    contents = proc.stdout.read()  # type: ignore
     contents_yaml = yaml.safe_load(contents)
     # the route tester charm does:
     # config = {"some": "config"},
@@ -64,7 +67,7 @@ async def test_dynamic_config_created(ops_test: OpsTest):
 async def test_static_config_updated(ops_test: OpsTest):
     cmd = f"juju ssh -m {ops_test.model_name} --container traefik {APP_NAME}/0 cat /etc/traefik/traefik.yaml"
     proc = Popen(shlex.split(cmd), stdout=PIPE, text=True)
-    contents = proc.stdout.read()
+    contents = proc.stdout.read()  # type: ignore
     contents_yaml = yaml.safe_load(contents)
     # the route tester charm does:
     # static = {"entryPoints": {"test-port": {"address": ":4545"}}},
@@ -82,6 +85,7 @@ async def test_added_entrypoint_reachable(ops_test: OpsTest):
 
 @pytest.mark.teardown
 async def test_remove_relation(ops_test: OpsTest):
+    assert ops_test.model
     await ops_test.juju(
         "remove-relation", f"{TESTER_APP_NAME}:traefik-route", f"{APP_NAME}:traefik-route"
     )

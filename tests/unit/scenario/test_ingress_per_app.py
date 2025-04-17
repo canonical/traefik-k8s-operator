@@ -17,8 +17,8 @@ from charms.traefik_k8s.v2.ingress import (
 from ops import CharmBase, Framework
 from scenario import Context, Model, Mount, Relation, State
 
-from tests.scenario._utils import create_ingress_relation
-from tests.scenario.conftest import MOCK_LB_ADDRESS
+from tests.unit.conftest import MOCK_LB_ADDRESS
+from tests.unit.scenario._utils import create_ingress_relation
 
 
 @pytest.mark.parametrize(
@@ -55,7 +55,7 @@ def test_ingress_per_app_created(
     if scheme == "https":
         # traefik has no tls relation, but the requirer does: reverse termination case
         # service_def["rootCAs"] = ["/opt/traefik/juju/certificate.cert"]
-        service_def["loadBalancer"]["serversTransport"] = "reverseTerminationTransport"
+        service_def["loadBalancer"]["serversTransport"] = "reverseTerminationTransport"  # type: ignore
         # service_def["serversTransports"] = {
         #     "reverseTerminationTransport": {"insecureSkipVerify": True}
         # }
@@ -244,9 +244,9 @@ def test_ingress_per_app_v1_upgrade_v2(
 
     # WHEN a charm upgrade occurs
     with requirer_ctx.manager("upgrade-charm", state) as mgr:
-        assert not mgr.charm.ipa.is_ready()
+        assert not mgr.charm.ipa.is_ready()  # type: ignore
         state_out = mgr.run()
-        assert not mgr.charm.ipa.is_ready()
+        assert not mgr.charm.ipa.is_ready()  # type: ignore
 
     # THEN the relation databags are upgraded to match the v2 spec
     ingress_out = state_out.get_relations("ingress")[0]
@@ -275,10 +275,13 @@ def test_proxied_endpoints(
     ipav1 = Relation("ingress", remote_app_data=requirer_data_v1)
     ipav2 = Relation(
         "ingress",
-        remote_app_data=IngressRequirerAppData(
-            model=model.name, name="remote/0", port=port, mode=mode
+        remote_app_data=IngressRequirerAppData(  # type: ignore
+            model=model.name,
+            name="remote/0",
+            port=port,
+            mode=mode,  # type: ignore
         ).dump(),
-        remote_units_data={0: IngressRequirerUnitData(host=host, ip="0.0.0.1").dump()},
+        remote_units_data={0: IngressRequirerUnitData(host=host, ip="0.0.0.1").dump()},  # type: ignore
     )
 
     state = State(leader=True, relations=[ipav1, ipav2, ipu], containers=[traefik_container])

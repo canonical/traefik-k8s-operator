@@ -31,7 +31,7 @@ def test_io_ingress_requirer_unit_data(clear):
 def test_io_ingress_requirer_app_data():
     """Round trip test: A.dump().load() == A for A = IngressRequirerAppData."""
     databag = {}
-    app_data = IngressRequirerAppData(port=10, name="foo", model="coslite", strip_prefix=True)
+    app_data = IngressRequirerAppData(port=10, name="foo", model="coslite", strip_prefix=True)  # type: ignore
 
     app_data.dump(databag)
     assert databag == {
@@ -55,8 +55,8 @@ def test_aliases():
         port=10,
         name="foo",
         model="coslite",
-        strip_prefix=True,
-        redirect_https=True,
+        strip_prefix=True,  # type: ignore
+        redirect_https=True,  # type: ignore
     )
 
     app_data.dump(databag)
@@ -79,7 +79,7 @@ def test_io_provider_data():
     """Round trip test: A.dump().load() == A for A = IngressProviderAppData."""
     databag = {}
     url = {"url": "https://foo.com/"}
-    app_data = IngressProviderAppData(ingress=url)
+    app_data = IngressProviderAppData(ingress=url)  # type: ignore
 
     app_data.dump(databag)
     assert databag == {"ingress": json.dumps(url)}

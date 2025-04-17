@@ -1,25 +1,220 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
-
+name: traefik-k8s
 type: charm
-bases:
-  - build-on:
-      - name: "ubuntu"
-        channel: "20.04"
-    run-on:
-      - name: "ubuntu"
-        channel: "20.04"
+summary: |
+  A Juju charm to run a Traefik-powered ingress controller on Kubernetes.
+description: |
+  A Juju-operated Traefik operator that routes requests from the outside of a
+  Kubernetes cluster to Juju units and applications.
+
+links:
+  documentation: https://discourse.charmhub.io/t/traefik-k8s-docs-index/10778
+  website: https://charmhub.io/traefik-k8s
+  source: https://github.com/canonical/traefik-k8s-operator
+  issues: https://github.com/canonical/traefik-k8s-operator/issues
+
+assumes:
+  - k8s-api
+
+platforms:
+  ubuntu@20.04:amd64:
+
 parts:
   charm:
-    charm-binary-python-packages:
-      - setuptools
-      - jsonschema
-      - cryptography
+    source: .
+    plugin: uv
+    build-packages: [git]
+    build-snaps: [astral-uv]
+    override-build: |
+      craftctl default
+      git describe --always > $CRAFT_PART_INSTALL/version
 
-      # From PYDEPS
-      - "importlib-metadata==6.0.0"
-      - "opentelemetry-exporter-otlp-proto-http==1.21.0"
-      - "pydantic>=2"
-    build-packages:
-      - git
+containers:
+  traefik:
+    resource: traefik-image
+    mounts:
+      - storage: configurations
+        location: /opt/traefik/
 
+resources:
+  traefik-image:
+    type: oci-image
+    description: |
+      OCI image for traefik. This charms makes the following assumptions about the image:
+      - executable is `/usr/bin/traefik`
+      - has `update-ca-certificates`
+    upstream-source: docker.io/ubuntu/traefik:2-22.04
+
+storage:
+  # We need to store the configurations in a volume, as Traefik's directory
+  # discovery provider does not work in the file system of the Docker image
+  configurations:
+    type: filesystem
+
+provides:
+  ingress:
+    interface: ingress
+    optional: true
+    description: |
+      Provides ingress-like routing to the related Juju application, load-balancing across all units
+  ingress-per-unit:
+    interface: ingress_per_unit
+    optional: true
+    description: |
+      Provides ingress-like routing to the single units of the related Juju application
+  metrics-endpoint:
+    interface: prometheus_scrape
+    optional: true
+    description: |
+      Exposes the Prometheus metrics endpoint providing telemetry about the
+      Traefik instance
+  traefik-route:
+    interface: traefik_route
+    optional: true
+    description: |
+      Provides endpoint for a traefik-route charm to sit between Traefik and a
+      charm in need of ingress, configuring the relation on a per-unit basis.
+  grafana-dashboard:
+    optional: true
+    description: |
+      Forwards the built-in grafana dashboard(s) for monitoring traefik.
+    interface: grafana_dashboard
+
+requires:
+  certificates:
+    interface: tls-certificates
+    limit: 1
+    optional: true
+    description: |
+      Send a CSR to- and obtain a signed certificate from an external CA.
+  experimental-forward-auth:
+    interface: forward_auth
+    limit: 1
+    optional: true
+    description: |
+      Receive config from e.g. oathkeeper, for rendering the forwardAuth middleware.
+      The same middleware is applied to all proxied endpoints that requested Identity and Access Proxy (IAP) protection.
+      For this reason we set a relation count limit of 1.
+      This feature is experimental and may be unstable. In order to enable it, run `juju config enable_experimental_forward_auth=True`.
+  logging:
+    interface: loki_push_api
+    optional: true
+    description: |
+      Receives Loki's push api endpoint address to push logs to, and forwards charm's built-in alert rules to Loki.
+  charm-tracing:
+    description: |
+      Enables sending charm traces to a distributed tracing backend such as Tempo.
+    limit: 1
+    optional: true
+    interface: tracing
+  workload-tracing:
+    description: |
+      Enables sending workload traces to a distributed tracing backend such as Tempo.
+    limit: 1
+    optional: true
+    interface: tracing
+  receive-ca-cert:
+    interface: certificate_transfer
+    optional: true
+    description: |
+      Receive a CA cert for traefik to trust.
+      This relation can be used with a local CA to obtain the CA cert that was used to sign proxied
+      endpoints.
+
+    # Must limit the relation count to 1 due to
+    # https://github.com/canonical/certificate-transfer-interface/issues/6
+    limit: 1
+
+peers:
+  peers:
+    interface: traefik_peers
+
+config:
+  options:
+    enable_experimental_forward_auth:
+      description: |
+        Enables `forward-auth` middleware capabilities required to set up Identity and Access Proxy.
+        This feature is experimental and may be unstable.
+      type: boolean
+      default: False
+    loadbalancer_annotations:
+      description: |
+        A comma-separated list of annotations to apply to the LoadBalancer service.
+        The format should be: `key1=value1,key2=value2,key3=value3`.
+        These annotations are passed directly to the Kubernetes LoadBalancer service, 
+        enabling customization for specific cloud provider settings or integrations.
+        
+        Example:
+          "external-dns.alpha.kubernetes.io/hostname=example.com,service.beta.kubernetes.io/aws-load-balancer-type=nlb"
+
+        Ensure the annotations are correctly formatted and adhere to Kubernetes' syntax and character set : https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/#syntax-and-character-set
+        Invalid values will result in LoadBalancer being removed and all previously set annotations will be lost.
+      type: string
+    basic_auth_user:
+      description: |
+        Enables the `basicAuth` middleware for **all** routes on this proxy. 
+        The format of this string must be: `name:hashed-password`, generated with e.g. htpasswd.
+        Supported hashing algorithms are: MD5, SHA1, BCrypt.
+        For more documentation see https://doc.traefik.io/traefik/middlewares/http/basicauth/
+        Once this config option is set, the username/password pair will be required to authenticate 
+        http requests on all routes proxied by this traefik app.
+      type: string
+    external_hostname:
+      description: |
+        The DNS name to be used by Traefik ingress.
+        If unspecified, the gateway ingress ip address will be used, e.g,
+        as provided by MetalLB. This needs to be a `bare` hostname: i.e. 
+        no schema prefix and no port.
+      type: string
+    routing_mode:
+      description: |
+        The routing mode allows you to specify how Traefik going to generate
+        routes on behalf of the requesters.
+
+        Valid values are "path" and "subdomain".
+
+        With the "path" routing mode, Traefik will use its externally-visible url,
+        and create a route for the requester that will be structure like:
+
+        `<external_url>/<requester_model_name>-<requester_application_name>-<requester-unit-index>`
+
+        For example, an ingress-per-unit provider with `http://foo` external URL,
+        will provide to the unit `my-unit/2` in the `my-model` model the
+        following URL:
+
+        `http://foo/my-model-my-unit-2`
+
+        With the "subdomain" routing mode, Traefik will use its externally-visible url,
+        and create a route for the requester that will be structure like:
+
+        `<protocol>://<requester_model_name>-<requester_application_name>-<requester-unit-index>.<external_hostname>:<port>/`
+
+        For example, an ingress-per-unit provider with `http://foo:8080` external URL,
+        will provide to the unit `my-unit/2` in the `my-model` model the following URL:
+
+        `http://my-model-my-unit-2.foo:8080`
+        
+        Note that, for 'subdomain' routing mode, the external_hostname must be set and not be set to an IP address.  This
+        is because subdomains are not supported for IP addresses.
+      type: string
+      default: path
+
+    tls-ca:
+      description: |
+        CA cert used for TLS termination.
+      type: string
+    tls-cert:
+      description: |
+        SSL cert used for TLS termination.
+      type: string
+    tls-key:
+      description: |
+        Key used for TLS termination.
+      type: string
+
+actions:
+  show-proxied-endpoints:
+    description: |
+      Returns a list of endpoints, 
+      including both the endpoints proxied by this Traefik proxy and Traefik's own endpoint.

@@ -27,15 +27,16 @@ async def get_k8s_service_address(ops_test: OpsTest, service_name: str) -> Optio
     Returns:
         The LoadBalancer service address as a string, or None if not found
     """
+    assert ops_test.model
     model = ops_test.model.info
     try:
-        result = sh.kubectl(
+        result = sh.kubectl(  # type: ignore
             *f"-n {model.name} get service/{service_name} -o=jsonpath='{{.status.loadBalancer.ingress[0].ip}}'".split()
         )
         ip_address = result.strip("'")
         return ip_address
     except Exception as e:
-        logger.error("Error retrieving service address %s", e, exc_info=1)
+        logger.error("Error retrieving service address %s", e, exc_info=1)  # type: ignore
         return None
 
 
@@ -48,9 +49,10 @@ async def delete_k8s_service(ops_test: OpsTest, service_name: str) -> None:
     """
     # In CI, tests consistently timeout on `waiting: gateway address unavailable`.
     # Just in case lb service still exists before next run, let's remove it
+    assert ops_test.model
     model = ops_test.model.info
     try:
-        sh.kubectl(*f"-n {model.name} delete service/{service_name}".split())
+        sh.kubectl(*f"-n {model.name} delete service/{service_name}".split())  # type: ignore
     except Exception:
         return
 
@@ -66,6 +68,7 @@ async def get_address(ops_test: OpsTest, app_name: str, unit_num: Optional[int] 
     Returns:
         unit address as a string
     """
+    assert ops_test.model
     status = await ops_test.model.get_status()
     app = status["applications"][app_name]
     return (
@@ -81,6 +84,7 @@ async def remove_application(
     # In CI, tests consistently timeout on `waiting: gateway address unavailable`.
     # Just in case there's an unreleased socket, let's try to remove traefik more gently.
 
+    assert ops_test.model
     app = ops_test.model.applications.get(name)
     if not app:
         return
@@ -108,6 +112,7 @@ async def deploy_and_configure_minio(ops_test: OpsTest) -> None:
         "access-key": "accesskey",
         "secret-key": "secretkey",
     }
+    assert ops_test.model
     await ops_test.model.deploy("minio", channel="edge", trust=True, config=config)
     await ops_test.model.wait_for_idle(apps=["minio"], status="active", timeout=2000)
     minio_addr = await get_address(ops_test, "minio", 0)
@@ -146,6 +151,7 @@ async def deploy_tempo_cluster(ops_test: OpsTest):
     worker_app = "tempo-worker"
     tempo_worker_charm_url, worker_channel = "tempo-worker-k8s", "edge"
     tempo_coordinator_charm_url, coordinator_channel = "tempo-coordinator-k8s", "edge"
+    assert ops_test.model
     await ops_test.model.deploy(
         tempo_worker_charm_url, application_name=worker_app, channel=worker_channel, trust=True
     )
@@ -196,6 +202,7 @@ async def get_traces_patiently(tempo_host, service_name="tracegen-otlp_http", tl
 
 async def get_application_ip(ops_test: OpsTest, app_name: str) -> str:
     """Get the application IP address."""
+    assert ops_test.model
     status = await ops_test.model.get_status()
     app = status["applications"][app_name]
     return app.public_address

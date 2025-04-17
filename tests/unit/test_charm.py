@@ -3,6 +3,7 @@
 
 import json
 import socket
+from typing import Optional
 import unittest
 from unittest.mock import Mock, PropertyMock, patch
 
@@ -17,7 +18,7 @@ from ops.testing import Harness
 from charm import TraefikIngressCharm
 from traefik import STATIC_CONFIG_PATH
 
-ops.testing.SIMULATE_CAN_CONNECT = True
+ops.testing.SIMULATE_CAN_CONNECT = True  # type: ignore
 
 
 def relate(harness: Harness, per_app_relation: bool = False) -> Relation:
@@ -25,6 +26,7 @@ def relate(harness: Harness, per_app_relation: bool = False) -> Relation:
     relation_id = harness.add_relation(interface_name, "remote")
     harness.add_relation_unit(relation_id, "remote/0")
     relation = harness.model.get_relation(interface_name, relation_id)
+    assert relation
     requirer.relation = relation
     requirer.local_app = harness.charm.app
     return relation
@@ -46,8 +48,8 @@ def _requirer_provide_ingress_requirements(
             model="test-model",
             name="remote/0",
             port=port,
-            redirect_https=redirect_https,
-            strip_prefix=strip_prefix,
+            redirect_https=redirect_https,  # type: ignore
+            strip_prefix=strip_prefix,  # type: ignore
         ).dump()
         unit_data = IngressRequirerUnitData(host=host, ip=ip).dump()
         # do not emit this event, as we need to 'simultaneously'
@@ -99,8 +101,8 @@ def _render_middlewares(*, strip_prefix: bool = False, redirect_https: bool = Fa
 
 
 class _RequirerMock:
-    local_app: Application = None
-    relation: Relation = None
+    local_app: Optional[Application] = None
+    relation: Optional[Relation] = None
 
     def is_ready(self):
         try:
@@ -110,6 +112,8 @@ class _RequirerMock:
 
     @property
     def ingress(self):
+        assert self.relation
+        assert self.local_app
         return yaml.safe_load(self.relation.data[self.local_app]["ingress"])
 
     @property
@@ -462,7 +466,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
         charm.traefik._tcp_entrypoints = charm._tcp_entrypoints()
 
         self.harness.container_pebble_ready("traefik")
-        prefix = charm._get_prefix(data)
+        prefix = charm._get_prefix(data)  # type: ignore
         assert charm._tcp_entrypoints() == {prefix: 3000}
 
         expected_entrypoint = {"address": ":3000"}
@@ -502,6 +506,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
         expected_provider_info = self.harness.charm.forward_auth.get_provider_info()
 
+        assert expected_provider_info
         assert expected_provider_info.decisions_address == provider_info["decisions_address"]
         assert expected_provider_info.app_names == provider_info["app_names"]
         assert expected_provider_info.headers == provider_info["headers"]

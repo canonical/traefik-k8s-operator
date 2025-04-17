@@ -9,7 +9,7 @@ import pytest
 import yaml
 from scenario import Container, Mount, Relation, State
 
-from tests.scenario._utils import _render_config
+from tests.unit.scenario._utils import _render_config
 
 
 def _create_relation(
@@ -111,7 +111,7 @@ def test_middleware_config(
         redirect_https=redirect_https,
         scheme="http",
         tls_enabled=False,
-        port=9000,
+        port="9000",
     )
 
     assert yaml.safe_load(config_file) == expected

@@ -11,7 +11,7 @@ import scenario
 import yaml
 from scenario import Container, ExecOutput, Mount, Relation, State
 
-from tests.scenario._utils import _render_config, create_ingress_relation
+from tests.unit.scenario._utils import _render_config, create_ingress_relation
 from traefik import DYNAMIC_CONFIG_DIR
 
 
@@ -101,6 +101,7 @@ def test_middleware_config(
     )
 
     # AND GIVEN external host is set (see also decorator)
+    assert relation
     state = State(
         leader=True,
         config={"routing_mode": routing_mode, "external_hostname": "testhostname"},

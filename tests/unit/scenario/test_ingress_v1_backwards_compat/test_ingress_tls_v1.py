@@ -5,7 +5,7 @@ import pytest
 import yaml
 from scenario import Container, Mount, Relation, State
 
-from tests.scenario._utils import _render_config
+from tests.unit.scenario._utils import _render_config
 
 
 def _create_ingress_relation(
@@ -96,7 +96,7 @@ def test_middleware_config(traefik_ctx, routing_mode, strip_prefix, redirect_htt
         redirect_https=redirect_https,
         rel_name="ingress",
         scheme="http",
-        port=9000,
+        port=str(9000),
     )
 
     assert yaml.safe_load(config_file) == expected

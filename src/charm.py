@@ -1400,4 +1400,4 @@ def _get_relation_type(relation: Relation) -> _IngressRelationType:
 
 
 if __name__ == "__main__":
-    main(TraefikIngressCharm, use_juju_for_storage=True)
+    main(TraefikIngressCharm, use_juju_for_storage=True)  # type: ignore

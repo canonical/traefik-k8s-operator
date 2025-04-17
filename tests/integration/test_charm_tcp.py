@@ -27,6 +27,7 @@ tcp_charm_resources = {
 
 @pytest.mark.abort_on_fail
 async def test_deployment(ops_test: OpsTest, traefik_charm, tcp_tester_charm):
+    assert ops_test.model
     await deploy_traefik_if_not_deployed(ops_test, traefik_charm)
     await ops_test.model.deploy(tcp_tester_charm, "tcp-tester", resources=tcp_charm_resources)
     await ops_test.model.wait_for_idle(
@@ -36,6 +37,7 @@ async def test_deployment(ops_test: OpsTest, traefik_charm, tcp_tester_charm):
 
 @pytest.mark.abort_on_fail
 async def test_relate(ops_test: OpsTest):
+    assert ops_test.model
     await ops_test.model.add_relation(
         "tcp-tester:ingress-per-unit", "traefik-k8s:ingress-per-unit"
     )
@@ -44,6 +46,7 @@ async def test_relate(ops_test: OpsTest):
 
 @pytest.mark.abort_on_fail
 async def test_relation_data_shape(ops_test: OpsTest):
+    assert ops_test.model_full_name
     data = get_relation_data(
         requirer_endpoint="tcp-tester/0:ingress-per-unit",
         provider_endpoint="traefik-k8s/0:ingress-per-unit",
@@ -73,6 +76,8 @@ async def test_relation_data_shape(ops_test: OpsTest):
 
 
 async def assert_tcp_charm_has_ingress(ops_test: OpsTest):
+    assert ops_test.model
+    assert ops_test.model_full_name
     traefik_ip = await get_k8s_service_address(ops_test, "traefik-k8s-lb")
     data = get_relation_data(
         requirer_endpoint="tcp-tester/0:ingress-per-unit",
@@ -106,6 +111,7 @@ async def test_tcp_connection(ops_test: OpsTest):
 
 @pytest.mark.abort_on_fail
 async def test_remove_relation(ops_test: OpsTest):
+    assert ops_test.model
     await ops_test.juju(
         "remove-relation", "tcp-tester:ingress-per-unit", "traefik-k8s:ingress-per-unit"
     )

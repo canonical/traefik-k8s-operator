@@ -3,6 +3,7 @@
 import asyncio
 import subprocess
 import time
+from typing import Optional
 import urllib.request
 from urllib.error import HTTPError
 
@@ -31,6 +32,7 @@ IPA = "ipa-tester"
 @pytest.mark.abort_on_fail
 @pytest.mark.skip_on_deployed
 async def test_deployment(ops_test: OpsTest, traefik_charm, ipa_tester_charm):
+    assert ops_test.model
     await asyncio.gather(
         ops_test.model.deploy(traefik_charm, application_name=APP_NAME, resources=trfk_resources),
         ops_test.model.deploy(ipa_tester_charm, IPA),
@@ -42,6 +44,7 @@ async def test_deployment(ops_test: OpsTest, traefik_charm, ipa_tester_charm):
 @pytest.mark.abort_on_fail
 @pytest.mark.skip_on_deployed
 async def test_relate(ops_test: OpsTest):
+    assert ops_test.model
     await ops_test.model.add_relation("ipa-tester:ingress", f"{APP_NAME}:ingress")
     await ops_test.model.wait_for_idle([APP_NAME, IPA])
 
@@ -57,7 +60,7 @@ def get_tester_url(model):
 
 
 @retry(stop=stop_after_delay(60 * 1))  # 5 minutes
-def assert_get_url_returns(url: str, expected: int, auth: str = None):
+def assert_get_url_returns(url: str, expected: int, auth: Optional[str] = None):
     print(f"attempting to curl {url} (with auth? {'yes' if auth else 'no'})")
     if auth:
         passman = urllib.request.HTTPPasswordMgrWithDefaultRealm()

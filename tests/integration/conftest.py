@@ -10,7 +10,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Optional
 
 import juju
 import pytest
@@ -83,17 +83,11 @@ def copy_traefik_library_into_tester_charms(ops_test):
 @pytest.fixture(scope="module")
 @timed_memoizer
 async def traefik_charm(ops_test):
-    count = 0
-    while True:
-        try:
-            charm = await ops_test.build_charm(".", verbosity="debug")
-            return charm
-        except RuntimeError:
-            logger.warning("Failed to build traefik. Trying again!")
-            count += 1
+    if charm_file := os.environ.get("CHARM_PATH"):
+        return Path(charm_file)
 
-            if count == 3:
-                raise
+    charm = await ops_test.build_charm(".", verbosity="debug")
+    return charm
 
 
 @pytest.fixture(scope="module")
@@ -209,7 +203,7 @@ def purge(data: dict):
             del data[key]
 
 
-def get_unit_info(unit_name: str, model: str = None) -> dict:
+def get_unit_info(unit_name: str, model: Optional[str] = None) -> dict:
     """Returns unit-info data structure.
 
      for example:
@@ -239,7 +233,7 @@ def get_unit_info(unit_name: str, model: str = None) -> dict:
         cmd.insert(3, model)
 
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE)
-    raw_data = proc.stdout.read().decode("utf-8").strip()
+    raw_data = proc.stdout.read().decode("utf-8").strip()  # type: ignore
 
     data = yaml.safe_load(raw_data) if raw_data else None
 
@@ -247,7 +241,7 @@ def get_unit_info(unit_name: str, model: str = None) -> dict:
         raise ValueError(
             f"no unit info could be grabbed for {unit_name}; "
             f"are you sure it's a valid unit name?"
-            f"cmd={' '.join(proc.args)}"
+            f"cmd={' '.join(proc.args)}"  # type: ignore
         )
 
     if unit_name not in data:
@@ -293,7 +287,7 @@ class UnitRelationData:
 
 
 def get_content(
-    obj: str, other_obj, include_default_juju_keys: bool = False, model: str = None
+    obj: str, other_obj, include_default_juju_keys: bool = False, model: Optional[str] = None
 ) -> UnitRelationData:
     """Get the content of the databag of `obj`, as seen from `other_obj`."""
     unit_name, endpoint = obj.split(":")
@@ -339,7 +333,7 @@ def get_relation_data(
     provider_endpoint: str,
     requirer_endpoint: str,
     include_default_juju_keys: bool = False,
-    model: str = None,
+    model: Optional[str] = None,
 ):
     """Get relation databags for a juju relation.
 
@@ -364,7 +358,7 @@ def _can_connect(ip, port) -> bool:
     except:  # noqa: E722
         return False
     finally:
-        s.close()
+        s.close()  # type: ignore
 
 
 def assert_can_connect(ip, port):
@@ -372,6 +366,7 @@ def assert_can_connect(ip, port):
 
 
 async def deploy_traefik_if_not_deployed(ops_test: OpsTest, traefik_charm):
+    assert ops_test.model
     try:
         await ops_test.model.deploy(
             traefik_charm, application_name="traefik-k8s", resources=trfk_resources
@@ -385,6 +380,7 @@ async def deploy_traefik_if_not_deployed(ops_test: OpsTest, traefik_charm):
 
 
 async def deploy_charm_if_not_deployed(ops_test: OpsTest, charm, app_name: str, resources=None):
+    assert ops_test.model
     if not ops_test.model.applications.get(app_name):
         await ops_test.model.deploy(charm, resources=resources, application_name=app_name)
 
@@ -398,9 +394,10 @@ async def safe_relate(ops_test: OpsTest, ep1, ep2):
     # in pytest-operator CI, we deploy all tests in the same model.
     # Therefore, it might be that by the time we run this module, the two endpoints
     # are already related.
+    assert ops_test.model
     try:
         await ops_test.model.add_relation(ep1, ep2)
-    except juju.errors.JujuAPIError as e:
+    except juju.errors.JujuAPIError as e:  # type: ignore
         # relation already exists? skip
         logging.error(e)
         pass
@@ -411,6 +408,7 @@ async def setup_env(ops_test: OpsTest):
     # Prevent "update-status" from interfering with the test:
     # - if fired "too quickly", traefik will flip between active/idle and maintenance;
     # - make sure charm code does not rely on update-status for correct operation.
+    assert ops_test.model
     await ops_test.model.set_config(
         {"update-status-hook-interval": "60m", "logging-config": "<root>=WARNING; unit=DEBUG"}
     )

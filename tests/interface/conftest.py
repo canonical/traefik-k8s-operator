@@ -23,7 +23,7 @@ def interface_tester(interface_tester: InterfaceTester):
             charm_type=TraefikIngressCharm,
             state_template=State(
                 leader=True,
-                config={
+                config={  # type: ignore
                     # if we don't pass external_hostname, we have to mock
                     # all sorts of lightkube calls
                     "external_hostname": "0.0.0.0",
@@ -47,7 +47,7 @@ def interface_tester(interface_tester: InterfaceTester):
                         },
                         layers={
                             "foo": Layer(
-                                {
+                                {  # type: ignore
                                     "summary": "foo",
                                     "description": "bar",
                                     "services": {

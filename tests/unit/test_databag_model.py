@@ -9,15 +9,15 @@ from pydantic import ConfigDict
 @pytest.mark.parametrize("nest_under", (True, False))
 def test_round_trip(nest_under):
     if nest_under:
-        if pydantic.version.VERSION.split(".") <= ["2"]:
+        if pydantic.version.VERSION.split(".") <= ["2"]:  # type: ignore
 
-            class MyAppData(IngressRequirerAppData):
+            class MyAppData(IngressRequirerAppData):  # type: ignore
                 _NEST_UNDER = "config"
 
         else:
 
-            class MyAppData(IngressRequirerAppData):
-                model_config = ConfigDict(_NEST_UNDER="config")
+            class MyAppData(IngressRequirerAppData):  # type: ignore
+                model_config = ConfigDict(_NEST_UNDER="config")  # type: ignore
 
     else:
 
@@ -37,7 +37,7 @@ def test_round_trip(nest_under):
     model.dump(db)
 
     if nest_under:
-        if pydantic.version.VERSION.split(".") <= ["2"]:
+        if pydantic.version.VERSION.split(".") <= ["2"]:  # type: ignore
             assert db == {"config": json.dumps(aliased)}
         else:
             assert db == {"config": json.dumps(aliased, separators=(",", ":"))}
@@ -66,7 +66,7 @@ def test_deserialize_raw():
 
 def test_invalid_model():
     with pytest.raises(pydantic.ValidationError):
-        IngressRequirerAppData(model="foo", name=10, port="asdasder", scheme="bubble")
+        IngressRequirerAppData(model="foo", name=10, port="asdasder", scheme="bubble")  # type: ignore
 
 
 def test_extra_fields():
@@ -74,8 +74,8 @@ def test_extra_fields():
         model="foo",
         name="bar",
         port=10,
-        strip_prefix=True,
-        redirect_https=False,
+        strip_prefix=True,  # type: ignore
+        redirect_https=False,  # type: ignore
         scheme="https",
-        qux="floz",
+        qux="floz",  # type: ignore
     )
