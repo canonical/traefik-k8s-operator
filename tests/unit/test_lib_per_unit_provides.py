@@ -89,6 +89,7 @@ def test_ingress_unit_provider_related(provider, harness, leader):
 @pytest.mark.parametrize("strip_prefix", (True, False))
 def test_ingress_unit_provider_request(provider, harness, strip_prefix):
     relation = relate(harness)
+    assert relation
     _requirer_provide_ingress_requirements(harness, 80, relation, strip_prefix=strip_prefix)
     assert provider.is_ready(relation)
 
@@ -96,10 +97,10 @@ def test_ingress_unit_provider_request(provider, harness, strip_prefix):
 @pytest.mark.parametrize("port, host", ((80, "1.1.1.1"), (81, "10.1.10.1")))
 @pytest.mark.parametrize("strip_prefix", (True, False))
 def test_ingress_unit_provider_request_response_nonleader(
-    provider, harness, port, host, strip_prefix
+    provider: IngressPerUnitProvider, harness, port, host, strip_prefix
 ):
-    provider: IngressPerUnitProvider
     relation = relate(harness)
+    assert relation
     _requirer_provide_ingress_requirements(
         harness, port, relation, host=host, strip_prefix=strip_prefix
     )
@@ -120,6 +121,7 @@ def test_ingress_unit_provider_request_response_nonleader(
 def test_ingress_unit_provider_request_response(provider, harness, url, strip_prefix):
     relation = relate(harness)
     harness.set_leader(True)
+    assert relation
     _requirer_provide_ingress_requirements(harness, 80, relation, strip_prefix=strip_prefix)
     provider.publish_url(relation, "remote/0", url)
 

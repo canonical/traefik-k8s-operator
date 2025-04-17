@@ -9,7 +9,7 @@ from ops.testing import Harness
 
 from charm import TraefikIngressCharm
 
-ops.testing.SIMULATE_CAN_CONNECT = True
+ops.testing.SIMULATE_CAN_CONNECT = True  # type: ignore
 
 
 class TlsWithExternalHostname(unittest.TestCase):

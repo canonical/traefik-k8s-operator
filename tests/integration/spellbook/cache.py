@@ -56,7 +56,7 @@ def spellbook_fetch(  # noqa: C901
     Params::
         :param charm_root: Charm tree root.
         :param charm_name: Name of the charm. If not given, will default to whatever
-            charm_root/metadata.yaml says.
+            charm_root/charmcraft.yaml says.
         :param hash_paths: Specific directories or files to base the hashing on.
             Defaults to 'charm_root/'.
         :param pull_libs: Path to local charm lib files to include in the package.
@@ -117,7 +117,7 @@ def spellbook_fetch(  # noqa: C901
 
     logging.info(f"hash: {charm_tree_sum}")
 
-    charm_tag = charm_name or _get_charm_name(charm_root / "metadata.yaml")
+    charm_tag = charm_name or _get_charm_name(charm_root / "charmcraft.yaml")
 
     cached_charm_path = cache_dir / f"{charm_tag}.{charm_tree_sum}.charm"
 

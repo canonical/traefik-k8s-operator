@@ -44,6 +44,7 @@ def fetch_health_sync(url: str):
 
 @pytest.mark.abort_on_fail
 async def test_deployment(ops_test: OpsTest, traefik_charm, health_tester_charm):
+    assert ops_test.model
     await asyncio.gather(
         ops_test.model.deploy(
             traefik_charm,
@@ -66,11 +67,13 @@ async def test_deployment(ops_test: OpsTest, traefik_charm, health_tester_charm)
 
 @pytest.mark.abort_on_fail
 async def test_relate(ops_test: OpsTest):
+    assert ops_test.model
     await ops_test.model.add_relation("health-tester:ingress", "traefik-k8s:ingress")
     await ops_test.model.wait_for_idle(["traefik-k8s", "health-tester"])
 
 
 async def test_health(ops_test: OpsTest):
+    assert ops_test.model
     traefik_address = await get_k8s_service_address(ops_test, "traefik-k8s-lb")
     health_address = f"http://{traefik_address}/{ops_test.model.name}-health-tester/health"
 
