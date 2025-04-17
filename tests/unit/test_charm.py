@@ -3,8 +3,8 @@
 
 import json
 import socket
-from typing import Optional
 import unittest
+from typing import Optional
 from unittest.mock import Mock, PropertyMock, patch
 
 import ops.testing

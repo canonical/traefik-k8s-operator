@@ -3,8 +3,8 @@
 import asyncio
 import subprocess
 import time
-from typing import Optional
 import urllib.request
+from typing import Optional
 from urllib.error import HTTPError
 
 import pytest
