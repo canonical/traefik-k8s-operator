@@ -32,7 +32,21 @@ CONFIG = {
                 "loadBalancer": {"servers": [{"url": "http://foo.testmodel-endpoints.local:8080"}]}
             }
         },
-    }
+    },
+    "tcp": {
+        "routers": {
+            "juju-bar-router": {
+                "entryPoints": ["web"],
+                "rule": "PathPrefix(`/path`)",
+                "service": "juju-bar-service",
+            }
+        },
+        "services": {
+            "juju-bar-service": {
+                "loadBalancer": {"servers": [{"url": "http://bar.testmodel-endpoints.local:8080"}]}
+            }
+        },
+    },
 }
 
 CONFIG_WITH_TLS = {
@@ -62,7 +76,34 @@ CONFIG_WITH_TLS = {
                 "loadBalancer": {"servers": [{"url": "http://foo.testmodel-endpoints.local:8080"}]}
             }
         },
-    }
+    },
+    "tcp": {
+        "routers": {
+            "juju-bar-router": {
+                "entryPoints": ["web"],
+                "rule": "PathPrefix(`/path`)",
+                "service": "juju-bar-service",
+            },
+            "juju-bar-router-tls": {
+                "entryPoints": ["web"],
+                "rule": "PathPrefix(`/path`)",
+                "service": "juju-bar-service",
+                "tls": {
+                    "domains": [
+                        {
+                            "main": "testhostname",
+                            "sans": ["*.testhostname"],
+                        },
+                    ],
+                },
+            },
+        },
+        "services": {
+            "juju-bar-service": {
+                "loadBalancer": {"servers": [{"url": "http://bar.testmodel-endpoints.local:8080"}]}
+            }
+        },
+    },
 }
 
 TCP_CONFIG = {
