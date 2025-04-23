@@ -176,19 +176,23 @@ class Traefik:
     def update_cert_configuration(self, certs: dict):
         """Update the server cert, ca, and key configuration files."""
         # Remove certs that are no longer needed.
-        CERTS_DIR.mkdir(parents=True, exist_ok=True)
-        for path in CERTS_DIR.iterdir():
-            if path.name.endswith(".cert") and path.name[:5] not in certs:
-                path.unlink()
-        for path in self._container.list_files(CERTS_DIR):
-            if path.name.endswith(".cert") and path.name[:5] not in certs:
-                self._container.remove_path(path.path)
-            if path.name.endswith(".key") and path.name[:4] not in certs:
-                self._container.remove_path(path.path)
-        for path in self._container.list_files(CA_CERTS_DIR):
-            # There could be other .crt files here so make sure the names are identifiable.
-            if path.name.endswith(".traefik-charm.crt") and path.name[:18] not in certs:
-                self._container.remove_path(path.path)
+        if certs:
+            CERTS_DIR.mkdir(parents=True, exist_ok=True)
+        if CERTS_DIR.is_dir():
+            for path in CERTS_DIR.iterdir():
+                if path.name.endswith(".cert") and path.name[:5] not in certs:
+                    path.unlink()
+        if self._container.isdir(CERTS_DIR):
+            for path in self._container.list_files(CERTS_DIR):
+                if path.name.endswith(".cert") and path.name[:5] not in certs:
+                    self._container.remove_path(path.path)
+                if path.name.endswith(".key") and path.name[:4] not in certs:
+                    self._container.remove_path(path.path)
+        if self._container.isdir(CA_CERTS_DIR):
+            for path in self._container.list_files(CA_CERTS_DIR):
+                # There could be other .crt files here so make sure the names are identifiable.
+                if path.name.endswith(".traefik-charm.crt") and path.name[:18] not in certs:
+                    self._container.remove_path(path.path)
         for hostname, cert in certs.items():
             with (CERTS_DIR / f"{hostname}.cert").open("w") as f:
                 f.write(cert["cert"])
