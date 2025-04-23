@@ -363,7 +363,7 @@ class TraefikIngressCharm(CharmBase):
     def _get_cert_requests(self) -> list:
         addrs = {
             urlparse(endpoint["url"]).hostname
-            for endpoint in self._get_proxied_endpoints().values()
+            for endpoint in self._get_proxied_endpoints().values() if "url" in endpoint
         }
         csrs = []
         for addr in addrs:

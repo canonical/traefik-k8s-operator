@@ -513,7 +513,7 @@ class IngressPerAppProvider(_IngressPerAppBase):
             )
 
     def _handle_relation_broken(self, event):
-        self.on.data_removed.emit(event.relation)  # type: ignore
+        self.on.data_removed.emit(event.relation, event.relation.app)  # type: ignore
 
     def wipe_ingress_data(self, relation: Relation):
         """Clear ingress data from relation."""
@@ -528,7 +528,7 @@ class IngressPerAppProvider(_IngressPerAppBase):
             )
             return
         del relation.data[self.app]["ingress"]
-        self.on.endpoints_updated.emit(relation=relation)
+        self.on.endpoints_updated.emit(relation=relation, app=relation.app)
 
     def _get_requirer_units_data(self, relation: Relation) -> List["IngressRequirerUnitData"]:
         """Fetch and validate the requirer's unit databag."""
@@ -562,7 +562,7 @@ class IngressPerAppProvider(_IngressPerAppBase):
                 self._get_requirer_app_data(relation), self._get_requirer_units_data(relation)
             )
         except (pydantic.ValidationError, DataValidationError) as e:
-            raise DataValidationError("failed to validate ingress requirer data") from e
+            raise DataValidationError("failed to validate ingress requirer data: %s" % str(e)) from e
 
     def is_ready(self, relation: Optional[Relation] = None):
         """The Provider is ready if the requirer has sent valid data."""
@@ -572,7 +572,7 @@ class IngressPerAppProvider(_IngressPerAppBase):
         try:
             self.get_data(relation)
         except (DataValidationError, NotReadyError) as e:
-            log.debug("Provider not ready; validation error encountered: %s" % str(e))
+            log.info("Provider not ready; validation error encountered: %s" % str(e))
             return False
         return True
 
@@ -597,7 +597,7 @@ class IngressPerAppProvider(_IngressPerAppBase):
         ingress_url = {"url": url}
         try:
             IngressProviderAppData(ingress=ingress_url).dump(relation.data[self.app])  # type: ignore
-            self.on.endpoints_updated.emit(relation=relation)
+            self.on.endpoints_updated.emit(relation=relation, app=relation.app)
         except pydantic.ValidationError as e:
             # If we cannot validate the url as valid, publish an empty databag and log the error.
             log.error(f"Failed to validate ingress url '{url}' - got ValidationError {e}")
@@ -763,7 +763,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
 
     def _handle_relation_broken(self, event):
         self._stored.current_url = None  # type: ignore
-        self.on.revoked.emit(event.relation)  # type: ignore
+        self.on.revoked.emit(relation=event.relation, app=event.relation.app)  # type: ignore
 
     def _handle_upgrade_or_leader(self, event):
         """On upgrade/leadership change: ensure we publish the data we have."""
