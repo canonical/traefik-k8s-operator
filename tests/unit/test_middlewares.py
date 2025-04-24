@@ -65,10 +65,6 @@ def _create_relation(
 @pytest.mark.parametrize("strip_prefix", (False, True))
 @pytest.mark.parametrize("redirect_https", (False, True))
 @pytest.mark.parametrize("scheme", ("http", "https"))
-@patch("charm.TraefikIngressCharm._ingressed_address", PropertyMock(return_value="testhostname"))
-@patch("charm.TraefikIngressCharm._static_config_changed", PropertyMock(return_value=False))
-@patch("traefik.Traefik.is_ready", PropertyMock(return_value=True))
-@patch("charm.TraefikIngressCharm.version", PropertyMock(return_value="0.0.0"))
 def test_middleware_config(
     traefik_ctx, traefik_container, rel_name, routing_mode, strip_prefix, redirect_https, scheme
 ):
