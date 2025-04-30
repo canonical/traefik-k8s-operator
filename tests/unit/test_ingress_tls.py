@@ -29,21 +29,10 @@ def _create_tls_relation(*, app_name: str, strip_prefix: bool, redirect_https: b
 @patch("charm.TraefikIngressCharm._static_config_changed", MagicMock(return_value=False))
 @patch("charm.TraefikIngressCharm.version", PropertyMock(return_value="0.0.0"))
 def test_middleware_config(
-    traefik_ctx, routing_mode, strip_prefix, redirect_https, tls_from_configs
+    traefik_ctx, traefik_container, routing_mode, strip_prefix, redirect_https, tls_from_configs
 ):
     td = tempfile.TemporaryDirectory()
-    containers = [
-        Container(
-            name="traefik",
-            can_connect=True,
-            mounts={"configurations": Mount("/opt/traefik/", td.name)},
-            exec_mock={("find", "/opt/traefik/juju", "-name", "*.yaml", "-delete"): ExecOutput()},
-            layers={
-                "traefik": ops.pebble.Layer({"services": {"traefik": {"startup": "enabled"}}})
-            },
-            service_status={"traefik": ops.pebble.ServiceStatus.ACTIVE},
-        )
-    ]
+    containers = [traefik_container]
 
     # GIVEN a relation is requesting some middlewares
     rel_id = 0
