@@ -595,8 +595,8 @@ class IngressPerAppProvider(_IngressPerAppBase):
             # If we cannot validate the url as valid, publish an empty databag and log the error.
             log.error(f"Failed to validate ingress url '{url}' - got ValidationError {e}")
             log.error(
-                "url was not published to ingress relation for {relation.app}.  This error is likely due to an"
-                " error or misconfiguration of the charm calling this library."
+                f"url was not published to ingress relation for {relation.app}.  This error is likely due to an"
+                f" error or misconfiguration of the charm calling this library."
             )
             IngressProviderAppData(ingress=None).dump(relation.data[self.app])  # type: ignore
 
