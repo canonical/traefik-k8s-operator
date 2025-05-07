@@ -21,11 +21,14 @@ INGRESS_UNIT_DATA = {
     "host": '"example.local"',
 }
 
+
 def reinstantiate_charm(harness: Harness):
     harness._framework = Framework(
-            harness._storage, harness._charm_dir, harness._meta, harness._model)
+        harness._storage, harness._charm_dir, harness._meta, harness._model
+    )
     harness._charm = None
     harness.begin()
+
 
 class TlsWithExternalHostname(unittest.TestCase):
     @patch(
@@ -49,8 +52,12 @@ class TlsWithExternalHostname(unittest.TestCase):
         self.harness.set_leader(True)
         self.harness.container_pebble_ready("traefik")
         self.harness.begin_with_initial_hooks()
-        rel_id = self.harness.add_relation("ingress", "server", app_data=INGRESS_APP_DATA, unit_data=INGRESS_UNIT_DATA)
-        self.harness.update_relation_data(rel_id, "traefik-k8s", {"ingress": '{"url": "https://example.com/test-model-appname"}'})
+        rel_id = self.harness.add_relation(
+            "ingress", "server", app_data=INGRESS_APP_DATA, unit_data=INGRESS_UNIT_DATA
+        )
+        self.harness.update_relation_data(
+            rel_id, "traefik-k8s", {"ingress": '{"url": "https://example.com/test-model-appname"}'}
+        )
         reinstantiate_charm(self.harness)
 
     @patch(
