@@ -84,7 +84,7 @@ LIBAPI = 2
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 15
+LIBPATCH = 16
 
 PYDEPS = ["pydantic"]
 
@@ -562,7 +562,9 @@ class IngressPerAppProvider(_IngressPerAppBase):
                 self._get_requirer_app_data(relation), self._get_requirer_units_data(relation)
             )
         except (pydantic.ValidationError, DataValidationError) as e:
-            raise DataValidationError("failed to validate ingress requirer data: %s" % str(e)) from e
+            raise DataValidationError(
+                "failed to validate ingress requirer data: %s" % str(e)
+            ) from e
 
     def is_ready(self, relation: Optional[Relation] = None):
         """The Provider is ready if the requirer has sent valid data."""

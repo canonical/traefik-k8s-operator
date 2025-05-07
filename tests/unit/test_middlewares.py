@@ -1,15 +1,13 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-import tempfile
 from pathlib import Path
 from unittest.mock import PropertyMock, patch
 
-import ops
 import pytest
 import scenario
 import yaml
-from scenario import Container, ExecOutput, Mount, Relation, State
+from scenario import Relation, State
 
 from tests.unit._utils import _render_config, create_ingress_relation
 from traefik import DYNAMIC_CONFIG_DIR
@@ -68,7 +66,6 @@ def _create_relation(
 def test_middleware_config(
     traefik_ctx, traefik_container, rel_name, routing_mode, strip_prefix, redirect_https, scheme
 ):
-    td = tempfile.TemporaryDirectory()
 
     # GIVEN a relation is requesting some middlewares
     rel_id = 0
