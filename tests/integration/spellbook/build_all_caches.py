@@ -15,8 +15,6 @@ def main():
         hash_paths=[
             traefik_root / "src",
             traefik_root / "lib",
-            traefik_root / "metadata.yaml",
-            traefik_root / "config.yaml",
             traefik_root / "charmcraft.yaml",
         ],
     )

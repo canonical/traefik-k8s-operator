@@ -35,7 +35,7 @@ def event_container(event_class):
 @pytest.fixture
 def charm_cls(event_container):
     class MyCharm(CharmBase):
-        on = event_container()
+        on = event_container()  # type: ignore
         event = None
 
         def __init__(self, framework):

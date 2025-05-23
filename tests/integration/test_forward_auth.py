@@ -24,6 +24,7 @@ IAP_REQUIRER_CHARM = "iap-requirer"
 
 @pytest.fixture(scope="module")
 def lightkube_client(ops_test: OpsTest) -> Client:
+    assert ops_test.model
     client = Client(field_manager=OATHKEEPER_CHARM, namespace=ops_test.model.name)
     return client
 
@@ -32,6 +33,7 @@ async def get_reverse_proxy_app_url(
     ops_test: OpsTest, ingress_app_name: str, app_name: str
 ) -> str:
     """Get the ingress address of an app."""
+    assert ops_test.model
     address = await get_k8s_service_address(ops_test, f"{ingress_app_name}-lb")
     proxy_app_url = f"http://{address}/{ops_test.model.name}-{app_name}/"
     logger.debug(f"Retrieved address: {proxy_app_url}")
@@ -42,6 +44,7 @@ async def get_reverse_proxy_app_url(
 @pytest.mark.abort_on_fail
 async def test_deployment(ops_test: OpsTest, traefik_charm, forward_auth_tester_charm):
     """Deploy the charms and integrations required to set up an Identity and Access Proxy."""
+    assert ops_test.model
     await deploy_traefik_if_not_deployed(ops_test, traefik_charm)
 
     # Enable experimental-forward-auth
@@ -163,6 +166,7 @@ def update_access_rules_configmap(ops_test: OpsTest, lightkube_client: Client, r
     This is a workaround to test response headers without deploying identity-platform bundle.
     The anonymous authenticator is used only for testing purposes.
     """
+    assert ops_test.model
     cm = lightkube_client.get(ConfigMap, "access-rules", namespace=ops_test.model.name)
     data = {"access-rules-iap-requirer-anonymous.json": str(rule)}
     cm.data = data
@@ -175,7 +179,9 @@ def update_access_rules_configmap(ops_test: OpsTest, lightkube_client: Client, r
     reraise=True,
 )
 def update_config_configmap(ops_test: OpsTest, lightkube_client: Client):
+    assert ops_test.model
     cm = lightkube_client.get(ConfigMap, name="oathkeeper-config", namespace=ops_test.model.name)
+    assert cm.data
     cm = yaml.safe_load(cm.data["oathkeeper.yaml"])
     cm["access_rules"]["repositories"] = [
         "file://etc/config/access-rules/access-rules-iap-requirer-anonymous.json"
@@ -187,6 +193,7 @@ def update_config_configmap(ops_test: OpsTest, lightkube_client: Client):
 
 
 async def test_remove_forward_auth_integration(ops_test: OpsTest):
+    assert ops_test.model
     await ops_test.juju("remove-relation", "oathkeeper", "traefik-k8s:experimental-forward-auth")
     await ops_test.model.wait_for_idle(
         [TRAEFIK_CHARM, OATHKEEPER_CHARM, IAP_REQUIRER_CHARM], status="active"

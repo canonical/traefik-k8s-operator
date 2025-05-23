@@ -107,6 +107,7 @@ def test_ready_single_unit(harness, charm, listen_to, url):
 def test_ready_other_unit(harness, charm, listen_to, url):
     relation = relate(harness)
     _requirer_provide_ingress(harness, charm.unit.name, url, relation)
+    assert relation
 
     new_unit_name = relation.app.name + "1"
     new_unit_url = url + "/new_unit"

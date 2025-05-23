@@ -21,8 +21,12 @@ from tests.integration.test_charm_tcp import (  # noqa
 
 @pytest_asyncio.fixture
 async def tcp_ipu_deployment(
-    ops_test: OpsTest, traefik_charm, tcp_tester_charm, ipu_tester_charm  # noqa
+    ops_test: OpsTest,
+    traefik_charm,
+    tcp_tester_charm,
+    ipu_tester_charm,  # noqa
 ):
+    assert ops_test.model
     await asyncio.gather(
         deploy_traefik_if_not_deployed(ops_test, traefik_charm),
         deploy_charm_if_not_deployed(

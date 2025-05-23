@@ -1,6 +1,7 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 """Helpers for unit testing charms which use this library."""
+
 import uuid
 from unittest.mock import Mock, patch
 
@@ -114,7 +115,7 @@ TCP_CONFIG_WITH_TLS = {
 
 
 @pytest.fixture(scope="function")
-def harness() -> Harness[TraefikIngressCharm]:
+def harness() -> Harness[TraefikIngressCharm]:  # type: ignore
     harness = Harness(TraefikIngressCharm)
     harness.set_model_name(MODEL_NAME)
     harness.handle_exec("traefik", ["update-ca-certificates", "--fresh"], result=0)
@@ -125,7 +126,7 @@ def harness() -> Harness[TraefikIngressCharm]:
     patcher = patch.object(TraefikIngressCharm, "version", property(lambda *_: "0.0.0"))
     patcher.start()
 
-    yield harness
+    yield harness  # type: ignore
     harness.cleanup()
 
 
@@ -164,6 +165,7 @@ def test_relation_initialization(harness: Harness[TraefikIngressCharm]):
 def test_relation_not_ready(harness: Harness[TraefikIngressCharm]):
     _, relation = initialize_and_setup_tr_relation(harness)
     charm = harness.charm
+    assert relation
     assert not charm.traefik_route.is_ready(relation)
     assert charm.traefik_route.get_config(relation) is None
 
@@ -174,6 +176,7 @@ def test_relation_ready(harness: Harness[TraefikIngressCharm]):
     config = yaml.dump(CONFIG)
     harness.update_relation_data(tr_relation_id, REMOTE_APP_NAME, {"config": config})
 
+    assert relation
     assert charm.traefik_route.is_ready(relation)
     assert charm.traefik_route.get_config(relation) == config
 
@@ -186,6 +189,7 @@ def test_tr_ready_handler_called(harness: Harness[TraefikIngressCharm]):
     config = yaml.dump(CONFIG)
     harness.update_relation_data(tr_relation_id, REMOTE_APP_NAME, {"config": config})
 
+    assert relation
     assert charm.traefik_route.is_ready(relation)
     assert charm.traefik_route.get_config(relation) == config
 
@@ -223,6 +227,7 @@ def test_static_config(harness: Harness[TraefikIngressCharm], topology: JujuTopo
     charm.traefik_route.on.ready.emit(charm.model.get_relation("traefik-route"))
 
     assert charm.traefik._traefik_route_static_configs == [{"foo": "bar"}]
+    assert relation
     assert charm.traefik_route.is_ready(relation)
 
     # verify the static config is there
@@ -285,6 +290,7 @@ def test_static_config_broken(harness: Harness[TraefikIngressCharm], topology: J
     assert conf["log"] == {"level": "DEBUG"}
 
     # THEN  the dynamic config is there too
+    assert relation
     file = f"/opt/traefik/juju/juju_ingress_{relation.name}_{relation.id}_{relation.app.name}.yaml"
     assert yaml.safe_load(charm.container.pull(file).read()) == CONFIG_WITH_TLS
 
@@ -401,6 +407,7 @@ def test_tls_configuration_parametrized(
     )
 
     # Verify that the relation is ready and the config is correctly loaded.
+    assert relation
     assert charm.traefik_route.is_ready(relation)
     assert charm.traefik_route.get_config(relation) == config_yaml
 

@@ -1,5 +1,49 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
+[project]
+name = "traefik-k8s"
+version = "0.0"
+requires-python = "~=3.8"
+
+dependencies = [
+  "ops>=2.10.0",
+  "cosl",
+  "lightkube >= 0.8.1",
+  "lightkube-models >= 1.22.0.4",
+  "lightkube-extensions @ git+https://github.com/canonical/lightkube-extensions.git@main",
+  "cryptography",
+  "deepmerge",
+  "jsonschema",
+  # PYDEPS
+  "importlib-metadata==6.0.0",
+  "opentelemetry-exporter-otlp-proto-http==1.21.0",
+  "opentelemetry-api==1.21.0",
+  "pydantic>=2",
+]
+
+[project.optional-dependencies]
+dev = [
+  # Linting
+  "ruff",
+  "codespell",
+  # Static
+  "pyright",
+  # Unit
+  "pytest",
+  "pytest-subtests",
+  "coverage[toml]",
+  "ipdb",
+  "ops-scenario==6.1.7",
+  # Interface
+  "pytest-interface-tester>0.3",
+  # Integration
+  "juju",
+  "pytest-asyncio==0.21.2",
+  "pytest-operator",
+  "tenacity==8.3.0",  # fix for https://github.com/jd/tenacity/issues/471
+  "sh",
+  "minio",
+]
 
 # Testing tools configuration
 [tool.coverage.run]
@@ -13,14 +57,10 @@ minversion = "6.0"
 log_cli_level = "INFO"
 asyncio_mode = "auto"
 markers = [
-    "setup: tests that mutate the model topology by adding stuff (deselect with '-m \"not setup\"')",
-    "teardown: tests that mutate the model topology by removing stuff (deselect with '-m \"not teardown\"')",
+  "setup: tests that mutate the model topology by adding stuff (deselect with '-m \"not setup\"')",
+  "teardown: tests that mutate the model topology by removing stuff (deselect with '-m \"not teardown\"')",
 ]
-
-# Formatting tools configuration
-[tool.black]
-line-length = 99
-target-version = ["py38"]
+addopts = "--tb=native --verbose --capture=no --log-cli-level=INFO"
 
 # Linting tools configuration
 [tool.ruff]
@@ -40,9 +80,15 @@ convention = "google"
 
 [tool.pyright]
 reportTypedDictNotRequiredAccess = false
-extraPaths = ["lib"]
+extraPaths = ["src", "lib"]
 pythonVersion = "3.8"
 pythonPlatform = "All"
+exclude = [
+  "tests/integration/testers/**",
+  "tests/integration/spellbook/**",
+  "lib/charms/traefik_k8s/v1/**",
+]
 
 [tool.codespell]
 skip = ".git,.tox,build,venv*"
+ignore-words-list = "assertIn"

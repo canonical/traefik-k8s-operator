@@ -25,6 +25,7 @@ from tests.integration.helpers import (
 
 @pytest.mark.abort_on_fail
 async def test_deployment(ops_test: OpsTest, traefik_charm, ipa_tester_charm):
+    assert ops_test.model
     await asyncio.gather(
         ops_test.model.deploy(
             traefik_charm, application_name="traefik-k8s", resources=trfk_resources
@@ -39,11 +40,13 @@ async def test_deployment(ops_test: OpsTest, traefik_charm, ipa_tester_charm):
 
 @pytest.mark.abort_on_fail
 async def test_relate(ops_test: OpsTest):
+    assert ops_test.model
     await ops_test.model.add_relation("ipa-tester:ingress", "traefik-k8s:ingress")
     await ops_test.model.wait_for_idle(["traefik-k8s", "ipa-tester"])
 
 
 def assert_ipa_charm_has_ingress(ops_test: OpsTest):
+    assert ops_test.model_full_name
     data = get_relation_data(
         requirer_endpoint="ipa-tester/0:ingress",
         provider_endpoint="traefik-k8s/0:ingress",
@@ -64,6 +67,7 @@ async def test_ipa_charm_has_ingress(ops_test: OpsTest):
 
 @pytest.mark.abort_on_fail
 async def test_relation_data_shape(ops_test: OpsTest):
+    assert ops_test.model_full_name
     data = get_relation_data(
         requirer_endpoint="ipa-tester/0:ingress",
         provider_endpoint="traefik-k8s/0:ingress",
@@ -99,6 +103,7 @@ async def test_relation_data_shape(ops_test: OpsTest):
 
 @pytest.mark.abort_on_fail
 async def test_remove_relation(ops_test: OpsTest):
+    assert ops_test.model
     await ops_test.juju("remove-relation", "ipa-tester:ingress", "traefik-k8s:ingress")
     await ops_test.model.wait_for_idle(["traefik-k8s", "ipa-tester"], status="active")
 

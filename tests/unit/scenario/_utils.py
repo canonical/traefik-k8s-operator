@@ -1,5 +1,5 @@
 import json
-from typing import List
+from typing import List, Optional
 
 from scenario import Relation
 
@@ -44,7 +44,7 @@ def _render_config(
     transports = {}
     if scheme == "https":
         # service_spec["rootCAs"] = ["/opt/traefik/juju/certificate.cert"]
-        service_spec["loadBalancer"]["serversTransport"] = "reverseTerminationTransport"
+        service_spec["loadBalancer"]["serversTransport"] = "reverseTerminationTransport"  # type: ignore
         transports = {"reverseTerminationTransport": {"insecureSkipVerify": False}}
 
     expected = {
@@ -93,7 +93,7 @@ def _render_config(
 
 def create_ingress_relation(
     *,
-    rel_id: int = None,
+    rel_id: Optional[int] = None,
     app_name: str = "remote",
     strip_prefix: bool = False,
     redirect_https: bool = False,

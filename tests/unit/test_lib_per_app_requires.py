@@ -70,6 +70,7 @@ def test_ingress_app_requirer_related(requirer: IngressPerAppRequirer, harness, 
     with capture(harness.charm, IngressPerAppReadyEvent) as captured:
         harness.update_relation_data(relation_id, "remote", {"ingress": json.dumps({"url": url})})
     event = captured.event
+    assert event
     assert event.url == url
     assert requirer.url == url
     assert requirer.is_ready()
@@ -92,7 +93,7 @@ def test_validator(requirer: IngressPerAppRequirer, harness, auto_data, ok, stri
     harness.add_network("10.0.0.10")
     harness.add_relation("ingress", "remote")
     requirer._strip_prefix = strip_prefix
-    requirer._scheme = scheme
+    requirer._scheme = scheme  # type: ignore
 
     if not ok:
         with pytest.raises(DataValidationError):
