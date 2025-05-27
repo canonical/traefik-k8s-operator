@@ -325,7 +325,7 @@ class TraefikRouteRequirer(Object):
     {
         "config": "<Traefik dynamic config YAML>",
         "static": "<Traefik static config YAML>",  # Optional, requires Traefik restart
-        "raw": "<bool>"  # Determines if Traefik should append TLS config for non HTTP routes
+        "raw": "<bool>"  # Determines if Traefik should append TLS config for ALL routes
     }
     ```
 
@@ -350,7 +350,7 @@ class TraefikRouteRequirer(Object):
 
         if self._raw:
             log.warning(
-                "Raw mode enabled: TLS routes for non-HTTP protocols will not be auto-generated. "
+                "Raw mode enabled: TLS routes for ALL protocols will not be auto-generated. "
                 "Enable this only if you fully understand and intend to bypass the additional TLS configuration."
             )
 
