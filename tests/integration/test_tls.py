@@ -167,7 +167,7 @@ async def test_tls_termination(ops_test: OpsTest, temp_dir):
     await ops_test.model.deploy(
         "ch:self-signed-certificates",
         application_name="root-ca",
-        channel="edge",
+        channel="1/edge",
     )
     await ops_test.model.applications["root-ca"].set_config(
         {
