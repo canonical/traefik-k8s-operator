@@ -58,23 +58,28 @@ def get_endpoints(ops_test: OpsTest, *, scheme: str, netloc: str) -> list:
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy(ops_test: OpsTest, traefik_charm):
     await asyncio.gather(
-        ops_test.model.deploy(traefik_charm, resources=trfk.resources, application_name=trfk.name),
+        ops_test.model.deploy(
+            traefik_charm,
+            resources=trfk.resources,
+            application_name=trfk.name,
+            trust=True,
+        ),
         ops_test.model.deploy(
             ipu.charm,
             application_name=ipu.name,
-            channel="2/edge",  # TODO change to "stable" once available
+            channel="latest/edge",  # TODO change to "stable" once available
             trust=True,
         ),
         ops_test.model.deploy(
             ipa.charm,
             application_name=ipa.name,
-            channel="2/edge",  # TODO change to "stable" once available
+            channel="latest/edge",  # TODO change to "stable" once available
             trust=True,
         ),
         ops_test.model.deploy(
             ipr.charm,
             application_name=ipr.name,
-            channel="2/edge",  # TODO change to "stable" once available
+            channel="latest/edge",  # TODO change to "stable" once available
             trust=True,
         ),
     )
@@ -167,7 +172,7 @@ async def test_tls_termination(ops_test: OpsTest, temp_dir):
     await ops_test.model.deploy(
         "ch:self-signed-certificates",
         application_name="root-ca",
-        channel="1/edge",
+        channel="latest/edge",
     )
     await ops_test.model.applications["root-ca"].set_config(
         {

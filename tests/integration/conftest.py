@@ -374,7 +374,10 @@ def assert_can_connect(ip, port):
 async def deploy_traefik_if_not_deployed(ops_test: OpsTest, traefik_charm):
     try:
         await ops_test.model.deploy(
-            traefik_charm, application_name="traefik-k8s", resources=trfk_resources
+            traefik_charm,
+            application_name="traefik-k8s",
+            resources=trfk_resources,
+            trust=True,
         )
     except JujuError as e:
         if 'cannot add application "traefik-k8s": application already exists' not in str(e):
