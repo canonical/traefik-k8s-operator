@@ -67,19 +67,19 @@ async def test_build_and_deploy(ops_test: OpsTest, traefik_charm):
         ops_test.model.deploy(
             ipu.charm,
             application_name=ipu.name,
-            channel="1/edge",  # TODO change to "stable" once available
+            channel="1/stable",
             trust=True,
         ),
         ops_test.model.deploy(
             ipa.charm,
             application_name=ipa.name,
-            channel="1/edge",  # TODO change to "stable" once available
+            channel="1/stable",
             trust=True,
         ),
         ops_test.model.deploy(
             ipr.charm,
             application_name=ipr.name,
-            channel="1/edge",  # TODO change to "stable" once available
+            channel="1/stable",
             trust=True,
         ),
     )
@@ -172,7 +172,7 @@ async def test_tls_termination(ops_test: OpsTest, temp_dir):
     await ops_test.model.deploy(
         "ch:self-signed-certificates",
         application_name="root-ca",
-        channel="1/edge",
+        channel="1/stable",
     )
     await ops_test.model.applications["root-ca"].set_config(
         {
