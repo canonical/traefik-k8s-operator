@@ -961,10 +961,9 @@ class TraefikIngressCharm(CharmBase):
                     )
                 )
 
-        if "http" in config:
-            _process_routes(config["http"].get("routers", {}), protocol="http")
-
         if not is_raw:
+            if "http" in config:
+                _process_routes(config["http"].get("routers", {}), protocol="http")
             if "tcp" in config:
                 _process_routes(config["tcp"].get("routers", {}), protocol="tcp")
 

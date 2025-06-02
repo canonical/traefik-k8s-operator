@@ -379,8 +379,8 @@ def test_static_config_updates_tcp_entrypoints(
     [
         # Scenario 1: HTTP config should always have TLS routes appended.
         (CONFIG, str(False), CONFIG_WITH_TLS),
-        # Scenario 2: HTTP config with raw True still gets TLS routes appended.
-        (CONFIG, str(True), CONFIG_WITH_TLS),
+        # Scenario 2: HTTP config with raw True does not add TLS configuration.
+        (CONFIG, str(True), CONFIG),
         # Scenario 3: TCP config, raw False adds TLS configuration.
         (TCP_CONFIG, str(False), TCP_CONFIG_WITH_TLS),
         # Scenario 4: TCP config, raw True does not add TLS configuration.

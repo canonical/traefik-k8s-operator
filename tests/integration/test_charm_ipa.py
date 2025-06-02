@@ -27,7 +27,7 @@ from tests.integration.helpers import (
 async def test_deployment(ops_test: OpsTest, traefik_charm, ipa_tester_charm):
     await asyncio.gather(
         ops_test.model.deploy(
-            traefik_charm, application_name="traefik-k8s", resources=trfk_resources
+            traefik_charm, application_name="traefik-k8s", resources=trfk_resources, trust=True
         ),
         ops_test.model.deploy(ipa_tester_charm, "ipa-tester"),
     )
