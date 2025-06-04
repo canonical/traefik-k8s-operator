@@ -1,7 +1,7 @@
 # Cryptographic primitives and recipes
 # Code: https://github.com/pyca/cryptography
 # Docs: https://cryptography.io/
-# Deps: tls-certificates-interface
+# Deps: tls_certificates
 cryptography
 
 # Handle merging of nested data structures in python.
@@ -39,6 +39,8 @@ ops >= 2.10.0
 importlib-metadata==6.0.0
 opentelemetry-exporter-otlp-proto-http==1.21.0
 opentelemetry-api==1.21.0
+# Deps tls_certificates
 pydantic>=2
 
-cosl
+# Version required by prometheus_scrape for generic_alert_groups
+cosl>=0.0.53
