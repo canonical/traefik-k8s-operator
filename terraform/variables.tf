@@ -29,9 +29,8 @@ variable "model_name" {
 }
 
 variable "revision" {
-  description = "Charm revision"
+  description = "Revision number of the charm"
   type        = number
-  nullable    = true
   default     = null
 }
 
