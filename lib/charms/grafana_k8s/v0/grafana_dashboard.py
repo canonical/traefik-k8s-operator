@@ -219,7 +219,7 @@ LIBAPI = 0
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
 
-LIBPATCH = 42
+LIBPATCH = 44
 
 PYDEPS = ["cosl >= 0.0.50"]
 
@@ -1244,6 +1244,10 @@ class GrafanaDashboardProvider(Object):
             for dashboard_relation in self._charm.model.relations[self._relation_name]:
                 self._upset_dashboards_on_relation(dashboard_relation)
 
+    def reload_dashboards(self, inject_dropdowns: bool = True) -> None:
+        """Reloads dashboards and updates all relations."""
+        self._update_all_dashboards_from_dir(inject_dropdowns=inject_dropdowns)
+
     def _update_all_dashboards_from_dir(
         self, _: Optional[HookEvent] = None, inject_dropdowns: bool = True
     ) -> None:
@@ -1672,14 +1676,22 @@ class GrafanaDashboardConsumer(Object):
 
     def set_peer_data(self, key: str, data: Any) -> None:
         """Put information into the peer data bucket instead of `StoredState`."""
-        self._charm.peers.data[self._charm.app][key] = json.dumps(data)  # type: ignore[attr-defined]
+        peers = self._charm.peers  # type: ignore[attr-defined]
+        if not peers or not peers.data:
+            logger.info("set_peer_data: no peer relation. Is the charm being installed/removed?")
+            return
+        peers.data[self._charm.app][key] = json.dumps(data)  # type: ignore[attr-defined]
 
     def get_peer_data(self, key: str) -> Any:
         """Retrieve information from the peer data bucket instead of `StoredState`."""
-        if rel := self._charm.peers:  # type: ignore[attr-defined]
-            data = rel.data[self._charm.app].get(key, "")
-            return json.loads(data) if data else {}
-        return {}
+        peers = self._charm.peers  # type: ignore[attr-defined]
+        if not peers or not peers.data:
+            logger.warning(
+                "get_peer_data: no peer relation. Is the charm being installed/removed?"
+            )
+            return {}
+        data = peers.data[self._charm.app].get(key, "")
+        return json.loads(data) if data else {}
 
 
 class GrafanaDashboardAggregator(Object):
