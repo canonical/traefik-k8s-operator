@@ -65,7 +65,7 @@ def test_ingress_app_provider_relate_provide(
         name="foo",
         model="bar",
         port=42,
-        strip_prefix=strip_prefix,
+        strip_prefix=strip_prefix,  # type: ignore
         scheme=scheme,
     ).dump()
     remote_unit_data = {"host": '"host"', "ip": '"10.87.0.1"'}

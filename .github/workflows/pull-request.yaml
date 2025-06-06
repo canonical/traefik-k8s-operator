@@ -4,13 +4,10 @@ on:
   pull_request:
     branches:
       - main
+      - track/**
 
 jobs:
   pull-request:
     name: PR
-    uses: canonical/observability/.github/workflows/charm-pull-request.yaml@v0
+    uses: canonical/observability/.github/workflows/charm-pull-request.yaml@v1
     secrets: inherit
-
-  terraform-checks:
-    name: Terraform
-    uses: canonical/observability/.github/workflows/terraform-quality-checks.yaml@v0

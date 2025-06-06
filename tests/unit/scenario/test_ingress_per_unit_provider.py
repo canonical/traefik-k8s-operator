@@ -86,6 +86,7 @@ def test_ingress_unit_provider_request_response(port, host, leader, url, mode, i
 
     def callback(charm: MockProviderCharm):
         ingress = charm.model.get_relation("ingress-per-unit")
+        assert ingress
         remote_unit = list(ingress.units)[0]
 
         assert charm.ipu.is_ready(ingress)
@@ -108,7 +109,9 @@ def test_ingress_unit_provider_request_response(port, host, leader, url, mode, i
     state = State(model=model, relations=[ipu_remote_provided], leader=leader)
 
     out = Context(charm_type=MockProviderCharm, meta=MockProviderCharm.META).run(
-        ipu_remote_provided.changed_event, state, post_event=callback
+        ipu_remote_provided.changed_event,
+        state,
+        post_event=callback,  # type: ignore
     )
 
     if leader:

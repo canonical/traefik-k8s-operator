@@ -21,7 +21,7 @@ def charm_tracing_relation():
         receivers=[
             Receiver(
                 url="http://foo.com:81",
-                protocol=ProtocolType(name="otlp_http", type="http"),
+                protocol=ProtocolType(name="otlp_http", type="http"),  # type: ignore
             )
         ]
     ).dump(db)
@@ -36,7 +36,7 @@ def workload_tracing_relation():
         receivers=[
             Receiver(
                 url="http://foo.com:14238",
-                protocol=ProtocolType(name="jaeger_thrift_http", type="http"),
+                protocol=ProtocolType(name="jaeger_thrift_http", type="http"),  # type: ignore
             )
         ]
     ).dump(workload_db)
@@ -53,7 +53,7 @@ def test_charm_trace_collection(traefik_ctx, traefik_container, caplog, charm_tr
     with patch(
         "opentelemetry.exporter.otlp.proto.http.trace_exporter.OTLPSpanExporter.export"
     ) as f:
-        f.return_value = opentelemetry.sdk.trace.export.SpanExportResult.SUCCESS
+        f.return_value = opentelemetry.sdk.trace.export.SpanExportResult.SUCCESS  # type: ignore
         os.environ[CHARM_TRACING_ENABLED] = "1"
         # WHEN traefik receives <any event>
         traefik_ctx.run(charm_tracing_relation.changed_event, state_in)

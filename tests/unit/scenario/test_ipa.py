@@ -16,7 +16,7 @@ def join(traefik_ctx: Context, state: State):
     """Simulate a new unit joining the ingress relation."""
     ingress = state.get_relations("ingress")[0]
     state = traefik_ctx.run(ingress.joined_event, state)
-    remote_units_data = ingress.remote_units_data
+    remote_units_data = ingress.remote_units_data  # type: ignore
 
     joining_unit_id = max(remote_units_data)
     if set(remote_units_data[joining_unit_id]).difference(DEFAULT_JUJU_DATABAG):
@@ -50,7 +50,7 @@ def depart(traefik_ctx: Context, state: State):
 
     def _pop(state: State):
         ingress = state.get_relations("ingress")[0]
-        remote_units_data = ingress.remote_units_data.copy()
+        remote_units_data = ingress.remote_units_data.copy()  # type: ignore
         departing_unit_id = max(remote_units_data)
         del remote_units_data[departing_unit_id]
         return state.replace(relations=[ingress.replace(remote_units_data=remote_units_data)])
@@ -63,7 +63,7 @@ def depart(traefik_ctx: Context, state: State):
 
 def break_(traefik_ctx: Context, state: State):
     """Simulate breaking the ingress relation."""
-    for _ in state.get_relations("ingress")[0].remote_units_data:
+    for _ in state.get_relations("ingress")[0].remote_units_data:  # type: ignore
         # depart all units
         depart(traefik_ctx, state)
 
