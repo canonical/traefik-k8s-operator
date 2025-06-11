@@ -10,6 +10,8 @@ jobs:
     name: PR
     uses: canonical/observability/.github/workflows/charm-pull-request.yaml@v0
     secrets: inherit
+    with:
+      juju-channel: "3.6/stable"
 
   terraform-checks:
     name: Terraform
