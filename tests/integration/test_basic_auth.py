@@ -32,7 +32,9 @@ IPA = "ipa-tester"
 @pytest.mark.skip_on_deployed
 async def test_deployment(ops_test: OpsTest, traefik_charm, ipa_tester_charm):
     await asyncio.gather(
-        ops_test.model.deploy(traefik_charm, application_name=APP_NAME, resources=trfk_resources),
+        ops_test.model.deploy(
+            traefik_charm, application_name=APP_NAME, resources=trfk_resources, trust=True
+        ),
         ops_test.model.deploy(ipa_tester_charm, IPA),
     )
 

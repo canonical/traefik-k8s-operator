@@ -86,7 +86,7 @@ class TraefikRouteCharm(CharmBase):
     traefik_route = TraefikRouteRequirer(
         self, self.model.relations.get("traefik-route"),
         "traefik-route",
-        raw=True  # Traefik will not modify TLS settings on non HTTP routes
+        raw=True  # Traefik will not modify TLS settings on all routes
     )
     if self.traefik_route.is_ready():
         self.traefik_route.submit_to_traefik(
@@ -120,7 +120,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 2
+LIBPATCH = 3
 
 log = logging.getLogger(__name__)
 
@@ -325,7 +325,7 @@ class TraefikRouteRequirer(Object):
     {
         "config": "<Traefik dynamic config YAML>",
         "static": "<Traefik static config YAML>",  # Optional, requires Traefik restart
-        "raw": "<bool>"  # Determines if Traefik should append TLS config for non HTTP routes
+        "raw": "<bool>"  # Determines if Traefik should append TLS config for ALL routes
     }
     ```
 
@@ -350,7 +350,7 @@ class TraefikRouteRequirer(Object):
 
         if self._raw:
             log.warning(
-                "Raw mode enabled: TLS routes for non-HTTP protocols will not be auto-generated. "
+                "Raw mode enabled: TLS routes for ALL protocols will not be auto-generated. "
                 "Enable this only if you fully understand and intend to bypass the additional TLS configuration."
             )
 
