@@ -1,0 +1,8 @@
+# Copyright 2022 Canonical Ltd.
+# See LICENSE file for licensing details.
+set-health:
+  description: "Set the health state for this unit only (true for healthy, false for unhealthy)"
+  parameters:
+    is-healthy:
+      type: boolean
+      description: "Desired health state (true for healthy, false for unhealthy)"

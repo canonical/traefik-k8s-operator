@@ -84,7 +84,7 @@ LIBAPI = 2
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 14
+LIBPATCH = 15
 
 PYDEPS = ["pydantic"]
 
@@ -246,12 +246,32 @@ class ProviderSchema(BaseModel):
     app: IngressProviderAppData
 
 
+class IngressHealthCheck(BaseModel):
+    """HealthCheck schema for Ingress."""
+
+    path: str = Field(description="The health check endpoint path (required).")
+    scheme: Optional[str] = Field(
+        default=None, description="Replaces the server URL scheme for the health check endpoint."
+    )
+    hostname: Optional[str] = Field(
+        default=None, description="Hostname to be set in the health check request."
+    )
+    port: Optional[int] = Field(
+        default=None, description="Replaces the server URL port for the health check endpoint."
+    )
+    interval: str = Field(default="30s", description="Frequency of the health check calls.")
+    timeout: str = Field(default="5s", description="Maximum duration for a health check request.")
+
+
 class IngressRequirerAppData(DatabagModel):
     """Ingress requirer application databag model."""
 
     model: str = Field(description="The model the application is in.")
     name: str = Field(description="the name of the app requesting ingress.")
     port: int = Field(description="The port the app wishes to be exposed.")
+    healthcheck_params: Optional[IngressHealthCheck] = Field(
+        default=None, description="Optional health check configuration for ingress."
+    )
 
     # fields on top of vanilla 'ingress' interface:
     strip_prefix: Optional[bool] = Field(
@@ -668,6 +688,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         # fixme: this is horrible UX.
         #  shall we switch to manually calling provide_ingress_requirements with all args when ready?
         scheme: Union[Callable[[], str], str] = lambda: "http",
+        healthcheck_params: Optional[Dict[str, Any]] = None,
     ):
         """Constructor for IngressRequirer.
 
@@ -677,23 +698,34 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         All request args must be given as keyword args.
 
         Args:
-            charm: the charm that is instantiating the library.
-            relation_name: the name of the relation endpoint to bind to (defaults to `ingress`);
-                relation must be of interface type `ingress` and have "limit: 1")
+            charm: The charm that is instantiating the library.
+            relation_name: The name of the relation endpoint to bind to (defaults to "ingress");
+                the relation must be of interface type "ingress" and have a limit of 1.
             host: Hostname to be used by the ingress provider to address the requiring
                 application; if unspecified, the default Kubernetes service name will be used.
             ip: Alternative addressing method other than host to be used by the ingress provider;
-                if unspecified, binding address from juju network API will be used.
-            strip_prefix: configure Traefik to strip the path prefix.
-            redirect_https: redirect incoming requests to HTTPS.
-            scheme: callable returning the scheme to use when constructing the ingress url.
-                Or a string, if the scheme is known and stable at charm-init-time.
+                if unspecified, the binding address from the Juju network API will be used.
+            healthcheck_params: Optional dictionary containing health check
+                configuration parameters conforming to the IngressHealthCheck schema. The dictionary must include:
+                    - "path" (str): The health check endpoint path (required).
+                It may also include:
+                    - "scheme" (Optional[str]): Replaces the server URL scheme for the health check endpoint.
+                    - "hostname" (Optional[str]): Hostname to be set in the health check request.
+                    - "port" (Optional[int]): Replaces the server URL port for the health check endpoint.
+                    - "interval" (str): Frequency of the health check calls (defaults to "30s" if omitted).
+                    - "timeout" (str): Maximum duration for a health check request (defaults to "5s" if omitted).
+                If provided, "path" is required while "interval" and "timeout" will use Traefik's defaults when not specified.
+            strip_prefix: Configure Traefik to strip the path prefix.
+            redirect_https: Redirect incoming requests to HTTPS.
+            scheme: Either a callable that returns the scheme to use when constructing the ingress URL,
+                or a string if the scheme is known and stable at charm initialization.
 
         Request Args:
             port: the port of the service
         """
         super().__init__(charm, relation_name)
         self.charm: CharmBase = charm
+        self.healthcheck_params = healthcheck_params
         self.relation_name = relation_name
         self._strip_prefix = strip_prefix
         self._redirect_https = redirect_https
@@ -825,6 +857,11 @@ class IngressPerAppRequirer(_IngressPerAppBase):
                 port=port,
                 strip_prefix=self._strip_prefix,  # type: ignore  # pyright does not like aliases
                 redirect_https=self._redirect_https,  # type: ignore  # pyright does not like aliases
+                healthcheck_params=(
+                    IngressHealthCheck(**self.healthcheck_params)
+                    if self.healthcheck_params
+                    else None
+                ),
             ).dump(app_databag)
         except pydantic.ValidationError as e:
             msg = "failed to validate app data"

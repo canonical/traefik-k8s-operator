@@ -73,7 +73,7 @@ def copy_traefik_library_into_tester_charms(ops_test):
         "traefik_k8s/v1/ingress_per_unit.py",
         "traefik_k8s/v0/traefik_route.py",
     ]
-    for tester in ["forward-auth", "ipa", "ipu", "tcp", "route"]:
+    for tester in ["forward-auth", "ipa", "ipu", "tcp", "route", "health"]:
         for lib in libraries:
             install_path = f"tests/integration/testers/{tester}/lib/charms/{lib}"
             os.makedirs(os.path.dirname(install_path), exist_ok=True)
@@ -175,6 +175,23 @@ async def route_tester_charm(ops_test):
             return charm
         except RuntimeError:
             logger.warning("Failed to build route tester. Trying again!")
+            count += 1
+
+            if count == 3:
+                raise
+
+
+@pytest.fixture(scope="module")
+@timed_memoizer
+async def health_tester_charm(ops_test: OpsTest):
+    charm_path = (Path(__file__).parent / "testers" / "health").absolute()
+    count = 0
+    while True:
+        try:
+            charm = await ops_test.build_charm(charm_path, verbosity="debug")
+            return charm
+        except RuntimeError:
+            logger.warning("Failed to build health tester. Trying again!")
             count += 1
 
             if count == 3:
@@ -357,7 +374,10 @@ def assert_can_connect(ip, port):
 async def deploy_traefik_if_not_deployed(ops_test: OpsTest, traefik_charm):
     try:
         await ops_test.model.deploy(
-            traefik_charm, application_name="traefik-k8s", resources=trfk_resources
+            traefik_charm,
+            application_name="traefik-k8s",
+            resources=trfk_resources,
+            trust=True,
         )
     except JujuError as e:
         if 'cannot add application "traefik-k8s": application already exists' not in str(e):

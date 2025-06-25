@@ -1,0 +1,20 @@
+# Copyright 2022 Canonical Ltd.
+# See LICENSE file for licensing details.
+name: health-mock
+display-name: health-mock
+description: health tester
+summary: health tester
+requires:
+  ingress:
+    interface: ingress
+    limit: 1
+
+containers:
+  python:
+    resource: python-image
+
+resources:
+  python-image:
+    type: oci-image
+    description: OCI image for python runtime
+    upstream-source: ubuntu/python:3.10-22.04_stable

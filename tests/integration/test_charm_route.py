@@ -27,7 +27,9 @@ TESTER_APP_NAME = "route"
 @pytest.mark.setup
 async def test_deployment(ops_test: OpsTest, traefik_charm, route_tester_charm):
     await asyncio.gather(
-        ops_test.model.deploy(traefik_charm, application_name=APP_NAME, resources=trfk_resources),
+        ops_test.model.deploy(
+            traefik_charm, application_name=APP_NAME, resources=trfk_resources, trust=True
+        ),
         ops_test.model.deploy(route_tester_charm, TESTER_APP_NAME),
     )
 

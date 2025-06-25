@@ -533,7 +533,7 @@ from ops.charm import (
     RelationRole,
     WorkloadEvent,
 )
-from ops.framework import EventBase, EventSource, Object, ObjectEvents
+from ops.framework import BoundEvent, EventBase, EventSource, Object, ObjectEvents
 from ops.jujuversion import JujuVersion
 from ops.model import Container, ModelError, Relation
 from ops.pebble import APIError, ChangeError, Layer, PathError, ProtocolError
@@ -546,7 +546,7 @@ LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 13
+LIBPATCH = 17
 
 PYDEPS = ["cosl"]
 
@@ -1354,7 +1354,7 @@ class LokiPushApiProvider(Object):
 
         Return url to loki, including port number, but without the endpoint subpath.
         """
-        return "http://{}:{}".format(socket.getfqdn(), self.port)
+        return f"{self.scheme}://{socket.getfqdn()}:{self.port}"
 
     def _endpoint(self, url) -> dict:
         """Get Loki push API endpoint for a given url.
@@ -1543,10 +1543,13 @@ class ConsumerBase(Object):
         alert_rules_path: str = DEFAULT_ALERT_RULES_RELATIVE_PATH,
         recursive: bool = False,
         skip_alert_topology_labeling: bool = False,
+        *,
+        forward_alert_rules: bool = True,
     ):
         super().__init__(charm, relation_name)
         self._charm = charm
         self._relation_name = relation_name
+        self._forward_alert_rules = forward_alert_rules
         self.topology = JujuTopology.from_charm(charm)
 
         try:
@@ -1569,7 +1572,8 @@ class ConsumerBase(Object):
         alert_rules = (
             AlertRules(None) if self._skip_alert_topology_labeling else AlertRules(self.topology)
         )
-        alert_rules.add_path(self._alert_rules_path, recursive=self._recursive)
+        if self._forward_alert_rules:
+            alert_rules.add_path(self._alert_rules_path, recursive=self._recursive)
         alert_rules_as_dict = alert_rules.as_dict()
 
         relation.data[self._charm.app]["metadata"] = json.dumps(self.topology.as_dict())
@@ -1617,6 +1621,9 @@ class LokiPushApiConsumer(ConsumerBase):
         alert_rules_path: str = DEFAULT_ALERT_RULES_RELATIVE_PATH,
         recursive: bool = True,
         skip_alert_topology_labeling: bool = False,
+        *,
+        refresh_event: Optional[Union[BoundEvent, List[BoundEvent]]] = None,
+        forward_alert_rules: bool = True,
     ):
         """Construct a Loki charm client.
 
@@ -1642,6 +1649,9 @@ class LokiPushApiConsumer(ConsumerBase):
             alert_rules_path: a string indicating a path where alert rules can be found
             recursive: Whether to scan for rule files recursively.
             skip_alert_topology_labeling: whether to skip the alert topology labeling.
+            forward_alert_rules: a boolean flag to toggle forwarding of charmed alert rules.
+            refresh_event: an optional bound event or list of bound events which
+                will be observed to re-set scrape job data (IP address and others)
 
         Raises:
             RelationNotFoundError: If there is no relation in the charm's metadata.yaml
@@ -1667,13 +1677,25 @@ class LokiPushApiConsumer(ConsumerBase):
             charm, relation_name, RELATION_INTERFACE_NAME, RelationRole.requires
         )
         super().__init__(
-            charm, relation_name, alert_rules_path, recursive, skip_alert_topology_labeling
+            charm,
+            relation_name,
+            alert_rules_path,
+            recursive,
+            skip_alert_topology_labeling,
+            forward_alert_rules=forward_alert_rules,
         )
         events = self._charm.on[relation_name]
         self.framework.observe(self._charm.on.upgrade_charm, self._on_lifecycle_event)
+        self.framework.observe(self._charm.on.config_changed, self._on_lifecycle_event)
         self.framework.observe(events.relation_joined, self._on_logging_relation_joined)
         self.framework.observe(events.relation_changed, self._on_logging_relation_changed)
         self.framework.observe(events.relation_departed, self._on_logging_relation_departed)
+
+        if refresh_event:
+            if not isinstance(refresh_event, list):
+                refresh_event = [refresh_event]
+            for ev in refresh_event:
+                self.framework.observe(ev, self._on_lifecycle_event)
 
     def _on_lifecycle_event(self, _: HookEvent):
         """Update require relation data on charm upgrades and other lifecycle events.
@@ -1734,8 +1756,11 @@ class LokiPushApiConsumer(ConsumerBase):
 
         self.on.loki_push_api_endpoint_joined.emit()
 
-    def _reinitialize_alert_rules(self):
+    def reload_alerts(self) -> None:
         """Reloads alert rules and updates all relations."""
+        self._reinitialize_alert_rules()
+
+    def _reinitialize_alert_rules(self):
         for relation in self._charm.model.relations[self._relation_name]:
             self._handle_alert_rules(relation)
 
@@ -2550,10 +2575,17 @@ class LogForwarder(ConsumerBase):
         alert_rules_path: str = DEFAULT_ALERT_RULES_RELATIVE_PATH,
         recursive: bool = True,
         skip_alert_topology_labeling: bool = False,
+        refresh_event: Optional[Union[BoundEvent, List[BoundEvent]]] = None,
+        forward_alert_rules: bool = True,
     ):
         _PebbleLogClient.check_juju_version()
         super().__init__(
-            charm, relation_name, alert_rules_path, recursive, skip_alert_topology_labeling
+            charm,
+            relation_name,
+            alert_rules_path,
+            recursive,
+            skip_alert_topology_labeling,
+            forward_alert_rules=forward_alert_rules,
         )
         self._charm = charm
         self._relation_name = relation_name
@@ -2563,6 +2595,12 @@ class LogForwarder(ConsumerBase):
         self.framework.observe(on.relation_changed, self._update_logging)
         self.framework.observe(on.relation_departed, self._update_logging)
         self.framework.observe(on.relation_broken, self._update_logging)
+
+        if refresh_event:
+            if not isinstance(refresh_event, list):
+                refresh_event = [refresh_event]
+            for ev in refresh_event:
+                self.framework.observe(ev, self._update_logging)
 
         for container_name in self._charm.meta.containers.keys():
             snake_case_container_name = container_name.replace("-", "_")
