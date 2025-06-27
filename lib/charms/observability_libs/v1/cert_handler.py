@@ -68,7 +68,7 @@ logger = logging.getLogger(__name__)
 
 LIBID = "b5cd5cd580f3428fa5f59a8876dcbe6a"
 LIBAPI = 1
-LIBPATCH = 15
+LIBPATCH = 16
 
 VAULT_SECRET_LABEL = "cert-handler-private-vault"
 
@@ -609,7 +609,7 @@ class CertHandler(Object):
         cert = self.get_cert()
         if not cert:
             return None
-        chain = cert.chain_as_pem()
+        chain = cert.chain_as_pem_string()
         if cert.certificate not in chain:
             # add server cert to chain
             chain = cert.certificate + "\n\n" + chain
