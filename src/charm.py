@@ -342,9 +342,7 @@ class TraefikIngressCharm(CharmBase):
 
     @property
     def _is_forward_auth_all_enabled(self) -> bool:
-        if self.config["forward_auth_all"]:
-            return True
-        return False
+        return cast(bool, self.config["forward_auth_all"])
 
     @property
     def _forward_auth_all_excluded(self) -> str:
@@ -352,10 +350,7 @@ class TraefikIngressCharm(CharmBase):
 
         With a config "iam,model-1/app-1" we would get ["iam"]
         """
-        forward_all_exclude = self.config["forward_auth_all_exclude"]
-        if forward_all_exclude:
-            return forward_all_exclude
-        return ""
+        return cast(str, self.config["forward_auth_all_exclude"])
 
     @property
     def _forward_auth_all_excluded_models(self) -> Optional[Set[str]]:
