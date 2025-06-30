@@ -341,6 +341,53 @@ class TraefikIngressCharm(CharmBase):
         return False
 
     @property
+    def _is_forward_auth_all_enabled(self) -> bool:
+        if self.config["forward_auth_all"]:
+            return True
+        return False
+
+    @property
+    def _forward_auth_all_excluded(self) -> str:
+        """Get the set of excluded models to exclude from forward auth all.
+
+        With a config "iam,model-1/app-1" we would get ["iam"]
+        """
+        forward_all_exclude = self.config["forward_auth_all_exclude"]
+        if forward_all_exclude:
+            return forward_all_exclude
+        return ""
+
+    @property
+    def _forward_auth_all_excluded_models(self) -> Optional[Set[str]]:
+        """Get the set of excluded models to exclude from forward auth all.
+
+        With a config "iam,model-1/app-1" we would get ["iam"]
+        """
+        forward_all_exclude = self._forward_auth_all_excluded
+        if forward_all_exclude:
+            excluded_models = set()
+            for entry in forward_all_exclude.split(","):
+                if not entry.count("/"):
+                    excluded_models.add(entry)
+            return excluded_models
+        return None
+
+    @property
+    def _forward_auth_all_excluded_apps(self) -> Optional[Set[Tuple[str, str]]]:
+        """Get the set of excluded apps and their model to exclude from forward auth all.
+
+        With a config "iam,model-1/app-1" we would get [("model-1", "app-1")]
+        """
+        forward_all_exclude = self._forward_auth_all_excluded
+        if forward_all_exclude:
+            excluded_apps = set()
+            for entry in forward_all_exclude.split(","):
+                if len(names := entry.split("/")) == 2:
+                    excluded_apps.add((names[0], names[1]))
+            return excluded_apps
+        return None
+
+    @property
     def _basic_auth_user(self) -> Optional[str]:
         """A single user for the global basic auth configuration.
 
@@ -645,6 +692,8 @@ class TraefikIngressCharm(CharmBase):
                 self._external_host,
                 self.config["routing_mode"],
                 self._is_forward_auth_enabled,
+                self._is_forward_auth_all_enabled,
+                self._forward_auth_all_excluded,
                 self._basic_auth_user,
                 self._is_tls_enabled(),
             )
