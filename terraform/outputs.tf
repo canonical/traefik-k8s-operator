@@ -6,9 +6,11 @@ output "endpoints" {
   value = {
     # Requires
     certificates              = "certificates",
+    charm_tracing             = "charm-tracing",
     experimental_forward_auth = "experimental-forward-auth",
     logging                   = "logging",
-    tracing                   = "tracing",
+    receive_ca_cert           = "receive-ca-cert",
+    workload_tracing          = "workload-tracing",
     # Provides
     grafana_dashboard = "grafana-dashboard",
     ingress           = "ingress",
