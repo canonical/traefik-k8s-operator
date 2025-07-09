@@ -110,6 +110,15 @@ requires:
     # Must limit the relation count to 1 due to
     # https://github.com/canonical/certificate-transfer-interface/issues/6
     limit: 1
+  upstream-ingress:
+    interface: ingress
+    limit: 1
+    description: |
+      Configure to use an ingress upstream of this gateway.  Useful so you can have internal gateways that are then
+      exposed by an additional external ingress.
+      If an upstream ingress is configured:
+      * routing-mode must be set to "path"
+      * if set, external_hostname must be set to the upstream ingress's hostname
 
 peers:
   peers:
