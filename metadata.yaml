@@ -110,6 +110,9 @@ requires:
     # Must limit the relation count to 1 due to
     # https://github.com/canonical/certificate-transfer-interface/issues/6
     limit: 1
+  upstream-ingress:
+    interface: ingress
+    limit: 1
 
 peers:
   peers:
