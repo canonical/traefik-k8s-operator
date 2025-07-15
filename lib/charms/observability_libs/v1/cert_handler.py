@@ -68,7 +68,7 @@ logger = logging.getLogger(__name__)
 
 LIBID = "b5cd5cd580f3428fa5f59a8876dcbe6a"
 LIBAPI = 1
-LIBPATCH = 16
+LIBPATCH = 17
 
 VAULT_SECRET_LABEL = "cert-handler-private-vault"
 
@@ -80,6 +80,37 @@ def is_ip_address(value: str) -> bool:
         return True
     except ipaddress.AddressValueError:
         return False
+
+
+def split_chain(chain: str) -> List[str]:
+    """Split a chain string in to individual cert strings.
+
+    Args:
+        chain: The chain to split.
+
+    Returns:
+        List[str]: A list of cert strings.
+    """
+    certs = []
+    current_cert = []
+    lines = chain.strip().splitlines()
+
+    in_cert = False
+    for line in lines:
+        line = line.strip()
+        if line == "-----BEGIN CERTIFICATE-----":
+            # The first line of a new cert.
+            in_cert = True
+            current_cert = [line]
+        elif line == "-----END CERTIFICATE-----":
+            # The last line of the cert.
+            current_cert.append(line)
+            certs.append("\n".join(current_cert))
+            in_cert = False
+        elif in_cert:
+            # Somewhere in the middle.
+            current_cert.append(line)
+    return certs
 
 
 class CertChanged(EventBase):
@@ -613,6 +644,15 @@ class CertHandler(Object):
         if cert.certificate not in chain:
             # add server cert to chain
             chain = cert.certificate + "\n\n" + chain
+
+        # Needed for backwards compatibility with self-signed-certificates.
+        # See https://github.com/canonical/traefik-k8s-operator/issues/491.
+        # This should be removed when revision 308 of self-signed-certificates is sufficiently old.
+        certs = split_chain(chain)
+        if cert.certificate.strip() != certs[0].strip():
+            certs.reverse()
+            chain = "\n\n".join(certs)
+
         return chain
 
     def _on_certificate_expiring(
