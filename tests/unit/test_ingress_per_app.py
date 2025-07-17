@@ -14,10 +14,10 @@ from charms.traefik_k8s.v2.ingress import (
     IngressRequirerAppData,
     IngressRequirerUnitData,
 )
+from conftest import MOCK_LB_ADDRESS
 from ops import CharmBase, Framework
 from scenario import Context, Model, Mount, Relation, State
 
-from conftest import MOCK_LB_ADDRESS
 from tests.unit._utils import create_ingress_relation
 
 
