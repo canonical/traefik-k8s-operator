@@ -1,6 +1,49 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 
+[project]
+name = "traefik-k8s-operator"
+version = "0.1.0"
+description = "Kubernetes operator for Traefik, managed by Juju."
+authors = ["Canonical Ltd."]
+dependencies = [
+    "cryptography",
+    "deepmerge",
+    "jsonschema",
+    "lightkube >= 0.8.1",
+    "lightkube-models >= 1.22.0.4",
+    "lightkube-extensions",
+    "ops >= 2.10.0",
+    "importlib-metadata == 6.0.0",
+    "opentelemetry-exporter-otlp-proto-http == 1.21.0",
+    "opentelemetry-api == 1.21.0",
+    "pydantic >= 2",
+    "cosl"
+]
+
+[project.optional-dependencies]
+dev = [
+    "black",
+    "ruff",
+    "codespell",
+    "pytest-subtests",
+    "coverage[toml]",
+    "ipdb",
+    "pytest==8.2.2",
+    "pytest-asyncio==0.21.2",
+    "pytest-operator",
+    "juju",
+    "tenacity==8.3.0",
+    "sh",
+    "minio",
+    "pyright==1.1.318",
+    "ops-scenario~=6.0",
+    "pytest-interface-tester > 0.3"
+]
+
+[tool.uv.sources]
+lightkube-extensions = { git = "https://github.com/canonical/lightkube-extensions.git", rev = "main" }
+
 # Testing tools configuration
 [tool.coverage.run]
 branch = true
@@ -46,3 +89,4 @@ pythonPlatform = "All"
 
 [tool.codespell]
 skip = ".git,.tox,build,venv*"
+

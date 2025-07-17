@@ -11,7 +11,7 @@ import scenario
 import yaml
 from scenario import Container, ExecOutput, Mount, Relation, State
 
-from tests.scenario._utils import _render_config, create_ingress_relation
+from tests.unit._utils import _render_config, create_ingress_relation
 from traefik import DYNAMIC_CONFIG_DIR
 
 

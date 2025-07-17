@@ -9,7 +9,7 @@ import pytest
 import yaml
 from scenario import Container, Mount, Relation, State
 
-from tests.scenario._utils import _render_config
+from tests.unit._utils import _render_config
 
 
 def _create_relation(
