@@ -8,11 +8,11 @@ on:
 jobs:
   pull-request:
     name: PR
-    uses: canonical/observability/.github/workflows/charm-pull-request.yaml@v0
+    uses: canonical/observability/.github/workflows/charm-pull-request.yaml@v1
     secrets: inherit
     with:
       juju-channel: "3.6/stable"
 
   terraform-checks:
     name: Terraform
-    uses: canonical/observability/.github/workflows/terraform-quality-checks.yaml@v0
+    uses: canonical/observability/.github/workflows/terraform-quality-checks.yaml@v1
