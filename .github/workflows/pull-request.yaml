@@ -12,7 +12,3 @@ jobs:
     secrets: inherit
     with:
       juju-channel: "3.6/stable"
-
-  terraform-checks:
-    name: Terraform
-    uses: canonical/observability/.github/workflows/terraform-quality-checks.yaml@v1
