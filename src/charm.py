@@ -188,7 +188,6 @@ class TraefikIngressCharm(CharmBase):
 
         # TODO: If external hostname and upstream ingress both exist, we need to tell the user that we are ignoring the hostname
 
-
         # TODO: Move this back down?
         # Setup 'upstream-ingress' relation to allow this Traefik to be ingressed through another
         # ingress provider (eg: to layer multiple ingresses)
@@ -205,7 +204,9 @@ class TraefikIngressCharm(CharmBase):
         # event (created, changed, ...) or on a charm leader elected or upgrade event.  It does not send data at
         # instantiation (now) or unrelated events.  If host or port changes because of some other change (eg: adding
         # TLS, changing external host, etc.) we need to send the new data manually at that time.
-        upstream_ingress_route_configuration = self._generate_upstream_ingress_route_configuration()
+        upstream_ingress_route_configuration = (
+            self._generate_upstream_ingress_route_configuration()
+        )
         self.upstream_ingress = IngressPerAppRequirer(
             charm=self,
             relation_name="upstream-ingress",
@@ -751,6 +752,15 @@ class TraefikIngressCharm(CharmBase):
             self._wipe_ingress_for_all_relations()
             self.unit.status = BlockedStatus(
                 '"external_hostname" must be set while using routing mode "subdomain"'
+            )
+            return
+
+        if self.upstream_ingress.is_ready() and routing_mode != "path":
+            # upstream ingress is only compatible with path routing mode
+            # TODO: If this charm is rewritten in a holistic way, make sure this validation truly blocks the charm
+            self._wipe_ingress_for_all_relations()
+            self.unit.status = BlockedStatus(
+                'routing_mode must be set to "path" when charm has an upstream ingress'
             )
             return
 

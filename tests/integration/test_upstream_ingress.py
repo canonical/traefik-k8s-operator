@@ -143,6 +143,21 @@ async def test_traefik_route_ingressed_through_upstream_ingress(ops_test: OpsTes
 
 
 @pytest.mark.abort_on_fail
+async def test_traefik_with_upstream_ingress_blocked_if_in_subdomain_mode(ops_test: OpsTest):
+    """Assert that the Traefik app cannot be related to an upstream ingress if routing_mode=subdomain."""
+    # Confirm we're not blocked already
+    assert ops_test.model.applications[TRAEFIK].status == "active"
+
+    # Set the Traefik app to routing_mode=subdomain and assert that it is blocked
+    await ops_test.model.applications[TRAEFIK].set_config({"routing_mode": "subdomain"})
+    await ops_test.model.wait_for_idle([TRAEFIK], status="blocked", timeout=300)
+
+    # Return to path routing mode and assert that it is active again
+    await ops_test.model.applications[TRAEFIK].set_config({"routing_mode": "path"})
+    await ops_test.model.wait_for_idle([TRAEFIK], status="active", timeout=300)
+
+
+@pytest.mark.abort_on_fail
 async def test_add_tls_to_all_ingresses(ops_test: OpsTest):
     """Enable TLS for both ingresses.
 
