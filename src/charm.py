@@ -1339,7 +1339,7 @@ class TraefikIngressCharm(CharmBase):
         if self.upstream_ingress.is_ready():
             # Return the address without the scheme
             parsed = urlparse(self.upstream_ingress.url)
-            return parsed.geturl().replace(f"{parsed.scheme}://", "", 1)
+            return parsed.geturl().replace(f"{parsed.scheme}://", "", 1)  # pyright: ignore
         return self._gateway_address
 
     @property
