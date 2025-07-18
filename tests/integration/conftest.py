@@ -83,6 +83,9 @@ def copy_traefik_library_into_tester_charms(ops_test):
 @pytest.fixture(scope="module")
 @timed_memoizer
 async def traefik_charm(ops_test):
+    charm_path = os.environ.get("CHARM_PATH")
+    if charm_path:
+        return Path(charm_path)
     count = 0
     while True:
         try:
@@ -91,7 +94,6 @@ async def traefik_charm(ops_test):
         except RuntimeError:
             logger.warning("Failed to build traefik. Trying again!")
             count += 1
-
             if count == 3:
                 raise
 
@@ -108,7 +110,6 @@ async def forward_auth_tester_charm(ops_test):
         except RuntimeError:
             logger.warning("Failed to build forward auth tester. Trying again!")
             count += 1
-
             if count == 3:
                 raise
 
@@ -125,7 +126,6 @@ async def ipa_tester_charm(ops_test):
         except RuntimeError:
             logger.warning("Failed to build ipa tester. Trying again!")
             count += 1
-
             if count == 3:
                 raise
 
@@ -142,7 +142,6 @@ async def ipu_tester_charm(ops_test):
         except RuntimeError:
             logger.warning("Failed to build ipu tester. Trying again!")
             count += 1
-
             if count == 3:
                 raise
 
@@ -159,7 +158,6 @@ async def tcp_tester_charm(ops_test):
         except RuntimeError:
             logger.warning("Failed to build tcp tester. Trying again!")
             count += 1
-
             if count == 3:
                 raise
 
@@ -176,7 +174,6 @@ async def route_tester_charm(ops_test):
         except RuntimeError:
             logger.warning("Failed to build route tester. Trying again!")
             count += 1
-
             if count == 3:
                 raise
 
@@ -193,7 +190,6 @@ async def health_tester_charm(ops_test: OpsTest):
         except RuntimeError:
             logger.warning("Failed to build health tester. Trying again!")
             count += 1
-
             if count == 3:
                 raise
 

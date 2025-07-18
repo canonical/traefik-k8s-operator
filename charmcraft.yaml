@@ -2,24 +2,17 @@
 # See LICENSE file for licensing details.
 
 type: charm
-bases:
-  - build-on:
-      - name: "ubuntu"
-        channel: "20.04"
-    run-on:
-      - name: "ubuntu"
-        channel: "20.04"
+
+platforms:
+  ubuntu@20.04:amd64:
+
 parts:
   charm:
-    charm-binary-python-packages:
-      - setuptools
-      - jsonschema
-      - cryptography
-
-      # From PYDEPS
-      - "importlib-metadata==6.0.0"
-      - "opentelemetry-exporter-otlp-proto-http==1.21.0"
-      - "pydantic>=2"
-    build-packages:
-      - git
+    source: .
+    plugin: uv
+    build-packages: [git]
+    build-snaps: [astral-uv]
+    override-build: |
+      craftctl default
+      git describe --always > $CRAFT_PART_INSTALL/version
 
