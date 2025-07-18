@@ -7,7 +7,7 @@ from ops import ActiveStatus, BlockedStatus, WaitingStatus
 from scenario import Container, State
 
 
-@patch("charm.TraefikIngressCharm._external_host", PropertyMock(return_value="foo.bar"))
+@patch("charm.TraefikIngressCharm._ingressed_address", PropertyMock(return_value="foo.bar"))
 def test_start_traefik_is_not_running(traefik_ctx, *_):
     # GIVEN external host is set (see decorator)
     state = State(
@@ -21,7 +21,7 @@ def test_start_traefik_is_not_running(traefik_ctx, *_):
     assert out.unit_status == WaitingStatus("waiting for service: 'traefik'")
 
 
-@patch("charm.TraefikIngressCharm._external_host", PropertyMock(return_value=False))
+@patch("charm.TraefikIngressCharm._gateway_address", PropertyMock(return_value=False))
 def test_start_traefik_no_hostname(traefik_ctx, *_):
     # GIVEN external host is not set (see decorator)
     # WHEN a `start` hook fires
@@ -37,7 +37,7 @@ def test_start_traefik_no_hostname(traefik_ctx, *_):
     )
 
 
-@patch("charm.TraefikIngressCharm._external_host", PropertyMock(return_value="1.1.1.1"))
+@patch("charm.TraefikIngressCharm._ingressed_address", PropertyMock(return_value="1.1.1.1"))
 def test_start_traefik_subdomain_without_hostname(traefik_ctx, *_):
     # GIVEN external_hostname is not set but routing_mode is set to subdomain
     # WHEN a `start` hook fires
@@ -53,7 +53,7 @@ def test_start_traefik_subdomain_without_hostname(traefik_ctx, *_):
     )
 
 
-@patch("charm.TraefikIngressCharm._external_host", PropertyMock(return_value="foo.bar"))
+@patch("charm.TraefikIngressCharm._ingressed_address", PropertyMock(return_value="foo.bar"))
 @patch("traefik.Traefik.is_ready", PropertyMock(return_value=True))
 @patch("charm.TraefikIngressCharm._static_config_changed", PropertyMock(return_value=False))
 def test_start_traefik_active(traefik_ctx, *_):
@@ -67,4 +67,4 @@ def test_start_traefik_active(traefik_ctx, *_):
     out = traefik_ctx.run("start", state)
 
     # THEN unit status is `active`
-    assert out.unit_status == ActiveStatus("Serving at foo.bar")
+    assert out.unit_status == ActiveStatus("Serving at http://foo.bar")
