@@ -11,7 +11,7 @@ import json
 import logging
 import re
 import socket
-from typing import Any, Dict, List, Optional, Tuple, Union, cast
+from typing import Any, Dict, List, Optional, Set, Tuple, Union, cast
 from urllib.parse import urlparse
 
 import pydantic
@@ -341,6 +341,48 @@ class TraefikIngressCharm(CharmBase):
         return False
 
     @property
+    def _is_forward_auth_all_enabled(self) -> bool:
+        return cast(bool, self.config["forward_auth_all"])
+
+    @property
+    def _forward_auth_all_excluded(self) -> str:
+        """Get the set of excluded models to exclude from forward auth all.
+
+        With a config "iam,model-1/app-1" we would get ["iam"]
+        """
+        return cast(str, self.config["forward_auth_all_exclude"])
+
+    @property
+    def _forward_auth_all_excluded_models(self) -> Optional[Set[str]]:
+        """Get the set of excluded models to exclude from forward auth all.
+
+        With a config "iam,model-1/app-1" we would get ["iam"]
+        """
+        forward_all_exclude = self._forward_auth_all_excluded
+        if forward_all_exclude:
+            excluded_models = set()
+            for entry in forward_all_exclude.split(","):
+                if not entry.count("/"):
+                    excluded_models.add(entry)
+            return excluded_models
+        return None
+
+    @property
+    def _forward_auth_all_excluded_apps(self) -> Optional[Set[Tuple[str, str]]]:
+        """Get the set of excluded apps and their model to exclude from forward auth all.
+
+        With a config "iam,model-1/app-1" we would get [("model-1", "app-1")]
+        """
+        forward_all_exclude = self._forward_auth_all_excluded
+        if forward_all_exclude:
+            excluded_apps = set()
+            for entry in forward_all_exclude.split(","):
+                if len(names := entry.split("/")) == 2:
+                    excluded_apps.add((names[0], names[1]))
+            return excluded_apps
+        return None
+
+    @property
     def _basic_auth_user(self) -> Optional[str]:
         """A single user for the global basic auth configuration.
 
@@ -645,6 +687,8 @@ class TraefikIngressCharm(CharmBase):
                 self._external_host,
                 self.config["routing_mode"],
                 self._is_forward_auth_enabled,
+                self._is_forward_auth_all_enabled,
+                self._forward_auth_all_excluded,
                 self._basic_auth_user,
                 self._is_tls_enabled(),
             )
@@ -995,6 +1039,41 @@ class TraefikIngressCharm(CharmBase):
         config = config_getter(relation)
         self._push_configurations(relation, config)
 
+    def _is_forward_auth_all_protected_app(
+        self, model_name: Optional[str], app_name: Optional[str]
+    ) -> bool:
+        """Check if the app is protected by forward auth."""
+        if not self._is_forward_auth_all_enabled:
+            return False
+
+        if not self._is_forward_auth_enabled:
+            logger.warning(
+                "Forward auth all is enabled, but forward auth is not. "
+                "This is likely a misconfiguration."
+            )
+            return False
+        # If forward_auth_all is enabled, we protect all apps except those excluded.
+        excluded_models = self._forward_auth_all_excluded_models
+        excluded_apps = self._forward_auth_all_excluded_apps
+
+        if excluded_models and model_name in excluded_models:
+            logger.debug(f"Model '{model_name}' is excluded from forward auth all protection.")
+            return False
+
+        if excluded_apps and (model_name, app_name) in excluded_apps:
+            logger.debug(
+                f"App '{app_name}' in model '{model_name}' is excluded from forward auth all protection."
+            )
+            return False
+
+        return True
+
+    def _is_protected_app(self, model_name: Optional[str], app_name: Optional[str]) -> bool:
+        """Check if the app is protected by forward auth all or the forward auth integration."""
+        return self._is_forward_auth_all_protected_app(
+            model_name, app_name
+        ) or self.forward_auth.is_protected_app(app=app_name)
+
     def _get_configs_per_leader(self, relation: Relation) -> Dict[str, Any]:
         """Generates ingress per leader config."""
         # this happens to be the same behaviour as ingress v1 (legacy) provided.
@@ -1015,7 +1094,9 @@ class TraefikIngressCharm(CharmBase):
             redirect_https=data.get("redirect-https", False),
             strip_prefix=data.get("strip-prefix", False),
             external_host=self.external_host,
-            forward_auth_app=self.forward_auth.is_protected_app(app=data.get("name")),
+            forward_auth_app=self._is_protected_app(
+                model_name=data.get("model"), app_name=data.get("name")
+            ),
             forward_auth_config=self.forward_auth.get_provider_info(),
         )
 
@@ -1050,7 +1131,9 @@ class TraefikIngressCharm(CharmBase):
             port=data.app.port,
             external_host=self.external_host,
             hosts=[udata.host for udata in data.units],
-            forward_auth_app=self.forward_auth.is_protected_app(app=data.app.name),
+            forward_auth_app=self._is_protected_app(
+                model_name=data.app.model, app_name=data.app.name
+            ),
             forward_auth_config=self.forward_auth.get_provider_info(),
             healthcheck_params=(
                 data.app.healthcheck_params.model_dump(exclude_none=True)
@@ -1108,7 +1191,9 @@ class TraefikIngressCharm(CharmBase):
                     strip_prefix=data.get("strip-prefix"),
                     redirect_https=data.get("redirect-https"),
                     external_host=self.external_host,
-                    forward_auth_app=self.forward_auth.is_protected_app(app=data.get("name")),
+                    forward_auth_app=self._is_protected_app(
+                        model_name=data.get("model"), app_name=data.get("name")
+                    ),
                     forward_auth_config=self.forward_auth.get_provider_info(),
                 )
 

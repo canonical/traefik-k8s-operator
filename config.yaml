@@ -8,6 +8,19 @@ options:
       This feature is experimental and may be unstable.
     type: boolean
     default: False
+  forward_auth_all:
+    description: |
+      Whether or not to identity protect all the applications. This requires `enable_experimental_forward_auth` to be enabled.
+      It also requires the `experimental_forward_auth` relation to be integrated.
+    type: boolean
+    default: False
+  forward_auth_all_exclude:
+    description: |
+      Comma separated list of model or model/app to unprotect (e.g "iam, model-1/app-1").
+      This allows to override the configuration `forward_auth_all`.
+      It also requires the `experimental_forward_auth` relation to be integrated.
+    type: string
+    default: ""
   loadbalancer_annotations:
     description: |
       A comma-separated list of annotations to apply to the LoadBalancer service.
