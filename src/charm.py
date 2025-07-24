@@ -83,7 +83,7 @@ from traefik import (
     StaticConfigMergeConflictError,
     Traefik,
 )
-from utils import is_hostname
+from utils import hash, is_hostname
 
 # To keep a tidy debug-log, we suppress some DEBUG/INFO logs from some imported libs,
 # even when charm logging is set to a lower level.
@@ -641,12 +641,14 @@ class TraefikIngressCharm(CharmBase):
         since it can be quite expensive.
         """
         return hash(
-            (
-                self._external_host,
-                self.config["routing_mode"],
-                self._is_forward_auth_enabled,
-                self._basic_auth_user,
-                self._is_tls_enabled(),
+            str(
+                (
+                    str(self._external_host),
+                    self.config["routing_mode"],
+                    str(self._is_forward_auth_enabled),
+                    str(self._basic_auth_user),
+                    str(self._is_tls_enabled()),
+                )
             )
         )
 
