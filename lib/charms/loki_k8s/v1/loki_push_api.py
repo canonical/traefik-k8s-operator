@@ -190,10 +190,7 @@ The `LokiPushApiConsumer` constructor requires two things:
   with its clients. If provided, this relation name must match a required
   relation in metadata.yaml with the `loki_push_api` interface.
 
-  This argument is not required if your metadata.yaml has precisely one
-  required relation in metadata.yaml with the `loki_push_api` interface, as the
-  lib will automatically resolve the relation name inspecting the using the
-  meta information of the charm
+  If not provided, the relation name defaults to `logging`.
 
 Any time the relation between a Loki provider charm and a Loki consumer charm is
 established, a `LokiPushApiEndpointJoined` event is fired. In the consumer side
@@ -546,7 +543,7 @@ LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 17
+LIBPATCH = 18
 
 PYDEPS = ["cosl"]
 
