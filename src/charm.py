@@ -364,7 +364,7 @@ class TraefikIngressCharm(CharmBase):
         addrs = {
             urlparse(endpoint["url"]).hostname
             for endpoint in self._get_proxied_endpoints().values()
-            if "url" in endpoint
+            if "url" in endpoint and urlparse(endpoint["url"]).scheme  # For a TCP route there will be no scheme which will cause urlparse().hostname to return None. Therefore we should catch the TCP routes here.
         }
         csrs = []
         for addr in addrs:
