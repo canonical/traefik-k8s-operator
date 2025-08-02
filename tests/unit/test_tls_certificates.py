@@ -43,7 +43,7 @@ class TlsWithExternalHostname(unittest.TestCase):
     def test_external_hostname_is_set_after_relation_joins(self, mock_get_loadbalancer_status):
         # GIVEN an external hostname is not set
         self.assertFalse(self.harness.charm.config.get("external_hostname"))
-        self.assertEqual(self.harness.charm.external_host, "10.0.0.1")
+        self.assertEqual(self.harness.charm.ingressed_address, "10.0.0.1")
 
         # WHEN a "certificates" relation is formed
         # THEN the charm logs an appropriate DEBUG line
@@ -52,7 +52,7 @@ class TlsWithExternalHostname(unittest.TestCase):
 
         # AND WHEN an external hostname is set
         self.harness.update_config({"external_hostname": "testhostname"})
-        self.assertEqual(self.harness.charm.external_host, "testhostname")
+        self.assertEqual(self.harness.charm.ingressed_address, "testhostname")
         # AND when a root ca joins
 
         self.harness.add_relation_unit(self.rel_id, "root-ca/0")
@@ -64,7 +64,7 @@ class TlsWithExternalHostname(unittest.TestCase):
     def test_external_hostname_is_set_before_relation_joins(self):
         # GIVEN an external hostname is set
         self.harness.update_config({"external_hostname": "testhostname"})
-        self.assertEqual(self.harness.charm.external_host, "testhostname")
+        self.assertEqual(self.harness.charm.ingressed_address, "testhostname")
 
         # WHEN a "certificates" relation is formed
         self.rel_id = self.harness.add_relation("certificates", "root-ca")
