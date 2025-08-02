@@ -1,10 +1,8 @@
-import tempfile
 from unittest.mock import MagicMock, PropertyMock, patch
 
-import ops.pebble
 import pytest
 import yaml
-from scenario import Container, ExecOutput, Mount, Relation, State
+from scenario import Relation, State
 
 from tests.unit._utils import _render_config, create_ingress_relation
 
@@ -28,22 +26,11 @@ def _create_tls_relation(*, app_name: str, strip_prefix: bool, redirect_https: b
 @patch("traefik.Traefik.is_ready", PropertyMock(return_value=True))
 @patch("charm.TraefikIngressCharm._static_config_changed", MagicMock(return_value=False))
 @patch("charm.TraefikIngressCharm.version", PropertyMock(return_value="0.0.0"))
+@patch("traefik.Traefik.update_cert_configuration", MagicMock())
 def test_middleware_config(
-    traefik_ctx, routing_mode, strip_prefix, redirect_https, tls_from_configs
+    traefik_ctx, traefik_container, routing_mode, strip_prefix, redirect_https, tls_from_configs
 ):
-    td = tempfile.TemporaryDirectory()
-    containers = [
-        Container(
-            name="traefik",
-            can_connect=True,
-            mounts={"configurations": Mount("/opt/traefik/", td.name)},
-            exec_mock={("find", "/opt/traefik/juju", "-name", "*.yaml", "-delete"): ExecOutput()},
-            layers={
-                "traefik": ops.pebble.Layer({"services": {"traefik": {"startup": "enabled"}}})
-            },
-            service_status={"traefik": ops.pebble.ServiceStatus.ACTIVE},
-        )
-    ]
+    containers = [traefik_container]
 
     # GIVEN a relation is requesting some middlewares
     rel_id = 0
