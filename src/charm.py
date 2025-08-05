@@ -188,22 +188,13 @@ class TraefikIngressCharm(CharmBase):
 
         # TODO: If external hostname and upstream ingress both exist, we need to tell the user that we are ignoring the hostname
 
-        # TODO: Move this back down?
         # Setup 'upstream-ingress' relation to allow this Traefik to be ingressed through another
         # ingress provider (eg: to layer multiple ingresses)
-        # Note: This must be done prior to any call to external_host, as it is used by that method.
         #
-
-        logger.warning("DEBUG: Setting up upstream ingress relation")
-        data = self._generate_upstream_ingress_route_configuration()
-        logger.warning("DEBUG: host is %s", data["host"])
-        logger.warning("DEBUG: scheme is %s", data["scheme"])
-        logger.warning("DEBUG: port is %s", data["port"])
-
         # NOTE: IngressPerAppRequirer only automatically sends host/port data to a related application on a relation
         # event (created, changed, ...) or on a charm leader elected or upgrade event.  It does not send data at
         # instantiation (now) or unrelated events.  If host or port changes because of some other change (eg: adding
-        # TLS, changing external host, etc.) we need to send the new data manually at that time.
+        # TLS, changing external host, etc.) that data must be sent manually at that time.
         upstream_ingress_route_configuration = (
             self._generate_upstream_ingress_route_configuration()
         )
@@ -213,7 +204,7 @@ class TraefikIngressCharm(CharmBase):
             strip_prefix=True,
             port=upstream_ingress_route_configuration["port"],
             # This scheme is the scheme used between the upstream ingress and this one.  It is not necessarily the same
-            # as that used by the upstream ingress to the external clients.
+            # as that used between the upstream ingress and the external clients.
             scheme=upstream_ingress_route_configuration["scheme"],
             host=upstream_ingress_route_configuration["host"],
         )
