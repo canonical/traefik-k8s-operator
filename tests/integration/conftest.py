@@ -73,7 +73,15 @@ def copy_traefik_library_into_tester_charms(ops_test):
         "traefik_k8s/v1/ingress_per_unit.py",
         "traefik_k8s/v0/traefik_route.py",
     ]
-    for tester in ["forward-auth", "ipa", "ipu", "tcp", "route", "health"]:
+    for tester in [
+        "forward-auth",
+        "ipa",
+        "ipu",
+        "tcp",
+        "route",
+        "health",
+        "ingress-requirer-mock",
+    ]:
         for lib in libraries:
             install_path = f"tests/integration/testers/{tester}/lib/charms/{lib}"
             os.makedirs(os.path.dirname(install_path), exist_ok=True)
@@ -126,6 +134,23 @@ async def ipa_tester_charm(ops_test):
         except RuntimeError:
             logger.warning("Failed to build ipa tester. Trying again!")
             count += 1
+            if count == 3:
+                raise
+
+
+@pytest.fixture(scope="module")
+@timed_memoizer
+async def ingress_requirer_mock(ops_test):
+    charm_path = (Path(__file__).parent / "testers" / "ingress-requirer-mock").absolute()
+    count = 0
+    while True:
+        try:
+            charm = await ops_test.build_charm(charm_path, verbosity="debug")
+            return charm
+        except RuntimeError:
+            logger.warning("Failed to build ingress-requirer-mock. Trying again!")
+            count += 1
+
             if count == 3:
                 raise
 

@@ -1,0 +1,44 @@
+# Copyright 2022 Canonical Ltd.
+# See LICENSE file for licensing details.
+name: ingress-requirer-mock
+description: mock for requirer side of all ingress types in traefik
+summary: mock for requirer side of all ingress types in traefik
+type: charm
+bases:
+  - build-on:
+      - name: "ubuntu"
+        channel: "20.04"
+    run-on:
+      - name: "ubuntu"
+        channel: "20.04"
+parts:
+  charm:
+    charm-binary-python-packages:
+      - cryptography
+      - jsonschema
+      - pydantic>=2
+
+
+requires:
+  ingress:
+    interface: ingress
+    limit: 1
+  ingress-2:
+    interface: ingress
+    limit: 1
+  traefik-route:
+    interface: traefik_route
+    limit: 1
+  ingress-per-unit:
+    interface: ingress_per_unit
+    limit: 1
+
+containers:
+  echo-server:
+    resource: echo-server-image
+
+resources:
+  echo-server-image:
+    type: oci-image
+    description: OCI image for echo server
+    upstream-source: jmalloc/echo-server:v0.3.7

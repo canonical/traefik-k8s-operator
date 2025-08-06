@@ -24,7 +24,7 @@ def _create_tls_relation(*, app_name: str, strip_prefix: bool, redirect_https: b
 @pytest.mark.parametrize("strip_prefix", (False, True))
 @pytest.mark.parametrize("redirect_https", (False, True))
 @pytest.mark.parametrize("tls_from_configs", (True, False))
-@patch("charm.TraefikIngressCharm._external_host", PropertyMock(return_value="testhostname"))
+@patch("charm.TraefikIngressCharm._ingressed_address", PropertyMock(return_value="testhostname"))
 @patch("traefik.Traefik.is_ready", PropertyMock(return_value=True))
 @patch("charm.TraefikIngressCharm._static_config_changed", MagicMock(return_value=False))
 @patch("charm.TraefikIngressCharm.version", PropertyMock(return_value="0.0.0"))

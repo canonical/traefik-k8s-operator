@@ -11,7 +11,7 @@ from charm import TraefikIngressCharm
 from traefik import Traefik
 
 
-@patch("charm.TraefikIngressCharm._external_host", PropertyMock(return_value="foo.bar"))
+@patch("charm.TraefikIngressCharm._ingressed_address", PropertyMock(return_value="foo.bar"))
 def test_start_traefik_is_not_running(*_, traefik_ctx):
     #
     # equivalent to:
@@ -44,7 +44,7 @@ def test_start_traefik_is_not_running(*_, traefik_ctx):
     assert out.unit_status == ("waiting", f"waiting for service: '{Traefik.service_name}'")
 
 
-@patch("charm.TraefikIngressCharm._external_host", PropertyMock(return_value=False))
+@patch("charm.TraefikIngressCharm._traefik_external_address", PropertyMock(return_value=False))
 def test_start_traefik_no_hostname(*_, traefik_ctx):
     state = State(
         config={"routing_mode": "path"},
@@ -57,7 +57,7 @@ def test_start_traefik_no_hostname(*_, traefik_ctx):
     )
 
 
-@patch("charm.TraefikIngressCharm._external_host", PropertyMock(return_value="foo.bar"))
+@patch("charm.TraefikIngressCharm._ingressed_address", PropertyMock(return_value="foo.bar"))
 @patch("traefik.Traefik.is_ready", PropertyMock(return_value=True))
 @patch("charm.TraefikIngressCharm._static_config_changed", PropertyMock(return_value=False))
 def test_start_traefik_active(*_, traefik_ctx):
@@ -66,4 +66,4 @@ def test_start_traefik_active(*_, traefik_ctx):
         containers=[Container(name="traefik", can_connect=False)],
     )
     out = Context(charm_type=TraefikIngressCharm).run("start", state)
-    assert out.unit_status == ("active", "Serving at foo.bar")
+    assert out.unit_status == ("active", "Serving at http://foo.bar")
