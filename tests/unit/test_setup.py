@@ -44,7 +44,7 @@ def test_start_traefik_is_not_running(*_, traefik_ctx):
     assert out.unit_status == ("waiting", f"waiting for service: '{Traefik.service_name}'")
 
 
-@patch("charm.TraefikIngressCharm._gateway_address", PropertyMock(return_value=False))
+@patch("charm.TraefikIngressCharm._traefik_external_address", PropertyMock(return_value=False))
 def test_start_traefik_no_hostname(*_, traefik_ctx):
     state = State(
         config={"routing_mode": "path"},

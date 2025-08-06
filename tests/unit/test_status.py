@@ -21,7 +21,7 @@ def test_start_traefik_is_not_running(traefik_ctx, *_):
     assert out.unit_status == WaitingStatus("waiting for service: 'traefik'")
 
 
-@patch("charm.TraefikIngressCharm._gateway_address", PropertyMock(return_value=False))
+@patch("charm.TraefikIngressCharm._traefik_external_address", PropertyMock(return_value=False))
 def test_start_traefik_no_hostname(traefik_ctx, *_):
     # GIVEN external host is not set (see decorator)
     # WHEN a `start` hook fires

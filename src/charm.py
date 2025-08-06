@@ -681,7 +681,7 @@ class TraefikIngressCharm(CharmBase):
         """
         return hash(
             (
-                self._gateway_address,
+                self._traefik_external_address,
                 self.config["routing_mode"],
                 self._is_forward_auth_enabled,
                 self._basic_auth_user,
@@ -755,7 +755,7 @@ class TraefikIngressCharm(CharmBase):
             )
             return
 
-        hostname = self._gateway_address
+        hostname = self._traefik_external_address
 
         if not hostname:
             self._wipe_ingress_for_all_relations()
@@ -846,7 +846,7 @@ class TraefikIngressCharm(CharmBase):
     @property
     def ready(self) -> bool:
         """Check whether we have an external host set, and traefik is running."""
-        if not self._gateway_address:
+        if not self._traefik_external_address:
             self._wipe_ingress_for_all_relations()  # fixme: no side-effects in prop
             self.unit.status = BlockedStatus(
                 "Traefik load balancer is unable to obtain an IP or hostname from the cluster."
@@ -1270,7 +1270,7 @@ class TraefikIngressCharm(CharmBase):
         """Return the scheme, host, and port needed for the upstream ingress relation."""
         scheme = self._gateway_scheme
         port = Traefik.tls_port if scheme == "https" else Traefik.port
-        host = self._gateway_address
+        host = self._traefik_external_address
         return {
             "scheme": scheme,
             "host": host,
@@ -1278,7 +1278,7 @@ class TraefikIngressCharm(CharmBase):
         }
 
     @property
-    def _gateway_address(self) -> Optional[str]:
+    def _traefik_external_address(self) -> Optional[str]:
         """Return the address used to ingress directly through this Traefik's gateway.
 
         This returns the first of the following:
@@ -1298,11 +1298,11 @@ class TraefikIngressCharm(CharmBase):
     def gateway_address(self) -> str:
         """Return the address used to ingress directly through this Traefik's gateway, raising if unavailable.
 
-        Returns the value of `_gateway_address` if it is non None, otherwise it will raise an exception.
+        Returns the value of `_traefik_external_address` if it is non None, otherwise it will raise an exception.
 
         To prevent that from happening, ensure this is only accessed behind an is_ready guard.
         """
-        address = self._gateway_address
+        address = self._traefik_external_address
         if address is None or not isinstance(address, str):
             raise ExternalHostNotReadyError()
         return address
@@ -1331,7 +1331,7 @@ class TraefikIngressCharm(CharmBase):
             # Return the address without the scheme
             parsed = urlparse(self.upstream_ingress.url)
             return parsed.geturl().replace(f"{parsed.scheme}://", "", 1)  # pyright: ignore
-        return self._gateway_address
+        return self._traefik_external_address
 
     @property
     def ingressed_address(self) -> str:
@@ -1384,7 +1384,7 @@ class TraefikIngressCharm(CharmBase):
     def server_cert_sans_dns(self) -> List[str]:
         """Provide certificate SANs DNS."""
         # unsafe: it's allowed to be None in this case, CertHandler will take it
-        target = self._gateway_address
+        target = self._traefik_external_address
 
         if is_hostname(target):
             assert isinstance(target, str), target  # for type checker
