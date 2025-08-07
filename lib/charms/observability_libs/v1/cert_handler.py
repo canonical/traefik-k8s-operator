@@ -1,41 +1,17 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
-"""## Overview.
+"""# [DEPRECATED] CertHandler Library.
 
-This document explains how to use the `CertHandler` class to
-create and manage TLS certificates through the `tls_certificates` interface.
+The `cert_handler` library is deprecated and will be **removed in October 2025**.
+Please migrate to the `tls_certificates_interface.v4` charm library.
 
-The goal of the CertHandler is to provide a wrapper to the `tls_certificates`
-library functions to make the charm integration smoother.
-
-## Library Usage
-
-This library should be used to create a `CertHandler` object, as per the
-following example:
-
-```python
-self.cert_handler = CertHandler(
-    charm=self,
-    key="my-app-cert-manager",
-    cert_subject="unit_name",  # Optional
-)
-```
-
-You can then observe the library's custom event and make use of the key and cert:
-```python
-self.framework.observe(self.cert_handler.on.cert_changed, self._on_server_cert_changed)
-
-container.push(keypath, self.cert_handler.private_key)
-container.push(certpath, self.cert_handler.server_cert)
-```
-
-Since this library uses [Juju Secrets](https://juju.is/docs/juju/secret) it requires Juju >= 3.0.3.
 """
 import abc
 import hashlib
 import ipaddress
 import json
 import socket
+import warnings
 from itertools import filterfalse
 from typing import Dict, List, Optional, Union
 
@@ -68,10 +44,15 @@ logger = logging.getLogger(__name__)
 
 LIBID = "b5cd5cd580f3428fa5f59a8876dcbe6a"
 LIBAPI = 1
-LIBPATCH = 17
+LIBPATCH = 18
 
 VAULT_SECRET_LABEL = "cert-handler-private-vault"
 
+
+warnings.warn(
+    "The `cert_handler` library is deprecated and will be removed in October 2025. Please migrate to the `tls_certificates_interface.v4` charm library.",
+    DeprecationWarning,
+)
 
 def is_ip_address(value: str) -> bool:
     """Return True if the input value is a valid IPv4 address; False otherwise."""
