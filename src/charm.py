@@ -174,17 +174,6 @@ class TraefikIngressCharm(CharmBase):
         self._lightkube_client = None
         self._lightkube_field_manager: str = self.app.name
         self._lb_name: str = f"{self.app.name}-lb"
-        # The sans should be the host where this Traefik receives traffic directly (eg: this Traefik's ingress host, not
-        # an upstream ingress that can lead to this Traefik).  It will be either the loadbalancer or the service
-        # ClusterIP created by Juju for this charm.
-        sans = self.server_cert_sans_dns
-        self.cert = CertHandler(
-            self,
-            key="trfk-server-cert",
-            # Route53 complains if CN is not a hostname
-            cert_subject=sans[0] if sans else None,
-            sans=sans,
-        )
 
         self.recv_ca_cert = CertificateTransferRequires(self, "receive-ca-cert")
 
