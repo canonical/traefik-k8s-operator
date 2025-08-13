@@ -262,7 +262,14 @@ class TraefikIngressCharm(CharmBase):
         )
 
         # Certs Relation
-        self.csrs = self._get_cert_requests()
+        all_csrs = self._get_cert_requests()
+        # Filter out any invalid certificate requests to prevent TLSCertificatesError
+        self.csrs = []
+        for csr in all_csrs:
+            if csr.is_valid():
+                self.csrs.append(csr)
+            else:
+                logger.warning(f"Filtered out invalid certificate request for common_name: '{csr.common_name}'")
         certs_refresh_events = [
             self.ingress_per_unit.on.endpoints_updated,
             self.ingress_per_appv1.on.endpoints_updated,
