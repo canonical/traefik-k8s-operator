@@ -364,6 +364,11 @@ class TraefikIngressCharm(CharmBase):
         }
         csrs = []
         for addr in addrs:
+            # Additional validation - addr should not be None or empty
+            if not addr:
+                logger.warning("Skipping empty or None address when creating certificate requests")
+                continue
+
             sans_dns = []  # Needed for pyright
             sans_ip = []  # Needed for pyright
             if is_hostname(addr):
@@ -381,12 +386,19 @@ class TraefikIngressCharm(CharmBase):
                         # If all else fails, we'd rather use the bare IP
                         sans_ip = [addr] if addr else []
                         sans_dns = []
+
+                # If reverse DNS lookup failed, ensure we still have the IP in sans_ip
+                if not sans_dns and not sans_ip and addr:
+                    sans_ip = [addr]
+
             if sans_dns:
                 common_name = sans_dns[0]
             elif sans_ip:
                 common_name = sans_ip[0]
             else:
-                common_name = ""
+                # Skip creating certificate request if we have no valid common name
+                logger.warning(f"Skipping certificate request for address {addr} - no valid common name")
+                continue
             csrs.append(
                 CertificateRequestAttributes(
                     common_name=common_name,
@@ -394,6 +406,7 @@ class TraefikIngressCharm(CharmBase):
                     sans_ip=frozenset(sans_ip),
                 )
             )
+
         return csrs
 
     @property
