@@ -84,7 +84,7 @@ LIBAPI = 2
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 15
+LIBPATCH = 16
 
 PYDEPS = ["pydantic"]
 
@@ -525,7 +525,7 @@ class IngressPerAppProvider(_IngressPerAppBase):
         del relation.data[self.app]["ingress"]
 
     def _get_requirer_units_data(self, relation: Relation) -> List["IngressRequirerUnitData"]:
-        """Fetch and validate the requirer's app databag."""
+        """Fetch and validate the requirer's unit databag."""
         out: List["IngressRequirerUnitData"] = []
 
         unit: Unit
@@ -874,7 +874,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         return self.relations[0] if self.relations else None
 
     def _get_url_from_relation_data(self) -> Optional[str]:
-        """The full ingress URL to reach the current unit.
+        """The full ingress URL to reach the charm application.
 
         Returns None if the URL isn't available yet.
         """
@@ -903,7 +903,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
 
     @property
     def url(self) -> Optional[str]:
-        """The full ingress URL to reach the current unit.
+        """The full ingress URL to reach the charm application.
 
         Returns None if the URL isn't available yet.
         """
