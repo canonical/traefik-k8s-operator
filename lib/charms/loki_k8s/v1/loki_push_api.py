@@ -498,6 +498,7 @@ class MyCharm(...):
 Do this, and all charm logs will be forwarded to Loki as soon as a relation is formed.
 """
 
+import copy
 import json
 import logging
 import os
@@ -543,7 +544,7 @@ LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 18
+LIBPATCH = 19
 
 PYDEPS = ["cosl"]
 
@@ -1542,11 +1543,13 @@ class ConsumerBase(Object):
         skip_alert_topology_labeling: bool = False,
         *,
         forward_alert_rules: bool = True,
+        extra_alert_labels: Dict = {},
     ):
         super().__init__(charm, relation_name)
         self._charm = charm
         self._relation_name = relation_name
         self._forward_alert_rules = forward_alert_rules
+        self._extra_alert_labels = extra_alert_labels
         self.topology = JujuTopology.from_charm(charm)
 
         try:
@@ -1562,6 +1565,15 @@ class ConsumerBase(Object):
 
         self._recursive = recursive
 
+    @staticmethod
+    def _inject_extra_labels_to_alert_rules(rules: Dict, extra_alert_labels: Dict) -> Dict:
+        """Return a copy of the rules dict with extra labels injected."""
+        result = copy.deepcopy(rules)
+        for group in result.get("groups", []):
+            for rule in group.get("rules", []):
+                rule.setdefault("labels", {}).update(extra_alert_labels)
+        return result
+
     def _handle_alert_rules(self, relation):
         if not self._charm.unit.is_leader():
             return
@@ -1572,6 +1584,11 @@ class ConsumerBase(Object):
         if self._forward_alert_rules:
             alert_rules.add_path(self._alert_rules_path, recursive=self._recursive)
         alert_rules_as_dict = alert_rules.as_dict()
+
+        if self._extra_alert_labels:
+            alert_rules_as_dict = ConsumerBase._inject_extra_labels_to_alert_rules(
+                alert_rules_as_dict, self._extra_alert_labels
+            )
 
         relation.data[self._charm.app]["metadata"] = json.dumps(self.topology.as_dict())
         relation.data[self._charm.app]["alert_rules"] = json.dumps(
@@ -1621,6 +1638,7 @@ class LokiPushApiConsumer(ConsumerBase):
         *,
         refresh_event: Optional[Union[BoundEvent, List[BoundEvent]]] = None,
         forward_alert_rules: bool = True,
+        extra_alert_labels: Dict = {},
     ):
         """Construct a Loki charm client.
 
@@ -1647,6 +1665,7 @@ class LokiPushApiConsumer(ConsumerBase):
             recursive: Whether to scan for rule files recursively.
             skip_alert_topology_labeling: whether to skip the alert topology labeling.
             forward_alert_rules: a boolean flag to toggle forwarding of charmed alert rules.
+            extra_alert_labels: Dict of extra labels to inject alert rules with.
             refresh_event: an optional bound event or list of bound events which
                 will be observed to re-set scrape job data (IP address and others)
 
@@ -1680,6 +1699,7 @@ class LokiPushApiConsumer(ConsumerBase):
             recursive,
             skip_alert_topology_labeling,
             forward_alert_rules=forward_alert_rules,
+            extra_alert_labels=extra_alert_labels,
         )
         events = self._charm.on[relation_name]
         self.framework.observe(self._charm.on.upgrade_charm, self._on_lifecycle_event)
