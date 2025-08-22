@@ -34,7 +34,7 @@ LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 18
+LIBPATCH = 19
 
 DEFAULT_RELATION_NAME = "ingress"
 RELATION_INTERFACE = "ingress"
@@ -214,11 +214,16 @@ class IngressPerAppDataRemovedEvent(RelationEvent):
     """Event representing that ingress data has been removed for an app."""
 
 
+class IngressPerAppEndpointsUpdatedEvent(RelationEvent):
+    """Event representing that the proxied endpoints have been updated."""
+
+
 class IngressPerAppProviderEvents(ObjectEvents):
     """Container for IPA Provider events."""
 
     data_provided = EventSource(IngressPerAppDataProvidedEvent)
     data_removed = EventSource(IngressPerAppDataRemovedEvent)
+    endpoints_updated = EventSource(IngressPerAppEndpointsUpdatedEvent)
 
 
 class IngressPerAppProvider(_IngressPerAppBase):
@@ -252,7 +257,7 @@ class IngressPerAppProvider(_IngressPerAppBase):
             )
 
     def _handle_relation_broken(self, event):
-        self.on.data_removed.emit(event.relation)  # type: ignore
+        self.on.data_removed.emit(event.relation, event.relation.app)  # type: ignore
 
     def wipe_ingress_data(self, relation: Relation):
         """Clear ingress data from relation."""
@@ -267,6 +272,7 @@ class IngressPerAppProvider(_IngressPerAppBase):
             )
             return
         del relation.data[self.app]["ingress"]
+        self.on.endpoints_updated.emit(relation=relation, app=relation.app)
 
     def _get_requirer_data(self, relation: Relation) -> RequirerData:  # type: ignore
         """Fetch and validate the requirer's app databag.
@@ -330,6 +336,7 @@ class IngressPerAppProvider(_IngressPerAppBase):
         ingress_data = {"ingress": ingress}
         _validate_data(ingress_data, INGRESS_PROVIDES_APP_SCHEMA)
         relation.data[self.app]["ingress"] = yaml.safe_dump(ingress)
+        self.on.endpoints_updated.emit(relation=relation, app=relation.app)
 
     @property
     def proxied_endpoints(self):
@@ -454,7 +461,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
 
     def _handle_relation_broken(self, event):
         self._stored.current_url = None  # type: ignore
-        self.on.revoked.emit(event.relation)  # type: ignore
+        self.on.revoked.emit(relation=event.relation, app=event.relation.app)  # type: ignore
 
     def _handle_upgrade_or_leader(self, event):
         """On upgrade/leadership change: ensure we publish the data we have."""
