@@ -355,11 +355,12 @@ class TraefikIngressCharm(CharmBase):
 
         # Action handlers
         observe(self.on.show_proxied_endpoints_action, self._on_show_proxied_endpoints)  # type: ignore
+        observe(self.on.show_external_endpoints_action, self._on_show_external_endpoints)  # type: ignore
 
     def _get_cert_requests(self) -> list:
         addrs = {
             urlparse(endpoint["url"]).hostname
-            for endpoint in self._get_proxied_endpoints().values()
+            for endpoint in self._get_proxied_endpoints(use_gateway_address=True).values()
             if "url" in endpoint and urlparse(endpoint["url"]).scheme  # For a TCP route there will be no scheme which will cause urlparse().hostname to return None. Therefore we should catch the TCP routes here.
         }
         csrs = []
@@ -657,12 +658,27 @@ class TraefikIngressCharm(CharmBase):
         return certs
 
     def _on_show_proxied_endpoints(self, event: ActionEvent):
-        event.set_results({"proxied-endpoints": json.dumps(self._get_proxied_endpoints())})
+        event.set_results({"proxied-endpoints": json.dumps(self._get_proxied_endpoints(use_gateway_address=True))})
 
-    def _get_proxied_endpoints(self) -> dict:
+    def _on_show_external_endpoints(self, event: ActionEvent):
+        event.set_results({"external-endpoints": json.dumps(self._get_proxied_endpoints(use_gateway_address=False))})
+
+    def _get_proxied_endpoints(self, use_gateway_address: bool=True) -> dict:
+        """Show the endpoints proxied by traefik.
+
+        Args:
+            use_gateway_address: Use traefik's address instead of any upstream ingress address.
+        Returns:
+            A dict of the form {"url": "<endpoint_url>", ...}
+        """
         result = {}
         if not self.ready:
             return result
+
+        traefik_endpoint = {
+            self.app.name: {"url": f"{self._ingressed_scheme}://{self.ingressed_address}"}
+        }
+        result.update(traefik_endpoint)
 
         for provider in (self.ingress_per_unit, self.ingress_per_appv1, self.ingress_per_appv2):
             try:
@@ -677,6 +693,29 @@ class TraefikIngressCharm(CharmBase):
                     f"failed to fetch proxied endpoints from (at least one of) the "
                     f"remote apps {remote_app_names!r} with error {e}."
                 )
+
+        # Replace hosts with gateway address if requested
+        if use_gateway_address:
+            for app_name, endpoint_data in result.items():
+                if "url" in endpoint_data:
+                    original_url = endpoint_data["url"]
+                    parsed_url = urlparse(original_url)
+
+                    # Handle TCP URLs without schemes - these get parsed with scheme but no netloc
+                    if parsed_url.netloc == '' and ':' in original_url and '://' not in original_url:
+                        # This is likely a TCP URL in "host:port" format
+                        try:
+                            host, port = original_url.rsplit(':', 1)
+                            new_url = f"{self.gateway_address}:{port}"
+                        except ValueError:
+                            # Fallback: if parsing fails, keep original URL
+                            new_url = original_url
+                    else:
+                        # Standard URL with scheme - replace the netloc normally
+                        # Use of the underscore method here is actually supported by the docs: https://docs.python.org/3/library/urllib.parse.html#urllib.parse.urlparse
+                        new_url = parsed_url._replace(netloc=self.gateway_address).geturl()
+
+                    endpoint_data["url"] = new_url
         return result
 
     def _tcp_entrypoints(self):
