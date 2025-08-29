@@ -81,7 +81,7 @@ def spellbook_fetch(  # noqa: C901
             pack_out = check_output(("charmcraft", "pack", "--format=json", "-p", str(charm_root)))
         except CalledProcessError as e:
             raise RuntimeError(
-                "Charmcraft pack failed. " "Attempt a `charmcraft clean` or inspect the logs."
+                "Charmcraft pack failed. Attempt a `charmcraft clean` or inspect the logs."
             ) from e
         # if everything went OK, `charmcraft pack` returns the packed charm filename
         try:
@@ -89,13 +89,19 @@ def spellbook_fetch(  # noqa: C901
             charm_filename = charmcraft_pack_out["charms"][0]
         except (json.JSONDecodeError, KeyError, IndexError) as e:
             raise RuntimeError(
-                f"Could not determine path to packed charm file from charmcraft pack output: {pack_out!r}"
+                (
+                    "Could not determine path to packed charm file from charmcraft pack output:"
+                    f" {pack_out!r}"
+                )
             ) from e
 
         packed_charm_path = (Path(os.getcwd()) / charm_filename).absolute()
         if not packed_charm_path.exists():
             raise RuntimeError(
-                f"Could not determine path to packed charm file from charmcraft pack output: {pack_out!r}"
+                (
+                    "Could not determine path to packed charm file from charmcraft pack output:"
+                    f" {pack_out!r}"
+                )
             )
         return packed_charm_path
 

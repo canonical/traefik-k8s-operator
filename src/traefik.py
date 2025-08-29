@@ -154,8 +154,9 @@ class Traefik:
                     ],
                     "stores": {
                         "default": {
-                            # When the external hostname is a bare IP, traefik cannot match a domain,
-                            # so we must set the default cert for the TLS handshake to succeed.
+                            # When the external hostname is a bare IP,
+                            # traefik cannot match a domain, so we must set the default cert
+                            # for the TLS handshake to succeed.
                             "defaultCertificate": {
                                 "certFile": SERVER_CERT_PATH,
                                 "keyFile": SERVER_KEY_PATH,
@@ -215,7 +216,8 @@ class Traefik:
     def _add_ca(self, ca: CA):
         """Add a ca.
 
-        After doing this (any number of times), the caller is responsible for invoking update-ca-certs.
+        After doing this (any number of times),
+        the caller is responsible for invoking update-ca-certs.
         """
         self._container.push(ca.path, ca.ca, make_dirs=True)
 
@@ -298,9 +300,10 @@ class Traefik:
         }
 
         if self._tracing_endpoint:
-            # ref: https://github.com/traefik/traefik/blob/v2.11/docs/content/observability/tracing/jaeger.md
-            # TODO once we bump to Traefik v3, Jaeger needs to be replaced with otlp and config needs to be updated
-            # see https://doc.traefik.io/traefik/observability/tracing/opentelemetry/ for more reference
+            # ref: https://github.com/traefik/traefik/blob/v2.11/docs/content/observability/tracing/jaeger.md  #noqa
+            # TODO once we bump to Traefik v3, Jaeger needs to be replaced with otlp and
+            # config needs to be updated.
+            # see https://doc.traefik.io/traefik/observability/tracing/opentelemetry/
             static_config["tracing"] = {
                 "jaeger": {
                     "collector": {
@@ -309,13 +312,15 @@ class Traefik:
                 }
             }
 
-        # we attempt to put together the base config with whatever the user passed via traefik_route.
-        # in case there are conflicts between the base config and some route, or between the routes themselves,
-        # we'll be forced to bail out.
+        # we attempt to put together the base config with whatever the user
+        # passed via traefik_route.
+        # in case there are conflicts between the base config and some route,
+        # or between the routes themselves, we'll be forced to bail out.
         extra_configs = list(self._traefik_route_static_configs)
 
         for extra_config in extra_configs:
-            # static_config_deep_merge does things in-place, so we deepcopy the base config in case things go wrong
+            # static_config_deep_merge does things in-place,
+            # so we deepcopy the base config in case things go wrong
             previous = deepcopy(static_config)
             try:
                 static_config_deep_merge(static_config, extra_config)
@@ -645,7 +650,13 @@ class Traefik:
         environment = {}
         if self._tracing_endpoint:
             environment = {
-                "JAEGER_TAGS": f"juju_application={self._topology.application},juju_model={self._topology.model},juju_model_uuid={self._topology.model_uuid},juju_unit={self._topology.unit},juju_charm={self._topology.charm_name}"
+                "JAEGER_TAGS": (
+                    f"juju_application={self._topology.application},"
+                    f"juju_model={self._topology.model},"
+                    f"juju_model_uuid={self._topology.model_uuid},"
+                    f"juju_unit={self._topology.unit},"
+                    f"juju_charm={self._topology.charm_name}"
+                )
             }
 
         layer = {

@@ -165,8 +165,8 @@ async def pull_server_cert(ops_test, path):
 
 
 @pytest.mark.xfail(
-        reason="Failing due to #491.  Remove this after #509 is implemented."
-               "See also: https://github.com/canonical/traefik-k8s-operator/issues/521"
+    reason="Failing due to #491.  Remove this after #509 is implemented."
+    "See also: https://github.com/canonical/traefik-k8s-operator/issues/521"
 )
 # @pytest.mark.abort_on_fail
 async def test_tls_termination(ops_test: OpsTest, temp_dir):
