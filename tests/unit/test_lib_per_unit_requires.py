@@ -29,6 +29,7 @@ class MockRequirerCharm(CharmBase):
     )
 
     def __init__(self, *args, **kwargs):
+        """Initialize the mock charm."""
         super().__init__(*args, **kwargs)
         self.ipu = IngressPerUnitRequirer(self, port=80)
 
@@ -219,6 +220,7 @@ class TestInterlibDependency(unittest.TestCase):
         )
 
         def __init__(self, *args, **kwargs):
+            """Initialize the mock charm."""
             super().__init__(*args, **kwargs)
             self.ipu = IngressPerUnitRequirer(self, relation_name="ingress", port=80)
             self.dependee = copy(self.ipu.url)  # Stand-in for interlib dependency

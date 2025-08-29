@@ -160,6 +160,7 @@ class TraefikIngressCharm(CharmBase):
     _stored = StoredState()
 
     def __init__(self, *args):
+        """Initialize the charm."""
         super().__init__(*args)
 
         self._stored.set_default(
@@ -858,7 +859,7 @@ class TraefikIngressCharm(CharmBase):
         return True
 
     def _handle_ingress_data_provided(self, event: RelationEvent):
-        """A unit has provided data requesting ipu."""
+        """Handle data provided by an unit requesting ingress."""
         if not self.ready:
             event.defer()
             return
@@ -872,7 +873,7 @@ class TraefikIngressCharm(CharmBase):
             self.unit.status = ActiveStatus(self.serving_message())
 
     def _handle_ingress_data_removed(self, event: RelationEvent):
-        """A unit has removed the data we need to provide ingress."""
+        """Handle data removal for ingress."""
         self._wipe_ingress_for_relation(
             event.relation, wipe_rel_data=not isinstance(event, RelationBrokenEvent)
         )
@@ -884,11 +885,11 @@ class TraefikIngressCharm(CharmBase):
         self._reconcile_lb()
 
     def _handle_upstream_ingress_changed(self, _: RelationEvent):
-        """The upstream ingress relation has changed."""
+        """Handle change in the upstream ingress relation."""
         self._process_status_and_configurations()
 
     def _handle_traefik_route_ready(self, event: TraefikRouteRequirerReadyEvent):
-        """A traefik_route charm has published some ingress data."""
+        """Handle ingress data published by a traefik-route charm."""
         if self._static_config_changed:
             # This will regenerate the static configs and reevaluate all dynamic configs,
             # including this one.
@@ -1054,7 +1055,7 @@ class TraefikIngressCharm(CharmBase):
         self._push_configurations(relation, config)
 
     def _get_configs_per_leader(self, relation: Relation) -> Dict[str, Any]:
-        """Generates ingress per leader config."""
+        """Generate ingress per leader config."""
         # this happens to be the same behaviour as ingress v1 (legacy) provided.
         ipa = self.ingress_per_appv1
 
@@ -1242,7 +1243,7 @@ class TraefikIngressCharm(CharmBase):
         self.traefik.restart()
 
     def _provider_from_relation(self, relation: Relation):
-        """Returns the correct IngressProvider based on a relation."""
+        """Return the correct IngressProvider based on a relation."""
         relation_type = _get_relation_type(relation)
         if relation_type is _IngressRelationType.per_app:
             # first try to tell if remote is speaking v2

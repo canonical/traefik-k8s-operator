@@ -25,6 +25,7 @@ class MockProviderCharm(CharmBase):
     )
 
     def __init__(self, *args, **kwargs):
+        """Initialize the mock charm."""
         super().__init__(*args, **kwargs)
         self.ipa = IngressPerAppProvider(self)
 

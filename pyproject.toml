@@ -12,15 +12,15 @@ dependencies = [
     "cryptography",
     "deepmerge",
     "jsonschema",
-    "lightkube >= 0.8.1",
-    "lightkube-models >= 1.22.0.4",
+    "lightkube>=0.8.1",
+    "lightkube-models>=1.22.0.4",
     "lightkube-extensions",
-    "ops >= 2.10.0",
-    "importlib-metadata == 6.0.0",
-    "opentelemetry-exporter-otlp-proto-http == 1.21.0",
-    "opentelemetry-api == 1.21.0",
-    "pydantic >= 2",
-    "cosl"
+    "ops>=2.10.0",
+    "importlib-metadata==6.0.0",
+    "opentelemetry-exporter-otlp-proto-http==1.21.0",
+    "opentelemetry-api==1.21.0",
+    "pydantic>=2",
+    "cosl",
 ]
 
 [project.optional-dependencies]
@@ -39,7 +39,19 @@ dev = [
     "minio",
     "pyright==1.1.318",
     "ops-scenario~=6.0",
-    "pytest-interface-tester > 0.3"
+    "pytest-interface-tester>0.3",
+    "codespell>=2.4.1",
+    "flake8>=5.0.4",
+    "flake8-builtins>=2.5.0",
+    "flake8-copyright>=0.2.4",
+    "flake8-docstrings>=1.7.0",
+    "isort>=5.13.2",
+    "mypy>=1.14.1",
+    "pep8-naming>=0.14.1",
+    "pydocstyle>=2.10",
+    "pylint>=3.2.7",
+    "pylint-pydantic>=0.3.5",
+    "pyproject-flake8>=5.0.4.post1",
 ]
 
 [tool.uv.sources]
@@ -91,3 +103,35 @@ pythonPlatform = "All"
 [tool.codespell]
 skip = ".git,.tox,build,venv*"
 
+# Linting tools configuration
+[tool.flake8]
+max-line-length = 99
+max-doc-length = 99
+max-complexity = 10
+exclude = [".git", "__pycache__", ".tox", "build", "dist", "*.egg_info", "venv"]
+select = ["E", "W", "F", "C", "N", "R", "D", "H"]
+# Ignore W503, E501 because using black creates errors with this
+# Ignore D107 Missing docstring in __init__
+ignore = ["W503", "E501", "D107"]
+# D100, D101, D102, D103: Ignore missing docstrings in tests
+per-file-ignores = ["tests/*:D100,D101,D102,D103,D104,D205,D212,D415"]
+docstring-convention = "google"
+
+[tool.isort]
+line_length = 99
+profile = "black"
+skip = ["src/legacy.py"]
+
+[tool.mypy]
+check_untyped_defs = true
+disallow_untyped_defs = true
+explicit_package_bases = true
+ignore_missing_imports = true
+namespace_packages = true
+
+[[tool.mypy.overrides]]
+disallow_untyped_defs = false
+module = "tests.*"
+
+[tool.pylint]
+disable = "wrong-import-order"

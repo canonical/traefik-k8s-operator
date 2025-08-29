@@ -339,7 +339,7 @@ def test_ingress_with_hostname_and_routing_mode(
     traefik_container,
     tmp_path,
 ):
-    """Tests that the ingress relation provides a URL for valid external hostname and routing mode combinations."""
+    """Check that the ingress relation provides a URL for valid hostname and routing configs."""
     ipa = create_ingress_relation(strip_prefix=True, unit_name=UNIT_NAME)
     state = State(
         model=Model(name=MODEL_NAME),

@@ -109,6 +109,19 @@ class Traefik:
         basic_auth_user: Optional[str] = None,
         tracing_endpoint: Optional[str] = None,
     ):
+        """Initialize traefik service class.
+
+        Args:
+            container: The traefik container.
+            routing_mode: Routing mode.
+            tls_enabled: If TLS is enabled.
+            experimental_forward_auth_enabled: If forward_auth is enabled.
+            tcp_entrypoints: TCP entrypoints.
+            traefik_route_static_configs: Static config for traefik-route relations.
+            topology: Juju topology.
+            basic_auth_user: User for basic auth.
+            tracing_endpoint: Tracing endpoint.
+        """
         self._container = container
         self._tcp_entrypoints = tcp_entrypoints
         self._traefik_route_static_configs = traefik_route_static_configs

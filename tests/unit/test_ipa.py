@@ -23,7 +23,9 @@ def join(traefik_ctx: Context, state: State):
         joining_unit_id += 1
 
     remote_units_data[joining_unit_id] = {
-        "host": f'"neutron-{joining_unit_id}.neutron-endpoints.zaza-de71889d82db.svc.cluster.local"'
+        "host": (
+            f'"neutron-{joining_unit_id}.neutron-endpoints.zaza-de71889d82db.svc.cluster.local"'
+        )
     }
     relations = [
         ingress.replace(
