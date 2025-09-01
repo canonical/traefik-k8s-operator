@@ -668,6 +668,7 @@ class TraefikIngressCharm(CharmBase):
 
         Args:
             use_gateway_address: Use traefik's address instead of any upstream ingress address.
+
         Returns:
             A dict of the form {"url": "<endpoint_url>", ...}
         """
