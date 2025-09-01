@@ -340,7 +340,15 @@ class TestTraefikIngressCharm(unittest.TestCase):
         action_event = Mock(spec=ActionEvent)
         self.harness.update_config({"external_hostname": "foo"})
         self.harness.charm._on_show_proxied_endpoints(action_event)
-        action_event.set_results.assert_called_once_with({"proxied-endpoints": "{}"})
+        action_event.set_results.assert_called_once_with(
+            {
+                "proxied-endpoints": json.dumps(
+                    {
+                        "traefik-k8s": {"url": "http://foo"},
+                    }
+                )
+            }
+        )
 
     @patch(
         "charm.TraefikIngressCharm._get_loadbalancer_status",
@@ -372,6 +380,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
             {
                 "proxied-endpoints": json.dumps(
                     {
+                        "traefik-k8s": {"url": "http://testhostname"},
                         "remote": {"url": "http://testhostname/test-model-remote-0"},
                     }
                 )
@@ -403,6 +412,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
             {
                 "proxied-endpoints": json.dumps(
                     {
+                        "traefik-k8s": {"url": "http://testhostname"},
                         "remote/0": {"url": "http://testhostname/test-model-remote-0"},
                     }
                 )
