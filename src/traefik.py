@@ -300,7 +300,7 @@ class Traefik:
         }
 
         if self._tracing_endpoint:
-            # ref: https://github.com/traefik/traefik/blob/v2.11/docs/content/observability/tracing/jaeger.md  #noqa
+            # ref: https://github.com/traefik/traefik/blob/v2.11/docs/content/observability/tracing/jaeger.md  # noqa
             # TODO once we bump to Traefik v3, Jaeger needs to be replaced with otlp and
             # config needs to be updated.
             # see https://doc.traefik.io/traefik/observability/tracing/opentelemetry/

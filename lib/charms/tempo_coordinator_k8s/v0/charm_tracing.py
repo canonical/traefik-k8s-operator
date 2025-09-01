@@ -313,8 +313,8 @@ from typing import (
 
 import opentelemetry
 import ops
-from opentelemetry.exporter.otlp.proto.common._internal.trace_encoder import ( # type: ignore
-    encode_spans # type: ignore
+from opentelemetry.exporter.otlp.proto.common._internal.trace_encoder import (
+    encode_spans,  # type: ignore; type: ignore
 )
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter  # type: ignore
 from opentelemetry.sdk.resources import Resource

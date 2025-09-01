@@ -189,6 +189,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import yaml
+from cosl import DashboardPath40UID, LZMABase64
 from ops.charm import (
     CharmBase,
     HookEvent,
@@ -208,7 +209,6 @@ from ops.framework import (
     StoredState,
 )
 from ops.model import Relation
-from cosl import LZMABase64, DashboardPath40UID
 
 # The unique Charmhub library identifier, never change it
 LIBID = "c49eb9c7dfef40c7b6235ebd67010a3f"

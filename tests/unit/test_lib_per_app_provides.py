@@ -5,10 +5,7 @@ from textwrap import dedent
 
 import pytest
 import yaml
-from charms.traefik_k8s.v2.ingress import (
-    IngressPerAppProvider,
-    IngressRequirerAppData,
-)
+from charms.traefik_k8s.v2.ingress import IngressPerAppProvider, IngressRequirerAppData
 from ops.charm import CharmBase
 from ops.testing import Harness
 

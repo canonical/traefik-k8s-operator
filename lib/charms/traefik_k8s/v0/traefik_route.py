@@ -341,6 +341,14 @@ class TraefikRouteRequirer(Object):
         relation_name: str = "traefik-route",
         raw: Optional[bool] = False,
     ):
+        """Initialize the traefik-route requirer class.
+
+        Args:
+            charm: Requirer charm.
+            relation: traefik-route relation.
+            relation_name: Name of the relation. Defaults to "traefik-route".
+            raw: Whether or not to enable raw mode. Defaults to False.
+        """
         super(TraefikRouteRequirer, self).__init__(charm, relation_name)
         self._stored.set_default(external_host=None, scheme=None)
 
@@ -351,7 +359,8 @@ class TraefikRouteRequirer(Object):
         if self._raw:
             log.warning(
                 "Raw mode enabled: TLS routes for ALL protocols will not be auto-generated. "
-                "Enable this only if you fully understand and intend to bypass the additional TLS configuration."
+                "Enable this only if you fully understand and intend to bypass the additional"
+                "TLS configuration."
             )
 
         self.framework.observe(

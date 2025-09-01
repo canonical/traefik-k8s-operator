@@ -10,13 +10,8 @@ import pytest
 import yaml
 from pytest_operator.plugin import OpsTest
 
-from tests.integration.conftest import (
-    trfk_resources,
-)
-from tests.integration.helpers import (
-    get_k8s_service_address,
-    remove_application,
-)
+from tests.integration.conftest import trfk_resources
+from tests.integration.helpers import get_k8s_service_address, remove_application
 
 APP_NAME = "traefik"
 TESTER_APP_NAME = "route"

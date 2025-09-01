@@ -64,14 +64,7 @@ from typing import Any, Dict, Optional, Tuple, Union
 
 import yaml
 from ops.charm import CharmBase, RelationEvent
-from ops.framework import (
-    EventSource,
-    Object,
-    ObjectEvents,
-    StoredDict,
-    StoredList,
-    StoredState,
-)
+from ops.framework import EventSource, Object, ObjectEvents, StoredDict, StoredList, StoredState
 from ops.model import Application, ModelError, Relation, Unit
 
 # The unique Charmhub library identifier, never change it
@@ -205,6 +198,12 @@ class RelationException(RuntimeError):
     """
 
     def __init__(self, relation: Relation, entity: Union[Application, Unit]):
+        """Initialize the relation exception base class.
+
+        Args:
+            relation: Relation instance.
+            entity: Application and Unit.
+        """
         super().__init__(relation)
         self.args = (
             "There is an error with the relation {}:{} with {}".format(
@@ -223,6 +222,13 @@ class RelationPermissionError(RelationException):
     """Ingress is requested to do something for which it lacks permissions."""
 
     def __init__(self, relation: Relation, entity: Union[Application, Unit], message: str):
+        """Initialize the exception.
+
+        Args:
+            relation: Relation instance.
+            entity: Application and Unit.
+            message: Exception message.
+        """
         super(RelationPermissionError, self).__init__(relation, entity)
         self.args = (
             "Unable to write data to relation '{}:{}' with {}: {}".format(
@@ -475,7 +481,7 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
             requirer_units_data[remote_unit] = remote_data
         return requirer_units_data
 
-    def _get_requirer_unit_data(self, relation: Relation, remote_unit: Unit) -> RequirerData:  # type: ignore
+    def _get_requirer_unit_data(self, relation: Relation, remote_unit: Unit) -> RequirerData:  # type: ignore  # noqa
         """Fetch and validate the requirer unit data for this unit.
 
         For convenience, we convert 'port' to integer.
@@ -741,7 +747,7 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
         self._stored.current_urls = current_urls  # type: ignore
 
         removed = previous_urls.keys() - current_urls.keys()  # type: ignore
-        changed = {a for a in current_urls if current_urls[a] != previous_urls.get(a)}  # type: ignore
+        changed = {a for a in current_urls if current_urls[a] != previous_urls.get(a)}  # type: ignore  # noqa
 
         this_unit_name = self.unit.name
         # do not use self.relation in this context because if

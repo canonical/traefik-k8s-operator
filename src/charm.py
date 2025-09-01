@@ -42,10 +42,7 @@ from charms.traefik_k8s.v0.traefik_route import (
     TraefikRouteRequirerReadyEvent,
 )
 from charms.traefik_k8s.v1.ingress import IngressPerAppProvider as IPAv1
-from charms.traefik_k8s.v1.ingress_per_unit import (
-    DataValidationError,
-    IngressPerUnitProvider,
-)
+from charms.traefik_k8s.v1.ingress_per_unit import DataValidationError, IngressPerUnitProvider
 from charms.traefik_k8s.v2.ingress import IngressPerAppProvider as IPAv2
 from charms.traefik_k8s.v2.ingress import IngressPerAppRequirer
 from cosl import JujuTopology
@@ -68,22 +65,10 @@ from ops.charm import (
     UpdateStatusEvent,
 )
 from ops.framework import StoredState
-from ops.model import (
-    ActiveStatus,
-    BlockedStatus,
-    MaintenanceStatus,
-    Relation,
-    WaitingStatus,
-)
+from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, Relation, WaitingStatus
 from ops.pebble import PathError
 
-from traefik import (
-    CA,
-    SERVER_CERT_PATH,
-    RoutingMode,
-    StaticConfigMergeConflictError,
-    Traefik,
-)
+from traefik import CA, SERVER_CERT_PATH, RoutingMode, StaticConfigMergeConflictError, Traefik
 from utils import is_hostname
 
 # To keep a tidy debug-log, we suppress some DEBUG/INFO logs from some imported libs,
@@ -103,7 +88,7 @@ _TRAEFIK_CONTAINER_NAME = "traefik"
 # - Example invalid: "value@", "value#", "value space"
 ANNOTATION_VALUE_PATTERN = re.compile(r"^[\w.\-_]+$")
 
-# Based on https://github.com/kubernetes/apimachinery/blob/v0.31.3/pkg/util/validation/validation.go#L204
+# Based on https://github.com/kubernetes/apimachinery/blob/v0.31.3/pkg/util/validation/validation.go#L204  # noqa
 # Regex for DNS1123 subdomains:
 # - Starts with a lowercase letter or number ([a-z0-9])
 # - May contain dashes (-), but not consecutively, and must not start or end with them
@@ -114,7 +99,7 @@ DNS1123_SUBDOMAIN_PATTERN = re.compile(
     r"^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$"
 )
 
-# Based on https://github.com/kubernetes/apimachinery/blob/v0.31.3/pkg/util/validation/validation.go#L32
+# Based on https://github.com/kubernetes/apimachinery/blob/v0.31.3/pkg/util/validation/validation.go#L32  # noqa
 # Regex for Kubernetes qualified names:
 # - Starts with an alphanumeric character ([A-Za-z0-9])
 # - Can include dashes (-), underscores (_), dots (.), or alphanumeric characters in the middle
@@ -173,9 +158,10 @@ class TraefikIngressCharm(CharmBase):
         self._lightkube_field_manager: str = self.app.name
         self._lb_name: str = f"{self.app.name}-lb"
 
-        # The sans should be the host where this Traefik receives traffic directly (eg: this Traefik's ingress host, not
-        # an upstream ingress that can lead to this Traefik).  It will be either the loadbalancer or the service
-        # ClusterIP created by Juju for this charm.
+        # The sans should be the host where this Traefik receives traffic directly (eg: this
+        # Traefik's ingress host, not an upstream ingress that can lead to this Traefik).
+        # It will be either the loadbalancer or the service ClusterIP created by Juju for this
+        # charm.
         sans = self.server_cert_sans_dns
         self.cert = CertHandler(
             self,
@@ -187,15 +173,17 @@ class TraefikIngressCharm(CharmBase):
 
         self.recv_ca_cert = CertificateTransferRequires(self, "receive-ca-cert")
 
-        # TODO: If external hostname and upstream ingress both exist, we need to tell the user that we are ignoring the hostname
+        # TODO: If external hostname and upstream ingress both exist, we need to tell the user
+        # that we are ignoring the hostname
 
         # Setup 'upstream-ingress' relation to allow this Traefik to be ingressed through another
         # ingress provider (eg: to layer multiple ingresses)
         #
-        # NOTE: IngressPerAppRequirer only automatically sends host/port data to a related application on a relation
-        # event (created, changed, ...) or on a charm leader elected or upgrade event.  It does not send data at
-        # instantiation (now) or unrelated events.  If host or port changes because of some other change (eg: adding
-        # TLS, changing external host, etc.) that data must be sent manually at that time.
+        # NOTE: IngressPerAppRequirer only automatically sends host/port data to a related
+        # application on a relation event (created, changed, ...) or on a charm leader elected
+        # or upgrade event.  It does not send data at instantiation (now) or unrelated events.
+        # If host or port changes because of some other change (eg: adding TLS, changing external
+        # host, etc.) that data must be sent manually at that time.
         upstream_ingress_route_configuration = (
             self._generate_upstream_ingress_route_configuration()
         )
@@ -204,8 +192,9 @@ class TraefikIngressCharm(CharmBase):
             relation_name="upstream-ingress",
             strip_prefix=True,
             port=upstream_ingress_route_configuration["port"],
-            # This scheme is the scheme used between the upstream ingress and this one.  It is not necessarily the same
-            # as that used between the upstream ingress and the external clients.
+            # This scheme is the scheme used between the upstream ingress and this one.
+            # It is not necessarily the same as that used between the upstream ingress and the
+            # external clients.
             scheme=upstream_ingress_route_configuration["scheme"],
             host=upstream_ingress_route_configuration["host"],
         )
@@ -342,7 +331,10 @@ class TraefikIngressCharm(CharmBase):
         observe(route_events.data_removed, self._handle_ingress_data_removed)  # type: ignore
 
         # Action handlers
-        observe(self.on.show_proxied_endpoints_action, self._on_show_proxied_endpoints)  # type: ignore
+        observe(
+            self.on.show_proxied_endpoints_action,
+            self._on_show_proxied_endpoints,  # type: ignore
+        )
 
     @property
     def _service_ports(self) -> List[ServicePort]:
@@ -395,7 +387,8 @@ class TraefikIngressCharm(CharmBase):
         parsed into a dictionary where each key-value pair corresponds to an annotation.
 
         Returns:
-            Optional[Dict[str, str]]: A dictionary of annotations if provided in the Juju config and valid, otherwise None.
+            Optional[Dict[str, str]]: A dictionary of annotations if provided in the Juju config
+            and valid, otherwise None.
         """
         lb_annotations = cast(Optional[str], self.config.get("loadbalancer_annotations", None))
         return parse_annotations(lb_annotations)
@@ -479,7 +472,10 @@ class TraefikIngressCharm(CharmBase):
                 self._process_status_and_configurations()
         else:
             logger.info(
-                "The `enable_experimental_forward_auth` config option is not enabled. Forward-auth relation will not be processed"
+                (
+                    "The `enable_experimental_forward_auth` config option is not enabled."
+                    "Forward-auth relation will not be processed"
+                )
             )
 
     def _on_forward_auth_config_removed(self, event: AuthConfigRemovedEvent):
@@ -618,14 +614,16 @@ class TraefikIngressCharm(CharmBase):
                     entrypoint_name = self._get_prefix(data)  # type: ignore
                     entrypoints[entrypoint_name] = data["port"]
 
-        # for each static config sent via traefik_route add provided entryPoints to open a ServicePort
+        # for each static config sent via traefik_route add provided entryPoints to open a
+        # ServicePort
         static_configs = self._traefik_route_static_configs()
         for config in static_configs:
             if "entryPoints" in config:
                 provided_entrypoints = config["entryPoints"]
                 for entrypoint_name, value in provided_entrypoints.items():
-                    # TODO names can be only lower-case alphanumeric with dashes. Should we validate and replace?
-                    # ref https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#dns-label-names
+                    # TODO names can be only lower-case alphanumeric with dashes.
+                    # We should consider validate and replace.
+                    # ref https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#dns-label-names  # noqa
                     if "address" in value:
                         entrypoints[entrypoint_name] = value["address"].replace(":", "")
 
@@ -675,8 +673,8 @@ class TraefikIngressCharm(CharmBase):
     def _config_hash(self) -> int:
         """A hash of the config of this application.
 
-        Only include here the config options that, should they change, should trigger a recalculation of
-        the traefik config files.
+        Only include here the config options that, should they change, should trigger a
+        recalculation of the traefik config files.
         The main goal of this logic is to avoid recalculating status and configs on each event,
         since it can be quite expensive.
         """
@@ -695,9 +693,10 @@ class TraefikIngressCharm(CharmBase):
         self._update_config_if_changed()
 
     def _update_config_if_changed(self):
-        # that we're processing a config-changed event, doesn't necessarily mean that our config has changed (duh!)
-        # If the config hash has changed since we last calculated it, we need to
-        # recompute our state from scratch, based on all data sent over the relations and all configs
+        # that we're processing a config-changed event, doesn't necessarily mean that our config
+        # has changed. If the config hash has changed since we last calculated it, we need to
+        # recompute our state from scratch, based on all data sent over the relations and all
+        # configs.
         self._reconcile_lb()
         new_config_hash = self._config_hash
         if self._stored.config_hash != new_config_hash:
@@ -749,7 +748,8 @@ class TraefikIngressCharm(CharmBase):
 
         if self.upstream_ingress.is_ready() and routing_mode != "path":
             # upstream ingress is only compatible with path routing mode
-            # TODO: If this charm is rewritten in a holistic way, make sure this validation truly blocks the charm
+            # TODO: If this charm is rewritten in a holistic way, make sure this validation
+            # truly blocks the charm
             self._wipe_ingress_for_all_relations()
             self.unit.status = BlockedStatus(
                 'routing_mode must be set to "path" when charm has an upstream ingress'
@@ -780,8 +780,8 @@ class TraefikIngressCharm(CharmBase):
             self.unit.status = WaitingStatus(f"waiting for service: '{self.traefik.service_name}'")
             return
 
-        # Update any upstream ingress relation with the current host, port, and scheme.  Is a no-op if no upstream
-        # ingress is related to us.
+        # Update any upstream ingress relation with the current host, port, and scheme.
+        # Is a no-op if no upstream ingress is related to us.
         self.upstream_ingress.provide_ingress_requirements(
             **self._generate_upstream_ingress_route_configuration()
         )
@@ -865,8 +865,8 @@ class TraefikIngressCharm(CharmBase):
             return
         self._process_ingress_relation(event.relation)
 
-        # Without the following line, traefik.STATIC_CONFIG_PATH is updated with TCP endpoints only on
-        # update-status.
+        # Without the following line, traefik.STATIC_CONFIG_PATH is updated with TCP endpoints only
+        # on update-status.
         self._process_status_and_configurations()
 
         if isinstance(self.unit.status, MaintenanceStatus):
@@ -915,7 +915,7 @@ class TraefikIngressCharm(CharmBase):
             # FIXME: this status is lost when the next event comes in.
             #  We should start using the collect-status OF hook.
             self.unit.status = BlockedStatus(
-                "Failed to merge traefik-route static configs. " "Check logs for details."
+                "Failed to merge traefik-route static configs. Check logs for details."
             )
             return
         self._reconcile_lb()
@@ -1006,7 +1006,10 @@ class TraefikIngressCharm(CharmBase):
 
                 if not all([router_name, route_rule, service_name]):
                     logger.debug(
-                        f"Not enough information to generate a TLS config for {protocol} router {router_name}!"
+                        (
+                            f"Not enough information to generate a TLS config for {protocol}"
+                            f" router {router_name}!"
+                        )
                     )
                     continue
 
@@ -1045,7 +1048,7 @@ class TraefikIngressCharm(CharmBase):
             config_getter = self._get_configs_per_app
         elif provider is self.ingress_per_appv1:
             logger.warning(
-                "providing ingress over ingress v1: " "handling it as ingress per leader (legacy)"
+                "providing ingress over ingress v1: handling it as ingress per leader (legacy)"
             )
             config_getter = self._get_configs_per_leader
         else:
@@ -1145,9 +1148,7 @@ class TraefikIngressCharm(CharmBase):
             except DataValidationError as e:
                 # is_unit_ready should guard against no data being there yet,
                 # but if the data is invalid...
-                logger.error(
-                    f"invalid data shared through {relation} by " f"{unit}... Error: {e}."
-                )
+                logger.error(f"invalid data shared through {relation} by {unit}... Error: {e}.")
                 continue
 
             prefix = self._get_prefix(data)  # type: ignore
@@ -1226,7 +1227,8 @@ class TraefikIngressCharm(CharmBase):
         # Skip this for traefik-route because it doesn't have a `wipe_ingress_data` method.
         provider = self._provider_from_relation(relation)
         if wipe_rel_data and self.unit.is_leader() and provider != self.traefik_route:
-            provider.wipe_ingress_data(relation)  # type: ignore  # this is an ingress-type relation
+            # this is an ingress-type relation
+            provider.wipe_ingress_data(relation)  # type: ignore
 
     @staticmethod
     def _relation_config_file(relation: Relation):
@@ -1297,9 +1299,10 @@ class TraefikIngressCharm(CharmBase):
 
     @property
     def gateway_address(self) -> str:
-        """Return the address used to ingress directly through this Traefik's gateway, raising if unavailable.
+        """Return the address used to ingress directly through this Traefik's gateway.
 
-        Returns the value of `_traefik_external_address` if it is non None, otherwise it will raise an exception.
+        Returns the value of `_traefik_external_address` if it is non None,
+        otherwise it will raise an exception.
 
         To prevent that from happening, ensure this is only accessed behind an is_ready guard.
         """
@@ -1315,18 +1318,24 @@ class TraefikIngressCharm(CharmBase):
 
     @property
     def _ingressed_address(self) -> Optional[str]:
-        """Return the most upstream address available to access this Traefik, or None if not available.
+        """Return the most upstream address available to access this Traefik.
 
         Returns:
-        * if we have an upstream ingress, the URL by which we can ingress through it to get to this Traefik
+        * if we have an upstream ingress, the URL by which we can ingress through it to get to
+        this Traefik
         * otherwise, the address of this Traefik's gateway if it exists or None if it does not.
 
         Returns do not include scheme.
 
         Example returns:
         * no upstream ingress: this-traefik.example.com/
-        * one upstream Traefik ingress: upstream-traefik.example.com/this-traefik-model-this-traefik-app/
-        * two upstream Traefiks ingress: upstream-traefik1.example.com/upstreamTraefik2Model-upstreamTraefik2App/thisTraefikModel-thisTraefikApp/
+        * one upstream Traefik ingress:
+            upstream-traefik.example.com/this-traefik-model-this-traefik-app/
+        * two upstream Traefiks ingress:
+            (
+                "upstream-traefik1.example.com/upstreamTraefik2Model-"
+                "upstreamTraefik2App/thisTraefikModel-thisTraefikApp/"
+            )
         """
         if self.upstream_ingress.is_ready():
             # Return the address without the scheme
@@ -1336,23 +1345,23 @@ class TraefikIngressCharm(CharmBase):
 
     @property
     def ingressed_address(self) -> str:
-        """Return the most upstream address available to access this Traefik, raising if not available.
+        """Return the most upstream address available to access this Traefik.
 
-        Returns the value of `_ingressed_address` if it is non None, otherwise it will raise an exception.
-
-        To prevent that from happening, ensure this is only accessed behind an is_ready guard.
+        Returns:
+            None if the address is not available, otherwise return the address.
         """
         address = self._ingressed_address
         if address is None or not isinstance(address, str):
-            raise ExternalHostNotReadyError()
+            return ""
         return address
 
     @property
     def _ingressed_scheme(self):
         """Return the scheme used for the ingressed_address.
 
-        If we have an upstream ingress, this is the scheme for the url that ingress provides to access this Traefik.
-        Otherwise, this scheme is based on whether this Traefik instance has TLS enabled or not.
+        If we have an upstream ingress, this is the scheme for the url that ingress provides to
+        access this Traefik. Otherwise, this scheme is based on whether this Traefik instance has
+        TLS enabled or not.
         """
         if self.upstream_ingress.is_ready():
             return urlparse(self.upstream_ingress.url).scheme
@@ -1396,8 +1405,8 @@ class TraefikIngressCharm(CharmBase):
             name, _, _ = socket.gethostbyaddr(target)  # type: ignore
             # Do not return "hostname" like '10-43-8-149.kubernetes.default.svc.cluster.local'
             if is_hostname(name) and not name.endswith(".svc.cluster.local"):
-                # In case we can do a DNS lookup on that IP address,
-                #  return the resolved hostname as well as the IP address to be both included in the certificate SANS.
+                # In case we can do a DNS lookup on that IP address, return the resolved hostname
+                # as well as the IP address to be both included in the certificate SANS.
                 return [name, target] if target else [name]
 
         # If all else fails, we'd rather use the bare IP

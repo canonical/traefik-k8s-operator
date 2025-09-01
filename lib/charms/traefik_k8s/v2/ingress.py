@@ -50,6 +50,7 @@ class SomeCharm(CharmBase):
     def _on_ingress_revoked(self, event: IngressPerAppRevokedEvent):
         logger.info("This app no longer has ingress")
 """
+
 import ipaddress
 import json
 import logging
@@ -95,7 +96,7 @@ log = logging.getLogger(__name__)
 BUILTIN_JUJU_KEYS = {"ingress-address", "private-address", "egress-subnets"}
 
 PYDANTIC_IS_V1 = int(pydantic.version.VERSION.split(".")[0]) < 2
-if PYDANTIC_IS_V1:
+if PYDANTIC_IS_V1:  # noqa
     from pydantic import validator
 
     input_validator = partial(validator, pre=True)
@@ -152,7 +153,7 @@ if PYDANTIC_IS_V1:
                 databag[self._NEST_UNDER] = self.json(by_alias=True, exclude_defaults=True)
                 return databag
 
-            for key, value in self.dict(by_alias=True, exclude_defaults=True).items():  # type: ignore
+            for key, value in self.dict(by_alias=True, exclude_defaults=True).items():  # type: ignore  # noqa
                 databag[key] = json.dumps(value)
 
             return databag
@@ -222,7 +223,11 @@ else:
                 )
                 return databag
 
-            dct = self.model_dump(mode="json", by_alias=True, exclude_defaults=True)  # type: ignore
+            dct = self.model_dump(
+                mode="json",
+                by_alias=True,
+                exclude_defaults=True,  # type: ignore
+            )
             databag.update({k: json.dumps(v) for k, v in dct.items()})
             return databag
 
@@ -590,13 +595,16 @@ class IngressPerAppProvider(_IngressPerAppBase):
         """Publish to the app databag the ingress url."""
         ingress_url = {"url": url}
         try:
-            IngressProviderAppData(ingress=ingress_url).dump(relation.data[self.app])  # type: ignore
+            IngressProviderAppData(ingress=ingress_url).dump(relation.data[self.app])  # type: ignore  # noqa
         except pydantic.ValidationError as e:
             # If we cannot validate the url as valid, publish an empty databag and log the error.
             log.error(f"Failed to validate ingress url '{url}' - got ValidationError {e}")
             log.error(
-                "url was not published to ingress relation for {relation.app}.  This error is likely due to an"
-                " error or misconfiguration of the charm calling this library."
+                (
+                    f"url was not published to ingress relation for {relation.app}."
+                    f"This error is likely due to an error or misconfiguration of the"
+                    "charm calling this library."
+                )
             )
             IngressProviderAppData(ingress=None).dump(relation.data[self.app])  # type: ignore
 
@@ -621,7 +629,10 @@ class IngressPerAppProvider(_IngressPerAppBase):
         for ingress_relation in self.relations:
             if not ingress_relation.app:
                 log.warning(
-                    f"no app in relation {ingress_relation} when fetching proxied endpoints: skipping"
+                    (
+                        f"no app in relation {ingress_relation} when fetching proxied endpoints:"
+                        "skipping"
+                    )
                 )
                 continue
             try:
@@ -686,7 +697,8 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         strip_prefix: bool = False,
         redirect_https: bool = False,
         # fixme: this is horrible UX.
-        #  shall we switch to manually calling provide_ingress_requirements with all args when ready?
+        # shall we switch to manually calling provide_ingress_requirements with all args when
+        # ready?
         scheme: Union[Callable[[], str], str] = lambda: "http",
         healthcheck_params: Optional[Dict[str, Any]] = None,
     ):
@@ -706,19 +718,25 @@ class IngressPerAppRequirer(_IngressPerAppBase):
             ip: Alternative addressing method other than host to be used by the ingress provider;
                 if unspecified, the binding address from the Juju network API will be used.
             healthcheck_params: Optional dictionary containing health check
-                configuration parameters conforming to the IngressHealthCheck schema. The dictionary must include:
+                configuration parameters conforming to the IngressHealthCheck schema.
+                The dictionary must include:
                     - "path" (str): The health check endpoint path (required).
                 It may also include:
-                    - "scheme" (Optional[str]): Replaces the server URL scheme for the health check endpoint.
+                    - "scheme" (Optional[str]): Replaces the server URL scheme for the health check
+                        endpoint.
                     - "hostname" (Optional[str]): Hostname to be set in the health check request.
-                    - "port" (Optional[int]): Replaces the server URL port for the health check endpoint.
-                    - "interval" (str): Frequency of the health check calls (defaults to "30s" if omitted).
-                    - "timeout" (str): Maximum duration for a health check request (defaults to "5s" if omitted).
-                If provided, "path" is required while "interval" and "timeout" will use Traefik's defaults when not specified.
+                    - "port" (Optional[int]): Replaces the server URL port for the health check
+                        endpoint.
+                    - "interval" (str): Frequency of the health check calls
+                        (defaults to "30s" if omitted).
+                    - "timeout" (str): Maximum duration for a health check request
+                        (defaults to "5s" if omitted).
+                If provided, "path" is required while "interval" and "timeout" will use Traefik's
+                    defaults when not specified.
             strip_prefix: Configure Traefik to strip the path prefix.
             redirect_https: Redirect incoming requests to HTTPS.
-            scheme: Either a callable that returns the scheme to use when constructing the ingress URL,
-                or a string if the scheme is known and stable at charm initialization.
+            scheme: Either a callable that returns the scheme to use when constructing the ingress
+                URL, or a string if the scheme is known and stable at charm initialization.
 
         Request Args:
             port: the port of the service
@@ -850,13 +868,14 @@ class IngressPerAppRequirer(_IngressPerAppBase):
             scheme = self._get_scheme()
 
         try:
-            IngressRequirerAppData(  # type: ignore  # pyright does not like aliases
+            # Ignore pyright errors since pyright does not like aliases.
+            IngressRequirerAppData(  # type: ignore
                 model=self.model.name,
                 name=self.app.name,
                 scheme=scheme,
                 port=port,
-                strip_prefix=self._strip_prefix,  # type: ignore  # pyright does not like aliases
-                redirect_https=self._redirect_https,  # type: ignore  # pyright does not like aliases
+                strip_prefix=self._strip_prefix,  # type: ignore
+                redirect_https=self._redirect_https,  # type: ignore
                 healthcheck_params=(
                     IngressHealthCheck(**self.healthcheck_params)
                     if self.healthcheck_params
