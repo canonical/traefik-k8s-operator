@@ -76,7 +76,7 @@ LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 20
+LIBPATCH = 21
 
 log = logging.getLogger(__name__)
 
@@ -135,7 +135,7 @@ INGRESS_PROVIDES_APP_SCHEMA = {
 try:
     from typing import Literal, TypedDict  # type: ignore
 except ImportError:
-    from typing_extensions import Literal, TypedDict  # py35 compat  # type: ignore
+    from typing_extensions import Literal, TypedDict  # type: ignore  # py35 compat
 
 
 # Model of the data a unit implementing the requirer will need to provide.
@@ -445,7 +445,7 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
 
         self.on.endpoints_updated.emit(relation=relation, app=relation.app)
 
-    def wipe_ingress_data(self, relation) -> None:
+    def wipe_ingress_data(self, relation: Relation) -> None:
         """Remove all published ingress data.
 
         Assumes that this unit is leader.
