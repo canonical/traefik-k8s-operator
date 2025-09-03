@@ -1256,6 +1256,31 @@ wheels = [
 ]
 
 [[package]]
+name = "pylint-plugin-utils"
+version = "0.8.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pylint" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/4b/d2/3b9728910bc69232ec38d8fb7053c03c887bfe7e6e170649b683dd351750/pylint_plugin_utils-0.8.2.tar.gz", hash = "sha256:d3cebf68a38ba3fba23a873809155562571386d4c1b03e5b4c4cc26c3eee93e4", size = 10674, upload-time = "2023-05-20T04:42:16.154Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/af/ee/49d11aee31061bcc1d2726bd8334a2883ddcdbde7d7744ed6b3bd11704ed/pylint_plugin_utils-0.8.2-py3-none-any.whl", hash = "sha256:ae11664737aa2effbf26f973a9e0b6779ab7106ec0adc5fe104b0907ca04e507", size = 11171, upload-time = "2023-05-20T04:42:13.65Z" },
+]
+
+[[package]]
+name = "pylint-pydantic"
+version = "0.3.5"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pydantic" },
+    { name = "pylint" },
+    { name = "pylint-plugin-utils" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/13/b6/57b898006cb358af02b6a5b84909630630e89b299e7f9fc2dc7b3f0b61ef/pylint_pydantic-0.3.5-py3-none-any.whl", hash = "sha256:e7a54f09843b000676633ed02d5985a4a61c8da2560a3b0d46082d2ff171c4a1", size = 16139, upload-time = "2025-01-07T01:38:07.614Z" },
+]
+
+[[package]]
 name = "pymacaroons"
 version = "0.13.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1644,6 +1669,7 @@ dev = [
     { name = "mypy" },
     { name = "ops-scenario" },
     { name = "pylint" },
+    { name = "pylint-pydantic" },
     { name = "pyright" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
@@ -1679,6 +1705,7 @@ requires-dist = [
     { name = "ops-scenario", marker = "extra == 'dev'", specifier = "~=6.0" },
     { name = "pydantic", specifier = ">=2" },
     { name = "pylint", marker = "extra == 'dev'", specifier = ">=3.2.7" },
+    { name = "pylint-pydantic", marker = "extra == 'dev'", specifier = ">=0.3.5" },
     { name = "pyright", marker = "extra == 'dev'", specifier = "==1.1.318" },
     { name = "pytest", marker = "extra == 'dev'", specifier = "==8.2.2" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = "==0.21.2" },
