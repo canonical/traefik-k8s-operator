@@ -649,6 +649,8 @@ class TraefikIngressCharm(CharmBase):
         for csr in self.csrs:
             cert, private_key = self.certs.get_assigned_certificate(certificate_request=csr)
             if cert is None:
+                # The cert provider has not responded yet.
+                logger.debug(f"No cert found for csr: {csr}")
                 continue
             certs[csr.common_name] = {
                 "cert": str(cert.certificate),
