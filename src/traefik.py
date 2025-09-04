@@ -6,6 +6,7 @@
 import dataclasses
 import enum
 import logging
+import os
 import re
 import socket
 from copy import deepcopy
@@ -139,7 +140,7 @@ class Traefik:
                     "certificates": [
                         {
                             "certFile": cert_file,
-                            "keyFile": f"{cert_file[:-5]}.key",
+                            "keyFile": f"{os.path.splitext(cert_file)[0]}.key",
                         }
                         for cert_file in cert_files
                     ],
@@ -150,7 +151,7 @@ class Traefik:
                             "defaultCertificate": (
                                 {
                                     "certFile": cert_files[0],
-                                    "keyFile": f"{cert_files[0][:-5]}.key",
+                                    "keyFile": f"{os.path.splitext(cert_files[0])[0]}.key",
                                 }
                                 if len(cert_files) == 1
                                 else None
