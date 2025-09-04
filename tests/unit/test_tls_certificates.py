@@ -5,11 +5,29 @@ import unittest
 from unittest.mock import PropertyMock, patch
 
 import ops.testing
+from ops.framework import Framework
 from ops.testing import Harness
 
 from charm import TraefikIngressCharm
 
 ops.testing.SIMULATE_CAN_CONNECT = True
+
+INGRESS_APP_DATA = {
+    "model": '"test-model"',
+    "name": '"appname"',
+    "port": "5555",
+}
+INGRESS_UNIT_DATA = {
+    "host": '"example.local"',
+}
+
+
+def reinstantiate_charm(harness: Harness):
+    harness._framework = Framework(
+        harness._storage, harness._charm_dir, harness._meta, harness._model
+    )
+    harness._charm = None
+    harness.begin()
 
 
 class TlsWithExternalHostname(unittest.TestCase):
@@ -32,8 +50,15 @@ class TlsWithExternalHostname(unittest.TestCase):
         self.addCleanup(patcher.stop)
 
         self.harness.set_leader(True)
-        self.harness.begin_with_initial_hooks()
         self.harness.container_pebble_ready("traefik")
+        self.harness.begin_with_initial_hooks()
+        rel_id = self.harness.add_relation(
+            "ingress", "server", app_data=INGRESS_APP_DATA, unit_data=INGRESS_UNIT_DATA
+        )
+        self.harness.update_relation_data(
+            rel_id, "traefik-k8s", {"ingress": '{"url": "https://example.com/test-model-appname"}'}
+        )
+        reinstantiate_charm(self.harness)
 
     @patch(
         "charm.TraefikIngressCharm._get_loadbalancer_status",
@@ -72,4 +97,5 @@ class TlsWithExternalHostname(unittest.TestCase):
 
         # THEN a CSR is sent
         unit_databag = self.harness.get_relation_data(self.rel_id, self.harness.charm.unit.name)
+        print(unit_databag)
         self.assertIsNotNone(unit_databag.get("certificate_signing_requests"))

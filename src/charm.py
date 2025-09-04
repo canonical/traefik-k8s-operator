@@ -11,7 +11,7 @@ import json
 import logging
 import re
 import socket
-from typing import Any, Dict, List, Optional, Tuple, Union, cast
+from typing import Any, Dict, List, Optional, Union, cast
 from urllib.parse import urlparse
 
 import pydantic
@@ -33,10 +33,14 @@ from charms.oathkeeper.v0.forward_auth import (
     ForwardAuthRequirer,
     ForwardAuthRequirerConfig,
 )
-from charms.observability_libs.v1.cert_handler import CertHandler
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 from charms.tempo_coordinator_k8s.v0.charm_tracing import trace_charm
 from charms.tempo_coordinator_k8s.v0.tracing import TracingEndpointRequirer, charm_tracing_config
+from charms.tls_certificates_interface.v4.tls_certificates import (
+    CertificateRequestAttributes,
+    Mode,
+    TLSCertificatesRequiresV4,
+)
 from charms.traefik_k8s.v0.traefik_route import (
     TraefikRouteProvider,
     TraefikRouteRequirerReadyEvent,
@@ -60,7 +64,6 @@ from ops import main
 from ops.charm import (
     ActionEvent,
     CharmBase,
-    ConfigChangedEvent,
     PebbleReadyEvent,
     RelationBrokenEvent,
     RelationEvent,
@@ -172,18 +175,6 @@ class TraefikIngressCharm(CharmBase):
         self._lightkube_field_manager: str = self.app.name
         self._lb_name: str = f"{self.app.name}-lb"
 
-        # The sans should be the host where this Traefik receives traffic directly (eg: this Traefik's ingress host, not
-        # an upstream ingress that can lead to this Traefik).  It will be either the loadbalancer or the service
-        # ClusterIP created by Juju for this charm.
-        sans = self.server_cert_sans_dns
-        self.cert = CertHandler(
-            self,
-            key="trfk-server-cert",
-            # Route53 complains if CN is not a hostname
-            cert_subject=sans[0] if sans else None,
-            sans=sans,
-        )
-
         self.recv_ca_cert = CertificateTransferRequires(self, "receive-ca-cert")
 
         # TODO: If external hostname and upstream ingress both exist, we need to tell the user that we are ignoring the hostname
@@ -270,6 +261,28 @@ class TraefikIngressCharm(CharmBase):
             ),
         )
 
+        # Certs Relation
+        all_csrs = self._get_cert_requests()
+        # Filter out any invalid certificate requests to prevent TLSCertificatesError
+        self.csrs = []
+        for csr in all_csrs:
+            if csr.is_valid():
+                self.csrs.append(csr)
+            else:
+                logger.warning(f"Filtered out invalid certificate request for common_name: '{csr.common_name}'")
+        certs_refresh_events = [
+            self.ingress_per_unit.on.endpoints_updated,
+            self.ingress_per_appv1.on.endpoints_updated,
+            self.ingress_per_appv2.on.endpoints_updated,
+        ]
+        self.certs = TLSCertificatesRequiresV4(
+            charm=self,
+            relationship_name="certificates",
+            certificate_requests=self.csrs,
+            mode=Mode.UNIT,
+            refresh_events=certs_refresh_events,
+        )
+
         # Observability integrations
 
         # Provide grafana dashboards over a relation interface
@@ -312,9 +325,9 @@ class TraefikIngressCharm(CharmBase):
         observe(self.on.stop, self._on_stop)
         observe(self.on.remove, self._on_remove)
         observe(self.on.update_status, self._on_update_status)
-        observe(self.on.config_changed, self._on_config_changed)
+        observe(self.on.config_changed, self._on_change)
         observe(
-            self.cert.on.cert_changed,  # pyright: ignore
+            self.certs.on.certificate_available,  # pyright: ignore
             self._on_cert_changed,
         )
         observe(
@@ -342,6 +355,60 @@ class TraefikIngressCharm(CharmBase):
 
         # Action handlers
         observe(self.on.show_proxied_endpoints_action, self._on_show_proxied_endpoints)  # type: ignore
+        observe(self.on.show_external_endpoints_action, self._on_show_external_endpoints)  # type: ignore
+
+    def _get_cert_requests(self) -> list:
+        addrs = {
+            urlparse(endpoint["url"]).hostname
+            for endpoint in self._get_proxied_endpoints(use_gateway_address=True).values()
+            if "url" in endpoint and urlparse(endpoint["url"]).scheme  # For a TCP route there will be no scheme which will cause urlparse().hostname to return None. Therefore we should catch the TCP routes here.
+        }
+        csrs = []
+        for addr in addrs:
+            # Additional validation - addr should not be None or empty
+            if not addr:
+                logger.warning("Skipping empty or None address when creating certificate requests")
+                continue
+
+            sans_dns = []  # Needed for pyright
+            sans_ip = []  # Needed for pyright
+            if is_hostname(addr):
+                sans_dns = [addr]
+                sans_ip = []
+            else:
+                # This is an IP address. Try to look up the hostname.
+                with contextlib.suppress(OSError, TypeError):
+                    name, _, _ = socket.gethostbyaddr(addr)  # type: ignore
+                    # Do not return "hostname" like '10-43-8-149.kubernetes.default.svc.cluster.local'
+                    if is_hostname(name) and not name.endswith(".svc.cluster.local"):
+                        sans_dns = [name]
+                        sans_ip = [addr] if addr else []
+                    else:
+                        # If all else fails, we'd rather use the bare IP
+                        sans_ip = [addr] if addr else []
+                        sans_dns = []
+
+                # If reverse DNS lookup failed, ensure we still have the IP in sans_ip
+                if not sans_dns and not sans_ip and addr:
+                    sans_ip = [addr]
+
+            if sans_dns:
+                common_name = sans_dns[0]
+            elif sans_ip:
+                common_name = sans_ip[0]
+            else:
+                # Skip creating certificate request if we have no valid common name
+                logger.warning(f"Skipping certificate request for address {addr} - no valid common name")
+                continue
+            csrs.append(
+                CertificateRequestAttributes(
+                    common_name=common_name,
+                    sans_dns=frozenset(sans_dns),
+                    sans_ip=frozenset(sans_ip),
+                )
+            )
+
+        return csrs
 
     @property
     def _service_ports(self) -> List[ServicePort]:
@@ -520,7 +587,7 @@ class TraefikIngressCharm(CharmBase):
 
     def _is_tls_enabled(self) -> bool:
         """Return True if TLS is enabled."""
-        if self.cert.enabled:
+        if self.model.relations.get("certificates"):
             return True
         if (
             self.config.get("tls-ca", None)
@@ -544,37 +611,72 @@ class TraefikIngressCharm(CharmBase):
 
     def _on_cert_changed(self, event) -> None:
         # On slow machines, this event may come up before pebble is ready
-        if not self.container.can_connect():
-            event.defer()
-            return
+        self._configure()
 
-        self._update_cert_configs()
-        self._configure_traefik()
-        self._process_status_and_configurations()
+    def _update_cert_configs(self) -> None:
+        self.traefik.update_cert_configuration(self._get_certs())
 
-    def _update_cert_configs(self):
-        self.traefik.update_cert_configuration(*self._get_certs())
+    def _get_certs(self) -> dict:
+        """Get all certs to be installed.
 
-    def _get_certs(self) -> Tuple[Optional[str], Optional[str], Optional[str]]:
-        cert_handler = self.cert
+        Output should be of the form:
+        {
+          "hostname0": {
+            "cert": "<cert>",
+            "key": "<key>",
+            "ca": "<ca>"
+          },
+          "hostname1": {
+            "cert": "<cert>",
+            "key": "<key>",
+            "ca": "<ca>"
+          }
+        }
+        """
+        certs = {}
         if not self._is_tls_enabled():
-            return None, None, None
+            return certs
         if (
             self.config.get("tls-ca", None)
             and self.config.get("tls-cert", None)
             and self.config.get("tls-key", None)
         ):
-            return (
-                cast(str, self.config["tls-cert"]),
-                cast(str, self.config["tls-key"]),
-                cast(str, self.config["tls-ca"]),
-            )
-        return cert_handler.chain, cert_handler.private_key, cert_handler.ca_cert
+            certs["local-config"] = {
+                "cert": cast(str, self.config["tls-cert"]),
+                "key": cast(str, self.config["tls-key"]),
+                "ca": cast(str, self.config["tls-ca"]),
+            }
+        for csr in self.csrs:
+            cert, private_key = self.certs.get_assigned_certificate(certificate_request=csr)
+            if cert is None:
+                # The cert provider has not responded yet.
+                logger.debug(f"No cert found for csr: {csr}")
+                continue
+            certs[csr.common_name] = {
+                "cert": str(cert.certificate),
+                "key": str(private_key),
+                "ca": str(cert.ca),
+            }
+        return certs
 
     def _on_show_proxied_endpoints(self, event: ActionEvent):
-        if not self.ready:
-            return
+        event.set_results({"proxied-endpoints": json.dumps(self._get_proxied_endpoints(use_gateway_address=True))})
+
+    def _on_show_external_endpoints(self, event: ActionEvent):
+        event.set_results({"external-endpoints": json.dumps(self._get_proxied_endpoints(use_gateway_address=False))})
+
+    def _get_proxied_endpoints(self, use_gateway_address: bool=True) -> dict:
+        """Show the endpoints proxied by traefik.
+
+        Args:
+            use_gateway_address: Use traefik's address instead of any upstream ingress address.
+
+        Returns:
+            A dict of the form {"url": "<endpoint_url>", ...}
+        """
         result = {}
+        if not self.ready:
+            return result
 
         traefik_endpoint = {
             self.app.name: {"url": f"{self._ingressed_scheme}://{self.ingressed_address}"}
@@ -590,13 +692,34 @@ class TraefikIngressCharm(CharmBase):
                     (relation.app.name if relation.app else "<unknown-remote>")
                     for relation in provider.relations
                 ]
-                msg = (
+                logger.warning(
                     f"failed to fetch proxied endpoints from (at least one of) the "
                     f"remote apps {remote_app_names!r} with error {e}."
                 )
-                event.log(msg)
 
-        event.set_results({"proxied-endpoints": json.dumps(result)})
+        # Replace hosts with gateway address if requested
+        if use_gateway_address:
+            for app_name, endpoint_data in result.items():
+                if "url" in endpoint_data:
+                    original_url = endpoint_data["url"]
+                    parsed_url = urlparse(original_url)
+
+                    # Handle TCP URLs without schemes - these get parsed with scheme but no netloc
+                    if parsed_url.netloc == '' and ':' in original_url and '://' not in original_url:
+                        # This is likely a TCP URL in "host:port" format
+                        try:
+                            host, port = original_url.rsplit(':', 1)
+                            new_url = f"{self.gateway_address}:{port}"
+                        except ValueError:
+                            # Fallback: if parsing fails, keep original URL
+                            new_url = original_url
+                    else:
+                        # Standard URL with scheme - replace the netloc normally
+                        # Use of the underscore method here is actually supported by the docs: https://docs.python.org/3/library/urllib.parse.html#urllib.parse.urlparse
+                        new_url = parsed_url._replace(netloc=self.gateway_address).geturl()
+
+                    endpoint_data["url"] = new_url
+        return result
 
     def _tcp_entrypoints(self):
         # for each unit related via IPU in tcp mode, we need to generate the tcp
@@ -638,7 +761,7 @@ class TraefikIngressCharm(CharmBase):
         # ignore the unit status and start fresh.
         self._clear_all_configs_and_restart_traefik()
         # push the (fresh new) configs.
-        self._process_status_and_configurations()
+        self._configure()
         self._update_received_ca_certs()
         self._set_workload_version()
 
@@ -649,7 +772,8 @@ class TraefikIngressCharm(CharmBase):
         # routes.
         self.traefik.delete_dynamic_configs()
 
-        # we push the static config
+        # we push the config
+        self._update_cert_configs()
         self._configure_traefik()
         # now we restart traefik
         self._restart_traefik()
@@ -686,12 +810,23 @@ class TraefikIngressCharm(CharmBase):
                 self._is_forward_auth_enabled,
                 self._basic_auth_user,
                 self._is_tls_enabled(),
+                # The dict returned by _get_certs is not hashable so use a json str instead.
+                json.dumps(self._get_certs()),
             )
         )
 
-    def _on_config_changed(self, _: ConfigChangedEvent):
-        """Handle the ops.ConfigChanged event."""
-        self._update_config_if_changed()
+    def _on_change(self, _):
+        """General event handler for any change to config."""
+        self._configure()
+
+    def _configure(self):
+        """Configure the traefik charm."""
+        self._reconcile_lb()
+        if not self.container.can_connect():
+            return
+        self._update_cert_configs()
+        self._configure_traefik()
+        self._process_status_and_configurations()
 
     def _update_config_if_changed(self):
         # that we're processing a config-changed event, doesn't necessarily mean that our config has changed (duh!)

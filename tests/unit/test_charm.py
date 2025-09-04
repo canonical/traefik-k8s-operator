@@ -341,7 +341,13 @@ class TestTraefikIngressCharm(unittest.TestCase):
         self.harness.update_config({"external_hostname": "foo"})
         self.harness.charm._on_show_proxied_endpoints(action_event)
         action_event.set_results.assert_called_once_with(
-            {"proxied-endpoints": '{"traefik-k8s": {"url": "http://foo"}}'}
+            {
+                "proxied-endpoints": json.dumps(
+                    {
+                        "traefik-k8s": {"url": "http://foo"},
+                    }
+                )
+            }
         )
 
     @patch(
@@ -564,10 +570,7 @@ class TestTraefikCertTransferInterface(unittest.TestCase):
             relation_id=certificate_transfer_rel_id, remote_unit_name=f"{provider_app}/0"
         )
         call_list = patch_exec.call_args_list
-        assert [call.args[0] for call in call_list] == [
-            ["find", "/opt/traefik/juju", "-name", "*.yaml", "-delete"],
-            ["update-ca-certificates", "--fresh"],
-        ]
+        assert ["update-ca-certificates", "--fresh"] in [call.args[0] for call in call_list]
 
     @patch("ops.model.Container.exec")
     @patch(

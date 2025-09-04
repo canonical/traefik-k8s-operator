@@ -120,7 +120,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 3
+LIBPATCH = 4
 
 log = logging.getLogger(__name__)
 
@@ -254,10 +254,10 @@ class TraefikRouteProvider(Object):
         if self.is_ready(event.relation):
             # todo check data is valid here?
             self.update_traefik_address()
-            self.on.ready.emit(event.relation)
+            self.on.ready.emit(relation=event.relation, app=event.relation.app)
 
     def _on_relation_broken(self, event: RelationEvent):
-        self.on.data_removed.emit(event.relation)
+        self.on.data_removed.emit(relation=event.relation, app=event.relation.app)
 
     def update_traefik_address(
         self, *, external_host: Optional[str] = None, scheme: Optional[str] = None
@@ -402,13 +402,13 @@ class TraefikRouteRequirer(Object):
         """Update StoredState with external_host and other information from Traefik."""
         self._update_stored()
         if self._charm.unit.is_leader():
-            self.on.ready.emit(event.relation)
+            self.on.ready.emit(relation=event.relation, app=event.relation.app)
 
     def _on_relation_broken(self, event: RelationEvent) -> None:
         """On RelationBroken, clear the stored data if set and emit an event."""
         self._stored.external_host = ""
         if self._charm.unit.is_leader():
-            self.on.ready.emit(event.relation)
+            self.on.ready.emit(relation=event.relation, app=event.relation.app)
 
     def is_ready(self) -> bool:
         """Is the TraefikRouteRequirer ready to submit data to Traefik?"""
