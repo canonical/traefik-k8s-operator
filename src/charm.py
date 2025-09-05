@@ -258,7 +258,12 @@ class TraefikIngressCharm(CharmBase):
             if csr.is_valid():
                 self.csrs.append(csr)
             else:
-                logger.warning(f"Filtered out invalid certificate request for common_name: '{csr.common_name}'")
+                logger.warning(
+                    (
+                        "Filtered out invalid certificate request for common_name: "
+                        f"'{csr.common_name}'"
+                    )
+                )
         certs_refresh_events = [
             self.ingress_per_unit.on.endpoints_updated,
             self.ingress_per_appv1.on.endpoints_updated,
@@ -347,10 +352,15 @@ class TraefikIngressCharm(CharmBase):
         observe(self.on.show_external_endpoints_action, self._on_show_external_endpoints)  # type: ignore
 
     def _get_cert_requests(self) -> list:
+        # For a TCP route there will be no scheme which will cause urlparse()
+        # hostname to return None. Therefore we should catch the TCP routes here.
         addrs = {
             urlparse(endpoint["url"]).hostname
             for endpoint in self._get_proxied_endpoints(use_gateway_address=True).values()
-            if "url" in endpoint and urlparse(endpoint["url"]).scheme  # For a TCP route there will be no scheme which will cause urlparse().hostname to return None. Therefore we should catch the TCP routes here.
+            if "url" in endpoint
+            and urlparse(
+                endpoint["url"]
+            ).scheme
         }
         csrs = []
         for addr in addrs:
@@ -368,7 +378,8 @@ class TraefikIngressCharm(CharmBase):
                 # This is an IP address. Try to look up the hostname.
                 with contextlib.suppress(OSError, TypeError):
                     name, _, _ = socket.gethostbyaddr(addr)  # type: ignore
-                    # Do not return "hostname" like '10-43-8-149.kubernetes.default.svc.cluster.local'
+                    # Do not return "hostname" like
+                    # '10-43-8-149.kubernetes.default.svc.cluster.local'
                     if is_hostname(name) and not name.endswith(".svc.cluster.local"):
                         sans_dns = [name]
                         sans_ip = [addr] if addr else []
@@ -387,7 +398,9 @@ class TraefikIngressCharm(CharmBase):
                 common_name = sans_ip[0]
             else:
                 # Skip creating certificate request if we have no valid common name
-                logger.warning(f"Skipping certificate request for address {addr} - no valid common name")
+                logger.warning(
+                    f"Skipping certificate request for address {addr} - no valid common name"
+                )
                 continue
             csrs.append(
                 CertificateRequestAttributes(
@@ -653,12 +666,24 @@ class TraefikIngressCharm(CharmBase):
         return certs
 
     def _on_show_proxied_endpoints(self, event: ActionEvent):
-        event.set_results({"proxied-endpoints": json.dumps(self._get_proxied_endpoints(use_gateway_address=True))})
+        event.set_results(
+            {
+                "proxied-endpoints": json.dumps(
+                    self._get_proxied_endpoints(use_gateway_address=True)
+                )
+            }
+        )
 
     def _on_show_external_endpoints(self, event: ActionEvent):
-        event.set_results({"external-endpoints": json.dumps(self._get_proxied_endpoints(use_gateway_address=False))})
+        event.set_results(
+            {
+                "external-endpoints": json.dumps(
+                    self._get_proxied_endpoints(use_gateway_address=False)
+                )
+            }
+        )
 
-    def _get_proxied_endpoints(self, use_gateway_address: bool=True) -> dict:
+    def _get_proxied_endpoints(self, use_gateway_address: bool = True) -> dict:
         """Show the endpoints proxied by traefik.
 
         Args:
@@ -698,10 +723,14 @@ class TraefikIngressCharm(CharmBase):
                     parsed_url = urlparse(original_url)
 
                     # Handle TCP URLs without schemes - these get parsed with scheme but no netloc
-                    if parsed_url.netloc == '' and ':' in original_url and '://' not in original_url:
+                    if (
+                        parsed_url.netloc == ""
+                        and ":" in original_url
+                        and "://" not in original_url
+                    ):
                         # This is likely a TCP URL in "host:port" format
                         try:
-                            host, port = original_url.rsplit(':', 1)
+                            host, port = original_url.rsplit(":", 1)
                             new_url = f"{self.gateway_address}:{port}"
                         except ValueError:
                             # Fallback: if parsing fails, keep original URL

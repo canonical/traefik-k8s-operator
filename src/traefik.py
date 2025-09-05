@@ -159,8 +159,9 @@ class Traefik:
                     ],
                     "stores": {
                         "default": {
-                            # When the external hostname is a bare IP, traefik cannot match a domain,
-                            # so we must set the default cert for the TLS handshake to succeed.
+                            # When the external hostname is a bare IP, traefik cannot match a
+                            # domain, so we must set the default cert for the TLS handshake to
+                            # succeed.
                             "defaultCertificate": (
                                 {
                                     "certFile": cert_files[0],
@@ -187,7 +188,7 @@ class Traefik:
         if self._tls_enabled:
             self._update_tls_configuration()
 
-    def update_cert_configuration(self, certs: dict):
+    def update_cert_configuration(self, certs: dict):  # noqa: C901
         """Update the server cert, ca, and key configuration files."""
         # Remove certs that are no longer needed.
         if certs:
