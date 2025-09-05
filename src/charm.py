@@ -15,7 +15,6 @@ import socket
 from typing import Any, Dict, List, Optional, Union, cast
 from urllib.parse import urlparse
 
-import ops
 import pydantic
 import yaml
 from charms.certificate_transfer_interface.v0.certificate_transfer import (
@@ -59,7 +58,7 @@ from lightkube.models.core_v1 import ServicePort, ServiceSpec
 from lightkube.models.meta_v1 import ObjectMeta
 from lightkube.resources.core_v1 import Service
 from lightkube_extensions.batch import KubernetesResourceManager, create_charm_default_labels
-from ops import EventBase
+from ops import EventBase, main
 from ops.charm import (
     ActionEvent,
     CharmBase,
@@ -553,7 +552,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             return None
         if not (ingress_addresses := getattr(load_balancer_status, "ingress", None)):
             return None
-        if not (ingress_address := cast(list, ingress_addresses)[0]):
+        if not (ingress_address := ingress_addresses[0]):  # pylint: disable=unsubscriptable-object
             return None
 
         return ingress_address.hostname or ingress_address.ip
@@ -1733,5 +1732,6 @@ def _get_relation_type(relation: Relation) -> _IngressRelationType:
     raise RuntimeError("Invalid relation name (shouldn't happen)")
 
 
+# pylint: disable=not-callable
 if __name__ == "__main__":
-    ops.main(TraefikIngressCharm, use_juju_for_storage=True)  # type: ignore
+    main(TraefikIngressCharm, use_juju_for_storage=True)  # type: ignore
