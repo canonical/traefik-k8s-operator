@@ -229,15 +229,15 @@ async def test_traefik_route_ingressed_through_upstream_ingress_with_tls(ops_tes
 
 
 async def get_traefik_url(ops_test: OpsTest, traefik_app_name: str = TRAEFIK):
-    """Get the URL for the Traefik app, as provided by the show-proxied-endpoints action."""
-    proxied_endpoints_action = (
+    """Get the URL for the Traefik app, as provided by the show-external-endpoints action."""
+    external_endpoints_action = (
         await ops_test.model.applications[traefik_app_name]
         .units[0]
-        .run_action("show-proxied-endpoints")
+        .run_action("show-external-endpoints")
     )
-    proxied_endpoints_action_results = (await proxied_endpoints_action.wait()).results
-    proxied_endpoints = yaml.safe_load(proxied_endpoints_action_results["proxied-endpoints"])
-    return proxied_endpoints[traefik_app_name]["url"]
+    external_endpoints_action_results = (await external_endpoints_action.wait()).results
+    external_endpoints = yaml.safe_load(external_endpoints_action_results["external-endpoints"])
+    return external_endpoints[traefik_app_name]["url"]
 
 
 @retry(wait=wait_fixed(2), stop=stop_after_delay(5 * 1))

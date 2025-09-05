@@ -148,8 +148,10 @@ async def deploy_tempo_cluster(ops_test: OpsTest):
     """Deploys tempo in its HA version together with minio and s3-integrator."""
     tempo_app = "tempo"
     worker_app = "tempo-worker"
-    tempo_worker_charm_url, worker_channel = "tempo-worker-k8s", "1/stable"
-    tempo_coordinator_charm_url, coordinator_channel = "tempo-coordinator-k8s", "1/stable"
+    # Switching from 1/stable to 2/edge. We can switch back when this fix makes it to stable:
+    # https://github.com/canonical/tempo-operators/pull/161
+    tempo_worker_charm_url, worker_channel = "tempo-worker-k8s", "2/edge"
+    tempo_coordinator_charm_url, coordinator_channel = "tempo-coordinator-k8s", "2/edge"
     await ops_test.model.deploy(
         tempo_worker_charm_url, application_name=worker_app, channel=worker_channel, trust=True
     )

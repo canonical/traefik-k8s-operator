@@ -6,6 +6,7 @@
 import dataclasses
 import enum
 import logging
+import os
 import re
 import socket
 from copy import deepcopy
@@ -29,9 +30,9 @@ DYNAMIC_CERTS_PATH = f"{DYNAMIC_CONFIG_DIR}/certificates.yaml"
 DYNAMIC_TRACING_PATH = f"{DYNAMIC_CONFIG_DIR}/tracing.yaml"
 SERVER_CERT_PATH = f"{DYNAMIC_CONFIG_DIR}/server.cert"
 SERVER_KEY_PATH = f"{DYNAMIC_CONFIG_DIR}/server.key"
-CA_CERTS_PATH = "/usr/local/share/ca-certificates"
-CA_CERT_PATH = f"{CA_CERTS_PATH}/traefik-ca.crt"
-RECV_CA_TEMPLATE = Template(f"{CA_CERTS_PATH}/receive-ca-cert-$rel_id-ca.crt")
+CERTS_DIR = Path(DYNAMIC_CONFIG_DIR)
+CA_CERTS_DIR = Path("/usr/local/share/ca-certificates")
+RECV_CA_TEMPLATE = Template(f"{str(CA_CERTS_DIR)}/receive-ca-cert-$rel_id-ca.crt")
 BIN_PATH = "/usr/bin/traefik"
 LOG_PATH = "/var/log/traefik.log"
 
@@ -143,24 +144,31 @@ class Traefik:
 
     def _update_tls_configuration(self):
         """Generate and push tls config yaml for traefik."""
+        cert_files = [
+            x.path for x in self._container.list_files(CERTS_DIR) if x.path.endswith(".cert")
+        ]
         config = yaml.safe_dump(
             {
                 "tls": {
                     "certificates": [
                         {
-                            "certFile": SERVER_CERT_PATH,
-                            "keyFile": SERVER_KEY_PATH,
+                            "certFile": cert_file,
+                            "keyFile": f"{os.path.splitext(cert_file)[0]}.key",
                         }
+                        for cert_file in cert_files
                     ],
                     "stores": {
                         "default": {
-                            # When the external hostname is a bare IP,
-                            # traefik cannot match a domain, so we must set the default cert
-                            # for the TLS handshake to succeed.
-                            "defaultCertificate": {
-                                "certFile": SERVER_CERT_PATH,
-                                "keyFile": SERVER_KEY_PATH,
-                            },
+                            # When the external hostname is a bare IP, traefik cannot match a domain,
+                            # so we must set the default cert for the TLS handshake to succeed.
+                            "defaultCertificate": (
+                                {
+                                    "certFile": cert_files[0],
+                                    "keyFile": f"{os.path.splitext(cert_files[0])[0]}.key",
+                                }
+                                if len(cert_files) == 1
+                                else None
+                            )
                         },
                     },
                 }
@@ -179,28 +187,34 @@ class Traefik:
         if self._tls_enabled:
             self._update_tls_configuration()
 
-    def update_cert_configuration(
-        self, cert: Optional[str], key: Optional[str], ca: Optional[str]
-    ):
+    def update_cert_configuration(self, certs: dict):
         """Update the server cert, ca, and key configuration files."""
-        if cert:
-            # write it to the charm container too, for charm tracing.
-            local_cert_path = Path(SERVER_CERT_PATH)
-            local_cert_path.parent.mkdir(parents=True, exist_ok=True)
-            local_cert_path.write_text(cert)
-            self._container.push(SERVER_CERT_PATH, cert, make_dirs=True)
-        else:
-            self._container.remove_path(SERVER_CERT_PATH, recursive=True)
-
-        if key:
-            self._container.push(SERVER_KEY_PATH, key, make_dirs=True)
-        else:
-            self._container.remove_path(SERVER_KEY_PATH, recursive=True)
-
-        if ca:
-            self._container.push(CA_CERT_PATH, ca, make_dirs=True)
-        else:
-            self._container.remove_path(CA_CERT_PATH, recursive=True)
+        # Remove certs that are no longer needed.
+        if certs:
+            CERTS_DIR.mkdir(parents=True, exist_ok=True)
+        if CERTS_DIR.is_dir():
+            for path in CERTS_DIR.iterdir():
+                if path.name.endswith(".cert") and path.name[:5] not in certs:
+                    path.unlink()
+        if self._container.isdir(CERTS_DIR):
+            for path in self._container.list_files(CERTS_DIR):
+                if path.name.endswith(".cert") and path.name[:5] not in certs:
+                    self._container.remove_path(path.path)
+                if path.name.endswith(".key") and path.name[:4] not in certs:
+                    self._container.remove_path(path.path)
+        if self._container.isdir(CA_CERTS_DIR):
+            for path in self._container.list_files(CA_CERTS_DIR):
+                # There could be other .crt files here so make sure the names are identifiable.
+                if path.name.endswith(".traefik-charm.crt") and path.name[:18] not in certs:
+                    self._container.remove_path(path.path)
+        for hostname, cert in certs.items():
+            with (CERTS_DIR / f"{hostname}.cert").open("w") as f:
+                f.write(cert["cert"])
+            self._container.push(CERTS_DIR / f"{hostname}.cert", cert["cert"], make_dirs=True)
+            self._container.push(CERTS_DIR / f"{hostname}.key", cert["key"], make_dirs=True)
+            self._container.push(
+                CA_CERTS_DIR / f"{hostname}.traefik-charm.crt", cert["ca"], make_dirs=True
+            )
 
         self.update_ca_certs()
 
