@@ -544,7 +544,7 @@ LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 19
+LIBPATCH = 20
 
 PYDEPS = ["cosl"]
 
@@ -1601,26 +1601,38 @@ class ConsumerBase(Object):
         """Fetch Loki Push API endpoints sent from LokiPushApiProvider through relation data.
 
         Returns:
-            A list of dictionaries with Loki Push API endpoints, for instance:
+            A list of unique dictionaries with Loki Push API endpoints, for instance:
             [
                 {"url": "http://loki1:3100/loki/api/v1/push"},
                 {"url": "http://loki2:3100/loki/api/v1/push"},
             ]
         """
-        endpoints = []  # type: list
+        endpoints = []
+        seen_urls = set()
 
         for relation in self._charm.model.relations[self._relation_name]:
             for unit in relation.units:
                 if unit.app == self._charm.app:
-                    # This is a peer unit
                     continue
 
-                endpoint = relation.data[unit].get("endpoint")
-                if endpoint:
-                    deserialized_endpoint = json.loads(endpoint)
-                    endpoints.append(deserialized_endpoint)
+                if not (endpoint := relation.data[unit].get("endpoint")):
+                    continue
+
+                deserialized_endpoint = json.loads(endpoint)
+                url = deserialized_endpoint.get("url")
+
+                # It's necessary to deduplicte the endpoints because if we don't do this, in the event that Loki coordinator is related to Flog and is scaled,
+                # in the /etc/promtail/promtail_config.yaml of Flog, there will duplicate entries for each unit of the Loki coordinator, which will cause Flog to go into error due to the duplication.
+                # The deduplication applied here
+
+                if not url or url in seen_urls:
+                    continue
+
+                seen_urls.add(url)
+                endpoints.append({"url": url})
 
         return endpoints
+
 
 
 class LokiPushApiConsumer(ConsumerBase):
