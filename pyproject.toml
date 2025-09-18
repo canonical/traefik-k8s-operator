@@ -40,18 +40,6 @@ dev = [
     "pyright==1.1.318",
     "ops-scenario~=6.0",
     "pytest-interface-tester>0.3",
-    "codespell>=2.4.1",
-    "flake8>=5.0.4",
-    "flake8-builtins>=2.5.0",
-    "flake8-copyright>=0.2.4",
-    "flake8-docstrings>=1.7.0",
-    "isort>=5.13.2",
-    "mypy>=1.14.1",
-    "pep8-naming>=0.14.1",
-    "pydocstyle>=2.10",
-    "pylint>=3.2.7",
-    "pylint-pydantic>=0.3.5",
-    "pyproject-flake8>=5.0.4.post1",
 ]
 
 [tool.uv.sources]
@@ -81,11 +69,15 @@ target-version = ["py38"]
 # Linting tools configuration
 [tool.ruff]
 line-length = 99
-extend-exclude = [".git", "__pycache__", ".tox", "build", "dist", "*.egg_info", "venv"]
+extend-exclude = ["__pycache__", "*.egg_info"]
 
 [tool.ruff.lint]
 select = ["E", "W", "F", "C", "N", "R", "D", "I001", "Q"]
-ignore = ["N818", "E501", "RET504", "D107"]
+# Ignore E501 because using black creates errors with this
+# Ignore D107 Missing docstring in __init__
+# Ignore C90 because we do not check cyclomatic complexity as a rule
+ignore = ["C90", "E501", "D107", "N818", "RET504"]
+# D100, D101, D102, D103: Ignore missing docstrings in tests
 per-file-ignores = {"*tests/*" = ["D100","D101","D102","D103","D104","D205","D212","D415"]}
 
 [tool.ruff.lint.pydocstyle]
@@ -103,3 +95,6 @@ reportTypedDictNotRequiredAccess = false
 extraPaths = ["lib"]
 pythonVersion = "3.8"
 pythonPlatform = "All"
+
+[tool.codespell]
+skip = ".git,.tox,build,venv*"
