@@ -656,7 +656,7 @@ class TraefikIngressCharm(CharmBase):
             if str(chain[0]) != str(cert.certificate):
                 chain.reverse()
             certs[csr.common_name] = {
-                "cert": "\n\n".join(chain),
+                "chain": "\n\n".join(chain),
                 "key": str(private_key),
                 "ca": str(cert.ca),
             }
