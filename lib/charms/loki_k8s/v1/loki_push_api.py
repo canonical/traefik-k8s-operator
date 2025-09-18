@@ -544,7 +544,7 @@ LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 19
+LIBPATCH = 21
 
 PYDEPS = ["cosl"]
 
@@ -1601,26 +1601,44 @@ class ConsumerBase(Object):
         """Fetch Loki Push API endpoints sent from LokiPushApiProvider through relation data.
 
         Returns:
-            A list of dictionaries with Loki Push API endpoints, for instance:
+            A list of unique dictionaries with Loki Push API endpoints, for instance:
             [
                 {"url": "http://loki1:3100/loki/api/v1/push"},
                 {"url": "http://loki2:3100/loki/api/v1/push"},
             ]
         """
-        endpoints = []  # type: list
+        endpoints = []
+        seen_urls = set()
 
         for relation in self._charm.model.relations[self._relation_name]:
             for unit in relation.units:
                 if unit.app == self._charm.app:
-                    # This is a peer unit
                     continue
 
-                endpoint = relation.data[unit].get("endpoint")
-                if endpoint:
-                    deserialized_endpoint = json.loads(endpoint)
-                    endpoints.append(deserialized_endpoint)
+                if not (endpoint := relation.data[unit].get("endpoint")):
+                    continue
+
+                deserialized_endpoint = json.loads(endpoint)
+                url = deserialized_endpoint.get("url")
+
+                # Deduplicate by URL.
+                # With loki-k8s we have ingress-per-unit, so in that case
+                # we do want to collect the URLs of all the units.
+                # With loki-coordinator-k8s, even when the coordinator
+                # is scaled, we want to advertise only one URL.
+                # Without deduplication, we'd end up with the same
+                # tls config section in the promtail config file, in which
+                # case promtail immediately exits with the following error:
+                # [promtail] level=error ts=<timestamp> msg="error creating promtail" error="failed to create client manager: duplicate client configs are not allowed, found duplicate for name: "
+
+                if not url or url in seen_urls:
+                    continue
+
+                seen_urls.add(url)
+                endpoints.append(deserialized_endpoint)
 
         return endpoints
+
 
 
 class LokiPushApiConsumer(ConsumerBase):
