@@ -50,7 +50,10 @@ def traefik_container(tmp_path):
 def test_ingress_per_app_created(
     traefik_ctx, port, host, model, traefik_container, event_name, tmp_path, caplog
 ):
-    """Check the config when a new ingress per leader is created or changes (single remote unit)."""
+    """Check the config.
+
+    Performed when a new ingress per leader is created or changes (single remote unit).
+    """
     ipa = Relation(
         "ingress",
         remote_app_data={

@@ -40,6 +40,7 @@ if __name__ == "__main__":
 
 class HealthMock(CharmBase):
     def __init__(self, framework):
+        """Initialize the mock charm."""
         super().__init__(framework)
         self.unit.set_ports(8080)
         self.ipa = IngressPerAppRequirer(

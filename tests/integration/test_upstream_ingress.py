@@ -41,8 +41,9 @@ async def test_deploy_dependencies(ops_test: OpsTest, traefik_charm):
         channel="1/stable",
     )
 
-    # Deploy an ingress provider to use to ingress to this test's Traefik.  In this case, it happens to be another
-    # instance of Traefik, but it could be any ingress provider.
+    # Deploy an ingress provider to use to ingress to this test's Traefik.
+    # In this case, it happens to be another instance of Traefik,
+    # but it could be any ingress provider.
     await ops_test.model.deploy(
         traefik_charm,
         application_name=UPSTREAM_INGRESS,
@@ -117,7 +118,10 @@ async def test_ipa_ingressed_through_upstream_ingress(ops_test: OpsTest):
     """Assert that the IPA app can be reached through the layered ingresses."""
     upstream_ingress_url = await get_traefik_url(ops_test, traefik_app_name=UPSTREAM_INGRESS)
     assert_get_url_returns(
-        f"{upstream_ingress_url}/{ops_test.model.name}-{TRAEFIK}/{ops_test.model.name}-{IPA_TESTER}",
+        (
+            f"{upstream_ingress_url}/{ops_test.model.name}-"
+            f"{TRAEFIK}/{ops_test.model.name}-{IPA_TESTER}"
+        ),
         200,
     )
 
@@ -127,7 +131,10 @@ async def test_ipu_ingressed_through_upstream_ingress(ops_test: OpsTest):
     """Assert that the IPU app can be reached through the layered ingresses."""
     upstream_ingress_url = await get_traefik_url(ops_test, traefik_app_name=UPSTREAM_INGRESS)
     assert_get_url_returns(
-        f"{upstream_ingress_url}/{ops_test.model.name}-{TRAEFIK}/{ops_test.model.name}-{IPU_TESTER}-0",
+        (
+            f"{upstream_ingress_url}/{ops_test.model.name}-"
+            f"{TRAEFIK}/{ops_test.model.name}-{IPU_TESTER}-0"
+        ),
         200,
     )
 
@@ -137,14 +144,17 @@ async def test_traefik_route_ingressed_through_upstream_ingress(ops_test: OpsTes
     """Assert that the traefik-route app can be reached through the layered ingresses."""
     upstream_ingress_url = await get_traefik_url(ops_test, traefik_app_name=UPSTREAM_INGRESS)
     assert_get_url_returns(
-        f"{upstream_ingress_url}/{ops_test.model.name}-{TRAEFIK}/{ops_test.model.name}-{ROUTE_TESTER}-traefik-route",
+        (
+            f"{upstream_ingress_url}/{ops_test.model.name}-"
+            f"{TRAEFIK}/{ops_test.model.name}-{ROUTE_TESTER}-traefik-route"
+        ),
         200,
     )
 
 
 @pytest.mark.abort_on_fail
 async def test_traefik_with_upstream_ingress_blocked_if_in_subdomain_mode(ops_test: OpsTest):
-    """Assert that the Traefik app cannot be related to an upstream ingress if routing_mode=subdomain."""
+    """Assert that traefik cannot be related to an upstream ingress if routing_mode=subdomain."""
     # Confirm we're not blocked already
     assert ops_test.model.applications[TRAEFIK].status == "active"
 
@@ -161,12 +171,14 @@ async def test_traefik_with_upstream_ingress_blocked_if_in_subdomain_mode(ops_te
 async def test_add_tls_to_all_ingresses(ops_test: OpsTest):
     """Enable TLS for both ingresses.
 
-    For the upstream ingress to validate the certificates of the inner Traefik, we need to give it the CA-certs.
-    Because the `certificates` relation sends both your cert and the CA-chain, relating `traefik-upstream:certificates`
-    to `self-signed-certificates` has the effect of sending the necessary CA certs to the upstream ingress.
+    For the upstream ingress to validate the certificates of the inner Traefik,
+    we need to give it the CA-certs. Because the `certificates` relation sends
+    both your cert and the CA-chain, relating `traefik-upstream:certificates`
+    to `self-signed-certificates` has the effect of sending the necessary
+    CA certs to the upstream ingress.
 
-    TODO: We could just use the certificate-transfer relation to pass the CA-certs to upstream, but that is blocked by
-     https://github.com/canonical/traefik-k8s-operator/issues/495.
+    TODO: We could just use the certificate-transfer relation to pass the CA-certs to upstream,
+    but that is blocked by https://github.com/canonical/traefik-k8s-operator/issues/495.
     """
     await ops_test.model.add_relation(f"{TRAEFIK}:certificates", f"{CERTIFICATE_PROVIDER}")
     await ops_test.model.add_relation(
@@ -182,7 +194,10 @@ async def test_ipa_ingressed_through_upstream_ingress_with_tls(ops_test: OpsTest
     """Assert that the IPA app can be reached through the layered ingresses with TLS enabled."""
     upstream_ingress_url = await get_traefik_url(ops_test, traefik_app_name=UPSTREAM_INGRESS)
     assert_get_url_returns(
-        f"{upstream_ingress_url}/{ops_test.model.name}-{TRAEFIK}/{ops_test.model.name}-{IPA_TESTER}",
+        (
+            f"{upstream_ingress_url}/{ops_test.model.name}-"
+            f"{TRAEFIK}/{ops_test.model.name}-{IPA_TESTER}"
+        ),
         200,
     )
 
@@ -192,17 +207,23 @@ async def test_ipu_ingressed_through_upstream_ingress_with_tls(ops_test: OpsTest
     """Assert that the IPU app can be reached through the layered ingresses with TLS enabled."""
     upstream_ingress_url = await get_traefik_url(ops_test, traefik_app_name=UPSTREAM_INGRESS)
     assert_get_url_returns(
-        f"{upstream_ingress_url}/{ops_test.model.name}-{TRAEFIK}/{ops_test.model.name}-{IPU_TESTER}-0",
+        (
+            f"{upstream_ingress_url}/{ops_test.model.name}-"
+            f"{TRAEFIK}/{ops_test.model.name}-{IPU_TESTER}-0"
+        ),
         200,
     )
 
 
 @pytest.mark.abort_on_fail
 async def test_traefik_route_ingressed_through_upstream_ingress_with_tls(ops_test: OpsTest):
-    """Assert that the traefik-route app can be reached through the layered ingresses with TLS enabled."""
+    """Assert that the traefik-route app can be reached upstream ingress with TLS."""
     upstream_ingress_url = await get_traefik_url(ops_test, traefik_app_name=UPSTREAM_INGRESS)
     assert_get_url_returns(
-        f"{upstream_ingress_url}/{ops_test.model.name}-{TRAEFIK}/{ops_test.model.name}-{ROUTE_TESTER}-traefik-route",
+        (
+            f"{upstream_ingress_url}/{ops_test.model.name}-"
+            f"{TRAEFIK}/{ops_test.model.name}-{ROUTE_TESTER}-traefik-route"
+        ),
         200,
     )
 

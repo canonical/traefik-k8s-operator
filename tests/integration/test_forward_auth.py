@@ -86,9 +86,10 @@ async def test_deployment(ops_test: OpsTest, traefik_charm, forward_auth_tester_
     reraise=True,
 )
 async def test_allowed_forward_auth_url_redirect(ops_test: OpsTest) -> None:
-    """Test that a request hitting an application protected by IAP is forwarded by traefik to oathkeeper.
+    """Test forward oathkeeper.
 
-    An allowed request should be performed without authentication.
+    Test that a request hitting an application protected by IAP is forwarded by traefik
+    to oathkeeper. An allowed request should be performed without authentication.
     Retry the request to ensure the access rules were populated by oathkeeper.
     """
     requirer_url = await get_reverse_proxy_app_url(ops_test, TRAEFIK_CHARM, IAP_REQUIRER_CHARM)
@@ -100,9 +101,10 @@ async def test_allowed_forward_auth_url_redirect(ops_test: OpsTest) -> None:
 
 
 async def test_protected_forward_auth_url_redirect(ops_test: OpsTest) -> None:
-    """Test that when trying to reach a protected url, the request is forwarded by traefik to oathkeeper.
+    """Test forward protected url.
 
-    An unauthenticated request should then be denied with 401 Unauthorized response.
+    Test that when trying to reach a protected url, the request is forwarded by traefik
+    to oathkeeper. An unauthenticated request should then be denied with 401 Unauthorized response.
     """
     requirer_url = await get_reverse_proxy_app_url(ops_test, TRAEFIK_CHARM, IAP_REQUIRER_CHARM)
 

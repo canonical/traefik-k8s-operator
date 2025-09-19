@@ -40,7 +40,8 @@ async def test_workload_tracing_is_present(ops_test, traefik_charm):
     await ops_test.model.add_relation(
         "{}:workload-tracing".format(APP_NAME), "{}:tracing".format(TEMPO_APP_NAME)
     )
-    # but we also relate tempo to route through traefik so there's any traffic to generate traces from
+    # but we also relate tempo to route through traefik
+    # so there's any traffic to generate traces from
     await ops_test.model.add_relation(
         "{}:ingress".format(TEMPO_APP_NAME), "{}:traefik-route".format(APP_NAME)
     )

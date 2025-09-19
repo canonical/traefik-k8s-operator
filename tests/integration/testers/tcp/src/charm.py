@@ -13,6 +13,7 @@ class TCPRequirerMock(CharmBase):
     _tcp_port = 9999
 
     def __init__(self, framework):
+        """Initialize the mock charm."""
         super().__init__(framework)
 
         self.unit.open_port("tcp", self._tcp_port)

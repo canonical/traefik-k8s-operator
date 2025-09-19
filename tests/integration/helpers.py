@@ -30,7 +30,10 @@ async def get_k8s_service_address(ops_test: OpsTest, service_name: str) -> Optio
     model = ops_test.model.info
     try:
         result = sh.kubectl(
-            *f"-n {model.name} get service/{service_name} -o=jsonpath='{{.status.loadBalancer.ingress[0].ip}}'".split()
+            *(
+                f"-n {model.name} get service/{service_name} -o=jsonpath="
+                f"'{{.status.loadBalancer.ingress[0].ip}}'"
+            ).split()
         )
         ip_address = result.strip("'")
         return ip_address
@@ -103,7 +106,10 @@ def dequote(s: str):
 
 
 async def deploy_and_configure_minio(ops_test: OpsTest) -> None:
-    """Deploy and set up minio and s3-integrator needed for s3-like storage backend in the HA charms."""
+    """Deploy and set up minio and s3-integrator.
+
+    They are needed for s3-like storage backend in the HA charms.
+    """
     config = {
         "access-key": "accesskey",
         "secret-key": "secretkey",
@@ -174,7 +180,10 @@ async def deploy_tempo_cluster(ops_test: OpsTest):
 
 def get_traces(tempo_host: str, service_name="tracegen-otlp_http", tls=True):
     """Get traces directly from Tempo REST API."""
-    url = f"{'https' if tls else 'http'}://{tempo_host}:3200/api/search?tags=service.name={service_name}"
+    url = (
+        f"{'https' if tls else 'http'}://"
+        f"{tempo_host}:3200/api/search?tags=service.name={service_name}"
+    )
     req = requests.get(
         url,
         verify=False,
@@ -188,8 +197,8 @@ def get_traces(tempo_host: str, service_name="tracegen-otlp_http", tls=True):
 async def get_traces_patiently(tempo_host, service_name="tracegen-otlp_http", tls=True):
     """Get traces directly from Tempo REST API, but also try multiple times.
 
-    Useful for cases when Tempo might not return the traces immediately (its API is known for returning data in
-    random order).
+    Useful for cases when Tempo might not return the traces immediately
+    (its API is known for returning data in random order).
     """
     traces = get_traces(tempo_host, service_name=service_name, tls=tls)
     assert len(traces) > 0

@@ -45,7 +45,10 @@ def workload_tracing_relation():
 
 
 @pytest.mark.skip(
-    reason="Intermittent failure, and it takes a long time to fail. See https://github.com/canonical/traefik-k8s-operator/issues/519"
+    reason=(
+        "Intermittent failure, and it takes a long time to fail. "
+        "See https://github.com/canonical/traefik-k8s-operator/issues/519"
+    )
 )
 def test_charm_trace_collection(traefik_ctx, traefik_container, caplog, charm_tracing_relation):
     # GIVEN the presence of a tracing relation

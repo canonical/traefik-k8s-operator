@@ -29,6 +29,7 @@ class MockRequirerCharm(CharmBase):
     )
 
     def __init__(self, *args, **kwargs):
+        """Initialize the mock charm."""
         super().__init__(*args)
         self.ipa = IngressPerAppRequirer(self, port=80)
 

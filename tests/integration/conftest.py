@@ -30,6 +30,7 @@ logger = logging.getLogger(__name__)
 
 class Store(defaultdict):
     def __init__(self):
+        """Initialize the store."""
         super(Store, self).__init__(Store)
 
     def __getattr__(self, key):

@@ -11,10 +11,7 @@ import yaml
 from pytest_operator.plugin import OpsTest
 from tenacity import retry, stop_after_delay
 
-from tests.integration.conftest import (
-    get_relation_data,
-    trfk_resources,
-)
+from tests.integration.conftest import get_relation_data, trfk_resources
 
 USERNAME = "admin"
 PASSWORD = "admin"

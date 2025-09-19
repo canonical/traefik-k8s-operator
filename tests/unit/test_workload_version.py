@@ -10,7 +10,9 @@ from scenario import Container, Context, State
 from charm import TraefikIngressCharm
 
 
-@patch("charm.TraefikIngressCharm._get_loadbalancer_status", PropertyMock(return_value="loadbalancer"))
+@patch(
+    "charm.TraefikIngressCharm._get_loadbalancer_status", PropertyMock(return_value="loadbalancer")
+)
 @patch("lightkube.core.client.GenericSyncClient")
 @patch("charm.TraefikIngressCharm._static_config_changed", PropertyMock(return_value=False))
 @patch("charm.TraefikIngressCharm._ingressed_address", PropertyMock(return_value="foo.bar"))
