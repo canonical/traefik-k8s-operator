@@ -53,4 +53,3 @@ terraform.rc
 
 # Tests generate this file
 .charm_tracing_buffer.raw
-.vscode/
