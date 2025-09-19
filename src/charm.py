@@ -652,8 +652,11 @@ class TraefikIngressCharm(CharmBase):
                 # The cert provider has not responded yet.
                 logger.debug(f"No cert found for csr: {csr}")
                 continue
+            chain = [str(certificate) for certificate in cert.chain]
+            if str(chain[0]) != str(cert.certificate):
+                chain.reverse()
             certs[csr.common_name] = {
-                "cert": str(cert.certificate),
+                "chain": "\n\n".join(chain),
                 "key": str(private_key),
                 "ca": str(cert.ca),
             }
