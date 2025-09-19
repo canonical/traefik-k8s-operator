@@ -30,8 +30,10 @@ async def get_k8s_service_address(ops_test: OpsTest, service_name: str) -> Optio
     model = ops_test.model.info
     try:
         result = sh.kubectl(
-            *f"-n {model.name} get service/{service_name} -o=jsonpath="
-            "'{{.status.loadBalancer.ingress[0].ip}}'".split()
+            *(
+                f"-n {model.name} get service/{service_name} -o=jsonpath="
+                "'{{.status.loadBalancer.ingress[0].ip}}'"
+            ).split()
         )
         ip_address = result.strip("'")
         return ip_address
