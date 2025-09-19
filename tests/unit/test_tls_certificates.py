@@ -2,9 +2,10 @@
 # See LICENSE file for licensing details.
 
 import unittest
-from unittest.mock import PropertyMock, patch
+from unittest.mock import MagicMock, PropertyMock, patch
 
 import ops.testing
+import pytest
 from ops.framework import Framework
 from ops.testing import Harness
 
@@ -20,6 +21,22 @@ INGRESS_APP_DATA = {
 INGRESS_UNIT_DATA = {
     "host": '"example.local"',
 }
+
+
+@pytest.fixture(scope="function", name="mock_provider_certificate")
+def mock_provider_certificate_fixture() -> MagicMock:
+    """Mock tls certificate from a tls provider charm."""
+    cert = "-----BEGIN CERTIFICATE-----mock certificate-----END CERTIFICATE-----"
+    ca = "-----BEGIN CERTIFICATE-----mock ca-----END CERTIFICATE-----"
+    chain = [
+        ("-----BEGIN CERTIFICATE-----mock ca-----END CERTIFICATE-----"),
+        ("-----BEGIN CERTIFICATE-----mock certificate-----END CERTIFICATE-----"),
+    ]
+    provider_cert_mock = MagicMock()
+    provider_cert_mock.certificate = cert
+    provider_cert_mock.ca = ca
+    provider_cert_mock.chain = chain
+    return provider_cert_mock
 
 
 def reinstantiate_charm(harness: Harness):
@@ -99,3 +116,24 @@ class TlsWithExternalHostname(unittest.TestCase):
         unit_databag = self.harness.get_relation_data(self.rel_id, self.harness.charm.unit.name)
         print(unit_databag)
         self.assertIsNotNone(unit_databag.get("certificate_signing_requests"))
+
+
+def test_get_certs(monkeypatch: pytest.MonkeyPatch, mock_provider_certificate):
+    """Set up a TraefikIngressCharm with mocked relation and get_assigned_certificate method.
+
+    Then, run the _get_certs method.
+    The certificate chain should gets properly formatted and ordered.
+    """
+    monkeypatch.setattr(
+        "charm.TLSCertificatesRequiresV4.get_assigned_certificate",
+        MagicMock(return_value=(mock_provider_certificate, "mock private key")),
+    )
+    harness = Harness(TraefikIngressCharm)
+    harness.add_relation("certificates", "certificates_provider")
+    harness.begin()
+    mock_csr = MagicMock()
+    mock_csr.common_name = "example.com"
+    harness.charm.csrs = [mock_csr]
+    assert harness.charm._get_certs()["example.com"]["chain"].startswith(
+        mock_provider_certificate.certificate
+    )

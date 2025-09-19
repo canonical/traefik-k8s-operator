@@ -210,8 +210,8 @@ class Traefik:
                     self._container.remove_path(path.path)
         for hostname, cert in certs.items():
             with (CERTS_DIR / f"{hostname}.cert").open("w") as f:
-                f.write(cert["cert"])
-            self._container.push(CERTS_DIR / f"{hostname}.cert", cert["cert"], make_dirs=True)
+                f.write(cert["chain"])
+            self._container.push(CERTS_DIR / f"{hostname}.cert", cert["chain"], make_dirs=True)
             self._container.push(CERTS_DIR / f"{hostname}.key", cert["key"], make_dirs=True)
             self._container.push(
                 CA_CERTS_DIR / f"{hostname}.traefik-charm.crt", cert["ca"], make_dirs=True
