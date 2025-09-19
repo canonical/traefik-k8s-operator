@@ -60,7 +60,7 @@ async def test_dynamic_config_created(ops_test: OpsTest):
 async def test_static_config_updated(ops_test: OpsTest):
     cmd = (
         f"juju ssh -m {ops_test.model_name} --container traefik"
-        " {APP_NAME}/0 cat /etc/traefik/traefik.yaml"
+        f" {APP_NAME}/0 cat /etc/traefik/traefik.yaml"
     )
     proc = Popen(shlex.split(cmd), stdout=PIPE, text=True)
     contents = proc.stdout.read()
