@@ -18,6 +18,7 @@ class IPARequirerMock(CharmBase):
     """Charm a workload that accepts traffic on a port and supports all ingress types."""
 
     def __init__(self, framework):
+        """Initialize the mock charm."""
         super().__init__(framework)
         self.unit.set_ports(PORT)
 
@@ -46,9 +47,11 @@ class IPARequirerMock(CharmBase):
         self.framework.observe(self.on.collect_unit_status, self._on_collect_status)
 
         # The routes generated for us can overlap (if a user tries to browse to an ipu path
-        # (path-prefix="/modelname-appname-0") and an ipa path (path-prefix="/modelname-appname") exists, the ipa path can
-        # match and route the user.  This could generate a false positive, so as a protection we raise if more than one
-        # ingress relation is present.  traefik-route is also included in this check, as it can define any route path
+        # (path-prefix="/modelname-appname-0") and an ipa path (path-prefix="/modelname-appname")
+        # exists, the ipa path can match and route the user.
+        # This could generate a false positive, so as a protection we raise if more than one
+        # ingress relation is present.
+        # traefik-route is also included in this check, as it can define any route path
         # and similarly overlap the others.
         #
         # To test multiple ingress types, deploy multiple instances of this tester.
@@ -61,7 +64,8 @@ class IPARequirerMock(CharmBase):
             + len(self.model.relations["traefik-route"])
         ) > 1:
             raise ValueError(
-                "Tester only supports using a single type of ingress relation.  See tester code comments for why. "
+                "Tester only supports using a single type of ingress relation."
+                "See tester code comments for why. "
                 "Deploy multiple instances of this charm to test multiple ingress types."
             )
 
@@ -88,7 +92,6 @@ class IPARequirerMock(CharmBase):
         container.autostart()
 
     def _on_collect_status(self, event: CollectStatusEvent):
-
         if not self.unit.get_container("echo-server").can_connect():
             event.add_status(WaitingStatus("Waiting for echo server container to connect"))
             return
@@ -127,7 +130,8 @@ class IPARequirerMock(CharmBase):
 
     def _traefik_route_config(self) -> dict:
         """Build a raw ingress configuration for traefik-route."""
-        # The path prefix must be different than the automatically generated one for ingress per app, otherwise we'll
+        # The path prefix must be different than the automatically
+        # generated one for ingress per app, otherwise we'll
         # overwrite each other in cases where the tester is used for both.
         external_path = f"{self.model.name}-{self.model.app.name}-traefik-route"
         service_name = f"{external_path}-service"

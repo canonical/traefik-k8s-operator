@@ -10,13 +10,8 @@ import pytest
 import yaml
 from pytest_operator.plugin import OpsTest
 
-from tests.integration.conftest import (
-    trfk_resources,
-)
-from tests.integration.helpers import (
-    get_k8s_service_address,
-    remove_application,
-)
+from tests.integration.conftest import trfk_resources
+from tests.integration.helpers import get_k8s_service_address, remove_application
 
 APP_NAME = "traefik"
 TESTER_APP_NAME = "route"
@@ -63,7 +58,10 @@ async def test_dynamic_config_created(ops_test: OpsTest):
 
 
 async def test_static_config_updated(ops_test: OpsTest):
-    cmd = f"juju ssh -m {ops_test.model_name} --container traefik {APP_NAME}/0 cat /etc/traefik/traefik.yaml"
+    cmd = (
+        f"juju ssh -m {ops_test.model_name} --container traefik"
+        f" {APP_NAME}/0 cat /etc/traefik/traefik.yaml"
+    )
     proc = Popen(shlex.split(cmd), stdout=PIPE, text=True)
     contents = proc.stdout.read()
     contents_yaml = yaml.safe_load(contents)

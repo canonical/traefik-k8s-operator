@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 class IAPRequirerMock(CharmBase):
     def __init__(self, framework):
+        """Initialize the mock charm."""
         super().__init__(framework)
         self._container = self.unit.get_container("httpbin")
         self._service_name = "httpbin"
