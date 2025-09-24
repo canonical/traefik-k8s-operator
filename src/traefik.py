@@ -794,7 +794,7 @@ class Traefik:
 
     def _cleanup_tls_configuration(self):
         """Remove the Traefik certificates configuration if TLS is disabled."""
-        if not self._tls_enabled:
+        if not self._tls_enabled and self._container.can_connect():
             # Remove certificates.yaml if TLS is not configured.
             if self._container.exists(DYNAMIC_CERTS_PATH):
                 try:
