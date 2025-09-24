@@ -145,15 +145,6 @@ class Traefik:
 
     def _update_tls_configuration(self):
         """Generate and push tls config yaml for traefik."""
-        if not self._tls_enabled:
-            # Remove certificates.yaml if TLS is not configured.
-            if self._container.exists(DYNAMIC_CERTS_PATH):
-                try:
-                    self._container.remove_path(DYNAMIC_CERTS_PATH)
-                except PathError:
-                    logger.exception("Error removing certificates config. Skipping.")
-            return
-
         cert_files = [
             x.path for x in self._container.list_files(CERTS_DIR) if x.path.endswith(".cert")
         ]
@@ -195,7 +186,8 @@ class Traefik:
 
         self._setup_dynamic_config_folder()
 
-        self._update_tls_configuration()
+        if self._tls_enabled:
+            self._update_tls_configuration()
 
     def update_cert_configuration(self, certs: dict):  # noqa: C901
         """Update the server cert, ca, and key configuration files."""
@@ -799,3 +791,13 @@ class Traefik:
         # ensure the dynamic config dir exists else traefik will error on startup and fail to
         # set up the watcher
         self._container.make_dir(DYNAMIC_CONFIG_DIR, make_parents=True)
+
+    def _cleanup_tls_configuration(self):
+        """Remove the Traefik certificates configuration if TLS is disabled."""
+        if not self._tls_enabled:
+            # Remove certificates.yaml if TLS is not configured.
+            if self._container.exists(DYNAMIC_CERTS_PATH):
+                try:
+                    self._container.remove_path(DYNAMIC_CERTS_PATH)
+                except PathError:
+                    logger.exception("Error removing certificates config. Skipping.")
