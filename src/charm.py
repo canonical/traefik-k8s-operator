@@ -326,6 +326,11 @@ class TraefikIngressCharm(CharmBase):
             self.certs.on.certificate_available,  # pyright: ignore
             self._on_cert_changed,
         )
+        # Also run update logic on relation broken to properly update the status message.
+        observe(
+            self.on[CERTIFICATES_RELATION_NAME].relation_broken,  # pyright: ignore
+            self._on_cert_changed,
+        )
         observe(
             self.recv_ca_cert.on.certificate_available,  # pyright: ignore
             self._on_recv_ca_cert_available,
