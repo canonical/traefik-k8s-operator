@@ -6,10 +6,12 @@ from unittest.mock import MagicMock, PropertyMock, patch
 
 import ops.testing
 import pytest
+from ops import Container
 from ops.framework import Framework
 from ops.testing import Harness
 
 from charm import TraefikIngressCharm
+from traefik import Traefik
 
 ops.testing.SIMULATE_CAN_CONNECT = True
 
@@ -137,3 +139,25 @@ def test_get_certs(monkeypatch: pytest.MonkeyPatch, mock_provider_certificate):
     assert harness.charm._get_certs()["example.com"]["chain"].startswith(
         mock_provider_certificate.certificate
     )
+
+
+@pytest.mark.parametrize("tls_enabled", [(True,), (False)])
+def test_cleanup_tls_configuration(tls_enabled: bool):
+    container_mock = MagicMock(spec=Container)
+    container_mock.exists = MagicMock(return_value=True)
+    container_mock.can_connect = MagicMock(return_value=True)
+
+    traefik = Traefik(
+        container=container_mock,
+        routing_mode="path",
+        tls_enabled=tls_enabled,
+        experimental_forward_auth_enabled=False,
+        tcp_entrypoints={},
+        traefik_route_static_configs=[],
+        topology=MagicMock(),
+    )
+    traefik._cleanup_tls_configuration()
+    if not tls_enabled:
+        container_mock.remove_path.assert_called_once()
+    else:
+        container_mock.remove_path.assert_not_called()
