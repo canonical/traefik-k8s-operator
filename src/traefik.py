@@ -3,6 +3,7 @@
 # See LICENSE file for licensing details.
 
 """Traefik workload interface."""
+
 import dataclasses
 import enum
 import logging
@@ -197,17 +198,9 @@ class Traefik:
             for path in CERTS_DIR.iterdir():
                 if path.name.endswith(".cert") and path.name[:5] not in certs:
                     path.unlink()
-        if self._container.isdir(CERTS_DIR):
-            for path in self._container.list_files(CERTS_DIR):
-                if path.name.endswith(".cert") and path.name[:5] not in certs:
-                    self._container.remove_path(path.path)
-                if path.name.endswith(".key") and path.name[:4] not in certs:
-                    self._container.remove_path(path.path)
-        if self._container.isdir(CA_CERTS_DIR):
-            for path in self._container.list_files(CA_CERTS_DIR):
-                # There could be other .crt files here so make sure the names are identifiable.
-                if path.name.endswith(".traefik-charm.crt") and path.name[:18] not in certs:
-                    self._container.remove_path(path.path)
+
+        self._clean_up_certificates_in_traefik_container(excluded_certs=certs)
+
         for hostname, cert in certs.items():
             with (CERTS_DIR / f"{hostname}.cert").open("w") as f:
                 f.write(cert["chain"])
@@ -218,6 +211,35 @@ class Traefik:
             )
 
         self.update_ca_certs()
+
+    def _clean_up_certificates_in_traefik_container(self, excluded_certs: dict) -> None:
+        """Clean up certificates in the remote traefik container.
+
+        Args:
+            excluded_certs: Certificates to exclude from cleaning up.
+        """
+        if self._container.isdir(CERTS_DIR):
+            for path in self._container.list_files(CERTS_DIR):
+                try:
+                    if path.name.endswith(".cert") and path.name[:5] not in excluded_certs:
+                        self._container.remove_path(path.path)
+                    if path.name.endswith(".key") and path.name[:4] not in excluded_certs:
+                        self._container.remove_path(path.path)
+                except PathError:
+                    logger.exception("Error removing cert file.")
+                    continue
+        if self._container.isdir(CA_CERTS_DIR):
+            for path in self._container.list_files(CA_CERTS_DIR):
+                # There could be other .crt files here so make sure the names are identifiable.
+                try:
+                    if (
+                        path.name.endswith(".traefik-charm.crt")
+                        and path.name[:18] not in excluded_certs
+                    ):
+                        self._container.remove_path(path.path)
+                except PathError:
+                    logger.exception("Error removing ca cert file.")
+                    continue
 
     def add_cas(self, cas: Iterable[CA]):
         """Add any number of CAs to Traefik.
@@ -343,7 +365,7 @@ class Traefik:
                 if _raise:
                     raise e
                 logger.exception(
-                    f"Failed to merge {extra_config} into Traefik's static config." "Skipping..."
+                    f"Failed to merge {extra_config} into Traefik's static config.Skipping..."
                 )
                 # roll back any changes static_config_deep_merge might have done to static_config
                 static_config = previous

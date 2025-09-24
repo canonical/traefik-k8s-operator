@@ -357,10 +357,7 @@ class TraefikIngressCharm(CharmBase):
         addrs = {
             urlparse(endpoint["url"]).hostname
             for endpoint in self._get_proxied_endpoints(use_gateway_address=True).values()
-            if "url" in endpoint
-            and urlparse(
-                endpoint["url"]
-            ).scheme
+            if "url" in endpoint and urlparse(endpoint["url"]).scheme
         }
         csrs = []
         for addr in addrs:
@@ -620,6 +617,7 @@ class TraefikIngressCharm(CharmBase):
         self._configure()
 
     def _update_cert_configs(self) -> None:
+        """Update the server cert, ca, and key configuration files."""
         self.traefik.update_cert_configuration(self._get_certs())
 
     def _get_certs(self) -> dict:
