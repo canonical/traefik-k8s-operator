@@ -57,7 +57,7 @@ from lightkube.models.core_v1 import ServicePort, ServiceSpec
 from lightkube.models.meta_v1 import ObjectMeta
 from lightkube.resources.core_v1 import Service
 from lightkube_extensions.batch import KubernetesResourceManager, create_charm_default_labels
-from ops import main
+from ops import EventBase, main
 from ops.charm import (
     ActionEvent,
     CharmBase,
@@ -115,6 +115,8 @@ QUALIFIED_NAME_PATTERN = re.compile(r"^[A-Za-z0-9]([-A-Za-z0-9_.]*[A-Za-z0-9])?$
 LB_LABEL = "traefik-loadbalancer"
 
 PYDANTIC_IS_V1 = int(pydantic.version.VERSION.split(".")[0]) < 2
+
+CERTIFICATES_RELATION_NAME = "certificates"
 
 
 class _IngressRelationType(enum.Enum):
@@ -271,7 +273,7 @@ class TraefikIngressCharm(CharmBase):
         ]
         self.certs = TLSCertificatesRequiresV4(
             charm=self,
-            relationship_name="certificates",
+            relationship_name=CERTIFICATES_RELATION_NAME,
             certificate_requests=self.csrs,
             mode=Mode.UNIT,
             refresh_events=certs_refresh_events,
@@ -324,6 +326,11 @@ class TraefikIngressCharm(CharmBase):
             self.certs.on.certificate_available,  # pyright: ignore
             self._on_cert_changed,
         )
+        # Also run update logic on relation broken to properly update the status message.
+        observe(
+            self.on[CERTIFICATES_RELATION_NAME].relation_broken,  # pyright: ignore
+            self._on_cert_changed,
+        )
         observe(
             self.recv_ca_cert.on.certificate_available,  # pyright: ignore
             self._on_recv_ca_cert_available,
@@ -351,16 +358,34 @@ class TraefikIngressCharm(CharmBase):
         observe(self.on.show_proxied_endpoints_action, self._on_show_proxied_endpoints)  # type: ignore
         observe(self.on.show_external_endpoints_action, self._on_show_external_endpoints)  # type: ignore
 
+        # Hook hollistic method
+        observe(self.on.traefik_pebble_ready, self.cleanup_tls_configuration)  # type: ignore
+        observe(self.on.start, self.cleanup_tls_configuration)
+        observe(self.on.update_status, self.cleanup_tls_configuration)
+        observe(self.on.config_changed, self.cleanup_tls_configuration)
+        observe(
+            self.on[CERTIFICATES_RELATION_NAME].relation_broken,  # pyright: ignore
+            self.cleanup_tls_configuration,
+        )
+
+    def cleanup_tls_configuration(self, _: EventBase) -> None:
+        """Clean up Traefik's TLS configuration.
+
+        This method hooks almost every event the charm is currently acting on, checks if TLS is
+        enabled and cleans up Traefik's TLS configuration if TLS is not enabled.
+
+        It is intentional that this method is ran on almost all events as this method will evolve
+        as we refactor the charm to be more hollistic.
+        """
+        self.traefik._cleanup_tls_configuration()
+
     def _get_cert_requests(self) -> list:
         # For a TCP route there will be no scheme which will cause urlparse()
         # hostname to return None. Therefore we should catch the TCP routes here.
         addrs = {
             urlparse(endpoint["url"]).hostname
             for endpoint in self._get_proxied_endpoints(use_gateway_address=True).values()
-            if "url" in endpoint
-            and urlparse(
-                endpoint["url"]
-            ).scheme
+            if "url" in endpoint and urlparse(endpoint["url"]).scheme
         }
         csrs = []
         for addr in addrs:
@@ -593,7 +618,7 @@ class TraefikIngressCharm(CharmBase):
 
     def _is_tls_enabled(self) -> bool:
         """Return True if TLS is enabled."""
-        if self.model.relations.get("certificates"):
+        if self.model.relations.get(CERTIFICATES_RELATION_NAME):
             return True
         if (
             self.config.get("tls-ca", None)
@@ -620,6 +645,7 @@ class TraefikIngressCharm(CharmBase):
         self._configure()
 
     def _update_cert_configs(self) -> None:
+        """Update the server cert, ca, and key configuration files."""
         self.traefik.update_cert_configuration(self._get_certs())
 
     def _get_certs(self) -> dict:
