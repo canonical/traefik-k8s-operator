@@ -150,7 +150,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
 
     _stored = StoredState()
 
-    def __init__(self, *args):  # type: ignore[no-untyped-def]
+    def __init__(self, *args):  # type: ignore[no-untyped-def]  # pylint: disable=too-many-statements
         """Initialize the charm."""
         super().__init__(*args)
 
@@ -263,8 +263,8 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             else:
                 logger.warning(
                     (
-                        "Filtered out invalid certificate request for common_name: "
-                        f"'{csr.common_name}'"
+                        "Filtered out invalid certificate request for common_name: %s",
+                        csr.common_name
                     )
                 )
         certs_refresh_events = [
@@ -378,7 +378,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         It is intentional that this method is ran on almost all events as this method will evolve
         as we refactor the charm to be more hollistic.
         """
-        self.traefik._cleanup_tls_configuration()
+        self.traefik.cleanup_tls_configuration()
 
     def _get_cert_requests(self) -> list:
         # For a TCP route there will be no scheme which will cause urlparse()
@@ -425,7 +425,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             else:
                 # Skip creating certificate request if we have no valid common name
                 logger.warning(
-                    f"Skipping certificate request for address {addr} - no valid common name"
+                    "Skipping certificate request for address %s - no valid common name", addr
                 )
                 continue
             csrs.append(
@@ -643,7 +643,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             return False
         return True
 
-    def _on_cert_changed(self, event: EventBase) -> None:
+    def _on_cert_changed(self, _: EventBase) -> None:
         # On slow machines, this event may come up before pebble is ready
         self._configure()
 
@@ -685,7 +685,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             cert, private_key = self.certs.get_assigned_certificate(certificate_request=csr)
             if cert is None:
                 # The cert provider has not responded yet.
-                logger.debug(f"No cert found for csr: {csr}")
+                logger.debug("No cert found for csr: %s", csr)
                 continue
             chain = [str(certificate) for certificate in cert.chain]
             if str(chain[0]) != str(cert.certificate):
@@ -745,13 +745,15 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
                     for relation in provider.relations
                 ]
                 logger.warning(
-                    f"failed to fetch proxied endpoints from (at least one of) the "
-                    f"remote apps {remote_app_names!r} with error {e}."
+                    (
+                        "Failed to fetch proxied endpoints from (at least one of) the "
+                        "remote apps %s with error %s."
+                    ), remote_app_names, str(e)
                 )
 
         # Replace hosts with gateway address if requested
         if use_gateway_address:
-            for app_name, endpoint_data in result.items():
+            for _app_name, endpoint_data in result.items():
                 if "url" in endpoint_data:
                     original_url = endpoint_data["url"]
                     parsed_url = urlparse(original_url)
@@ -764,7 +766,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
                     ):
                         # This is likely a TCP URL in "host:port" format
                         try:
-                            host, port = original_url.rsplit(":", 1)
+                            _host, port = original_url.rsplit(":", 1)
                             new_url = f"{self.gateway_address}:{port}"
                         except ValueError:
                             # Fallback: if parsing fails, keep original URL

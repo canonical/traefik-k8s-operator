@@ -88,7 +88,7 @@ def static_config_deep_merge(dict1: dict, dict2: dict, _path: Optional[list] = N
     return dict1
 
 
-class Traefik:  # pylint: disable=too-many-instance-attributes
+class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-methods
     """Traefik workload representation."""
 
     port = 80
@@ -792,7 +792,7 @@ class Traefik:  # pylint: disable=too-many-instance-attributes
         # set up the watcher
         self._container.make_dir(DYNAMIC_CONFIG_DIR, make_parents=True)
 
-    def _cleanup_tls_configuration(self) -> None:
+    def cleanup_tls_configuration(self) -> None:
         """Remove the Traefik certificates configuration if TLS is disabled."""
         if not self._tls_enabled and self._container.can_connect():
             # Remove certificates.yaml if TLS is not configured.
