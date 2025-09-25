@@ -104,6 +104,7 @@ class TraefikRouteCharm(CharmBase):
         )
 ```
 """
+
 import logging
 from typing import Optional
 
@@ -222,7 +223,7 @@ class TraefikRouteProvider(Object):
         return self._stored.scheme or ""  # type: ignore
 
     @property
-    def relations(self):
+    def relations(self) -> list:
         """The list of Relation instances associated with this endpoint."""
         return list(self._charm.model.relations[self._relation_name])
 
@@ -250,18 +251,18 @@ class TraefikRouteProvider(Object):
             scheme = relation.data[relation.app].get("scheme", "")
             self._stored.scheme = scheme or self._stored.scheme  # pyright: ignore
 
-    def _on_relation_changed(self, event: RelationEvent):
+    def _on_relation_changed(self, event: RelationEvent) -> None:
         if self.is_ready(event.relation):
             # todo check data is valid here?
             self.update_traefik_address()
             self.on.ready.emit(relation=event.relation, app=event.relation.app)
 
-    def _on_relation_broken(self, event: RelationEvent):
+    def _on_relation_broken(self, event: RelationEvent) -> None:
         self.on.data_removed.emit(relation=event.relation, app=event.relation.app)
 
     def update_traefik_address(
         self, *, external_host: Optional[str] = None, scheme: Optional[str] = None
-    ):
+    ) -> None:
         """Ensure that requirers know the external host for Traefik."""
         if not self._charm.unit.is_leader():
             return
@@ -423,7 +424,7 @@ class TraefikRouteRequirer(Object):
         """Is the TraefikRouteRequirer ready to submit data to Traefik?"""
         return self._relation is not None
 
-    def submit_to_traefik(self, config: dict, static: Optional[dict] = None):
+    def submit_to_traefik(self, config: dict, static: Optional[dict] = None) -> None:
         """Submit an ingress configuration to Traefik.
 
         This method publishes dynamic and static configuration data to the
