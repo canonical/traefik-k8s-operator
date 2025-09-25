@@ -113,8 +113,10 @@ if PYDANTIC_IS_V1:  # noqa
 
         _NEST_UNDER = None
 
+        # Annotating -> "DatabagModel" as the return type here doesn't sit well with pyright
+        # We are disabling this line for now and come back to it later.
         @classmethod
-        def load(cls, databag: MutableMapping) -> None:
+        def load(cls, databag: MutableMapping):  # type: ignore[no-untyped-def]
             """Load this model from a Juju databag."""
             if cls._NEST_UNDER:
                 return cls.parse_obj(json.loads(databag[cls._NEST_UNDER]))
@@ -178,8 +180,10 @@ else:
         )  # type: ignore
         """Pydantic config."""
 
+        # Annotating -> "DatabagModel" as the return type here doesn't sit well with pyright
+        # We are disabling this line for now and come back to it later.
         @classmethod
-        def load(cls, databag: MutableMapping) -> None:
+        def load(cls, databag: MutableMapping):  # type: ignore[no-untyped-def]
             """Load this model from a Juju databag."""
             nest_under = cls.model_config.get("_NEST_UNDER")
             if nest_under:
@@ -331,7 +335,7 @@ class IngressRequirerUnitData(DatabagModel):
 
     # pydantic wants 'cls' as first arg
     @input_validator("ip")
-    def validate_ip(cls, ip: str) -> str:  # noqa: N805
+    def validate_ip(cls, ip: str) -> Optional[str]:  # noqa: N805
         """Validate ip."""
         if ip is None:
             return None
@@ -521,7 +525,6 @@ class IngressPerAppProvider(_IngressPerAppBase):
                 data.app.strip_prefix or False,
                 data.app.redirect_https or False,
             )
-
 
     def _handle_relation_broken(self, event: RelationEvent) -> None:
         self.on.data_removed.emit(event.relation, event.relation.app)  # type: ignore
