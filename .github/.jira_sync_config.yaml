@@ -1,5 +1,5 @@
 settings:
-  jira_project_key: "SMS"
+  jira_project_key: "ISD"
   status_mapping:
     opened: Untriaged
     closed: done
