@@ -119,6 +119,8 @@ PYDANTIC_IS_V1 = int(pydantic.version.VERSION.split(".")[0]) < 2  # pylint: disa
 
 CERTIFICATES_RELATION_NAME = "certificates"
 
+CERTIFICATES_RELATION_NAME = "certificates"
+
 
 class _IngressRelationType(enum.Enum):
     PER_APP = "per_app"
