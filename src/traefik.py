@@ -365,7 +365,7 @@ class Traefik:
                 if _raise:
                     raise e
                 logger.exception(
-                    f"Failed to merge {extra_config} into Traefik's static config.Skipping..."
+                    f"Failed to merge {extra_config} into Traefik's static config. Skipping..."
                 )
                 # roll back any changes static_config_deep_merge might have done to static_config
                 static_config = previous
