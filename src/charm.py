@@ -359,7 +359,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         observe(self.on.show_external_endpoints_action, self._on_show_external_endpoints)  # type: ignore
 
         # Hook hollistic method
-        observe(self.on.traefik_pebble_ready, self.cleanup_tls_configuration)  # type: ignore
+        observe(self.on.traefik_pebble_ready, self.cleanup_tls_configuration)
         observe(self.on.start, self.cleanup_tls_configuration)
         observe(self.on.update_status, self.cleanup_tls_configuration)
         observe(self.on.config_changed, self.cleanup_tls_configuration)
