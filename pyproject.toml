@@ -117,5 +117,6 @@ namespace_packages = true
 disallow_untyped_defs = false
 module = "tests.*"
 
+# Disabling logging-fstring-interpolation
 [tool.pylint]
-disable = "wrong-import-order,fixme"
+disable = "wrong-import-order,fixme,logging-fstring-interpolation"

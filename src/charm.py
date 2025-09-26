@@ -264,10 +264,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
                 self.csrs.append(csr)
             else:
                 logger.warning(
-                    (
-                        "Filtered out invalid certificate request for common_name: %s",
-                        csr.common_name
-                    )
+                    "Filtered out invalid certificate request for common_name: %s", csr.common_name
                 )
         certs_refresh_events = [
             self.ingress_per_unit.on.endpoints_updated,
@@ -570,7 +567,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             return False
         return True
 
-    def _on_forward_auth_config_changed(self, _event: AuthConfigChangedEvent) -> None:
+    def _on_forward_auth_config_changed(self, _: AuthConfigChangedEvent) -> None:
         if self._is_forward_auth_enabled:
             if self.forward_auth.is_ready():
                 self._process_status_and_configurations()
@@ -582,7 +579,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
                 )
             )
 
-    def _on_forward_auth_config_removed(self, _event: AuthConfigRemovedEvent) -> None:
+    def _on_forward_auth_config_removed(self, _: AuthConfigRemovedEvent) -> None:
         self._process_status_and_configurations()
 
     def _on_recv_ca_cert_available(self, event: CertificateTransferAvailableEvent) -> None:
@@ -687,7 +684,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             cert, private_key = self.certs.get_assigned_certificate(certificate_request=csr)
             if cert is None:
                 # The cert provider has not responded yet.
-                logger.debug("No cert found for csr: %s", csr)
+                logger.debug("No cert found for csr: %r", csr)
                 continue
             chain = [str(certificate) for certificate in cert.chain]
             if str(chain[0]) != str(cert.certificate):
@@ -749,8 +746,10 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
                 logger.warning(
                     (
                         "Failed to fetch proxied endpoints from (at least one of) the "
-                        "remote apps %s with error %s."
-                    ), remote_app_names, str(e)
+                        "remote apps %r with error %r."
+                    ),
+                    remote_app_names,
+                    str(e),
                 )
 
         # Replace hosts with gateway address if requested
@@ -792,7 +791,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
                     # is this necessary?
                     continue
                 if not ipu.is_unit_ready(relation, unit):
-                    logger.error("%s not ready: skipping...", relation)
+                    logger.error(f"{relation} not ready: skipping...")
                     continue
 
                 data = ipu.get_data(relation, unit)
@@ -1023,12 +1022,14 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             except IngressSetupError as e:
                 err_msg = e.args[0]
                 logger.error(
-                    "failed processing the ingress relation %s: %s", ingress_relation, err_msg
+                    f"failed processing the ingress relation {ingress_relation}: {err_msg!r}"
                 )
                 errors = True
 
         if errors:
-            logger.debug("unit in %s: %s", self.unit.status.name, self.unit.status.message)
+            logger.debug(
+                "unit in {!r}: {}".format(self.unit.status.name, self.unit.status.message)
+            )
             self.unit.status = BlockedStatus("setup of some ingress relation failed")
             logger.error("The setup of some ingress relation failed, see previous logs")
 
