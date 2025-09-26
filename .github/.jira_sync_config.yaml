@@ -6,11 +6,12 @@ settings:
     not_planned: rejected
     
   components:
-    - traefik
+    - Kubernetes ingress
 
-  add_gh_comment: false
-  sync_description: false
-  sync_comments: false
+  add_gh_comment: true
+
+  epic_key: ISD-3981
 
   label_mapping:
-    "Type: Enhancement": Story
+    bug: Bug
+    enhancement: Story

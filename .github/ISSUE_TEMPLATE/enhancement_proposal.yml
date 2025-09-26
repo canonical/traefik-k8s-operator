@@ -1,6 +1,6 @@
 name: Enhancement Proposal
 description: File an enhancement proposal
-labels: ["Type: Enhancement", "Status: Triage"]
+labels: ["enhancement"]
 body:
   - type: markdown
     attributes:
