@@ -286,7 +286,7 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
     def generate_static_config(self, _raise: bool = False) -> Dict[str, Any]:
         """Generate Traefik's static config yaml."""
         tcp_entrypoints = self._tcp_entrypoints
-        logger.debug("Statically configuring traefik with tcp entrypoints: %s.", tcp_entrypoints)
+        logger.debug(f"Statically configuring traefik with tcp entrypoints: {tcp_entrypoints}.")
 
         web_config: Dict[str, Any] = {
             "address": f":{self.port}",
@@ -365,7 +365,7 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
                 if _raise:
                     raise e
                 logger.exception(
-                    "Failed to merge %s into Traefik's static config.Skipping...", extra_config
+                    f"Failed to merge {extra_config} into Traefik's static config. Skipping..."
                 )
                 # roll back any changes static_config_deep_merge might have done to static_config
                 static_config = previous
@@ -670,7 +670,7 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         try:
             static_config_raw = self._container.pull(STATIC_CONFIG_PATH).read()
         except PathError as e:
-            logger.error("Could not fetch static config from container; %s", e)
+            logger.error(f"Could not fetch static config from container; {e}")
             return {}
 
         return yaml.safe_load(static_config_raw)
@@ -712,11 +712,11 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         }
 
         self._container.add_layer(self._layer_name, cast(LayerDict, layer), combine=True)
-        logger.debug("replanning %s after a service update", self.service_name)
+        logger.debug("replanning %r after a service update", self.service_name)
         self._container.replan()
 
         if self.is_ready:
-            logger.debug("restarting %s", self.service_name)
+            logger.debug("restarting %r", self.service_name)
             self._container.restart(self.service_name)
 
     def delete_dynamic_configs(self) -> None:

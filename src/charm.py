@@ -1200,8 +1200,10 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
 
                 if not all([router_name, route_rule, service_name]):
                     logger.debug(
-                        f"Not enough information to generate a TLS config for {protocol}"
-                        f" router {router_name}!"
+                        (
+                            f"Not enough information to generate a TLS config for {protocol}"
+                            f" router {router_name}!"
+                        )
                     )
                     continue
 
