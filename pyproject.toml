@@ -42,6 +42,8 @@ dev = [
     "pytest-interface-tester>0.3",
     "types-pyyaml>=6.0.12.20241230",
     "mypy>=1.14.1",
+    "pylint>=3.2.7",
+    "pylint-pydantic>=0.3.5",
 ]
 
 [tool.uv]
@@ -114,3 +116,7 @@ namespace_packages = true
 [[tool.mypy.overrides]]
 disallow_untyped_defs = false
 module = "tests.*"
+
+# Disabling logging-fstring-interpolation
+[tool.pylint]
+disable = "wrong-import-order,fixme,logging-fstring-interpolation"

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
+# pylint: disable=too-many-lines,import-error
 
 """Charmed traefik operator."""
 
@@ -91,7 +92,7 @@ _TRAEFIK_CONTAINER_NAME = "traefik"
 # - Example invalid: "value@", "value#", "value space"
 ANNOTATION_VALUE_PATTERN = re.compile(r"^[\w.\-_]+$")
 
-# Based on https://github.com/kubernetes/apimachinery/blob/v0.31.3/pkg/util/validation/validation.go#L204  # noqa
+# Based on https://github.com/kubernetes/apimachinery/blob/v0.31.3/pkg/util/validation/validation.go#L204  # noqa  # pylint: disable=line-too-long
 # Regex for DNS1123 subdomains:
 # - Starts with a lowercase letter or number ([a-z0-9])
 # - May contain dashes (-), but not consecutively, and must not start or end with them
@@ -102,7 +103,7 @@ DNS1123_SUBDOMAIN_PATTERN = re.compile(
     r"^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$"
 )
 
-# Based on https://github.com/kubernetes/apimachinery/blob/v0.31.3/pkg/util/validation/validation.go#L32  # noqa
+# Based on https://github.com/kubernetes/apimachinery/blob/v0.31.3/pkg/util/validation/validation.go#L32  # noqa  # pylint: disable=line-too-long
 # Regex for Kubernetes qualified names:
 # - Starts with an alphanumeric character ([A-Za-z0-9])
 # - Can include dashes (-), underscores (_), dots (.), or alphanumeric characters in the middle
@@ -114,15 +115,17 @@ QUALIFIED_NAME_PATTERN = re.compile(r"^[A-Za-z0-9]([-A-Za-z0-9_.]*[A-Za-z0-9])?$
 
 LB_LABEL = "traefik-loadbalancer"
 
-PYDANTIC_IS_V1 = int(pydantic.version.VERSION.split(".")[0]) < 2
+PYDANTIC_IS_V1 = int(pydantic.version.VERSION.split(".")[0]) < 2  # pylint: disable=no-member
+
+CERTIFICATES_RELATION_NAME = "certificates"
 
 CERTIFICATES_RELATION_NAME = "certificates"
 
 
 class _IngressRelationType(enum.Enum):
-    per_app = "per_app"
-    per_unit = "per_unit"
-    routed = "routed"
+    PER_APP = "per_app"
+    PER_UNIT = "per_unit"
+    ROUTED = "routed"
 
 
 class IngressSetupError(Exception):
@@ -144,12 +147,12 @@ class ExternalHostNotReadyError(Exception):
         IngressPerAppRequirer,
     ),
 )
-class TraefikIngressCharm(CharmBase):
+class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attributes
     """Charm the service."""
 
     _stored = StoredState()
 
-    def __init__(self, *args):  # type: ignore[no-untyped-def]
+    def __init__(self, *args):  # type: ignore[no-untyped-def]  # pylint: disable=too-many-statements
         """Initialize the charm."""
         super().__init__(*args)
 
@@ -261,10 +264,7 @@ class TraefikIngressCharm(CharmBase):
                 self.csrs.append(csr)
             else:
                 logger.warning(
-                    (
-                        "Filtered out invalid certificate request for common_name: "
-                        f"'{csr.common_name}'"
-                    )
+                    "Filtered out invalid certificate request for common_name: %s", csr.common_name
                 )
         certs_refresh_events = [
             self.ingress_per_unit.on.endpoints_updated,
@@ -377,7 +377,7 @@ class TraefikIngressCharm(CharmBase):
         It is intentional that this method is ran on almost all events as this method will evolve
         as we refactor the charm to be more hollistic.
         """
-        self.traefik._cleanup_tls_configuration()
+        self.traefik.cleanup_tls_configuration()
 
     def _get_cert_requests(self) -> list:
         # For a TCP route there will be no scheme which will cause urlparse()
@@ -424,7 +424,7 @@ class TraefikIngressCharm(CharmBase):
             else:
                 # Skip creating certificate request if we have no valid common name
                 logger.warning(
-                    f"Skipping certificate request for address {addr} - no valid common name"
+                    "Skipping certificate request for address %s - no valid common name", addr
                 )
                 continue
             csrs.append(
@@ -551,7 +551,7 @@ class TraefikIngressCharm(CharmBase):
             return None
         if not (ingress_addresses := getattr(load_balancer_status, "ingress", None)):
             return None
-        if not (ingress_address := ingress_addresses[0]):
+        if not (ingress_address := ingress_addresses[0]):  # pylint: disable=unsubscriptable-object
             return None
 
         return ingress_address.hostname or ingress_address.ip
@@ -567,7 +567,7 @@ class TraefikIngressCharm(CharmBase):
             return False
         return True
 
-    def _on_forward_auth_config_changed(self, event: AuthConfigChangedEvent) -> None:
+    def _on_forward_auth_config_changed(self, _: AuthConfigChangedEvent) -> None:
         if self._is_forward_auth_enabled:
             if self.forward_auth.is_ready():
                 self._process_status_and_configurations()
@@ -579,7 +579,7 @@ class TraefikIngressCharm(CharmBase):
                 )
             )
 
-    def _on_forward_auth_config_removed(self, event: AuthConfigRemovedEvent) -> None:
+    def _on_forward_auth_config_removed(self, _: AuthConfigRemovedEvent) -> None:
         self._process_status_and_configurations()
 
     def _on_recv_ca_cert_available(self, event: CertificateTransferAvailableEvent) -> None:
@@ -642,7 +642,7 @@ class TraefikIngressCharm(CharmBase):
             return False
         return True
 
-    def _on_cert_changed(self, event: EventBase) -> None:
+    def _on_cert_changed(self, _: EventBase) -> None:
         # On slow machines, this event may come up before pebble is ready
         self._configure()
 
@@ -737,7 +737,7 @@ class TraefikIngressCharm(CharmBase):
         for provider in (self.ingress_per_unit, self.ingress_per_appv1, self.ingress_per_appv2):
             try:
                 result.update(provider.proxied_endpoints)
-            except Exception as e:
+            except Exception as e:  # pylint: disable=broad-exception-caught
                 remote_app_names = [
                     # relation.app could be None
                     (relation.app.name if relation.app else "<unknown-remote>")
@@ -750,7 +750,7 @@ class TraefikIngressCharm(CharmBase):
 
         # Replace hosts with gateway address if requested
         if use_gateway_address:
-            for app_name, endpoint_data in result.items():
+            for _app_name, endpoint_data in result.items():
                 if "url" in endpoint_data:
                     original_url = endpoint_data["url"]
                     parsed_url = urlparse(original_url)
@@ -763,7 +763,7 @@ class TraefikIngressCharm(CharmBase):
                     ):
                         # This is likely a TCP URL in "host:port" format
                         try:
-                            host, port = original_url.rsplit(":", 1)
+                            _host, port = original_url.rsplit(":", 1)
                             new_url = f"{self.gateway_address}:{port}"
                         except ValueError:
                             # Fallback: if parsing fails, keep original URL
@@ -783,7 +783,7 @@ class TraefikIngressCharm(CharmBase):
         ipu = self.ingress_per_unit
         for relation in ipu.relations:
             for unit in relation.units:
-                if unit._is_our_unit:
+                if unit._is_our_unit:  # pylint: disable=protected-access
                     # is this necessary?
                     continue
                 if not ipu.is_unit_ready(relation, unit):
@@ -903,6 +903,7 @@ class TraefikIngressCharm(CharmBase):
 
             self._process_status_and_configurations()
 
+    # pylint: disable=too-many-return-statements
     def _process_status_and_configurations(self) -> None:
         self._reconcile_lb()
         if (
@@ -1022,9 +1023,7 @@ class TraefikIngressCharm(CharmBase):
                 errors = True
 
         if errors:
-            logger.debug(
-                "unit in {!r}: {}".format(self.unit.status.name, self.unit.status.message)
-            )
+            logger.debug("unit in %r: %s", self.unit.status.name, self.unit.status.message)
             self.unit.status = BlockedStatus("setup of some ingress relation failed")
             logger.error("The setup of some ingress relation failed, see previous logs")
 
@@ -1094,7 +1093,7 @@ class TraefikIngressCharm(CharmBase):
             except IngressSetupError as e:
                 err_msg = e.args[0]
                 logger.error(
-                    f"failed processing the ingress relation for "
+                    "failed processing the ingress relation for "
                     f"traefik-route ready with: {err_msg!r}"
                 )
 
@@ -1172,7 +1171,7 @@ class TraefikIngressCharm(CharmBase):
         config = self.traefik_route.get_dynamic_config(relation)
         if not config:
             logger.warning(
-                f"traefik route config could not be accessed: "
+                "traefik route config could not be accessed: "
                 f"traefik_route.get_config({relation}) returned None"
             )
             return
@@ -1316,7 +1315,7 @@ class TraefikIngressCharm(CharmBase):
 
         if self.unit.is_leader():
             external_url = self._get_ingressed_app_url(prefix)
-            logger.debug(f"publishing external url for {relation.app.name}: {external_url}")
+            logger.debug("publishing external url for %s: %s", relation.app.name, external_url)
 
             ipa.publish_url(relation, external_url)
 
@@ -1388,9 +1387,9 @@ class TraefikIngressCharm(CharmBase):
         return f"{data['model']}-{name}"
 
     def _get_ingressed_app_url(self, prefix: str) -> str:
-        if self._routing_mode is RoutingMode.path:
+        if self._routing_mode is RoutingMode.PATH:
             url = f"{self._ingressed_scheme}://{self.ingressed_address}/{prefix}"
-        else:  # traefik.RoutingMode.subdomain
+        else:  # traefik.RoutingMode.SUBDOMAIN
             url = f"{self._ingressed_scheme}://{prefix}.{self.ingressed_address}/"
         return url
 
@@ -1402,7 +1401,7 @@ class TraefikIngressCharm(CharmBase):
     def _wipe_ingress_for_relation(
         self, relation: Relation, *, wipe_rel_data: bool = True
     ) -> None:
-        logger.debug(f"Wiping ingress for the '{relation.name}:{relation.id}' relation")
+        logger.debug("Wiping ingress for the '%s:%d' relation", relation.name, relation.id)
 
         # Delete configuration files for the relation. In case of Traefik pod
         # churns, and depending on the event ordering, we might be executing this
@@ -1413,7 +1412,7 @@ class TraefikIngressCharm(CharmBase):
             name = self._relation_config_file(relation)
             try:
                 self.traefik.delete_dynamic_config(name)
-                logger.debug(f"Deleted {name} ingress configuration file")
+                logger.debug("Deleted %s ingress configuration file", name)
             except (PathError, FileNotFoundError):
                 logger.debug("Configurations for '%s:%s' not found", relation.name, relation.id)
 
@@ -1442,7 +1441,7 @@ class TraefikIngressCharm(CharmBase):
     def _provider_from_relation(self, relation: Relation) -> Any:
         """Return the correct IngressProvider based on a relation."""
         relation_type = _get_relation_type(relation)
-        if relation_type is _IngressRelationType.per_app:
+        if relation_type is _IngressRelationType.PER_APP:
             # first try to tell if remote is speaking v2
             if self.ingress_per_appv2.is_ready(relation):
                 return self.ingress_per_appv2
@@ -1458,9 +1457,9 @@ class TraefikIngressCharm(CharmBase):
             # if neither ingress v1 nor v2 are ready, the relation is simply still empty and we
             # don't know yet what protocol we're speaking
             return self.ingress_per_appv1
-        if relation_type is _IngressRelationType.per_unit:
+        if relation_type is _IngressRelationType.PER_UNIT:
             return self.ingress_per_unit
-        if relation_type is _IngressRelationType.routed:
+        if relation_type is _IngressRelationType.ROUTED:
             return self.traefik_route
         raise RuntimeError(f"Invalid relation type: {relation_type} ({relation.name})")
 
@@ -1638,15 +1637,17 @@ def is_valid_hostname(hostname: str) -> bool:
 def validate_annotation_key(key: str) -> bool:
     """Validate the annotation key."""
     if len(key) > 253:
-        logger.error(f"Invalid annotation key: '{key}'. Key length exceeds 253 characters.")
+        logger.error("Invalid annotation key: '%s'. Key length exceeds 253 characters.", key)
         return False
 
     if not is_qualified_name(key.lower()):
-        logger.error(f"Invalid annotation key: '{key}'. Must follow Kubernetes annotation syntax.")
+        logger.error(
+            "Invalid annotation key: '%s'. Must follow Kubernetes annotation syntax.", key
+        )
         return False
 
     if key.startswith(("kubernetes.io/", "k8s.io/")):
-        logger.error(f"Invalid annotation: Key '{key}' uses a reserved prefix.")
+        logger.error("Invalid annotation: Key '%s' uses a reserved prefix.", key)
         return False
 
     return True
@@ -1656,7 +1657,7 @@ def validate_annotation_value(value: str) -> bool:
     """Validate the annotation value."""
     if not ANNOTATION_VALUE_PATTERN.match(value):
         logger.error(
-            f"Invalid annotation value: '{value}'. Must follow Kubernetes annotation syntax."
+            "Invalid annotation value: '%s'. Must follow Kubernetes annotation syntax.", value
         )
         return False
 
@@ -1715,13 +1716,14 @@ def is_qualified_name(value: str) -> bool:
 
 def _get_relation_type(relation: Relation) -> _IngressRelationType:
     if relation.name == "ingress":
-        return _IngressRelationType.per_app
+        return _IngressRelationType.PER_APP
     if relation.name == "ingress-per-unit":
-        return _IngressRelationType.per_unit
+        return _IngressRelationType.PER_UNIT
     if relation.name == "traefik-route":
-        return _IngressRelationType.routed
+        return _IngressRelationType.ROUTED
     raise RuntimeError("Invalid relation name (shouldn't happen)")
 
 
+# pylint: disable=not-callable
 if __name__ == "__main__":
     main(TraefikIngressCharm, use_juju_for_storage=True)  # type: ignore

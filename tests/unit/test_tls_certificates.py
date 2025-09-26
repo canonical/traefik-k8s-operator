@@ -156,7 +156,7 @@ def test_cleanup_tls_configuration(tls_enabled: bool):
         traefik_route_static_configs=[],
         topology=MagicMock(),
     )
-    traefik._cleanup_tls_configuration()
+    traefik.cleanup_tls_configuration()
     if not tls_enabled:
         container_mock.remove_path.assert_called_once()
     else:

@@ -56,8 +56,8 @@ class CA:
 class RoutingMode(enum.Enum):
     """Routing mode."""
 
-    path = "path"
-    subdomain = "subdomain"
+    PATH = "path"
+    SUBDOMAIN = "subdomain"
 
 
 class TraefikError(Exception):
@@ -88,7 +88,7 @@ def static_config_deep_merge(dict1: dict, dict2: dict, _path: Optional[list] = N
     return dict1
 
 
-class Traefik:
+class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-methods
     """Traefik workload representation."""
 
     port = 80
@@ -98,7 +98,7 @@ class Traefik:
     service_name = "traefik"
     _tracing_endpoint = None
 
-    def __init__(
+    def __init__(  # pylint: disable=too-many-arguments
         self,
         *,
         container: Container,
@@ -337,7 +337,7 @@ class Traefik:
         }
 
         if self._tracing_endpoint:
-            # ref: https://github.com/traefik/traefik/blob/v2.11/docs/content/observability/tracing/jaeger.md  # noqa
+            # ref: https://github.com/traefik/traefik/blob/v2.11/docs/content/observability/tracing/jaeger.md  # noqa  # pylint: disable=line-too-long
             # TODO once we bump to Traefik v3, Jaeger needs to be replaced with otlp and
             # config needs to be updated.
             # see https://doc.traefik.io/traefik/observability/tracing/opentelemetry/
@@ -379,7 +379,7 @@ class Traefik:
         # TODO Use the Traefik user and group?
         self._container.push(STATIC_CONFIG_PATH, config_yaml, make_dirs=True)
 
-    def get_per_unit_http_config(
+    def get_per_unit_http_config(  # pylint: disable=too-many-arguments
         self,
         *,
         prefix: str,
@@ -405,7 +405,7 @@ class Traefik:
             forward_auth_config=forward_auth_config,
         )
 
-    def get_per_app_http_config(
+    def get_per_app_http_config(  # pylint: disable=too-many-arguments
         self,
         *,
         prefix: str,
@@ -435,7 +435,7 @@ class Traefik:
             healthcheck_params=healthcheck_params,
         )
 
-    def get_per_leader_http_config(
+    def get_per_leader_http_config(  # pylint: disable=too-many-arguments
         self,
         *,
         prefix: str,
@@ -461,7 +461,7 @@ class Traefik:
             forward_auth_config=forward_auth_config,
         )
 
-    def _generate_config_block(
+    def _generate_config_block(  # pylint: disable=too-many-arguments,too-many-locals
         self,
         prefix: str,
         lb_servers: List[Dict[str, str]],
@@ -485,9 +485,9 @@ class Traefik:
         strip_prefix_: bool = strip_prefix if strip_prefix is not None else False
 
         host = external_host
-        if self._routing_mode is RoutingMode.path:
+        if self._routing_mode is RoutingMode.PATH:
             route_rule = f"PathPrefix(`/{prefix}`)"
-        else:  # _RoutingMode.subdomain
+        else:  # _RoutingMode.SUBDOMAIN
             route_rule = f"Host(`{prefix}.{host}`)"
 
         traefik_router_name = f"juju-{prefix}-router"
@@ -579,7 +579,7 @@ class Traefik:
 
         return config
 
-    def _generate_middleware_config(
+    def _generate_middleware_config(  # pylint: disable=too-many-arguments
         self,
         redirect_https: bool,
         strip_prefix: bool,
@@ -613,7 +613,7 @@ class Traefik:
                 }
 
         no_prefix_middleware = {}  # type: Dict[str, Dict[str, Any]]
-        if self._routing_mode is RoutingMode.path and strip_prefix:
+        if self._routing_mode is RoutingMode.PATH and strip_prefix:
             no_prefix_middleware[f"juju-sidecar-noprefix-{prefix}"] = {
                 "stripPrefix": {"prefixes": [f"/{prefix}"], "forceSlash": False}
             }
@@ -704,7 +704,7 @@ class Traefik:
                     "override": "replace",
                     "summary": "Traefik",
                     # trick to drop the logs to a file but also keep them available in the pod logs
-                    "command": '/bin/sh -c "{} | tee {}"'.format(BIN_PATH, LOG_PATH),
+                    "command": f'/bin/sh -c "{BIN_PATH} | tee {LOG_PATH}"',
                     "startup": "enabled",
                     "environment": environment,
                 },
@@ -712,11 +712,11 @@ class Traefik:
         }
 
         self._container.add_layer(self._layer_name, cast(LayerDict, layer), combine=True)
-        logger.debug(f"replanning {self.service_name!r} after a service update")
+        logger.debug("replanning %r after a service update", self.service_name)
         self._container.replan()
 
         if self.is_ready:
-            logger.debug(f"restarting {self.service_name!r}")
+            logger.debug("restarting %r", self.service_name)
             self._container.restart(self.service_name)
 
     def delete_dynamic_configs(self) -> None:
@@ -792,7 +792,7 @@ class Traefik:
         # set up the watcher
         self._container.make_dir(DYNAMIC_CONFIG_DIR, make_parents=True)
 
-    def _cleanup_tls_configuration(self) -> None:
+    def cleanup_tls_configuration(self) -> None:
         """Remove the Traefik certificates configuration if TLS is disabled."""
         if not self._tls_enabled and self._container.can_connect():
             # Remove certificates.yaml if TLS is not configured.
