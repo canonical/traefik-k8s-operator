@@ -542,7 +542,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
                 Service, name=self._lb_name, namespace=self.model.name
             )
         except ApiError as e:
-            logger.error("Failed to fetch LoadBalancer %s: %r", self._lb_name, e)
+            logger.error(f"Failed to fetch LoadBalancer {self._lb_name}: {e}")
             return None
 
         if not (status := getattr(traefik_service, "status", None)):
