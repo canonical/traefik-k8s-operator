@@ -542,7 +542,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
                 Service, name=self._lb_name, namespace=self.model.name
             )
         except ApiError as e:
-            logger.error("Failed to fetch LoadBalancer %s: %s", self._lb_name, e)
+            logger.error("Failed to fetch LoadBalancer %s: %r", self._lb_name, e)
             return None
 
         if not (status := getattr(traefik_service, "status", None)):
@@ -684,7 +684,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             cert, private_key = self.certs.get_assigned_certificate(certificate_request=csr)
             if cert is None:
                 # The cert provider has not responded yet.
-                logger.debug("No cert found for csr: %r", csr)
+                logger.debug(f"No cert found for csr: {csr}")
                 continue
             chain = [str(certificate) for certificate in cert.chain]
             if str(chain[0]) != str(cert.certificate):
@@ -744,12 +744,8 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
                     for relation in provider.relations
                 ]
                 logger.warning(
-                    (
-                        "Failed to fetch proxied endpoints from (at least one of) the "
-                        "remote apps %r with error %r."
-                    ),
-                    remote_app_names,
-                    str(e),
+                    f"failed to fetch proxied endpoints from (at least one of) the "
+                    f"remote apps {remote_app_names!r} with error {e}."
                 )
 
         # Replace hosts with gateway address if requested
@@ -1099,8 +1095,8 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             except IngressSetupError as e:
                 err_msg = e.args[0]
                 logger.error(
-                    "failed processing the ingress relation for traefik-route ready with: %s",
-                    err_msg,
+                    "failed processing the ingress relation for "
+                    f"traefik-route ready with: {err_msg!r}"
                 )
 
                 self.unit.status = ActiveStatus("traefik-route relation degraded")
@@ -1132,7 +1128,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         provider = self._provider_from_relation(relation)
 
         if not provider.is_ready(relation):
-            logger.debug("Provider %s not ready; resetting ingress configurations.", provider)
+            logger.debug(f"Provider {provider} not ready; resetting ingress configurations.")
             self._wipe_ingress_for_relation(relation)
             raise IngressSetupError(f"provider is not ready: ingress for {relation} wiped.")
 
@@ -1155,7 +1151,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             return None
 
         if not isinstance(config, dict):
-            logger.error("traefik route sent unexpected object: %s (expecting dict).", config)
+            logger.error(f"traefik route sent unexpected object: {config} (expecting dict).")
             return None
 
         return config
@@ -1178,8 +1174,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         if not config:
             logger.warning(
                 "traefik route config could not be accessed: "
-                "traefik_route.get_config(%s) returned None",
-                relation,
+                f"traefik_route.get_config({relation}) returned None"
             )
             return
 
@@ -1205,12 +1200,8 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
 
                 if not all([router_name, route_rule, service_name]):
                     logger.debug(
-                        (
-                            "Not enough information to generate a TLS config for %s",
-                            protocol,
-                            " router %s!",
-                            router_name,
-                        )
+                        f"Not enough information to generate a TLS config for {protocol}"
+                        f" router {router_name}!"
                     )
                     continue
 
@@ -1266,7 +1257,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         try:
             data = ipa.get_data(relation)
         except DataValidationError as e:
-            logger.error("invalid data shared through %s... Error: %s.", relation, e)
+            logger.error(f"invalid data shared through {relation}... Error: {e}.")
             return {}
 
         prefix = self._get_prefix(data)  # type: ignore
@@ -1293,13 +1284,13 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
 
         ipa = self.ingress_per_appv2
         if not relation.app:
-            logger.error("no app on relation %s", relation)
+            logger.error(f"no app on relation {relation}")
             return {}
 
         try:
             data = ipa.get_data(relation)
         except DataValidationError as e:
-            logger.error("invalid data shared through %s... Error: %s.", relation, e)
+            logger.error(f"invalid data shared through {relation}... Error: {e}.")
             return {}
 
         prefix = self._get_prefix(
@@ -1349,9 +1340,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             except DataValidationError as e:
                 # is_unit_ready should guard against no data being there yet,
                 # but if the data is invalid...
-                logger.error(
-                    "invalid data shared through %s by %s... Error: %s.", relation, unit, e
-                )
+                logger.error(f"invalid data shared through {relation} by {unit}... Error: {e}.")
                 continue
 
             prefix = self._get_prefix(data)  # type: ignore
@@ -1460,12 +1449,10 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             if self.ingress_per_appv1.is_ready(relation):
                 # todo: only warn once per relation
                 logger.warning(
-                    (
-                        "%s is using a deprecated ingress v1 protocol to talk to Traefik. "
-                        "Please inform the maintainers of %s that they should bump to v2."
-                    ),
-                    relation,
-                    getattr(relation.app, "name", "<unknown remote>"),
+                    f"{relation} is using a deprecated ingress v1 protocol to talk to Traefik. "
+                    f"Please inform the maintainers of "
+                    f"{getattr(relation.app, 'name', '<unknown remote>')!r} that they "
+                    f"should bump to v2."
                 )
             # if neither ingress v1 nor v2 are ready, the relation is simply still empty and we
             # don't know yet what protocol we're speaking
