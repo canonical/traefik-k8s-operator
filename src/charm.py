@@ -1023,9 +1023,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
                 errors = True
 
         if errors:
-            logger.debug(
-                "unit in {!r}: {}".format(self.unit.status.name, self.unit.status.message)
-            )
+            logger.debug("unit in %r: %s", self.unit.status.name, self.unit.status.message)
             self.unit.status = BlockedStatus("setup of some ingress relation failed")
             logger.error("The setup of some ingress relation failed, see previous logs")
 
