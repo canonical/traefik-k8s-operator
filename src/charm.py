@@ -17,13 +17,13 @@ from urllib.parse import urlparse
 
 import pydantic
 import yaml
-from charms.certificate_transfer_interface.v0.certificate_transfer import (
-    CertificateAvailableEvent as CertificateTransferAvailableEvent,
+from charms.certificate_transfer_interface.v1.certificate_transfer import (
+    CertificatesAvailableEvent as CertificateTransferAvailableEvent,
 )
-from charms.certificate_transfer_interface.v0.certificate_transfer import (
-    CertificateRemovedEvent as CertificateTransferRemovedEvent,
+from charms.certificate_transfer_interface.v1.certificate_transfer import (
+    CertificatesRemovedEvent as CertificateTransferRemovedEvent,
 )
-from charms.certificate_transfer_interface.v0.certificate_transfer import (
+from charms.certificate_transfer_interface.v1.certificate_transfer import (
     CertificateTransferRequires,
 )
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
@@ -332,13 +332,13 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             self._on_cert_changed,
         )
         observe(
-            self.recv_ca_cert.on.certificate_available,  # pyright: ignore
+            self.recv_ca_cert.on.certificate_set_updated,  # pyright: ignore
             self._on_recv_ca_cert_available,
         )
         observe(
             # Need to observe a managed relation event because a custom wrapper is not available
             # https://github.com/canonical/mutual-tls-interface/issues/5
-            self.recv_ca_cert.on.certificate_removed,  # pyright: ignore
+            self.recv_ca_cert.on.certificates_removed,  # pyright: ignore
             self._on_recv_ca_cert_removed,
         )
 
@@ -601,7 +601,8 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         """
         cas = []
         if event:
-            cas.append(CA(event.ca, uid=event.relation_id))
+            for cert in event.certificates:
+                cas.append(CA(cert, uid=event.relation_id))
         else:
             for relation in self.model.relations.get(self.recv_ca_cert.relationship_name, []):
                 # For some reason, relation.units includes our unit and app. Need to exclude them.
