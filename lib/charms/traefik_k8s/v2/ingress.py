@@ -72,6 +72,7 @@ from typing import (
 )
 
 import pydantic
+from ops import EventBase
 from ops.charm import CharmBase, RelationBrokenEvent, RelationEvent
 from ops.framework import EventSource, Object, ObjectEvents, StoredState
 from ops.model import ModelError, Relation, Unit
@@ -85,7 +86,7 @@ LIBAPI = 2
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 17
+LIBPATCH = 19
 
 PYDEPS = ["pydantic"]
 
@@ -112,8 +113,10 @@ if PYDANTIC_IS_V1:  # noqa
 
         _NEST_UNDER = None
 
+        # Annotating -> "DatabagModel" as the return type here doesn't sit well with pyright
+        # We are disabling this line for now and come back to it later.
         @classmethod
-        def load(cls, databag: MutableMapping):
+        def load(cls, databag: MutableMapping):  # type: ignore[no-untyped-def]
             """Load this model from a Juju databag."""
             if cls._NEST_UNDER:
                 return cls.parse_obj(json.loads(databag[cls._NEST_UNDER]))
@@ -137,7 +140,7 @@ if PYDANTIC_IS_V1:  # noqa
                 log.debug(msg, exc_info=True)
                 raise DataValidationError(msg) from e
 
-        def dump(self, databag: Optional[MutableMapping] = None, clear: bool = True):
+        def dump(self, databag: Optional[MutableMapping] = None, clear: bool = True) -> Any:
             """Write the contents of this model to Juju databag.
 
             :param databag: the databag to write the data to.
@@ -161,9 +164,9 @@ if PYDANTIC_IS_V1:  # noqa
 else:
     from pydantic import ConfigDict, field_validator
 
-    input_validator = partial(field_validator, mode="before")
+    input_validator = partial(field_validator, mode="before")  # type: ignore
 
-    class DatabagModel(BaseModel):
+    class DatabagModel(BaseModel):  # type: ignore
         """Base databag model."""
 
         model_config = ConfigDict(
@@ -177,8 +180,10 @@ else:
         )  # type: ignore
         """Pydantic config."""
 
+        # Annotating -> "DatabagModel" as the return type here doesn't sit well with pyright
+        # We are disabling this line for now and come back to it later.
         @classmethod
-        def load(cls, databag: MutableMapping):
+        def load(cls, databag: MutableMapping):  # type: ignore[no-untyped-def]
             """Load this model from a Juju databag."""
             nest_under = cls.model_config.get("_NEST_UNDER")
             if nest_under:
@@ -203,7 +208,7 @@ else:
                 log.debug(msg, exc_info=True)
                 raise DataValidationError(msg) from e
 
-        def dump(self, databag: Optional[MutableMapping] = None, clear: bool = True):
+        def dump(self, databag: Optional[MutableMapping] = None, clear: bool = True) -> Any:
             """Write the contents of this model to Juju databag.
 
             :param databag: the databag to write the data to.
@@ -294,15 +299,17 @@ class IngressRequirerAppData(DatabagModel):
         default="http", description="What scheme to use in the generated ingress url"
     )
 
+    # pydantic wants 'cls' as first arg
     @input_validator("scheme")
-    def validate_scheme(cls, scheme):  # noqa: N805  # pydantic wants 'cls' as first arg
+    def validate_scheme(cls, scheme: str) -> str:  # noqa: N805
         """Validate scheme arg."""
         if scheme not in {"http", "https", "h2c"}:
             raise ValueError("invalid scheme: should be one of `http|https|h2c`")
         return scheme
 
+    # pydantic wants 'cls' as first arg
     @input_validator("port")
-    def validate_port(cls, port):  # noqa: N805  # pydantic wants 'cls' as first arg
+    def validate_port(cls, port: int) -> int:  # noqa: N805
         """Validate port."""
         assert isinstance(port, int), type(port)
         assert 0 < port < 65535, "port out of TCP range"
@@ -319,14 +326,16 @@ class IngressRequirerUnitData(DatabagModel):
         "IP can only be None if the IP information can't be retrieved from juju.",
     )
 
+    # pydantic wants 'cls' as first arg
     @input_validator("host")
-    def validate_host(cls, host):  # noqa: N805  # pydantic wants 'cls' as first arg
+    def validate_host(cls, host: str) -> str:  # noqa: N805
         """Validate host."""
         assert isinstance(host, str), type(host)
         return host
 
+    # pydantic wants 'cls' as first arg
     @input_validator("ip")
-    def validate_ip(cls, ip):  # noqa: N805  # pydantic wants 'cls' as first arg
+    def validate_ip(cls, ip: str) -> Optional[str]:  # noqa: N805
         """Validate ip."""
         if ip is None:
             return None
@@ -385,19 +394,19 @@ class _IngressPerAppBase(Object):
         observe(charm.on.upgrade_charm, self._handle_upgrade_or_leader)  # type: ignore
 
     @property
-    def relations(self):
+    def relations(self) -> List[Relation]:
         """The list of Relation instances associated with this endpoint."""
         return list(self.charm.model.relations[self.relation_name])
 
-    def _handle_relation(self, event):
+    def _handle_relation(self, event: RelationEvent) -> None:
         """Subclasses should implement this method to handle a relation update."""
         pass
 
-    def _handle_relation_broken(self, event):
+    def _handle_relation_broken(self, event: RelationEvent) -> None:
         """Subclasses should implement this method to handle a relation breaking."""
         pass
 
-    def _handle_upgrade_or_leader(self, event):
+    def _handle_upgrade_or_leader(self, event: EventBase) -> None:
         """Subclasses should implement this method to handle upgrades or leadership change."""
         pass
 
@@ -407,10 +416,10 @@ class _IPAEvent(RelationEvent):
     __optional_kwargs__: Dict[str, Any] = {}
 
     @classmethod
-    def __attrs__(cls):
+    def __attrs__(cls):  # type: ignore
         return cls.__args__ + tuple(cls.__optional_kwargs__.keys())
 
-    def __init__(self, handle, relation, *args, **kwargs):
+    def __init__(self, handle, relation, *args, **kwargs):  # type: ignore
         super().__init__(handle, relation)
 
         if not len(self.__args__) == len(args):
@@ -422,7 +431,7 @@ class _IPAEvent(RelationEvent):
             obj = kwargs.get(attr, default)
             setattr(self, attr, obj)
 
-    def snapshot(self):
+    def snapshot(self) -> Dict[str, Any]:
         dct = super().snapshot()
         for attr in self.__attrs__():
             obj = getattr(self, attr)
@@ -437,7 +446,7 @@ class _IPAEvent(RelationEvent):
 
         return dct
 
-    def restore(self, snapshot) -> None:
+    def restore(self, snapshot: Any) -> None:
         super().restore(snapshot)
         for attr, obj in snapshot.items():
             setattr(self, attr, obj)
@@ -500,7 +509,7 @@ class IngressPerAppProvider(_IngressPerAppBase):
         """
         super().__init__(charm, relation_name)
 
-    def _handle_relation(self, event):
+    def _handle_relation(self, event: RelationEvent) -> None:
         # created, joined or changed: if remote side has sent the required data:
         # notify listeners.
         if self.is_ready(event.relation):
@@ -517,10 +526,10 @@ class IngressPerAppProvider(_IngressPerAppBase):
                 data.app.redirect_https or False,
             )
 
-    def _handle_relation_broken(self, event):
+    def _handle_relation_broken(self, event: RelationEvent) -> None:
         self.on.data_removed.emit(event.relation, event.relation.app)  # type: ignore
 
-    def wipe_ingress_data(self, relation: Relation):
+    def wipe_ingress_data(self, relation: Relation) -> None:
         """Clear ingress data from relation."""
         assert self.unit.is_leader(), "only leaders can do this"
         try:
@@ -544,7 +553,7 @@ class IngressPerAppProvider(_IngressPerAppBase):
             databag = relation.data[unit]
             try:
                 data = IngressRequirerUnitData.load(databag)
-                out.append(data)
+                out.append(cast(IngressRequirerUnitData, data))
             except pydantic.ValidationError:
                 log.info(f"failed to validate remote unit data for {unit}")
                 raise
@@ -558,7 +567,7 @@ class IngressPerAppProvider(_IngressPerAppBase):
             raise NotReadyError(relation)
 
         databag = relation.data[app]
-        return IngressRequirerAppData.load(databag)
+        return cast(IngressRequirerAppData, IngressRequirerAppData.load(databag))
 
     def get_data(self, relation: Relation) -> IngressRequirerData:
         """Fetch the remote (requirer) app and units' databags."""
@@ -571,7 +580,7 @@ class IngressPerAppProvider(_IngressPerAppBase):
                 "failed to validate ingress requirer data: %s" % str(e)
             ) from e
 
-    def is_ready(self, relation: Optional[Relation] = None):
+    def is_ready(self, relation: Optional[Relation] = None) -> bool:
         """The Provider is ready if the requirer has sent valid data."""
         if not relation:
             return any(map(self.is_ready, self.relations))
@@ -599,7 +608,7 @@ class IngressPerAppProvider(_IngressPerAppBase):
 
         return IngressProviderAppData.load(databag)
 
-    def publish_url(self, relation: Relation, url: str):
+    def publish_url(self, relation: Relation, url: str) -> None:
         """Publish to the app databag the ingress url."""
         ingress_url = {"url": url}
         try:
@@ -658,8 +667,7 @@ class IngressPerAppProvider(_IngressPerAppBase):
                 continue
 
             # Validation above means ingress cannot be None, but type checker doesn't know that.
-            ingress = ingress_data.ingress
-            ingress = cast(IngressProviderAppData, ingress)
+            ingress = cast(IngressProviderAppData, ingress_data.ingress)
             if PYDANTIC_IS_V1:
                 results[ingress_relation.app.name] = ingress.dict()
             else:
@@ -694,6 +702,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
     # used to prevent spurious urls to be sent out if the event we're currently
     # handling is a relation-broken one.
     _stored = StoredState()
+    _auto_data: Optional[Tuple[Optional[str], Optional[str], int]]
 
     def __init__(
         self,
@@ -767,7 +776,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         else:
             self._auto_data = None
 
-    def _handle_relation(self, event):
+    def _handle_relation(self, event: RelationEvent) -> None:
         # created, joined or changed: if we have auto data: publish it
         self._publish_auto_data()
         if self.is_ready():
@@ -781,15 +790,15 @@ class IngressPerAppRequirer(_IngressPerAppBase):
                 self._stored.current_url = new_url  # type: ignore
                 self.on.ready.emit(event.relation, new_url)  # type: ignore
 
-    def _handle_relation_broken(self, event):
+    def _handle_relation_broken(self, event: RelationEvent) -> None:
         self._stored.current_url = None  # type: ignore
         self.on.revoked.emit(relation=event.relation, app=event.relation.app)  # type: ignore
 
-    def _handle_upgrade_or_leader(self, event):
+    def _handle_upgrade_or_leader(self, event: EventBase) -> None:
         """On upgrade/leadership change: ensure we publish the data we have."""
         self._publish_auto_data()
 
-    def is_ready(self):
+    def is_ready(self) -> bool:
         """The Requirer is ready if the Provider has sent valid data."""
         try:
             return bool(self._get_url_from_relation_data())
@@ -797,7 +806,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
             log.debug("Requirer not ready; validation error encountered: %s" % str(e))
             return False
 
-    def _publish_auto_data(self):
+    def _publish_auto_data(self) -> None:
         if self._auto_data:
             host, ip, port = self._auto_data
             self.provide_ingress_requirements(host=host, ip=ip, port=port)
@@ -809,7 +818,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         host: Optional[str] = None,
         ip: Optional[str] = None,
         port: int,
-    ):
+    ) -> None:
         """Publishes the data that Traefik needs to provide ingress.
 
         Args:
@@ -830,7 +839,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         ip: Optional[str],
         port: int,
         relation: Relation,
-    ):
+    ) -> None:
         if self.unit.is_leader():
             self._publish_app_data(scheme, port, relation)
 
@@ -841,7 +850,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         host: Optional[str],
         ip: Optional[str],
         relation: Relation,
-    ):
+    ) -> None:
         if not host:
             host = socket.getfqdn()
 
@@ -868,7 +877,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         scheme: Optional[str],
         port: int,
         relation: Relation,
-    ):
+    ) -> None:
         # assumes leadership!
         app_databag = relation.data[self.app]
 
@@ -897,7 +906,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
             raise DataValidationError(msg) from e
 
     @property
-    def relation(self):
+    def relation(self) -> Optional[Relation]:
         """The established Relation instance, or None."""
         return self.relations[0] if self.relations else None
 
@@ -923,7 +932,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         if not databag:  # not ready yet
             return None
 
-        ingress = IngressProviderAppData.load(databag).ingress
+        ingress = cast(IngressProviderAppData, IngressProviderAppData.load(databag)).ingress
         if ingress is None:
             return None
 

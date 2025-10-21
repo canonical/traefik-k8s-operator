@@ -56,8 +56,8 @@ class CA:
 class RoutingMode(enum.Enum):
     """Routing mode."""
 
-    path = "path"
-    subdomain = "subdomain"
+    PATH = "path"
+    SUBDOMAIN = "subdomain"
 
 
 class TraefikError(Exception):
@@ -72,7 +72,7 @@ class StaticConfigMergeConflictError(TraefikError):
     """Raised when static configs coming from different sources can't be merged."""
 
 
-def static_config_deep_merge(dict1: dict, dict2: dict, _path=None):
+def static_config_deep_merge(dict1: dict, dict2: dict, _path: Optional[list] = None) -> dict:
     """In-place deep merge dict2 into dict1."""
     _path = _path or []
 
@@ -88,7 +88,7 @@ def static_config_deep_merge(dict1: dict, dict2: dict, _path=None):
     return dict1
 
 
-class Traefik:
+class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-methods
     """Traefik workload representation."""
 
     port = 80
@@ -98,7 +98,7 @@ class Traefik:
     service_name = "traefik"
     _tracing_endpoint = None
 
-    def __init__(
+    def __init__(  # pylint: disable=too-many-arguments
         self,
         *,
         container: Container,
@@ -143,7 +143,7 @@ class Traefik:
             }
         ]
 
-    def _update_tls_configuration(self):
+    def _update_tls_configuration(self) -> None:
         """Generate and push tls config yaml for traefik."""
         cert_files = [
             x.path for x in self._container.list_files(CERTS_DIR) if x.path.endswith(".cert")
@@ -178,7 +178,7 @@ class Traefik:
         )
         self._container.push(DYNAMIC_CERTS_PATH, config, make_dirs=True)
 
-    def configure(self):
+    def configure(self) -> None:
         """Configure static and render TLS configuration based on existing certificates."""
         # Ensure the required basic configurations and folders exist
         static_config = self.generate_static_config()
@@ -189,7 +189,7 @@ class Traefik:
         if self._tls_enabled:
             self._update_tls_configuration()
 
-    def update_cert_configuration(self, certs: dict):  # noqa: C901
+    def update_cert_configuration(self, certs: dict) -> None:
         """Update the server cert, ca, and key configuration files."""
         # Remove certs that are no longer needed.
         if certs:
@@ -241,7 +241,7 @@ class Traefik:
                     logger.exception("Error removing ca cert file.")
                     continue
 
-    def add_cas(self, cas: Iterable[CA]):
+    def add_cas(self, cas: Iterable[CA]) -> None:
         """Add any number of CAs to Traefik.
 
         Calls update-ca-certificates once done.
@@ -250,7 +250,7 @@ class Traefik:
             self._add_ca(ca)
         self.update_ca_certs()
 
-    def _add_ca(self, ca: CA):
+    def _add_ca(self, ca: CA) -> None:
         """Add a ca.
 
         After doing this (any number of times),
@@ -258,7 +258,7 @@ class Traefik:
         """
         self._container.push(ca.path, ca.ca, make_dirs=True)
 
-    def remove_cas(self, uids: Iterable[Union[str, int]]):
+    def remove_cas(self, uids: Iterable[Union[str, int]]) -> None:
         """Remove all CAs with these UIDs.
 
         BEWARE of potential race conditions.
@@ -273,7 +273,7 @@ class Traefik:
             self._container.remove_path(ca_path)
         self.update_ca_certs()
 
-    def update_ca_certs(self):
+    def update_ca_certs(self) -> None:
         """Update ca certificates and restart traefik."""
         self._container.exec(["update-ca-certificates", "--fresh"]).wait()
 
@@ -337,7 +337,7 @@ class Traefik:
         }
 
         if self._tracing_endpoint:
-            # ref: https://github.com/traefik/traefik/blob/v2.11/docs/content/observability/tracing/jaeger.md  # noqa
+            # ref: https://github.com/traefik/traefik/blob/v2.11/docs/content/observability/tracing/jaeger.md  # noqa  # pylint: disable=line-too-long
             # TODO once we bump to Traefik v3, Jaeger needs to be replaced with otlp and
             # config needs to be updated.
             # see https://doc.traefik.io/traefik/observability/tracing/opentelemetry/
@@ -373,13 +373,13 @@ class Traefik:
 
         return static_config
 
-    def push_static_config(self, config: Dict[str, Any]):
+    def push_static_config(self, config: Dict[str, Any]) -> None:
         """Push static config yaml to the container."""
         config_yaml = yaml.safe_dump(config)
         # TODO Use the Traefik user and group?
         self._container.push(STATIC_CONFIG_PATH, config_yaml, make_dirs=True)
 
-    def get_per_unit_http_config(
+    def get_per_unit_http_config(  # pylint: disable=too-many-arguments
         self,
         *,
         prefix: str,
@@ -405,7 +405,7 @@ class Traefik:
             forward_auth_config=forward_auth_config,
         )
 
-    def get_per_app_http_config(
+    def get_per_app_http_config(  # pylint: disable=too-many-arguments
         self,
         *,
         prefix: str,
@@ -435,7 +435,7 @@ class Traefik:
             healthcheck_params=healthcheck_params,
         )
 
-    def get_per_leader_http_config(
+    def get_per_leader_http_config(  # pylint: disable=too-many-arguments
         self,
         *,
         prefix: str,
@@ -461,7 +461,7 @@ class Traefik:
             forward_auth_config=forward_auth_config,
         )
 
-    def _generate_config_block(
+    def _generate_config_block(  # pylint: disable=too-many-arguments,too-many-locals
         self,
         prefix: str,
         lb_servers: List[Dict[str, str]],
@@ -485,9 +485,9 @@ class Traefik:
         strip_prefix_: bool = strip_prefix if strip_prefix is not None else False
 
         host = external_host
-        if self._routing_mode is RoutingMode.path:
+        if self._routing_mode is RoutingMode.PATH:
             route_rule = f"PathPrefix(`/{prefix}`)"
-        else:  # _RoutingMode.subdomain
+        else:  # _RoutingMode.SUBDOMAIN
             route_rule = f"Host(`{prefix}.{host}`)"
 
         traefik_router_name = f"juju-{prefix}-router"
@@ -579,7 +579,7 @@ class Traefik:
 
         return config
 
-    def _generate_middleware_config(
+    def _generate_middleware_config(  # pylint: disable=too-many-arguments
         self,
         redirect_https: bool,
         strip_prefix: bool,
@@ -613,7 +613,7 @@ class Traefik:
                 }
 
         no_prefix_middleware = {}  # type: Dict[str, Dict[str, Any]]
-        if self._routing_mode is RoutingMode.path and strip_prefix:
+        if self._routing_mode is RoutingMode.PATH and strip_prefix:
             no_prefix_middleware[f"juju-sidecar-noprefix-{prefix}"] = {
                 "stripPrefix": {"prefixes": [f"/{prefix}"], "forceSlash": False}
             }
@@ -676,13 +676,13 @@ class Traefik:
         return yaml.safe_load(static_config_raw)
 
     @property
-    def is_ready(self):
+    def is_ready(self) -> bool:
         """Whether the traefik service is running."""
         if not self._container.can_connect():
             return False
         return bool(self._container.get_services(self.service_name))
 
-    def restart(self):
+    def restart(self) -> None:
         """Restart the pebble service."""
         environment = {}
         if self._tracing_endpoint:
@@ -704,7 +704,7 @@ class Traefik:
                     "override": "replace",
                     "summary": "Traefik",
                     # trick to drop the logs to a file but also keep them available in the pod logs
-                    "command": '/bin/sh -c "{} | tee {}"'.format(BIN_PATH, LOG_PATH),
+                    "command": f'/bin/sh -c "{BIN_PATH} | tee {LOG_PATH}"',
                     "startup": "enabled",
                     "environment": environment,
                 },
@@ -712,25 +712,25 @@ class Traefik:
         }
 
         self._container.add_layer(self._layer_name, cast(LayerDict, layer), combine=True)
-        logger.debug(f"replanning {self.service_name!r} after a service update")
+        logger.debug("replanning %r after a service update", self.service_name)
         self._container.replan()
 
         if self.is_ready:
-            logger.debug(f"restarting {self.service_name!r}")
+            logger.debug("restarting %r", self.service_name)
             self._container.restart(self.service_name)
 
-    def delete_dynamic_configs(self):
+    def delete_dynamic_configs(self) -> None:
         """Delete **ALL** yamls from the dynamic config dir."""
         # instead of multiple calls to self._container.remove_path(), delete all files in a swoop
         self._container.exec(["find", DYNAMIC_CONFIG_DIR, "-name", "*.yaml", "-delete"])
         logger.debug("Deleted all dynamic configuration files.")
 
-    def delete_dynamic_config(self, file_name: str):
+    def delete_dynamic_config(self, file_name: str) -> None:
         """Delete a specific yaml from the dynamic config dir."""
         self._container.remove_path(Path(DYNAMIC_CONFIG_DIR) / file_name)
         logger.debug("Deleted dynamic configuration file: %s", file_name)
 
-    def add_dynamic_config(self, file_name: str, config: str):
+    def add_dynamic_config(self, file_name: str, config: str) -> None:
         """Push a yaml to the dynamic config dir.
 
         The dynamic config dir is assumed to exist already.
@@ -744,7 +744,7 @@ class Traefik:
         logger.debug("Updated dynamic configuration file: %s", file_name)
 
     @property
-    def version(self):
+    def version(self) -> Optional[str]:
         """Traefik workload version."""
         version_output, _ = self._container.exec([BIN_PATH, "version"]).wait_output()
         # Output looks like this:
@@ -787,12 +787,12 @@ class Traefik:
         }
         return config
 
-    def _setup_dynamic_config_folder(self):
+    def _setup_dynamic_config_folder(self) -> None:
         # ensure the dynamic config dir exists else traefik will error on startup and fail to
         # set up the watcher
         self._container.make_dir(DYNAMIC_CONFIG_DIR, make_parents=True)
 
-    def _cleanup_tls_configuration(self):
+    def cleanup_tls_configuration(self) -> None:
         """Remove the Traefik certificates configuration if TLS is disabled."""
         if not self._tls_enabled and self._container.can_connect():
             # Remove certificates.yaml if TLS is not configured.
