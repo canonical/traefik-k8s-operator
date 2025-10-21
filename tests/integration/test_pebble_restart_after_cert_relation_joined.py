@@ -2,23 +2,23 @@
 # Copyright 2025 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-"""This module tests that after a certificates relation is joined by Traefik that it can successfully route traffic to HTTPS endpoints."""
+"""This module tests that after a certificates relation is joined by Traefik t
+hat it can successfully route traffic to HTTPS endpoints.
+"""
 
 import asyncio
 import logging
 from pathlib import Path
-from urllib.request import urlopen
 
 import pytest
+import requests
 import yaml
 from pytest_operator.plugin import OpsTest
 
 from tests.integration.helpers import (
-    delete_k8s_service,
     get_k8s_service_address,
-    remove_application,
 )
-import requests
+
 logger = logging.getLogger(__name__)
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
@@ -53,8 +53,8 @@ async def test_build_and_deploy(ops_test: OpsTest, traefik_charm):
     )
 
     await asyncio.gather(
-        ops_test.model.add_relation(f"alertmanager:ingress", "traefik"),
-        ops_test.model.add_relation(f"ssc:certificates", "alertmanager"),
+        ops_test.model.add_relation("alertmanager:ingress", "traefik"),
+        ops_test.model.add_relation("ssc:certificates", "alertmanager"),
     )
 
     await ops_test.model.wait_for_idle(status="active", timeout=600, idle_period=30)
@@ -63,9 +63,9 @@ async def test_build_and_deploy(ops_test: OpsTest, traefik_charm):
 @pytest.mark.abort_on_fail
 async def test_can_route_ingress_using_tls(ops_test: OpsTest):
     await asyncio.gather(
-        ops_test.model.add_relation(f"ssc:certificates", "traefik"),
+        ops_test.model.add_relation("ssc:certificates", "traefik"),
     )
-    
+
     traefik_address = await get_k8s_service_address(ops_test, "traefik-lb")
 
     # Both HTTP and HTTPS should work
