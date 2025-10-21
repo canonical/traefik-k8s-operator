@@ -885,6 +885,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
 
         self._configure_traefik()
         self._update_cert_configs()
+        self._restart_traefik()
         self._process_status_and_configurations()
 
     def _update_config_if_changed(self) -> None:
@@ -900,8 +901,9 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             if self._is_tls_enabled():
                 # we keep this nested under the hash-check because, unless the tls config has
                 # changed, we don't need to redo this.
-                self._update_cert_configs()
                 self._configure_traefik()
+                self._update_cert_configs()
+                self._restart_traefik()
 
             self._process_status_and_configurations()
 

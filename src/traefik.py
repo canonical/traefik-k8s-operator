@@ -274,14 +274,8 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         self.update_ca_certs()
 
     def update_ca_certs(self) -> None:
-        """Update ca certificates and restart traefik."""
+        """Update ca certificates. Traefik will restart from inside charm.py."""
         self._container.exec(["update-ca-certificates", "--fresh"]).wait()
-
-        # Must restart traefik after refreshing certs, otherwise:
-        # - newly added certs will not be loaded and traefik will keep erroring-out with "signed by
-        #   unknown authority".
-        # - old certs will be kept active.
-        self.restart()
 
     def generate_static_config(self, _raise: bool = False) -> Dict[str, Any]:
         """Generate Traefik's static config yaml."""
