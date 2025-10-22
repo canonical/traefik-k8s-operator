@@ -82,4 +82,7 @@ async def test_can_route_ingress_using_tls(ops_test: OpsTest):
     # Ensure we are able to get a 200 when calling AM. The helper asserts the status code.
     fetch_with_retry(alertmanager_address)
 
-
+    alertmanager_address_http = alertmanager_address.replace("https://", "http://")
+    # Ensure we are able to get a 200 when calling AM. The helper asserts the status code.
+    # This should also work with HTTP.
+    fetch_with_retry(alertmanager_address_http)
