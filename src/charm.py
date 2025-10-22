@@ -882,8 +882,10 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         self._reconcile_lb()
         if not self.container.can_connect():
             return
+
         self._update_cert_configs()
         self._configure_traefik()
+        self._restart_traefik()
         self._process_status_and_configurations()
 
     def _update_config_if_changed(self) -> None:
@@ -901,6 +903,8 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
                 # changed, we don't need to redo this.
                 self._update_cert_configs()
                 self._configure_traefik()
+
+                self._restart_traefik()
 
             self._process_status_and_configurations()
 

@@ -201,7 +201,6 @@ async def test_ipa_ingressed_through_upstream_ingress_with_tls(ops_test: OpsTest
         200,
     )
 
-
 @pytest.mark.abort_on_fail
 async def test_ipu_ingressed_through_upstream_ingress_with_tls(ops_test: OpsTest):
     """Assert that the IPU app can be reached through the layered ingresses with TLS enabled."""
@@ -213,7 +212,6 @@ async def test_ipu_ingressed_through_upstream_ingress_with_tls(ops_test: OpsTest
         ),
         200,
     )
-
 
 @pytest.mark.abort_on_fail
 async def test_traefik_route_ingressed_through_upstream_ingress_with_tls(ops_test: OpsTest):
@@ -238,7 +236,6 @@ async def get_traefik_url(ops_test: OpsTest, traefik_app_name: str = TRAEFIK):
     external_endpoints_action_results = (await external_endpoints_action.wait()).results
     external_endpoints = yaml.safe_load(external_endpoints_action_results["external-endpoints"])
     return external_endpoints[traefik_app_name]["url"]
-
 
 @retry(wait=wait_fixed(2), stop=stop_after_delay(5 * 1))
 def assert_get_url_returns(url: str, expected: int):

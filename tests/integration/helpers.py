@@ -12,7 +12,7 @@ from juju.application import Application
 from juju.unit import Unit
 from minio import Minio
 from pytest_operator.plugin import OpsTest
-from tenacity import retry, stop_after_attempt, wait_exponential
+from tenacity import retry, stop_after_attempt, wait_exponential, wait_fixed
 
 logger = logging.getLogger(__name__)
 
@@ -210,3 +210,13 @@ async def get_application_ip(ops_test: OpsTest, app_name: str) -> str:
     status = await ops_test.model.get_status()
     app = status["applications"][app_name]
     return app.public_address
+
+@retry(
+    wait=wait_fixed(5),
+    stop=stop_after_attempt(5),
+)
+def fetch_with_retry(url: str) -> requests.Response:
+    response = requests.get(url, verify=False, allow_redirects=True)
+    if response.status_code != 200:
+        raise AssertionError(f"Expected status 200, got {response.status_code}")
+    return response
