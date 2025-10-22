@@ -11,14 +11,11 @@ import logging
 from pathlib import Path
 
 import pytest
-import requests
 import yaml
-from pytest_operator.plugin import OpsTest
-from tenacity import retry, stop_after_attempt, wait_fixed
 from helpers import fetch_with_retry
+from pytest_operator.plugin import OpsTest
 
 logger = logging.getLogger(__name__)
-import time
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 resources = {"traefik-image": METADATA["resources"]["traefik-image"]["upstream-source"]}
 mock_hostname = "juju.local"
@@ -71,17 +68,18 @@ async def test_build_and_deploy(ops_test: OpsTest, traefik_charm):
 
 @pytest.mark.abort_on_fail
 async def test_can_route_ingress_using_tls(ops_test: OpsTest):
-    # It's important to test the behaviour by integrating traefik and ssc at this stage, after traefik has already been active/idle, meaning pebble has started traefik.
+    # Important to test integrating traefik and ssc here, after traefik has been active/idle.
+    # This means pebble has started traefik.
     # This helps ascertain that Traefik behaves as expected when it is related to SSC.
     await asyncio.gather(
         ops_test.model.add_relation("ssc:certificates", "traefik"),
     )
 
     traefik_address = await get_traefik_url(ops_test, "traefik")
-    
+
     alertmanager_address = f"{traefik_address}/{ops_test.model.info.name}-alertmanager"
 
     # Ensure we are able to get a 200 when calling AM. The helper asserts the status code.
-    response = fetch_with_retry(alertmanager_address)
+    fetch_with_retry(alertmanager_address)
 
 
