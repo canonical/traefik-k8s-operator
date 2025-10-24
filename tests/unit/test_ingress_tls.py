@@ -1,4 +1,3 @@
-# TODO: Add a module docstring explaining that this is either a ingressed app's TLS or Traefik's TLS test
 from unittest.mock import MagicMock, PropertyMock, patch
 
 import pytest

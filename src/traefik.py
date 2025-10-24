@@ -497,7 +497,10 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         if self._tls_enabled:
             router_cfg.update(
                 self.generate_tls_config_for_route(
-                    traefik_router_name, route_rule, traefik_service_name, external_host=external_host
+                    traefik_router_name,
+                    route_rule,
+                    traefik_service_name,
+                    external_host=external_host,
                 )
             )
 
@@ -574,7 +577,7 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
 
         return config
 
-    def _generate_middleware_config(  # pylint: disable=too-many-arguments
+    def _generate_middleware_config(  # pylint: disable=too-many-arguments, unused-argument
         self,
         redirect_https: bool,
         strip_prefix: bool,
