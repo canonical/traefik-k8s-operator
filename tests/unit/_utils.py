@@ -29,7 +29,7 @@ def _render_config(
     strip_prefix: bool,
     redirect_https: bool,
     scheme: str = "http",
-    tls_enabled: bool = True,
+    tls_enabled: bool = False,
     host: str = "10.1.10.1",
     port: str = "42",
 ):
@@ -55,38 +55,41 @@ def _render_config(
                     "rule": routing_rule[routing_mode],
                     "service": "juju-test-model-remote-0-service",
                 },
-                "juju-test-model-remote-0-router-tls": {
-                    "entryPoints": ["websecure"],
-                    "rule": routing_rule[routing_mode],
-                    "service": "juju-test-model-remote-0-service",
-                    "tls": {
-                        "domains": [
-                            {
-                                "main": "testhostname",
-                                "sans": ["*.testhostname"],
-                            },
-                        ],
-                    },
-                },
             },
             "services": {"juju-test-model-remote-0-service": service_spec},
         }
     }
+
+    if tls_enabled:
+        expected["http"]["routers"]["juju-test-model-remote-0-router-tls"] = {
+            "entryPoints": ["websecure"],
+            "rule": routing_rule[routing_mode],
+            "service": "juju-test-model-remote-0-service",
+            "tls": {
+                "domains": [
+                    {
+                        "main": "testhostname",
+                        "sans": ["*.testhostname"],
+                    },
+                ],
+            },
+        }
 
     if transports:
         expected["http"]["serversTransports"] = transports
 
     if middlewares := _render_middlewares(
         strip_prefix=strip_prefix and routing_mode == "path",
-        redirect_https=redirect_https and scheme == "https",
+        redirect_https=tls_enabled,
     ):
         expected["http"].update({"middlewares": middlewares})
         expected["http"]["routers"]["juju-test-model-remote-0-router"].update(
             {"middlewares": list(middlewares.keys())},
         )
-        expected["http"]["routers"]["juju-test-model-remote-0-router-tls"].update(
-            {"middlewares": list(middlewares.keys())},
-        )
+        if tls_enabled:
+            expected["http"]["routers"]["juju-test-model-remote-0-router-tls"].update(
+                {"middlewares": list(middlewares.keys())},
+            )
 
     return expected
 
