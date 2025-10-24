@@ -494,11 +494,15 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
                 "entryPoints": ["web"],
             },
         }
-        router_cfg.update(
-            self.generate_tls_config_for_route(
-                traefik_router_name, route_rule, traefik_service_name, external_host=external_host
+        if self._tls_enabled:
+            router_cfg.update(
+                self.generate_tls_config_for_route(
+                    traefik_router_name,
+                    route_rule,
+                    traefik_service_name,
+                    external_host=external_host,
+                )
             )
-        )
 
         # Add the "rootsCAs" section only if TLS is enabled. If the rootCA section
         # is empty or the file does not exist, HTTP requests will fail with
@@ -573,7 +577,7 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
 
         return config
 
-    def _generate_middleware_config(  # pylint: disable=too-many-arguments
+    def _generate_middleware_config(  # pylint: disable=too-many-arguments, unused-argument
         self,
         redirect_https: bool,
         strip_prefix: bool,
@@ -615,7 +619,7 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         # Condition rendering the https-redirect middleware on the scheme, otherwise we'd get a 404
         # when attempting to reach an http endpoint.
         redir_scheme_middleware = {}
-        if redirect_https and scheme == "https":
+        if self._tls_enabled:
             redir_scheme_middleware[f"juju-sidecar-redir-https-{prefix}"] = {
                 "redirectScheme": {"scheme": "https", "port": 443, "permanent": True}
             }
