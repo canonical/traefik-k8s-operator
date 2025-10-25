@@ -588,6 +588,8 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             return
         self._update_received_ca_certs(event)
         self._reconcile_lb()
+        # We need to restart Traefik now
+        self._restart_traefik()
 
     def _update_received_ca_certs(
         self, event: Optional[CertificateTransferAvailableEvent] = None
@@ -617,6 +619,8 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
     def _on_recv_ca_cert_removed(self, event: CertificateTransferRemovedEvent) -> None:
         # Assuming only one cert per relation (this is in line with the original lib design).
         self.traefik.remove_cas([event.relation_id])
+        # Since remove_cas will call update_ca_certs in traefik, a restart is needed.
+        self._restart_traefik()
         self._reconcile_lb()
 
     def _is_tls_enabled(self) -> bool:
@@ -650,6 +654,10 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
     def _update_cert_configs(self) -> None:
         """Update the server cert, ca, and key configuration files."""
         self.traefik.update_cert_configuration(self._get_certs())
+
+        # update_cert_configuration relies on traefik.update_ca_certs.
+        # Thus, we should restart traefik with the new CA certs.
+        self._restart_traefik()
 
     def _get_certs(self) -> dict:
         """Get all certs to be installed.
