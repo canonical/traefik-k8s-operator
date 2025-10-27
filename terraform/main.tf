@@ -13,7 +13,7 @@ resource "juju_application" "traefik" {
 
   charm {
     name     = "traefik-k8s"
-    channel  = var.channeluuid
+    channel  = var.channel
     revision = var.revision
   }
 }
