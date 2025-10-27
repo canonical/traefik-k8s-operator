@@ -381,7 +381,6 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         port: int,
         scheme: Optional[str],
         strip_prefix: Optional[bool],
-        redirect_https: Optional[bool],
         external_host: str,
         forward_auth_app: bool,
         forward_auth_config: Optional[ForwardAuthConfig],
@@ -393,7 +392,6 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             lb_servers=lb_servers,
             scheme=scheme,
             strip_prefix=strip_prefix,
-            redirect_https=redirect_https,
             external_host=external_host,
             forward_auth_app=forward_auth_app,
             forward_auth_config=forward_auth_config,
@@ -407,7 +405,6 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         hosts: List[str],
         port: int,
         strip_prefix: Optional[bool],
-        redirect_https: Optional[bool],
         external_host: str,
         forward_auth_app: bool,
         forward_auth_config: Optional[ForwardAuthConfig],
@@ -422,7 +419,6 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             lb_servers=lb_servers,
             scheme=scheme,
             strip_prefix=strip_prefix,
-            redirect_https=redirect_https,
             external_host=external_host,
             forward_auth_app=forward_auth_app,
             forward_auth_config=forward_auth_config,
@@ -437,7 +433,6 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         host: str,
         port: int,
         strip_prefix: bool,
-        redirect_https: bool,
         external_host: str,
         forward_auth_app: bool,
         forward_auth_config: Optional[ForwardAuthConfig],
@@ -449,7 +444,6 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             lb_servers=lb_servers,
             scheme=scheme,
             strip_prefix=strip_prefix,
-            redirect_https=redirect_https,
             external_host=external_host,
             forward_auth_app=forward_auth_app,
             forward_auth_config=forward_auth_config,
@@ -460,7 +454,6 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         prefix: str,
         lb_servers: List[Dict[str, str]],
         scheme: Optional[str],
-        redirect_https: Optional[bool],
         strip_prefix: Optional[bool],
         external_host: str,
         forward_auth_app: bool,
@@ -475,7 +468,6 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         """
         # purge any optionals:
         scheme_: str = scheme if scheme is not None else "http"
-        redirect_https_: bool = redirect_https if redirect_https is not None else False
         strip_prefix_: bool = strip_prefix if strip_prefix is not None else False
 
         host = external_host
@@ -560,9 +552,7 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             config["http"].update({"serversTransports": transports})
 
         middlewares = self._generate_middleware_config(
-            redirect_https=redirect_https_,
             strip_prefix=strip_prefix_,
-            scheme=scheme_,
             prefix=prefix,
             forward_auth_app=forward_auth_app,
             forward_auth_config=forward_auth_config,
@@ -577,11 +567,9 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
 
         return config
 
-    def _generate_middleware_config(  # pylint: disable=too-many-arguments, unused-argument
+    def _generate_middleware_config(  # pylint: disable=too-many-arguments
         self,
-        redirect_https: bool,
         strip_prefix: bool,
-        scheme: str,
         prefix: str,
         forward_auth_app: bool,
         forward_auth_config: Optional[ForwardAuthConfig],

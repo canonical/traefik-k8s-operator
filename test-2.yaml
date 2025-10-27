@@ -1,0 +1,8 @@
+bundle: kubernetes
+applications:
+  traefik:
+    charm: ./traefik-k8s_ubuntu@20.04-amd64.charm
+    resources:
+      traefik-image: 162
+    scale: 1
+    trust: true

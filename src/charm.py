@@ -1271,7 +1271,6 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             scheme="http",  # IPL (aka ingress v1) has no https option
             port=data["port"],
             host=data["host"],
-            redirect_https=data.get("redirect-https", False),
             strip_prefix=data.get("strip-prefix", False),
             external_host=self.gateway_address,
             forward_auth_app=self.forward_auth.is_protected_app(app=data.get("name")),
@@ -1304,7 +1303,6 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         config = self.traefik.get_per_app_http_config(
             prefix=prefix,
             scheme=data.app.scheme,
-            redirect_https=data.app.redirect_https,
             strip_prefix=data.app.strip_prefix,
             port=data.app.port,
             external_host=self.gateway_address,
@@ -1363,7 +1361,6 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
                     port=data["port"],
                     scheme=data.get("scheme"),
                     strip_prefix=data.get("strip-prefix"),
-                    redirect_https=data.get("redirect-https"),
                     external_host=self.gateway_address,
                     forward_auth_app=self.forward_auth.is_protected_app(app=data.get("name")),
                     forward_auth_config=self.forward_auth.get_provider_info(),
