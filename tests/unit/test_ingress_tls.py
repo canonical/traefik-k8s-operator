@@ -86,15 +86,16 @@ def test_middleware_config(
         rel_name="ingress",
         routing_mode=routing_mode,
         strip_prefix=strip_prefix,
-        redirect_https=redirect_https,
         scheme="http",
         host="0.0.0.42",
+        tls_enabled=True,  # TODO: This test only runs for `ingress`, not `per_unit` or `route`
     )
 
     assert yaml.safe_load(config_file) == expected
 
     ipa_out = out.get_relations("ingress")[0]
 
+    # AND Traefik publishes the ingress URL scheme as "https"
     if routing_mode == "path":
         url = "https://testhostname/test-model-remote-0"
     else:

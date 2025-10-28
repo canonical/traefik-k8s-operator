@@ -108,9 +108,7 @@ def test_middleware_config(
         rel_name="ingress",
         routing_mode=routing_mode,
         strip_prefix=strip_prefix,
-        redirect_https=redirect_https,
         scheme="http",
-        tls_enabled=False,
         port=9000,
     )
 
