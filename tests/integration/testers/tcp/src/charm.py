@@ -19,7 +19,7 @@ class TCPRequirerMock(CharmBase):
         self.unit.open_port("tcp", self._tcp_port)
         self.unit.status = ActiveStatus("ready")
 
-        # dummy charm: only create the relation AFTER pebble ready has fired.
+        # placeholder charm: only create the relation AFTER pebble ready has fired.
 
         self.framework.observe(self.on.ingress_per_unit_relation_created, self._ipu_created)
         self.framework.observe(self.on.tcp_server_pebble_ready, self._pebble_ready)
