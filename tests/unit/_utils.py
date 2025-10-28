@@ -4,22 +4,14 @@ from typing import List
 from scenario import Relation
 
 
-def _render_middlewares(*, strip_prefix: bool = False, redirect_https: bool = False) -> dict:
+def _render_middlewares(*, strip_prefix: bool = False) -> dict:
     no_prefix_middleware = {}
     if strip_prefix:
         no_prefix_middleware["juju-sidecar-noprefix-test-model-remote-0"] = {
             "stripPrefix": {"prefixes": ["/test-model-remote-0"], "forceSlash": False}
         }
 
-    # Condition rendering the https-redirect middleware on the scheme, otherwise we'd get a 404
-    # when attempting to reach an http endpoint.
-    redir_scheme_middleware = {}
-    if redirect_https:
-        redir_scheme_middleware["juju-sidecar-redir-https-test-model-remote-0"] = {
-            "redirectScheme": {"scheme": "https", "port": 443, "permanent": True}
-        }
-
-    return {**no_prefix_middleware, **redir_scheme_middleware}
+    return {**no_prefix_middleware}
 
 
 def _render_config(
@@ -27,7 +19,6 @@ def _render_config(
     rel_name: str,
     routing_mode: str,
     strip_prefix: bool,
-    redirect_https: bool,
     scheme: str = "http",
     tls_enabled: bool = False,
     host: str = "10.1.10.1",
@@ -80,7 +71,6 @@ def _render_config(
 
     if middlewares := _render_middlewares(
         strip_prefix=strip_prefix and routing_mode == "path",
-        redirect_https=tls_enabled,
     ):
         expected["http"].update({"middlewares": middlewares})
         expected["http"]["routers"]["juju-test-model-remote-0-router"].update(

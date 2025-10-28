@@ -93,7 +93,6 @@ def test_middleware_config(traefik_ctx, routing_mode, strip_prefix, redirect_htt
     expected = _render_config(
         routing_mode=routing_mode,
         strip_prefix=strip_prefix,
-        redirect_https=redirect_https,
         rel_name="ingress",
         scheme="http",
         port=9000,

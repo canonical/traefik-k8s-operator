@@ -101,7 +101,6 @@ def test_middleware_config(
         rel_name=rel_name,
         routing_mode=routing_mode,
         strip_prefix=strip_prefix,
-        redirect_https=redirect_https,
         scheme=scheme,
         port="42",
     )

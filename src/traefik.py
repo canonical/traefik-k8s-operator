@@ -606,16 +606,10 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
 
         # Condition rendering the https-redirect middleware on the scheme, otherwise we'd get a 404
         # when attempting to reach an http endpoint.
-        redir_scheme_middleware = {}
-        if self._tls_enabled:
-            redir_scheme_middleware[f"juju-sidecar-redir-https-{prefix}"] = {
-                "redirectScheme": {"scheme": "https", "port": 443, "permanent": True}
-            }
 
         return {
             **forwardauth_middleware,
             **no_prefix_middleware,
-            **redir_scheme_middleware,
             **basicauth_middleware,
         }
 
