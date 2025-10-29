@@ -189,6 +189,8 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import yaml
+from cosl import DashboardPath40UID, LZMABase64
+from cosl.types import type_convert_stored
 from ops.charm import (
     CharmBase,
     HookEvent,
@@ -203,12 +205,9 @@ from ops.framework import (
     EventSource,
     Object,
     ObjectEvents,
-    StoredDict,
-    StoredList,
     StoredState,
 )
 from ops.model import Relation
-from cosl import LZMABase64, DashboardPath40UID
 
 # The unique Charmhub library identifier, never change it
 LIBID = "c49eb9c7dfef40c7b6235ebd67010a3f"
@@ -219,7 +218,7 @@ LIBAPI = 0
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
 
-LIBPATCH = 44
+LIBPATCH = 46
 
 PYDEPS = ["cosl >= 0.0.50"]
 
@@ -946,23 +945,33 @@ class CharmedDashboard:
         # If we're running this from within an aggregator (such as grafana agent), then the uid was
         # already rendered there, so we do not want to overwrite it with a uid generated from aggregator's info.
         # We overwrite the uid only if it's not a valid "Path40" uid.
-        if not DashboardPath40UID.is_valid(original_uid := dashboard_dict.get("uid", "")):
+        original_uid = dashboard_dict.get("uid", "")
+
+        if DashboardPath40UID.is_valid(original_uid):
+            logger.debug(
+                "Processed dashboard '%s': kept original uid '%s'", dashboard_path, original_uid
+            )
+            return
+
+        try:
             rel_path = str(
                 dashboard_path.relative_to(charm_dir)
                 if dashboard_path.is_absolute()
                 else dashboard_path
             )
-            dashboard_dict["uid"] = DashboardPath40UID.generate(charm_name, rel_path)
-            logger.debug(
-                "Processed dashboard '%s': replaced original uid '%s' with '%s'",
-                dashboard_path,
-                original_uid,
-                dashboard_dict["uid"],
-            )
+        except ValueError:
+            uid =  DashboardPath40UID.generate(charm_name, str(dashboard_path))
         else:
-            logger.debug(
-                "Processed dashboard '%s': kept original uid '%s'", dashboard_path, original_uid
-            )
+            uid = DashboardPath40UID.generate(charm_name, rel_path)
+
+
+        logger.debug(
+            "Processed dashboard '%s': replaced original uid '%s' with '%s'",
+            dashboard_path,
+            original_uid,
+            uid,
+        )
+        dashboard_dict["uid"] = uid
 
     @classmethod
     def _add_tags(cls, dashboard_dict: dict, charm_name: str):
@@ -1025,18 +1034,6 @@ class CharmedDashboard:
             )
 
         return dashboard_templates
-
-
-def _type_convert_stored(obj):
-    """Convert Stored* to their appropriate types, recursively."""
-    if isinstance(obj, StoredList):
-        return list(map(_type_convert_stored, obj))
-    if isinstance(obj, StoredDict):
-        rdict = {}  # type: Dict[Any, Any]
-        for k in obj.keys():
-            rdict[k] = _type_convert_stored(obj[k])
-        return rdict
-    return obj
 
 
 class GrafanaDashboardsChanged(EventBase):
@@ -1346,7 +1343,7 @@ class GrafanaDashboardProvider(Object):
         # It's completely ridiculous to add a UUID, but if we don't have some
         # pseudo-random value, this never makes it across 'juju set-state'
         stored_data = {
-            "templates": _type_convert_stored(self._stored.dashboard_templates),  # pyright: ignore
+            "templates": type_convert_stored(self._stored.dashboard_templates),  # pyright: ignore
             "uuid": str(uuid.uuid4()),
         }
 
@@ -1612,7 +1609,7 @@ class GrafanaDashboardConsumer(Object):
         stored_data = rendered_dashboards
         currently_stored_data = self._get_stored_dashboards(relation.id)
 
-        coerced_data = _type_convert_stored(currently_stored_data) if currently_stored_data else {}
+        coerced_data = type_convert_stored(currently_stored_data) if currently_stored_data else {}
 
         if not coerced_data == stored_data:
             stored_dashboards = self.get_peer_data("dashboards")
@@ -1796,7 +1793,7 @@ class GrafanaDashboardAggregator(Object):
         """Push dashboards to the downstream Grafana relation."""
         # It's still ridiculous to add a UUID here, but needed
         stored_data = {
-            "templates": _type_convert_stored(self._stored.dashboard_templates),  # pyright: ignore
+            "templates": type_convert_stored(self._stored.dashboard_templates),  # pyright: ignore
             "uuid": str(uuid.uuid4()),
         }
 
@@ -1806,7 +1803,7 @@ class GrafanaDashboardAggregator(Object):
 
     def remove_dashboards(self, event: RelationBrokenEvent) -> None:
         """Remove a dashboard if the relation is broken."""
-        app_ids = _type_convert_stored(self._stored.id_mappings.get(event.app.name, ""))  # type: ignore
+        app_ids = type_convert_stored(self._stored.id_mappings.get(event.app.name, ""))  # type: ignore
 
         if not app_ids:
             logger.info("Could not look up stored dashboards for %s", event.app.name)  # type: ignore
@@ -1817,7 +1814,7 @@ class GrafanaDashboardAggregator(Object):
             del self._stored.dashboard_templates[id]  # type: ignore
 
         stored_data = {
-            "templates": _type_convert_stored(self._stored.dashboard_templates),  # pyright: ignore
+            "templates": type_convert_stored(self._stored.dashboard_templates),  # pyright: ignore
             "uuid": str(uuid.uuid4()),
         }
 
