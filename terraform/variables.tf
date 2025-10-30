@@ -28,11 +28,13 @@ variable "constraints" {
 variable "model_uuid" {
   description = "ID of the model to deploy to, takes priority over model + model_owner"
   type        = string
+  default     = ""
 }
 
 variable "model" {
   description = "Name of the model to deploy to."
   type        = string
+  default     = ""
 }
 
 variable "model_owner" {
