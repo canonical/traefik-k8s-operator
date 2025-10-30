@@ -37,6 +37,18 @@ RECV_CA_TEMPLATE = Template(f"{str(CA_CERTS_DIR)}/receive-ca-cert-$rel_id-ca.crt
 BIN_PATH = "/usr/bin/traefik"
 LOG_PATH = "/var/log/traefik.log"
 
+# Based on Mozilla's intermediate profile guideline
+TLS_MIN_VERSION = "VersionTLS12"
+TLS_CURVE_PREFERENCES = ["X25519", "CurveP256", "CurveP384"]
+TLS_CIPHER_SUITES = [
+    "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256",
+    "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+    "TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384",
+    "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384",
+    "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305",
+    "TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305",
+]
+
 _DIAGNOSTICS_PORT = 8082  # Prometheus metrics, healthcheck/ping
 
 
@@ -171,6 +183,13 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
                                 if len(cert_files) == 1
                                 else None
                             )
+                        },
+                    },
+                    "options": {
+                        "default": {
+                            "minVersion": TLS_MIN_VERSION,
+                            "curvePreferences": TLS_CURVE_PREFERENCES,
+                            "cipherSuites": TLS_CIPHER_SUITES,
                         },
                     },
                 }
