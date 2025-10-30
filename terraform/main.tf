@@ -8,7 +8,7 @@ resource "juju_application" "traefik" {
   name               = var.app_name
   config             = var.config
   constraints        = var.constraints
-  model_uuid         = var.model_uuid != "" ? var.model_uuid : data.juju_model.model[0].id
+  model_uuid         = var.model_uuid != "" ? var.model_uuid : data.juju_model.model.*.id
   storage_directives = var.storage_directives
   trust              = true
   units              = var.units
