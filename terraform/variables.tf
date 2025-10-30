@@ -26,8 +26,19 @@ variable "constraints" {
 }
 
 variable "model_uuid" {
-  description = "ID of the model to deploy to"
+  description = "ID of the model to deploy to, takes priority over model + model_owner"
   type        = string
+}
+
+variable "model" {
+  description = "Name of the model to deploy to."
+  type        = string
+}
+
+variable "model_owner" {
+  description = "ID of the model owner, used in conjunction with model name."
+  type        = string
+  default     = "admin"
 }
 
 variable "revision" {
