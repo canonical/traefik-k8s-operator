@@ -75,7 +75,7 @@ options:
     type: string
   tls-cert:
     description: |
-      SSL cert used for TLS termination.
+      SSL cert used for TLS termination. This will also accept full certificate chains.
     type: string
   tls-key:
     description: |

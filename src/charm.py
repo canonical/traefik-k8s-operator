@@ -665,12 +665,12 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         Output should be of the form:
         {
           "hostname0": {
-            "cert": "<cert>",
+            "chain": "<cert>",
             "key": "<key>",
             "ca": "<ca>"
           },
           "hostname1": {
-            "cert": "<cert>",
+            "chain": "<cert>",
             "key": "<key>",
             "ca": "<ca>"
           }
@@ -685,7 +685,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             and self.config.get("tls-key", None)
         ):
             certs["local-config"] = {
-                "cert": cast(str, self.config["tls-cert"]),
+                "chain": cast(str, self.config["tls-cert"]),
                 "key": cast(str, self.config["tls-key"]),
                 "ca": cast(str, self.config["tls-ca"]),
             }
