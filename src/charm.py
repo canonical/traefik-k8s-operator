@@ -474,9 +474,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
 
     @property
     def _is_anonymous_telemetry_enabled(self) -> bool:
-        if self.config["enable_anonymous_telemetry"]:
-            return True
-        return False
+        return bool(self.config["enable_anonymous_telemetry"])
 
     @property
     def _basic_auth_user(self) -> Optional[str]:
