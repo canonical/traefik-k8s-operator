@@ -253,6 +253,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
                 if self._is_workload_tracing_ready()
                 else None
             ),
+            anonymous_telemetry_enabled=self._is_anonymous_telemetry_enabled,
         )
 
         # Certs Relation
@@ -468,6 +469,12 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
     @property
     def _is_forward_auth_enabled(self) -> bool:
         if self.config["enable_experimental_forward_auth"]:
+            return True
+        return False
+
+    @property
+    def _is_anonymous_telemetry_enabled(self) -> bool:
+        if self.config["enable_anonymous_telemetry"]:
             return True
         return False
 

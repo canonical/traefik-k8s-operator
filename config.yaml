@@ -81,3 +81,11 @@ options:
     description: |
       Key used for TLS termination.
     type: string
+  enable_anonymous_telemetry:
+    description: |
+      Whether to enable anonymous telemetry data collection. When enabled, Traefik will
+      send anonymous usage statistics to https://collect.traefik.io. This helps the
+      Traefik team understand how the software is being used and improve the product.
+      No personal or sensitive data is collected.
+    type: boolean
+    default: true
