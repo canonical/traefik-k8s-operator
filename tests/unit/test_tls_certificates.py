@@ -155,7 +155,6 @@ def test_cleanup_tls_configuration(tls_enabled: bool):
         tcp_entrypoints={},
         traefik_route_static_configs=[],
         topology=MagicMock(),
-        anonymous_telemetry_enabled=True,
     )
     traefik.cleanup_tls_configuration()
     if not tls_enabled:
