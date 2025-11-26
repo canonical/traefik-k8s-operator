@@ -12,3 +12,14 @@ jobs:
     secrets: inherit
     with:
       juju-channel: "3.6/stable"
+
+  required_status_checks:
+    name: Required Status Checks
+    runs-on: ubuntu-latest
+    needs:
+      - pull-request
+    if: always() && !cancelled()
+    timeout-minutes: 5
+    steps:
+      - run: |
+          [ '${{ needs.pull-request.result }}' = 'skipped' ] || [ '${{ needs.pull-request.result }}' = 'success' ] || (echo pull-request failed && false)
