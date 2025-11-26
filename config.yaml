@@ -88,4 +88,4 @@ options:
       Traefik team understand how the software is being used and improve the product.
       No personal or sensitive data is collected.
     type: boolean
-    default: true
+    default: false
