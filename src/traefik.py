@@ -133,7 +133,6 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         self._topology = topology
         self._basic_auth_user = basic_auth_user
         self._tracing_endpoint = tracing_endpoint
-        self._anonymous_telemetry_enabled = anonymous_telemetry_enabled
 
     @property
     def scrape_jobs(self) -> list:
