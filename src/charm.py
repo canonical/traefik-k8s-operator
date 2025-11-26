@@ -17,29 +17,37 @@ from urllib.parse import urlparse
 
 import pydantic
 import yaml
-from charms.certificate_transfer_interface.v1.certificate_transfer import \
-    CertificatesAvailableEvent as CertificateTransferAvailableEvent
-from charms.certificate_transfer_interface.v1.certificate_transfer import \
-    CertificatesRemovedEvent as CertificateTransferRemovedEvent
-from charms.certificate_transfer_interface.v1.certificate_transfer import \
-    CertificateTransferRequires
+from charms.certificate_transfer_interface.v1.certificate_transfer import (
+    CertificatesAvailableEvent as CertificateTransferAvailableEvent,
+)
+from charms.certificate_transfer_interface.v1.certificate_transfer import (
+    CertificatesRemovedEvent as CertificateTransferRemovedEvent,
+)
+from charms.certificate_transfer_interface.v1.certificate_transfer import (
+    CertificateTransferRequires,
+)
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from charms.loki_k8s.v1.loki_push_api import LokiPushApiConsumer
-from charms.oathkeeper.v0.forward_auth import (AuthConfigChangedEvent,
-                                               AuthConfigRemovedEvent,
-                                               ForwardAuthRequirer,
-                                               ForwardAuthRequirerConfig)
+from charms.oathkeeper.v0.forward_auth import (
+    AuthConfigChangedEvent,
+    AuthConfigRemovedEvent,
+    ForwardAuthRequirer,
+    ForwardAuthRequirerConfig,
+)
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 from charms.tempo_coordinator_k8s.v0.charm_tracing import trace_charm
-from charms.tempo_coordinator_k8s.v0.tracing import (TracingEndpointRequirer,
-                                                     charm_tracing_config)
+from charms.tempo_coordinator_k8s.v0.tracing import TracingEndpointRequirer, charm_tracing_config
 from charms.tls_certificates_interface.v4.tls_certificates import (
-    CertificateRequestAttributes, Mode, TLSCertificatesRequiresV4)
+    CertificateRequestAttributes,
+    Mode,
+    TLSCertificatesRequiresV4,
+)
 from charms.traefik_k8s.v0.traefik_route import (
-    TraefikRouteProvider, TraefikRouteRequirerReadyEvent)
+    TraefikRouteProvider,
+    TraefikRouteRequirerReadyEvent,
+)
 from charms.traefik_k8s.v1.ingress import IngressPerAppProvider as IPAv1
-from charms.traefik_k8s.v1.ingress_per_unit import (DataValidationError,
-                                                    IngressPerUnitProvider)
+from charms.traefik_k8s.v1.ingress_per_unit import DataValidationError, IngressPerUnitProvider
 from charms.traefik_k8s.v2.ingress import IngressPerAppProvider as IPAv2
 from charms.traefik_k8s.v2.ingress import IngressPerAppRequirer
 from cosl import JujuTopology
@@ -49,19 +57,22 @@ from lightkube.core.exceptions import ApiError
 from lightkube.models.core_v1 import ServicePort, ServiceSpec
 from lightkube.models.meta_v1 import ObjectMeta
 from lightkube.resources.core_v1 import Service
-from lightkube_extensions.batch import (KubernetesResourceManager,
-                                        create_charm_default_labels)
+from lightkube_extensions.batch import KubernetesResourceManager, create_charm_default_labels
 from ops import EventBase, main
-from ops.charm import (ActionEvent, CharmBase, PebbleReadyEvent,
-                       RelationBrokenEvent, RelationEvent, StartEvent,
-                       UpdateStatusEvent)
+from ops.charm import (
+    ActionEvent,
+    CharmBase,
+    PebbleReadyEvent,
+    RelationBrokenEvent,
+    RelationEvent,
+    StartEvent,
+    UpdateStatusEvent,
+)
 from ops.framework import StoredState
-from ops.model import (ActiveStatus, BlockedStatus, MaintenanceStatus,
-                       Relation, WaitingStatus)
+from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, Relation, WaitingStatus
 from ops.pebble import PathError
 
-from traefik import (CA, SERVER_CERT_PATH, RoutingMode,
-                     StaticConfigMergeConflictError, Traefik)
+from traefik import CA, SERVER_CERT_PATH, RoutingMode, StaticConfigMergeConflictError, Traefik
 from utils import is_hostname
 
 # To keep a tidy debug-log, we suppress some DEBUG/INFO logs from some imported libs,
@@ -242,6 +253,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
                 if self._is_workload_tracing_ready()
                 else None
             ),
+            anonymous_telemetry_enabled=self._is_anonymous_telemetry_enabled,
         )
 
         # Certs Relation
@@ -459,6 +471,10 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         if self.config["enable_experimental_forward_auth"]:
             return True
         return False
+
+    @property
+    def _is_anonymous_telemetry_enabled(self) -> bool:
+        return bool(self.config["enable_anonymous_telemetry"])
 
     @property
     def _basic_auth_user(self) -> Optional[str]:

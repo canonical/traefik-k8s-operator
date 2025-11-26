@@ -218,6 +218,7 @@ def test_static_config(harness: Harness[TraefikIngressCharm], topology: JujuTopo
         experimental_forward_auth_enabled=charm._is_forward_auth_enabled,
         traefik_route_static_configs=charm._traefik_route_static_configs(),
         topology=topology,
+        anonymous_telemetry_enabled=True,
     )
 
     charm.traefik_route.on.ready.emit(charm.model.get_relation("traefik-route"))
@@ -314,6 +315,7 @@ def test_static_config_partially_broken(
             {"entryPoints": {"shondaland": {"address": ":6767"}}},
         ],
         topology=topology,
+        anonymous_telemetry_enabled=True,
     )
 
     # WHEN the charm receives a traefik-route ready event
@@ -362,6 +364,7 @@ def test_static_config_updates_tcp_entrypoints(
         experimental_forward_auth_enabled=charm._is_forward_auth_enabled,
         traefik_route_static_configs=charm._traefik_route_static_configs(),
         topology=topology,
+        anonymous_telemetry_enabled=True,
     )
 
     charm.traefik_route.on.ready.emit(charm.model.get_relation("traefik-route"))

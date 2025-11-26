@@ -110,6 +110,7 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         topology: JujuTopology,
         basic_auth_user: Optional[str] = None,
         tracing_endpoint: Optional[str] = None,
+        anonymous_telemetry_enabled: bool = True,
     ):
         """Initialize traefik service class.
 
@@ -123,6 +124,7 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             topology: Juju topology.
             basic_auth_user: User for basic auth.
             tracing_endpoint: Tracing endpoint.
+            anonymous_telemetry_enabled: Whether to enable anonymous telemetry.
         """
         self._container = container
         self._tcp_entrypoints = tcp_entrypoints
@@ -296,6 +298,7 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         static_config = {
             "global": {
                 "checknewversion": False,
+                "sendanonymoususage": self._anonymous_telemetry_enabled,
             },
             "log": {
                 "level": "DEBUG",
