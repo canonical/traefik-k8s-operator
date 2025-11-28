@@ -217,7 +217,7 @@ def test_tr_ready_deferred_when_container_not_ready(harness: Harness[TraefikIngr
         charm._handle_traefik_route_ready(mock_event)
 
     # Verify the event was deferred
-    assert mock_event.defer.called
+    mock_event.defer.assert_called_once()
 
 
 def test_static_config(harness: Harness[TraefikIngressCharm], topology: JujuTopology):
