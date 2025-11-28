@@ -192,6 +192,34 @@ def test_tr_ready_handler_called(harness: Harness[TraefikIngressCharm]):
     assert mocked_handle.called
 
 
+def test_tr_ready_deferred_when_container_not_ready(harness: Harness[TraefikIngressCharm]):
+    """Test that traefik-route-ready event is deferred when container is not ready."""
+    # Setup without calling container_pebble_ready to ensure container is not ready
+    harness.update_config({"external_hostname": "testhostname"})
+    harness.set_leader(True)
+    harness.begin()
+    # Explicitly NOT calling harness.container_pebble_ready("traefik")
+
+    charm = harness.charm
+    charm.container = charm.unit.get_container("traefik")
+
+    tr_relation_id = harness.add_relation(TR_RELATION_NAME, REMOTE_APP_NAME)
+    harness.add_relation_unit(tr_relation_id, REMOTE_UNIT_NAME)
+    relation = charm.model.get_relation(TR_RELATION_NAME)
+
+    # Create a mock event to track defer calls
+    mock_event = Mock()
+    mock_event.relation = relation
+
+    # Mock container.can_connect() to return False
+    with patch.object(charm.container, "can_connect", return_value=False):
+        # Call the handler when container is not ready
+        charm._handle_traefik_route_ready(mock_event)
+
+    # Verify the event was deferred
+    assert mock_event.defer.called
+
+
 def test_static_config(harness: Harness[TraefikIngressCharm], topology: JujuTopology):
     tr_relation_id, relation = initialize_and_setup_tr_relation(harness)
     config = yaml.dump(CONFIG)
