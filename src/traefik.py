@@ -295,9 +295,6 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         static_config = {
             "global": {
                 "checknewversion": False,
-                # TODO add juju config to disable anonymous usage
-                # https://github.com/canonical/observability/blob/main/decision-records/2026-06-27--upstream-telemetry.md
-                "sendanonymoususage": True,
             },
             "log": {
                 "level": "DEBUG",
