@@ -25,7 +25,11 @@ def test_traefik_route_ready_handles_pebble_connection(
     model,
     can_connect,
 ):
-    """Test that traefik-route ready event handler correctly checks pebble connection."""
+    """
+    arrange: A traefik-route relation is created.
+    act: The traefik-route changed event is triggered.
+    assert: If pebble cannot connect, the event is deferred.
+    """
     container = traefik_container.replace(can_connect=can_connect)
 
     traefik_route_relation = Relation(
