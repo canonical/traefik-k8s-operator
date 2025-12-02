@@ -618,8 +618,8 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
 
     def _on_recv_ca_cert_removed(self, event: CertificateTransferRemovedEvent) -> None:
         # Assuming only one cert per relation (this is in line with the original lib design).
-        self.traefik.remove_cas([event.relation_id])
-        # Since remove_cas will call update_ca_certs in traefik, a restart is needed.
+        self.traefik.remove_ca(str(event.relation_id))
+        # Since remove_ca will call update_ca_certs in traefik, a restart is needed.
         self._restart_traefik()
         self._reconcile_lb()
 
