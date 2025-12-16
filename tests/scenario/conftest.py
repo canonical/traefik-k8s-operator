@@ -1,3 +1,4 @@
+import pathlib
 from unittest.mock import PropertyMock, patch
 
 import pytest
@@ -8,6 +9,13 @@ from scenario import Container, Context, ExecOutput, Model, Mount
 from charm import TraefikIngressCharm
 
 MOCK_LB_ADDRESS = "1.2.3.4"
+
+
+@pytest.fixture
+def fake_fs(fs):
+    fs.add_real_directory(pathlib.Path(__file__).parent.parent.parent)
+    fs.create_dir("/tmp/pytest-of-dylan")
+    yield fs
 
 
 @pytest.fixture

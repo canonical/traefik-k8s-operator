@@ -10,9 +10,12 @@ from scenario import Container, Context, State
 from charm import TraefikIngressCharm
 
 
+@patch(
+    "charm.TraefikIngressCharm._get_loadbalancer_status", PropertyMock(return_value="loadbalancer")
+)
 @patch("lightkube.core.client.GenericSyncClient")
 @patch("charm.TraefikIngressCharm._static_config_changed", PropertyMock(return_value=False))
-@patch("charm.TraefikIngressCharm._external_host", PropertyMock(return_value="foo.bar"))
+@patch("charm.TraefikIngressCharm._ingressed_address", PropertyMock(return_value="foo.bar"))
 @patch("traefik.Traefik.is_ready", PropertyMock(return_value=True))
 @patch("charm.TraefikIngressCharm.version", PropertyMock(return_value="1.2.3"))
 class TestWorkloadVersion(unittest.TestCase):
@@ -27,7 +30,7 @@ class TestWorkloadVersion(unittest.TestCase):
     def test_workload_version_is_set_on_update_status(self, *_):
         # GIVEN an initial state without the workload version set
         out = self.context.run("start", self.state)
-        self.assertEqual(out.unit_status, ActiveStatus("Serving at foo.bar"))
+        self.assertEqual(out.unit_status, ActiveStatus("Serving at http://foo.bar"))
         self.assertEqual(out.workload_version, "")
 
         # WHEN update-status is triggered
@@ -40,7 +43,7 @@ class TestWorkloadVersion(unittest.TestCase):
         # GIVEN a state after update-status (which we know sets the workload version)
         # GIVEN an initial state with the workload version set
         out = self.context.run("update-status", self.state)
-        self.assertEqual(out.unit_status, ActiveStatus("Serving at foo.bar"))
+        self.assertEqual(out.unit_status, ActiveStatus("Serving at http://foo.bar"))
         self.assertEqual(out.workload_version, "1.2.3")
 
         # WHEN the charm is stopped

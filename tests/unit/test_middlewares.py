@@ -1,17 +1,15 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-import tempfile
 from pathlib import Path
 from unittest.mock import PropertyMock, patch
 
-import ops
 import pytest
 import scenario
 import yaml
-from scenario import Container, ExecOutput, Mount, Relation, State
+from scenario import Relation, State
 
-from tests.scenario._utils import _render_config, create_ingress_relation
+from tests.unit._utils import _render_config, create_ingress_relation
 from traefik import DYNAMIC_CONFIG_DIR
 
 
@@ -65,26 +63,9 @@ def _create_relation(
 @pytest.mark.parametrize("strip_prefix", (False, True))
 @pytest.mark.parametrize("redirect_https", (False, True))
 @pytest.mark.parametrize("scheme", ("http", "https"))
-@patch("charm.TraefikIngressCharm._external_host", PropertyMock(return_value="testhostname"))
-@patch("charm.TraefikIngressCharm._static_config_changed", PropertyMock(return_value=False))
-@patch("traefik.Traefik.is_ready", PropertyMock(return_value=True))
-@patch("charm.TraefikIngressCharm.version", PropertyMock(return_value="0.0.0"))
 def test_middleware_config(
-    traefik_ctx, rel_name, routing_mode, strip_prefix, redirect_https, scheme
+    traefik_ctx, traefik_container, rel_name, routing_mode, strip_prefix, redirect_https, scheme
 ):
-    td = tempfile.TemporaryDirectory()
-    containers = [
-        Container(
-            name="traefik",
-            can_connect=True,
-            mounts={"configurations": Mount("/opt/traefik/", td.name)},
-            exec_mock={("find", "/opt/traefik/juju", "-name", "*.yaml", "-delete"): ExecOutput()},
-            layers={
-                "traefik": ops.pebble.Layer({"services": {"traefik": {"startup": "enabled"}}})
-            },
-            service_status={"traefik": ops.pebble.ServiceStatus.ACTIVE},
-        )
-    ]
 
     # GIVEN a relation is requesting some middlewares
     rel_id = 0
@@ -104,7 +85,7 @@ def test_middleware_config(
     state = State(
         leader=True,
         config={"routing_mode": routing_mode, "external_hostname": "testhostname"},
-        containers=containers,
+        containers=[traefik_container],
         relations=[relation],
     )
 
@@ -120,9 +101,7 @@ def test_middleware_config(
         rel_name=rel_name,
         routing_mode=routing_mode,
         strip_prefix=strip_prefix,
-        redirect_https=redirect_https,
         scheme=scheme,
-        tls_enabled=False,
         port="42",
     )
 
@@ -130,26 +109,14 @@ def test_middleware_config(
 
 
 @patch("charm.TraefikIngressCharm.version", PropertyMock(return_value="0.0.0"))
-def test_basicauth_config(traefik_ctx: scenario.Context):
+def test_basicauth_config(traefik_ctx: scenario.Context, traefik_container):
     # GIVEN traefik is configured with a sample basicauth user
     ingress = create_ingress_relation()
     basicauth_user = "user:hashed-password"
     state = State(
         config={"basic_auth_user": basicauth_user},
         relations=[ingress],
-        containers=[
-            Container(
-                name="traefik",
-                can_connect=True,
-                exec_mock={
-                    ("find", "/opt/traefik/juju", "-name", "*.yaml", "-delete"): ExecOutput()
-                },
-                layers={
-                    "traefik": ops.pebble.Layer({"services": {"traefik": {"startup": "enabled"}}})
-                },
-                service_status={"traefik": ops.pebble.ServiceStatus.ACTIVE},
-            )
-        ],
+        containers=[traefik_container],
     )
 
     # WHEN we process a config-changed event

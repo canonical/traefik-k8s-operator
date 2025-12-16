@@ -30,6 +30,7 @@ logger = logging.getLogger(__name__)
 
 class Store(defaultdict):
     def __init__(self):
+        """Initialize the store."""
         super(Store, self).__init__(Store)
 
     def __getattr__(self, key):
@@ -73,7 +74,15 @@ def copy_traefik_library_into_tester_charms(ops_test):
         "traefik_k8s/v1/ingress_per_unit.py",
         "traefik_k8s/v0/traefik_route.py",
     ]
-    for tester in ["forward-auth", "ipa", "ipu", "tcp", "route", "health"]:
+    for tester in [
+        "forward-auth",
+        "ipa",
+        "ipu",
+        "tcp",
+        "route",
+        "health",
+        "ingress-requirer-mock",
+    ]:
         for lib in libraries:
             install_path = f"tests/integration/testers/{tester}/lib/charms/{lib}"
             os.makedirs(os.path.dirname(install_path), exist_ok=True)
@@ -83,6 +92,9 @@ def copy_traefik_library_into_tester_charms(ops_test):
 @pytest.fixture(scope="module")
 @timed_memoizer
 async def traefik_charm(ops_test):
+    charm_path = os.environ.get("CHARM_PATH")
+    if charm_path:
+        return Path(charm_path)
     count = 0
     while True:
         try:
@@ -91,7 +103,6 @@ async def traefik_charm(ops_test):
         except RuntimeError:
             logger.warning("Failed to build traefik. Trying again!")
             count += 1
-
             if count == 3:
                 raise
 
@@ -108,7 +119,6 @@ async def forward_auth_tester_charm(ops_test):
         except RuntimeError:
             logger.warning("Failed to build forward auth tester. Trying again!")
             count += 1
-
             if count == 3:
                 raise
 
@@ -124,6 +134,22 @@ async def ipa_tester_charm(ops_test):
             return charm
         except RuntimeError:
             logger.warning("Failed to build ipa tester. Trying again!")
+            count += 1
+            if count == 3:
+                raise
+
+
+@pytest.fixture(scope="module")
+@timed_memoizer
+async def ingress_requirer_mock(ops_test):
+    charm_path = (Path(__file__).parent / "testers" / "ingress-requirer-mock").absolute()
+    count = 0
+    while True:
+        try:
+            charm = await ops_test.build_charm(charm_path, verbosity="debug")
+            return charm
+        except RuntimeError:
+            logger.warning("Failed to build ingress-requirer-mock. Trying again!")
             count += 1
 
             if count == 3:
@@ -142,7 +168,6 @@ async def ipu_tester_charm(ops_test):
         except RuntimeError:
             logger.warning("Failed to build ipu tester. Trying again!")
             count += 1
-
             if count == 3:
                 raise
 
@@ -159,7 +184,6 @@ async def tcp_tester_charm(ops_test):
         except RuntimeError:
             logger.warning("Failed to build tcp tester. Trying again!")
             count += 1
-
             if count == 3:
                 raise
 
@@ -176,7 +200,6 @@ async def route_tester_charm(ops_test):
         except RuntimeError:
             logger.warning("Failed to build route tester. Trying again!")
             count += 1
-
             if count == 3:
                 raise
 
@@ -193,7 +216,6 @@ async def health_tester_charm(ops_test: OpsTest):
         except RuntimeError:
             logger.warning("Failed to build health tester. Trying again!")
             count += 1
-
             if count == 3:
                 raise
 

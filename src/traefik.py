@@ -3,9 +3,11 @@
 # See LICENSE file for licensing details.
 
 """Traefik workload interface."""
+
 import dataclasses
 import enum
 import logging
+import os
 import re
 import socket
 from copy import deepcopy
@@ -29,9 +31,9 @@ DYNAMIC_CERTS_PATH = f"{DYNAMIC_CONFIG_DIR}/certificates.yaml"
 DYNAMIC_TRACING_PATH = f"{DYNAMIC_CONFIG_DIR}/tracing.yaml"
 SERVER_CERT_PATH = f"{DYNAMIC_CONFIG_DIR}/server.cert"
 SERVER_KEY_PATH = f"{DYNAMIC_CONFIG_DIR}/server.key"
-CA_CERTS_PATH = "/usr/local/share/ca-certificates"
-CA_CERT_PATH = f"{CA_CERTS_PATH}/traefik-ca.crt"
-RECV_CA_TEMPLATE = Template(f"{CA_CERTS_PATH}/receive-ca-cert-$rel_id-ca.crt")
+CERTS_DIR = Path(DYNAMIC_CONFIG_DIR)
+CA_CERTS_DIR = Path("/usr/local/share/ca-certificates")
+RECV_CA_TEMPLATE = Template(f"{str(CA_CERTS_DIR)}/receive-ca-cert-$rel_id-ca.crt")
 BIN_PATH = "/usr/bin/traefik"
 LOG_PATH = "/var/log/traefik.log"
 
@@ -54,8 +56,8 @@ class CA:
 class RoutingMode(enum.Enum):
     """Routing mode."""
 
-    path = "path"
-    subdomain = "subdomain"
+    PATH = "path"
+    SUBDOMAIN = "subdomain"
 
 
 class TraefikError(Exception):
@@ -70,7 +72,7 @@ class StaticConfigMergeConflictError(TraefikError):
     """Raised when static configs coming from different sources can't be merged."""
 
 
-def static_config_deep_merge(dict1: dict, dict2: dict, _path=None):
+def static_config_deep_merge(dict1: dict, dict2: dict, _path: Optional[list] = None) -> dict:
     """In-place deep merge dict2 into dict1."""
     _path = _path or []
 
@@ -86,7 +88,7 @@ def static_config_deep_merge(dict1: dict, dict2: dict, _path=None):
     return dict1
 
 
-class Traefik:
+class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-methods
     """Traefik workload representation."""
 
     port = 80
@@ -96,7 +98,7 @@ class Traefik:
     service_name = "traefik"
     _tracing_endpoint = None
 
-    def __init__(
+    def __init__(  # pylint: disable=too-many-arguments
         self,
         *,
         container: Container,
@@ -109,6 +111,19 @@ class Traefik:
         basic_auth_user: Optional[str] = None,
         tracing_endpoint: Optional[str] = None,
     ):
+        """Initialize traefik service class.
+
+        Args:
+            container: The traefik container.
+            routing_mode: Routing mode.
+            tls_enabled: If TLS is enabled.
+            experimental_forward_auth_enabled: If forward_auth is enabled.
+            tcp_entrypoints: TCP entrypoints.
+            traefik_route_static_configs: Static config for traefik-route relations.
+            topology: Juju topology.
+            basic_auth_user: User for basic auth.
+            tracing_endpoint: Tracing endpoint.
+        """
         self._container = container
         self._tcp_entrypoints = tcp_entrypoints
         self._traefik_route_static_configs = traefik_route_static_configs
@@ -128,25 +143,34 @@ class Traefik:
             }
         ]
 
-    def _update_tls_configuration(self):
+    def _update_tls_configuration(self) -> None:
         """Generate and push tls config yaml for traefik."""
+        cert_files = [
+            x.path for x in self._container.list_files(CERTS_DIR) if x.path.endswith(".cert")
+        ]
         config = yaml.safe_dump(
             {
                 "tls": {
                     "certificates": [
                         {
-                            "certFile": SERVER_CERT_PATH,
-                            "keyFile": SERVER_KEY_PATH,
+                            "certFile": cert_file,
+                            "keyFile": f"{os.path.splitext(cert_file)[0]}.key",
                         }
+                        for cert_file in cert_files
                     ],
                     "stores": {
                         "default": {
-                            # When the external hostname is a bare IP, traefik cannot match a domain,
-                            # so we must set the default cert for the TLS handshake to succeed.
-                            "defaultCertificate": {
-                                "certFile": SERVER_CERT_PATH,
-                                "keyFile": SERVER_KEY_PATH,
-                            },
+                            # When the external hostname is a bare IP, traefik cannot match a
+                            # domain, so we must set the default cert for the TLS handshake to
+                            # succeed.
+                            "defaultCertificate": (
+                                {
+                                    "certFile": cert_files[0],
+                                    "keyFile": f"{os.path.splitext(cert_files[0])[0]}.key",
+                                }
+                                if len(cert_files) == 1
+                                else None
+                            )
                         },
                     },
                 }
@@ -154,8 +178,8 @@ class Traefik:
         )
         self._container.push(DYNAMIC_CERTS_PATH, config, make_dirs=True)
 
-    def configure(self):
-        """Configure static and tls."""
+    def configure(self) -> None:
+        """Configure static and render TLS configuration based on existing certificates."""
         # Ensure the required basic configurations and folders exist
         static_config = self.generate_static_config()
         self.push_static_config(static_config)
@@ -165,32 +189,59 @@ class Traefik:
         if self._tls_enabled:
             self._update_tls_configuration()
 
-    def update_cert_configuration(
-        self, cert: Optional[str], key: Optional[str], ca: Optional[str]
-    ):
+    def update_cert_configuration(self, certs: dict) -> None:
         """Update the server cert, ca, and key configuration files."""
-        if cert:
-            # write it to the charm container too, for charm tracing.
-            local_cert_path = Path(SERVER_CERT_PATH)
-            local_cert_path.parent.mkdir(parents=True, exist_ok=True)
-            local_cert_path.write_text(cert)
-            self._container.push(SERVER_CERT_PATH, cert, make_dirs=True)
-        else:
-            self._container.remove_path(SERVER_CERT_PATH, recursive=True)
+        # Remove certs that are no longer needed.
+        if certs:
+            CERTS_DIR.mkdir(parents=True, exist_ok=True)
+        if CERTS_DIR.is_dir():
+            for path in CERTS_DIR.iterdir():
+                if path.name.endswith(".cert") and path.name[:5] not in certs:
+                    path.unlink()
 
-        if key:
-            self._container.push(SERVER_KEY_PATH, key, make_dirs=True)
-        else:
-            self._container.remove_path(SERVER_KEY_PATH, recursive=True)
+        self._clean_up_certificates_in_traefik_container(excluded_certs=certs)
 
-        if ca:
-            self._container.push(CA_CERT_PATH, ca, make_dirs=True)
-        else:
-            self._container.remove_path(CA_CERT_PATH, recursive=True)
+        for hostname, cert in certs.items():
+            with (CERTS_DIR / f"{hostname}.cert").open("w") as f:
+                f.write(cert["chain"])
+            self._container.push(CERTS_DIR / f"{hostname}.cert", cert["chain"], make_dirs=True)
+            self._container.push(CERTS_DIR / f"{hostname}.key", cert["key"], make_dirs=True)
+            self._container.push(
+                CA_CERTS_DIR / f"{hostname}.traefik-charm.crt", cert["ca"], make_dirs=True
+            )
 
         self.update_ca_certs()
 
-    def add_cas(self, cas: Iterable[CA]):
+    def _clean_up_certificates_in_traefik_container(self, excluded_certs: dict) -> None:
+        """Clean up certificates in the remote traefik container.
+
+        Args:
+            excluded_certs: Certificates to exclude from cleaning up.
+        """
+        if self._container.isdir(CERTS_DIR):
+            for path in self._container.list_files(CERTS_DIR):
+                try:
+                    if path.name.endswith(".cert") and path.name[:5] not in excluded_certs:
+                        self._container.remove_path(path.path)
+                    if path.name.endswith(".key") and path.name[:4] not in excluded_certs:
+                        self._container.remove_path(path.path)
+                except PathError:
+                    logger.exception("Error removing cert file.")
+                    continue
+        if self._container.isdir(CA_CERTS_DIR):
+            for path in self._container.list_files(CA_CERTS_DIR):
+                # There could be other .crt files here so make sure the names are identifiable.
+                try:
+                    if (
+                        path.name.endswith(".traefik-charm.crt")
+                        and path.name[:18] not in excluded_certs
+                    ):
+                        self._container.remove_path(path.path)
+                except PathError:
+                    logger.exception("Error removing ca cert file.")
+                    continue
+
+    def add_cas(self, cas: Iterable[CA]) -> None:
         """Add any number of CAs to Traefik.
 
         Calls update-ca-certificates once done.
@@ -199,15 +250,16 @@ class Traefik:
             self._add_ca(ca)
         self.update_ca_certs()
 
-    def _add_ca(self, ca: CA):
+    def _add_ca(self, ca: CA) -> None:
         """Add a ca.
 
-        After doing this (any number of times), the caller is responsible for invoking update-ca-certs.
+        After doing this (any number of times),
+        the caller is responsible for invoking update-ca-certs.
         """
         self._container.push(ca.path, ca.ca, make_dirs=True)
 
-    def remove_cas(self, uids: Iterable[Union[str, int]]):
-        """Remove all CAs with these UIDs.
+    def remove_ca(self, uid: str) -> None:
+        """Remove CA with this UID.
 
         BEWARE of potential race conditions.
         Traefik watches the dynamic config dir and reloads automatically on change.
@@ -216,20 +268,16 @@ class Traefik:
 
         Calls update-ca-certificates once done.
         """
-        for uid in uids:
-            ca_path = RECV_CA_TEMPLATE.substitute(rel_id=str(uid))
+        ca_path = RECV_CA_TEMPLATE.substitute(rel_id=uid)
+        try:
             self._container.remove_path(ca_path)
+        except PathError:
+            logger.exception("Error removing cert file %s.", ca_path)
         self.update_ca_certs()
 
-    def update_ca_certs(self):
-        """Update ca certificates and restart traefik."""
+    def update_ca_certs(self) -> None:
+        """Update ca certificates. Traefik will restart from inside charm.py."""
         self._container.exec(["update-ca-certificates", "--fresh"]).wait()
-
-        # Must restart traefik after refreshing certs, otherwise:
-        # - newly added certs will not be loaded and traefik will keep erroring-out with "signed by
-        #   unknown authority".
-        # - old certs will be kept active.
-        self.restart()
 
     def generate_static_config(self, _raise: bool = False) -> Dict[str, Any]:
         """Generate Traefik's static config yaml."""
@@ -249,9 +297,6 @@ class Traefik:
         static_config = {
             "global": {
                 "checknewversion": False,
-                # TODO add juju config to disable anonymous usage
-                # https://github.com/canonical/observability/blob/main/decision-records/2026-06-27--upstream-telemetry.md
-                "sendanonymoususage": True,
             },
             "log": {
                 "level": "DEBUG",
@@ -285,9 +330,10 @@ class Traefik:
         }
 
         if self._tracing_endpoint:
-            # ref: https://github.com/traefik/traefik/blob/v2.11/docs/content/observability/tracing/jaeger.md
-            # TODO once we bump to Traefik v3, Jaeger needs to be replaced with otlp and config needs to be updated
-            # see https://doc.traefik.io/traefik/observability/tracing/opentelemetry/ for more reference
+            # ref: https://github.com/traefik/traefik/blob/v2.11/docs/content/observability/tracing/jaeger.md  # noqa  # pylint: disable=line-too-long
+            # TODO once we bump to Traefik v3, Jaeger needs to be replaced with otlp and
+            # config needs to be updated.
+            # see https://doc.traefik.io/traefik/observability/tracing/opentelemetry/
             static_config["tracing"] = {
                 "jaeger": {
                     "collector": {
@@ -296,13 +342,15 @@ class Traefik:
                 }
             }
 
-        # we attempt to put together the base config with whatever the user passed via traefik_route.
-        # in case there are conflicts between the base config and some route, or between the routes themselves,
-        # we'll be forced to bail out.
+        # we attempt to put together the base config with whatever the user
+        # passed via traefik_route.
+        # in case there are conflicts between the base config and some route,
+        # or between the routes themselves, we'll be forced to bail out.
         extra_configs = list(self._traefik_route_static_configs)
 
         for extra_config in extra_configs:
-            # static_config_deep_merge does things in-place, so we deepcopy the base config in case things go wrong
+            # static_config_deep_merge does things in-place,
+            # so we deepcopy the base config in case things go wrong
             previous = deepcopy(static_config)
             try:
                 static_config_deep_merge(static_config, extra_config)
@@ -310,7 +358,7 @@ class Traefik:
                 if _raise:
                     raise e
                 logger.exception(
-                    f"Failed to merge {extra_config} into Traefik's static config." "Skipping..."
+                    f"Failed to merge {extra_config} into Traefik's static config. Skipping..."
                 )
                 # roll back any changes static_config_deep_merge might have done to static_config
                 static_config = previous
@@ -318,13 +366,13 @@ class Traefik:
 
         return static_config
 
-    def push_static_config(self, config: Dict[str, Any]):
+    def push_static_config(self, config: Dict[str, Any]) -> None:
         """Push static config yaml to the container."""
         config_yaml = yaml.safe_dump(config)
         # TODO Use the Traefik user and group?
         self._container.push(STATIC_CONFIG_PATH, config_yaml, make_dirs=True)
 
-    def get_per_unit_http_config(
+    def get_per_unit_http_config(  # pylint: disable=too-many-arguments
         self,
         *,
         prefix: str,
@@ -332,7 +380,6 @@ class Traefik:
         port: int,
         scheme: Optional[str],
         strip_prefix: Optional[bool],
-        redirect_https: Optional[bool],
         external_host: str,
         forward_auth_app: bool,
         forward_auth_config: Optional[ForwardAuthConfig],
@@ -344,13 +391,12 @@ class Traefik:
             lb_servers=lb_servers,
             scheme=scheme,
             strip_prefix=strip_prefix,
-            redirect_https=redirect_https,
             external_host=external_host,
             forward_auth_app=forward_auth_app,
             forward_auth_config=forward_auth_config,
         )
 
-    def get_per_app_http_config(
+    def get_per_app_http_config(  # pylint: disable=too-many-arguments
         self,
         *,
         prefix: str,
@@ -358,7 +404,6 @@ class Traefik:
         hosts: List[str],
         port: int,
         strip_prefix: Optional[bool],
-        redirect_https: Optional[bool],
         external_host: str,
         forward_auth_app: bool,
         forward_auth_config: Optional[ForwardAuthConfig],
@@ -373,14 +418,13 @@ class Traefik:
             lb_servers=lb_servers,
             scheme=scheme,
             strip_prefix=strip_prefix,
-            redirect_https=redirect_https,
             external_host=external_host,
             forward_auth_app=forward_auth_app,
             forward_auth_config=forward_auth_config,
             healthcheck_params=healthcheck_params,
         )
 
-    def get_per_leader_http_config(
+    def get_per_leader_http_config(  # pylint: disable=too-many-arguments
         self,
         *,
         prefix: str,
@@ -388,7 +432,6 @@ class Traefik:
         host: str,
         port: int,
         strip_prefix: bool,
-        redirect_https: bool,
         external_host: str,
         forward_auth_app: bool,
         forward_auth_config: Optional[ForwardAuthConfig],
@@ -400,18 +443,16 @@ class Traefik:
             lb_servers=lb_servers,
             scheme=scheme,
             strip_prefix=strip_prefix,
-            redirect_https=redirect_https,
             external_host=external_host,
             forward_auth_app=forward_auth_app,
             forward_auth_config=forward_auth_config,
         )
 
-    def _generate_config_block(
+    def _generate_config_block(  # pylint: disable=too-many-arguments,too-many-locals
         self,
         prefix: str,
         lb_servers: List[Dict[str, str]],
         scheme: Optional[str],
-        redirect_https: Optional[bool],
         strip_prefix: Optional[bool],
         external_host: str,
         forward_auth_app: bool,
@@ -426,13 +467,12 @@ class Traefik:
         """
         # purge any optionals:
         scheme_: str = scheme if scheme is not None else "http"
-        redirect_https_: bool = redirect_https if redirect_https is not None else False
         strip_prefix_: bool = strip_prefix if strip_prefix is not None else False
 
         host = external_host
-        if self._routing_mode is RoutingMode.path:
+        if self._routing_mode is RoutingMode.PATH:
             route_rule = f"PathPrefix(`/{prefix}`)"
-        else:  # _RoutingMode.subdomain
+        else:  # _RoutingMode.SUBDOMAIN
             route_rule = f"Host(`{prefix}.{host}`)"
 
         traefik_router_name = f"juju-{prefix}-router"
@@ -445,11 +485,15 @@ class Traefik:
                 "entryPoints": ["web"],
             },
         }
-        router_cfg.update(
-            self.generate_tls_config_for_route(
-                traefik_router_name, route_rule, traefik_service_name, external_host=external_host
+        if self._tls_enabled:
+            router_cfg.update(
+                self.generate_tls_config_for_route(
+                    traefik_router_name,
+                    route_rule,
+                    traefik_service_name,
+                    external_host=external_host,
+                )
             )
-        )
 
         # Add the "rootsCAs" section only if TLS is enabled. If the rootCA section
         # is empty or the file does not exist, HTTP requests will fail with
@@ -507,9 +551,7 @@ class Traefik:
             config["http"].update({"serversTransports": transports})
 
         middlewares = self._generate_middleware_config(
-            redirect_https=redirect_https_,
             strip_prefix=strip_prefix_,
-            scheme=scheme_,
             prefix=prefix,
             forward_auth_app=forward_auth_app,
             forward_auth_config=forward_auth_config,
@@ -524,11 +566,9 @@ class Traefik:
 
         return config
 
-    def _generate_middleware_config(
+    def _generate_middleware_config(  # pylint: disable=too-many-arguments
         self,
-        redirect_https: bool,
         strip_prefix: bool,
-        scheme: str,
         prefix: str,
         forward_auth_app: bool,
         forward_auth_config: Optional[ForwardAuthConfig],
@@ -558,23 +598,17 @@ class Traefik:
                 }
 
         no_prefix_middleware = {}  # type: Dict[str, Dict[str, Any]]
-        if self._routing_mode is RoutingMode.path and strip_prefix:
+        if self._routing_mode is RoutingMode.PATH and strip_prefix:
             no_prefix_middleware[f"juju-sidecar-noprefix-{prefix}"] = {
                 "stripPrefix": {"prefixes": [f"/{prefix}"], "forceSlash": False}
             }
 
         # Condition rendering the https-redirect middleware on the scheme, otherwise we'd get a 404
         # when attempting to reach an http endpoint.
-        redir_scheme_middleware = {}
-        if redirect_https and scheme == "https":
-            redir_scheme_middleware[f"juju-sidecar-redir-https-{prefix}"] = {
-                "redirectScheme": {"scheme": "https", "port": 443, "permanent": True}
-            }
 
         return {
             **forwardauth_middleware,
             **no_prefix_middleware,
-            **redir_scheme_middleware,
             **basicauth_middleware,
         }
 
@@ -621,18 +655,24 @@ class Traefik:
         return yaml.safe_load(static_config_raw)
 
     @property
-    def is_ready(self):
+    def is_ready(self) -> bool:
         """Whether the traefik service is running."""
         if not self._container.can_connect():
             return False
         return bool(self._container.get_services(self.service_name))
 
-    def restart(self):
+    def restart(self) -> None:
         """Restart the pebble service."""
         environment = {}
         if self._tracing_endpoint:
             environment = {
-                "JAEGER_TAGS": f"juju_application={self._topology.application},juju_model={self._topology.model},juju_model_uuid={self._topology.model_uuid},juju_unit={self._topology.unit},juju_charm={self._topology.charm_name}"
+                "JAEGER_TAGS": (
+                    f"juju_application={self._topology.application},"
+                    f"juju_model={self._topology.model},"
+                    f"juju_model_uuid={self._topology.model_uuid},"
+                    f"juju_unit={self._topology.unit},"
+                    f"juju_charm={self._topology.charm_name}"
+                )
             }
 
         layer = {
@@ -643,7 +683,7 @@ class Traefik:
                     "override": "replace",
                     "summary": "Traefik",
                     # trick to drop the logs to a file but also keep them available in the pod logs
-                    "command": '/bin/sh -c "{} | tee {}"'.format(BIN_PATH, LOG_PATH),
+                    "command": f'/bin/sh -c "{BIN_PATH} | tee {LOG_PATH}"',
                     "startup": "enabled",
                     "environment": environment,
                 },
@@ -651,25 +691,25 @@ class Traefik:
         }
 
         self._container.add_layer(self._layer_name, cast(LayerDict, layer), combine=True)
-        logger.debug(f"replanning {self.service_name!r} after a service update")
+        logger.debug("replanning %r after a service update", self.service_name)
         self._container.replan()
 
         if self.is_ready:
-            logger.debug(f"restarting {self.service_name!r}")
+            logger.debug("restarting %r", self.service_name)
             self._container.restart(self.service_name)
 
-    def delete_dynamic_configs(self):
+    def delete_dynamic_configs(self) -> None:
         """Delete **ALL** yamls from the dynamic config dir."""
         # instead of multiple calls to self._container.remove_path(), delete all files in a swoop
         self._container.exec(["find", DYNAMIC_CONFIG_DIR, "-name", "*.yaml", "-delete"])
         logger.debug("Deleted all dynamic configuration files.")
 
-    def delete_dynamic_config(self, file_name: str):
+    def delete_dynamic_config(self, file_name: str) -> None:
         """Delete a specific yaml from the dynamic config dir."""
         self._container.remove_path(Path(DYNAMIC_CONFIG_DIR) / file_name)
         logger.debug("Deleted dynamic configuration file: %s", file_name)
 
-    def add_dynamic_config(self, file_name: str, config: str):
+    def add_dynamic_config(self, file_name: str, config: str) -> None:
         """Push a yaml to the dynamic config dir.
 
         The dynamic config dir is assumed to exist already.
@@ -683,7 +723,7 @@ class Traefik:
         logger.debug("Updated dynamic configuration file: %s", file_name)
 
     @property
-    def version(self):
+    def version(self) -> Optional[str]:
         """Traefik workload version."""
         version_output, _ = self._container.exec([BIN_PATH, "version"]).wait_output()
         # Output looks like this:
@@ -726,7 +766,17 @@ class Traefik:
         }
         return config
 
-    def _setup_dynamic_config_folder(self):
+    def _setup_dynamic_config_folder(self) -> None:
         # ensure the dynamic config dir exists else traefik will error on startup and fail to
         # set up the watcher
         self._container.make_dir(DYNAMIC_CONFIG_DIR, make_parents=True)
+
+    def cleanup_tls_configuration(self) -> None:
+        """Remove the Traefik certificates configuration if TLS is disabled."""
+        if not self._tls_enabled and self._container.can_connect():
+            # Remove certificates.yaml if TLS is not configured.
+            if self._container.exists(DYNAMIC_CERTS_PATH):
+                try:
+                    self._container.remove_path(DYNAMIC_CERTS_PATH)
+                except PathError:
+                    logger.exception("Error removing certificates config. Skipping.")

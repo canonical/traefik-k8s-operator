@@ -29,6 +29,7 @@ class MockRequirerCharm(CharmBase):
     )
 
     def __init__(self, *args, **kwargs):
+        """Initialize the mock charm."""
         super().__init__(*args)
         self.ipa = IngressPerAppRequirer(self, port=80)
 
@@ -92,7 +93,7 @@ def test_validator(requirer: IngressPerAppRequirer, harness, auto_data, ok, stri
     harness.add_network("10.0.0.10")
     harness.add_relation("ingress", "remote")
     requirer._strip_prefix = strip_prefix
-    requirer._scheme = scheme
+    requirer._ingressed_scheme = scheme
 
     if not ok:
         with pytest.raises(DataValidationError):

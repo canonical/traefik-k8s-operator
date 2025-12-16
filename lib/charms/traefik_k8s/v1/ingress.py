@@ -19,9 +19,10 @@ If it IS what you want after all, consider opening a feature request for explici
 import logging
 import socket
 import typing
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import yaml
+from ops import EventBase
 from ops.charm import CharmBase, RelationBrokenEvent, RelationEvent
 from ops.framework import EventSource, Object, ObjectEvents, StoredState
 from ops.model import ModelError, Relation
@@ -34,7 +35,7 @@ LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 18
+LIBPATCH = 20
 
 DEFAULT_RELATION_NAME = "ingress"
 RELATION_INTERFACE = "ingress"
@@ -97,10 +98,10 @@ RequirerData = TypedDict(
 # Provider ingress data model.
 ProviderIngressData = TypedDict("ProviderIngressData", {"url": str})
 # Provider application databag model.
-ProviderApplicationData = TypedDict("ProviderApplicationData", {"ingress": ProviderIngressData})  # type: ignore
+ProviderApplicationData = TypedDict("ProviderApplicationData", {"ingress": ProviderIngressData})  # type: ignore  # noqa
 
 
-def _validate_data(data, schema):
+def _validate_data(data: Any, schema: Any) -> None:
     """Checks whether `data` matches `schema`.
 
     Will raise DataValidationError if the data is not valid, else return None.
@@ -138,19 +139,19 @@ class _IngressPerAppBase(Object):
         observe(charm.on.upgrade_charm, self._handle_upgrade_or_leader)  # type: ignore
 
     @property
-    def relations(self):
+    def relations(self) -> List[Relation]:
         """The list of Relation instances associated with this endpoint."""
         return list(self.charm.model.relations[self.relation_name])
 
-    def _handle_relation(self, event):
+    def _handle_relation(self, event: RelationEvent) -> None:
         """Subclasses should implement this method to handle a relation update."""
         pass
 
-    def _handle_relation_broken(self, event):
+    def _handle_relation_broken(self, event: RelationEvent) -> None:
         """Subclasses should implement this method to handle a relation breaking."""
         pass
 
-    def _handle_upgrade_or_leader(self, event):
+    def _handle_upgrade_or_leader(self, event: EventBase) -> None:
         """Subclasses should implement this method to handle upgrades or leadership change."""
         pass
 
@@ -160,10 +161,10 @@ class _IPAEvent(RelationEvent):
     __optional_kwargs__: Dict[str, Any] = {}
 
     @classmethod
-    def __attrs__(cls):
+    def __attrs__(cls):  # type: ignore
         return cls.__args__ + tuple(cls.__optional_kwargs__.keys())
 
-    def __init__(self, handle, relation, *args, **kwargs):
+    def __init__(self, handle, relation, *args, **kwargs):  # type: ignore
         super().__init__(handle, relation)
 
         if not len(self.__args__) == len(args):
@@ -175,7 +176,7 @@ class _IPAEvent(RelationEvent):
             obj = kwargs.get(attr, default)
             setattr(self, attr, obj)
 
-    def snapshot(self):
+    def snapshot(self) -> Dict[str, Any]:
         dct = super().snapshot()
         for attr in self.__attrs__():
             obj = getattr(self, attr)
@@ -190,7 +191,7 @@ class _IPAEvent(RelationEvent):
 
         return dct
 
-    def restore(self, snapshot) -> None:
+    def restore(self, snapshot: Dict[str, Any]) -> None:
         super().restore(snapshot)
         for attr, obj in snapshot.items():
             setattr(self, attr, obj)
@@ -214,11 +215,16 @@ class IngressPerAppDataRemovedEvent(RelationEvent):
     """Event representing that ingress data has been removed for an app."""
 
 
+class IngressPerAppEndpointsUpdatedEvent(RelationEvent):
+    """Event representing that the proxied endpoints have been updated."""
+
+
 class IngressPerAppProviderEvents(ObjectEvents):
     """Container for IPA Provider events."""
 
     data_provided = EventSource(IngressPerAppDataProvidedEvent)
     data_removed = EventSource(IngressPerAppDataRemovedEvent)
+    endpoints_updated = EventSource(IngressPerAppEndpointsUpdatedEvent)
 
 
 class IngressPerAppProvider(_IngressPerAppBase):
@@ -236,7 +242,7 @@ class IngressPerAppProvider(_IngressPerAppBase):
         """
         super().__init__(charm, relation_name)
 
-    def _handle_relation(self, event):
+    def _handle_relation(self, event: RelationEvent) -> None:
         # created, joined or changed: if remote side has sent the required data:
         # notify listeners.
         if self.is_ready(event.relation):
@@ -251,10 +257,10 @@ class IngressPerAppProvider(_IngressPerAppBase):
                 data.get("redirect-https", False),
             )
 
-    def _handle_relation_broken(self, event):
-        self.on.data_removed.emit(event.relation)  # type: ignore
+    def _handle_relation_broken(self, event: RelationEvent) -> None:
+        self.on.data_removed.emit(event.relation, event.relation.app)  # type: ignore
 
-    def wipe_ingress_data(self, relation: Relation):
+    def wipe_ingress_data(self, relation: Relation) -> None:
         """Clear ingress data from relation."""
         assert self.unit.is_leader(), "only leaders can do this"
         try:
@@ -267,6 +273,7 @@ class IngressPerAppProvider(_IngressPerAppBase):
             )
             return
         del relation.data[self.app]["ingress"]
+        self.on.endpoints_updated.emit(relation=relation, app=relation.app)
 
     def _get_requirer_data(self, relation: Relation) -> RequirerData:  # type: ignore
         """Fetch and validate the requirer's app databag.
@@ -295,7 +302,7 @@ class IngressPerAppProvider(_IngressPerAppBase):
         """Fetch the remote app's databag, i.e. the requirer data."""
         return self._get_requirer_data(relation)
 
-    def is_ready(self, relation: Optional[Relation] = None):
+    def is_ready(self, relation: Optional[Relation] = None) -> bool:
         """The Provider is ready if the requirer has sent valid data."""
         if not relation:
             return any(map(self.is_ready, self.relations))
@@ -324,15 +331,16 @@ class IngressPerAppProvider(_IngressPerAppBase):
         _validate_data({"ingress": ingress}, INGRESS_PROVIDES_APP_SCHEMA)
         return ingress
 
-    def publish_url(self, relation: Relation, url: str):
+    def publish_url(self, relation: Relation, url: str) -> None:
         """Publish to the app databag the ingress url."""
         ingress = {"url": url}
         ingress_data = {"ingress": ingress}
         _validate_data(ingress_data, INGRESS_PROVIDES_APP_SCHEMA)
         relation.data[self.app]["ingress"] = yaml.safe_dump(ingress)
+        self.on.endpoints_updated.emit(relation=relation, app=relation.app)
 
     @property
-    def proxied_endpoints(self):
+    def proxied_endpoints(self) -> Dict[str, Any]:
         """Returns the ingress settings provided to applications by this IngressPerAppProvider.
 
         For example, when this IngressPerAppProvider has provided the
@@ -385,6 +393,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
     # used to prevent spurious urls to be sent out if the event we're currently
     # handling is a relation-broken one.
     _stored = StoredState()
+    _auto_data: Optional[Tuple[Optional[str], int]]
 
     def __init__(
         self,
@@ -437,7 +446,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         else:
             self._auto_data = None
 
-    def _handle_relation(self, event):
+    def _handle_relation(self, event: RelationEvent) -> None:
         # created, joined or changed: if we have auto data: publish it
         self._publish_auto_data(event.relation)
 
@@ -452,16 +461,16 @@ class IngressPerAppRequirer(_IngressPerAppBase):
                 self._stored.current_url = new_url  # type: ignore
                 self.on.ready.emit(event.relation, new_url)  # type: ignore
 
-    def _handle_relation_broken(self, event):
+    def _handle_relation_broken(self, event: EventBase) -> None:
         self._stored.current_url = None  # type: ignore
-        self.on.revoked.emit(event.relation)  # type: ignore
+        self.on.revoked.emit(relation=event.relation, app=event.relation.app)  # type: ignore
 
-    def _handle_upgrade_or_leader(self, event):
+    def _handle_upgrade_or_leader(self, event: EventBase) -> None:
         """On upgrade/leadership change: ensure we publish the data we have."""
         for relation in self.relations:
             self._publish_auto_data(relation)
 
-    def is_ready(self):
+    def is_ready(self) -> bool:
         """The Requirer is ready if the Provider has sent valid data."""
         try:
             return bool(self._get_url_from_relation_data())
@@ -469,12 +478,12 @@ class IngressPerAppRequirer(_IngressPerAppBase):
             log.info("Requirer not ready; validation error encountered: %s" % str(e))
             return False
 
-    def _publish_auto_data(self, relation: Relation):
+    def _publish_auto_data(self, _: Relation) -> None:
         if self._auto_data and self.unit.is_leader():
             host, port = self._auto_data
             self.provide_ingress_requirements(host=host, port=port)
 
-    def provide_ingress_requirements(self, *, host: Optional[str] = None, port: int):
+    def provide_ingress_requirements(self, *, host: Optional[str] = None, port: int) -> None:
         """Publishes the data that Traefik needs to provide ingress.
 
         NB only the leader unit is supposed to do this.
@@ -510,7 +519,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
         self.relation.data[self.app].update(data)
 
     @property
-    def relation(self):
+    def relation(self) -> Optional[Relation]:
         """The established Relation instance, or None."""
         return self.relations[0] if self.relations else None
 
@@ -525,7 +534,8 @@ class IngressPerAppRequirer(_IngressPerAppBase):
 
         # fetch the provider's app databag
         try:
-            raw = relation.data.get(relation.app, {}).get("ingress")
+            relation_data = relation.data.get(relation.app, {})  # type: ignore
+            raw = relation_data.get("ingress")
         except ModelError as e:
             log.debug(
                 f"Error {e} attempting to read remote app data; "

@@ -1,6 +1,57 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 
+[project]
+name = "traefik-k8s-operator"
+version = "0.1.0"
+description = "Kubernetes operator for Traefik, managed by Juju."
+authors = ["Canonical Ltd."]
+requires-python = "~=3.8.0"
+
+dependencies = [
+    "cryptography",
+    "deepmerge",
+    "jsonschema",
+    "lightkube>=0.8.1",
+    "lightkube-models>=1.22.0.4",
+    "lightkube-extensions",
+    "ops>=2.10.0",
+    "importlib-metadata==6.0.0",
+    "opentelemetry-exporter-otlp-proto-http==1.21.0",
+    "opentelemetry-api==1.21.0",
+    "pydantic>=2",
+    "cosl",
+]
+
+[project.optional-dependencies]
+dev = [
+    "black",
+    "ruff",
+    "pytest-subtests",
+    "coverage[toml]",
+    "ipdb",
+    "pytest==8.2.2",
+    "pytest-asyncio==0.21.2",
+    "pytest-operator",
+    "juju",
+    "tenacity==8.3.0",
+    "sh",
+    "minio",
+    "pyright==1.1.318",
+    "ops-scenario~=6.0",
+    "pytest-interface-tester>0.3",
+    "types-pyyaml>=6.0.12.20241230",
+    "mypy>=1.14.1",
+    "pylint>=3.2.7",
+    "pylint-pydantic>=0.3.5",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+lightkube-extensions = { git = "https://github.com/canonical/lightkube-extensions.git", rev = "main" }
+
 # Testing tools configuration
 [tool.coverage.run]
 branch = true
@@ -28,15 +79,23 @@ line-length = 99
 extend-exclude = ["__pycache__", "*.egg_info"]
 
 [tool.ruff.lint]
-select = ["E", "W", "F", "C", "N", "R", "D", "I001"]
+select = ["E", "W", "F", "C", "N", "R", "D", "I001", "Q"]
 # Ignore E501 because using black creates errors with this
 # Ignore D107 Missing docstring in __init__
-ignore = ["E501", "D107", "N818", "RET504"]
+# Ignore C90 because we do not check cyclomatic complexity as a rule
+ignore = ["C90", "E501", "D107", "N818", "RET504"]
 # D100, D101, D102, D103: Ignore missing docstrings in tests
-per-file-ignores = {"*tests/*" = ["D100","D101","D102","D103","D104"]}
+per-file-ignores = {"*tests/*" = ["D100","D101","D102","D103","D104","D205","D212","D415"]}
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
+
+[tool.ruff.lint.pycodestyle]
+max-doc-length = 99
+
+[tool.ruff.lint.mccabe]
+# Flag errors (`C901`) whenever the complexity level exceeds 10.
+max-complexity = 10
 
 [tool.pyright]
 reportTypedDictNotRequiredAccess = false
@@ -46,3 +105,18 @@ pythonPlatform = "All"
 
 [tool.codespell]
 skip = ".git,.tox,build,venv*"
+
+[tool.mypy]
+check_untyped_defs = true
+disallow_untyped_defs = true
+explicit_package_bases = true
+ignore_missing_imports = true
+namespace_packages = true
+
+[[tool.mypy.overrides]]
+disallow_untyped_defs = false
+module = "tests.*"
+
+# Disabling logging-fstring-interpolation
+[tool.pylint]
+disable = "wrong-import-order,fixme,logging-fstring-interpolation"

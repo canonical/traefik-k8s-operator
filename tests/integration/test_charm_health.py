@@ -9,14 +9,8 @@ from urllib.parse import urlparse
 import pytest
 from pytest_operator.plugin import OpsTest
 
-from tests.integration.conftest import (
-    trfk_resources,
-)
-from tests.integration.helpers import (
-    delete_k8s_service,
-    get_k8s_service_address,
-    remove_application,
-)
+from tests.integration.conftest import trfk_resources
+from tests.integration.helpers import get_k8s_service_address, remove_application
 
 health_tester_resources = {
     "python-image": "ubuntu/python:3.10-22.04_stable",
@@ -104,5 +98,4 @@ async def test_health(ops_test: OpsTest):
 
 
 async def test_cleanup(ops_test):
-    await delete_k8s_service(ops_test, "traefik-k8s-lb")
     await remove_application(ops_test, "traefik-k8s", timeout=60)

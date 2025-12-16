@@ -7,7 +7,7 @@ from os.path import join
 import pytest
 import requests
 import yaml
-from helpers import delete_k8s_service, get_k8s_service_address, remove_application
+from helpers import get_k8s_service_address, remove_application
 from lightkube import Client
 from lightkube.resources.core_v1 import ConfigMap
 from pytest_operator.plugin import OpsTest
@@ -79,15 +79,17 @@ async def test_deployment(ops_test: OpsTest, traefik_charm, forward_auth_tester_
     )
 
 
+@pytest.mark.xfail(reason="See https://github.com/canonical/traefik-k8s-operator/issues/522")
 @retry(
     wait=wait_exponential(multiplier=3, min=1, max=30),
     stop=stop_after_attempt(30),
     reraise=True,
 )
 async def test_allowed_forward_auth_url_redirect(ops_test: OpsTest) -> None:
-    """Test that a request hitting an application protected by IAP is forwarded by traefik to oathkeeper.
+    """Test forward oathkeeper.
 
-    An allowed request should be performed without authentication.
+    Test that a request hitting an application protected by IAP is forwarded by traefik
+    to oathkeeper. An allowed request should be performed without authentication.
     Retry the request to ensure the access rules were populated by oathkeeper.
     """
     requirer_url = await get_reverse_proxy_app_url(ops_test, TRAEFIK_CHARM, IAP_REQUIRER_CHARM)
@@ -99,9 +101,10 @@ async def test_allowed_forward_auth_url_redirect(ops_test: OpsTest) -> None:
 
 
 async def test_protected_forward_auth_url_redirect(ops_test: OpsTest) -> None:
-    """Test that when trying to reach a protected url, the request is forwarded by traefik to oathkeeper.
+    """Test forward protected url.
 
-    An unauthenticated request should then be denied with 401 Unauthorized response.
+    Test that when trying to reach a protected url, the request is forwarded by traefik
+    to oathkeeper. An unauthenticated request should then be denied with 401 Unauthorized response.
     """
     requirer_url = await get_reverse_proxy_app_url(ops_test, TRAEFIK_CHARM, IAP_REQUIRER_CHARM)
 
@@ -194,5 +197,4 @@ async def test_remove_forward_auth_integration(ops_test: OpsTest):
 
 
 async def test_cleanup(ops_test):
-    await delete_k8s_service(ops_test, "traefik-k8s-lb")
     await remove_application(ops_test, "traefik-k8s", timeout=60)

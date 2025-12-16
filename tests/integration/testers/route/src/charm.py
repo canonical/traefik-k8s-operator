@@ -8,6 +8,7 @@ from ops.model import ActiveStatus
 
 class RouteRequirerMock(CharmBase):
     def __init__(self, framework):
+        """Initialize the mock charm."""
         super().__init__(framework)
         self.traefik_route = TraefikRouteRequirer(
             self, self.model.get_relation("traefik-route"), "traefik_route"

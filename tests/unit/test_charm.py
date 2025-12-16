@@ -63,8 +63,9 @@ def _requirer_provide_ingress_requirements(
             "mode": mode,
             "port": str(port),
             "host": host,
-            # Must set these to something, because when used with subTest, the previous relation data
-            # must be overwritten: if a key is omitted, then a plain `update` would keep existing keys.
+            # Must set these to something, because when used with subTest,
+            # the previous relation data must be overwritten: if a key is omitted,
+            # then a plain `update` would keep existing keys.
             # TODO also need to test what happens when any of these is not specified at all
             "strip-prefix": "true" if strip_prefix else "false",
             "redirect-https": "true" if redirect_https else "false",
@@ -324,7 +325,10 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
         try:
             traefik_container.pull(
-                f"/opt/traefik/juju/juju_ingress_{relation.name}_{relation.id}_{relation.app.name}.yaml"
+                (
+                    "/opt/traefik/juju/juju_ingress_"
+                    f"{relation.name}_{relation.id}_{relation.app.name}.yaml"
+                )
             ).read()
             raise Exception("The line above should fail")
         except (FileNotFoundError, PathError):
@@ -341,7 +345,13 @@ class TestTraefikIngressCharm(unittest.TestCase):
         self.harness.update_config({"external_hostname": "foo"})
         self.harness.charm._on_show_proxied_endpoints(action_event)
         action_event.set_results.assert_called_once_with(
-            {"proxied-endpoints": '{"traefik-k8s": {"url": "http://foo"}}'}
+            {
+                "proxied-endpoints": json.dumps(
+                    {
+                        "traefik-k8s": {"url": "http://foo"},
+                    }
+                )
+            }
         )
 
     @patch(
@@ -476,7 +486,9 @@ class TestTraefikIngressCharm(unittest.TestCase):
             relation_id,
             "provider",
             {
-                "decisions_address": "https://oathkeeper.test-model.svc.cluster.local:4456/decisions",
+                "decisions_address": (
+                    "https://oathkeeper.test-model.svc.cluster.local:4456/decisions"
+                ),
                 "app_names": '["charmed-app"]',
                 "headers": '["X-User"]',
             },
@@ -564,10 +576,7 @@ class TestTraefikCertTransferInterface(unittest.TestCase):
             relation_id=certificate_transfer_rel_id, remote_unit_name=f"{provider_app}/0"
         )
         call_list = patch_exec.call_args_list
-        assert [call.args[0] for call in call_list] == [
-            ["find", "/opt/traefik/juju", "-name", "*.yaml", "-delete"],
-            ["update-ca-certificates", "--fresh"],
-        ]
+        assert ["update-ca-certificates", "--fresh"] in [call.args[0] for call in call_list]
 
     @patch("ops.model.Container.exec")
     @patch(

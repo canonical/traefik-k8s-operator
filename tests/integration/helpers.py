@@ -12,7 +12,7 @@ from juju.application import Application
 from juju.unit import Unit
 from minio import Minio
 from pytest_operator.plugin import OpsTest
-from tenacity import retry, stop_after_attempt, wait_exponential
+from tenacity import retry, stop_after_attempt, wait_exponential, wait_fixed
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,10 @@ async def get_k8s_service_address(ops_test: OpsTest, service_name: str) -> Optio
     model = ops_test.model.info
     try:
         result = sh.kubectl(
-            *f"-n {model.name} get service/{service_name} -o=jsonpath='{{.status.loadBalancer.ingress[0].ip}}'".split()
+            *(
+                f"-n {model.name} get service/{service_name} -o=jsonpath="
+                f"'{{.status.loadBalancer.ingress[0].ip}}'"
+            ).split()
         )
         ip_address = result.strip("'")
         return ip_address
@@ -103,7 +106,10 @@ def dequote(s: str):
 
 
 async def deploy_and_configure_minio(ops_test: OpsTest) -> None:
-    """Deploy and set up minio and s3-integrator needed for s3-like storage backend in the HA charms."""
+    """Deploy and set up minio and s3-integrator.
+
+    They are needed for s3-like storage backend in the HA charms.
+    """
     config = {
         "access-key": "accesskey",
         "secret-key": "secretkey",
@@ -144,6 +150,8 @@ async def deploy_tempo_cluster(ops_test: OpsTest):
     """Deploys tempo in its HA version together with minio and s3-integrator."""
     tempo_app = "tempo"
     worker_app = "tempo-worker"
+    # Switching from 1/stable to 2/edge. We can switch back when this fix makes it to stable:
+    # https://github.com/canonical/tempo-operators/pull/161
     tempo_worker_charm_url, worker_channel = "tempo-worker-k8s", "2/edge"
     tempo_coordinator_charm_url, coordinator_channel = "tempo-coordinator-k8s", "2/edge"
     await ops_test.model.deploy(
@@ -172,7 +180,10 @@ async def deploy_tempo_cluster(ops_test: OpsTest):
 
 def get_traces(tempo_host: str, service_name="tracegen-otlp_http", tls=True):
     """Get traces directly from Tempo REST API."""
-    url = f"{'https' if tls else 'http'}://{tempo_host}:3200/api/search?tags=service.name={service_name}"
+    url = (
+        f"{'https' if tls else 'http'}://"
+        f"{tempo_host}:3200/api/search?tags=service.name={service_name}"
+    )
     req = requests.get(
         url,
         verify=False,
@@ -186,8 +197,8 @@ def get_traces(tempo_host: str, service_name="tracegen-otlp_http", tls=True):
 async def get_traces_patiently(tempo_host, service_name="tracegen-otlp_http", tls=True):
     """Get traces directly from Tempo REST API, but also try multiple times.
 
-    Useful for cases when Tempo might not return the traces immediately (its API is known for returning data in
-    random order).
+    Useful for cases when Tempo might not return the traces immediately
+    (its API is known for returning data in random order).
     """
     traces = get_traces(tempo_host, service_name=service_name, tls=tls)
     assert len(traces) > 0
@@ -199,3 +210,13 @@ async def get_application_ip(ops_test: OpsTest, app_name: str) -> str:
     status = await ops_test.model.get_status()
     app = status["applications"][app_name]
     return app.public_address
+
+@retry(
+    wait=wait_fixed(5),
+    stop=stop_after_attempt(5),
+)
+def fetch_with_retry(url: str) -> requests.Response:
+    response = requests.get(url, verify=False, allow_redirects=True)
+    if response.status_code != 200:
+        raise AssertionError(f"Expected status 200, got {response.status_code}")
+    return response

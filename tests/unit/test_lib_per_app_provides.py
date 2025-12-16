@@ -5,10 +5,7 @@ from textwrap import dedent
 
 import pytest
 import yaml
-from charms.traefik_k8s.v2.ingress import (
-    IngressPerAppProvider,
-    IngressRequirerAppData,
-)
+from charms.traefik_k8s.v2.ingress import IngressPerAppProvider, IngressRequirerAppData
 from ops.charm import CharmBase
 from ops.testing import Harness
 
@@ -25,6 +22,7 @@ class MockProviderCharm(CharmBase):
     )
 
     def __init__(self, *args, **kwargs):
+        """Initialize the mock charm."""
         super().__init__(*args, **kwargs)
         self.ipa = IngressPerAppProvider(self)
 

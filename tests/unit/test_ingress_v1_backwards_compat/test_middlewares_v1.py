@@ -9,7 +9,7 @@ import pytest
 import yaml
 from scenario import Container, Mount, Relation, State
 
-from tests.scenario._utils import _render_config
+from tests.unit._utils import _render_config
 
 
 def _create_relation(
@@ -57,7 +57,7 @@ def _create_relation(
 @pytest.mark.parametrize("routing_mode", ("path", "subdomain"))
 @pytest.mark.parametrize("strip_prefix", (False, True))
 @pytest.mark.parametrize("redirect_https", (False, True))
-@patch("charm.TraefikIngressCharm._external_host", PropertyMock(return_value="testhostname"))
+@patch("charm.TraefikIngressCharm._ingressed_address", PropertyMock(return_value="testhostname"))
 @patch("traefik.Traefik.is_ready", PropertyMock(return_value=True))
 @patch("charm.TraefikIngressCharm._static_config_changed", PropertyMock(return_value=False))
 @patch("charm.TraefikIngressCharm.version", PropertyMock(return_value="0.0.0"))
@@ -108,9 +108,7 @@ def test_middleware_config(
         rel_name="ingress",
         routing_mode=routing_mode,
         strip_prefix=strip_prefix,
-        redirect_https=redirect_https,
         scheme="http",
-        tls_enabled=False,
         port=9000,
     )
 
