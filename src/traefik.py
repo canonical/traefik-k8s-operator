@@ -258,8 +258,8 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         """
         self._container.push(ca.path, ca.ca, make_dirs=True)
 
-    def remove_cas(self, uids: Iterable[Union[str, int]]) -> None:
-        """Remove all CAs with these UIDs.
+    def remove_ca(self, uid: str) -> None:
+        """Remove CA with this UID.
 
         BEWARE of potential race conditions.
         Traefik watches the dynamic config dir and reloads automatically on change.
@@ -268,9 +268,11 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
 
         Calls update-ca-certificates once done.
         """
-        for uid in uids:
-            ca_path = RECV_CA_TEMPLATE.substitute(rel_id=str(uid))
+        ca_path = RECV_CA_TEMPLATE.substitute(rel_id=uid)
+        try:
             self._container.remove_path(ca_path)
+        except PathError:
+            logger.exception("Error removing cert file %s.", ca_path)
         self.update_ca_certs()
 
     def update_ca_certs(self) -> None:
@@ -295,9 +297,6 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         static_config = {
             "global": {
                 "checknewversion": False,
-                # TODO add juju config to disable anonymous usage
-                # https://github.com/canonical/observability/blob/main/decision-records/2026-06-27--upstream-telemetry.md
-                "sendanonymoususage": True,
             },
             "log": {
                 "level": "DEBUG",

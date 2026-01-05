@@ -36,7 +36,10 @@ from charms.oathkeeper.v0.forward_auth import (
 )
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 from charms.tempo_coordinator_k8s.v0.charm_tracing import trace_charm
-from charms.tempo_coordinator_k8s.v0.tracing import TracingEndpointRequirer, charm_tracing_config
+from charms.tempo_coordinator_k8s.v0.tracing import (
+    TracingEndpointRequirer,
+    charm_tracing_config,
+)
 from charms.tls_certificates_interface.v4.tls_certificates import (
     CertificateRequestAttributes,
     Mode,
@@ -47,7 +50,10 @@ from charms.traefik_k8s.v0.traefik_route import (
     TraefikRouteRequirerReadyEvent,
 )
 from charms.traefik_k8s.v1.ingress import IngressPerAppProvider as IPAv1
-from charms.traefik_k8s.v1.ingress_per_unit import DataValidationError, IngressPerUnitProvider
+from charms.traefik_k8s.v1.ingress_per_unit import (
+    DataValidationError,
+    IngressPerUnitProvider,
+)
 from charms.traefik_k8s.v2.ingress import IngressPerAppProvider as IPAv2
 from charms.traefik_k8s.v2.ingress import IngressPerAppRequirer
 from cosl import JujuTopology
@@ -57,7 +63,10 @@ from lightkube.core.exceptions import ApiError
 from lightkube.models.core_v1 import ServicePort, ServiceSpec
 from lightkube.models.meta_v1 import ObjectMeta
 from lightkube.resources.core_v1 import Service
-from lightkube_extensions.batch import KubernetesResourceManager, create_charm_default_labels
+from lightkube_extensions.batch import (
+    KubernetesResourceManager,
+    create_charm_default_labels,
+)
 from ops import EventBase, main
 from ops.charm import (
     ActionEvent,
@@ -69,10 +78,22 @@ from ops.charm import (
     UpdateStatusEvent,
 )
 from ops.framework import StoredState
-from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, Relation, WaitingStatus
+from ops.model import (
+    ActiveStatus,
+    BlockedStatus,
+    MaintenanceStatus,
+    Relation,
+    WaitingStatus,
+)
 from ops.pebble import PathError
 
-from traefik import CA, SERVER_CERT_PATH, RoutingMode, StaticConfigMergeConflictError, Traefik
+from traefik import (
+    CA,
+    SERVER_CERT_PATH,
+    RoutingMode,
+    StaticConfigMergeConflictError,
+    Traefik,
+)
 from utils import is_hostname
 
 # To keep a tidy debug-log, we suppress some DEBUG/INFO logs from some imported libs,
@@ -618,8 +639,8 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
 
     def _on_recv_ca_cert_removed(self, event: CertificateTransferRemovedEvent) -> None:
         # Assuming only one cert per relation (this is in line with the original lib design).
-        self.traefik.remove_cas([event.relation_id])
-        # Since remove_cas will call update_ca_certs in traefik, a restart is needed.
+        self.traefik.remove_ca(str(event.relation_id))
+        # Since remove_ca will call update_ca_certs in traefik, a restart is needed.
         self._restart_traefik()
         self._reconcile_lb()
 
@@ -665,12 +686,12 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         Output should be of the form:
         {
           "hostname0": {
-            "cert": "<cert>",
+            "chain": "<cert>",
             "key": "<key>",
             "ca": "<ca>"
           },
           "hostname1": {
-            "cert": "<cert>",
+            "chain": "<cert>",
             "key": "<key>",
             "ca": "<ca>"
           }
@@ -685,7 +706,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             and self.config.get("tls-key", None)
         ):
             certs["local-config"] = {
-                "cert": cast(str, self.config["tls-cert"]),
+                "chain": cast(str, self.config["tls-cert"]),
                 "key": cast(str, self.config["tls-key"]),
                 "ca": cast(str, self.config["tls-ca"]),
             }
@@ -1095,6 +1116,9 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
 
     def _handle_traefik_route_ready(self, event: TraefikRouteRequirerReadyEvent) -> None:
         """Handle ingress data published by a traefik-route charm."""
+        if not self.container.can_connect():
+            event.defer()
+            return
         if self._static_config_changed:
             # This will regenerate the static configs and reevaluate all dynamic configs,
             # including this one.
