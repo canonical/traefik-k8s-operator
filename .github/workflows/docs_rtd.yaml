@@ -1,0 +1,9 @@
+name: RTD workflows
+
+on:
+  pull_request:
+
+jobs:
+  rtd-docs-checks:
+    uses: canonical/operator-workflows/.github/workflows/docs_rtd.yaml@main
+    secrets: inherit
