@@ -24,7 +24,7 @@ import yaml
 #
 # TODO: Update with the official name of your project or product
 
-project = "Traefik K8s charm"
+project = "Traefik charm"
 author = "Canonical Ltd."
 
 
@@ -226,12 +226,7 @@ templates_path = ["_templates"]
 # NOTE: If undefined, set to None, or empty,
 #       the sphinx_reredirects extension will be disabled.
 
-redirects = {
-    'reference/doc-cheat-sheet-myst/': '../myst-syntax-reference',
-    'reference/doc-cheat-sheet/': '../rst-syntax-reference',
-    'reference/style-guide-myst/': '../myst-syntax-reference',
-    'reference/style-guide/': '../rst-syntax-reference',
-}
+redirects = {}
 
 
 ###########################
@@ -371,6 +366,6 @@ if os.path.exists('./reuse/substitutions.yaml'):
 
 intersphinx_mapping = {
     "juju": ("https://documentation.ubuntu.com/juju/3.6/", None),
-    'starter-pack': ('https://canonical-example-product-documentation.readthedocs-hosted.com/en/latest', None),
+    'starter-pack': ('https://canonical-starter-pack.readthedocs-hosted.com/stable/', None),
     'sphinxcontrib-mermaid': ('https://sphinxcontrib-mermaid-demo.readthedocs.io/en/latest', None)
 }

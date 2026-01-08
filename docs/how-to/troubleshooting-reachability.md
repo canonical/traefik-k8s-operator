@@ -1,6 +1,6 @@
-(how_to_troubleshooting_reachability)=
-(how-to-troubleshooting-reachability)=
-# Troubleshooting reachability
+(how_to_troubleshoot_reachability)=
+
+# How to troubleshoot reachability
 
 After relating traefik to your charm, you may encounter reachability errors such as:
 - Internal server error

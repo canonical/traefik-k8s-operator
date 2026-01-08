@@ -1,6 +1,6 @@
-(how_to_integrating)=
-(how-to-integrating)=
-# Integrating
+(how_to_integrate)=
+
+# How to integrate
 
 The [traefik charm](https://charmhub.io/traefik-k8s) is a charm to provide ingress to another charmed application 'the juju way'. The idea is that if a charm integrates with `traefik-k8s` then you can relate the two applications and your application will receive the url at which ingress is made available.
 

@@ -1,5 +1,5 @@
 (reference_cryptographic_documentation_for_cos_lite_charms)=
-(reference-cryptographic-documentation-for-cos-lite-charms)=
+
 # Cryptographic documentation for COS-Lite charms
 
 This document provides cryptographic documentation for the COS-Lite bundle.

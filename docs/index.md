@@ -1,32 +1,28 @@
 ---
 myst:
   html_meta:
-    "description lang=en": "TBD"
+    "description lang=en": "A Juju charm deploying and managing Traefik on Kubernetes."
 ---
 (index)=
 
 # Charmed Traefik
 
-<!--Summary-->
 `traefik-k8s` is a charm for [Traefik], an ingress integrator and reverse proxy for Kubernetes.
 It is an essential part of the [COS Lite bundle].
 
-
-<!--Description-->
 This Charmed Operator handles instantiation, scaling, configuration, and Day 2 operations specific to Traefik.
 
 This operator drives the Traefik application, and it can be composed with other operators to deliver a complex application or service.
 
-
-<!--Needs-->
 The charm offers different kinds of ingress:
 - Ingress per app. This is the typical use case. The related app has only one ingress url like `/mymodel-myapp`, and Traefik will load-balance in a round-robin fashion across all units.
 - Ingress per unit. Each unit of the related app obtains its own ingress url, like `/mymodel-myapp-0`.
 - Traefik route. This is a means to provide a fully custom ingress configuration to Traefik.
 
-```{note} Ingress is a purely in-model concern. Traefik will happily cross-model relate with your remote ingress requirers, but will be unable to actually route to them. [This is a known issue.](https://github.com/canonical/operator/issues/970) ```
+```{note} 
+Ingress is a purely in-model concern. Traefik will happily cross-model relate with your remote ingress requirers, but will be unable to actually route to them. [This is a known issue.](https://github.com/canonical/operator/issues/970) 
+```
 
-<!--Target-->
 This charm is:
 - part of the COS Lite bundle
 - intended to be used together with certificates provider over the `tls-certificates` interface
@@ -57,8 +53,8 @@ Thinking about using the Canonical Observability Stack for your next project? [G
 
 ```{toctree}
 :hidden:
+tutorial/index.md
 how-to/index.md
 reference/index.md
-tutorials/index.md
 changelog.md
 ```

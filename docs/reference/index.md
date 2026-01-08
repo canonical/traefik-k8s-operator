@@ -1,12 +1,13 @@
-(reference-index)=
+---
+myst:
+  html_meta:
+    "description lang=en": "Technical information related to the Traefik charm."
+---
+
+(reference_index)=
+
 # Reference
 
 ```{toctree}
-:titlesonly:
-:maxdepth: 2
-:glob:
-:hidden:
-
-*
-*/index
+cryptographic-documentation-for-cos-lite-charms
 ```

@@ -1,22 +1,29 @@
-(tutorials_tls_termination_using_a_local_ca)=
-(tutorials-tls-termination-using-a-local-ca)=
-# TLS termination using a local ca
+---
+myst:
+  html_meta:
+    "description lang=en": "The Traefik charm tutorial that walks a user through TLS termination using a local root-ca."
+---
 
-[details=Metadata]
-| Key | Value |
-| --- | --- |
-| Summary | TLS termination using a local root-ca. |
-| Categories | deploy-applications |
-| Difficulty | 2 |
-| Author | [Leon Mintz](mailto:Leon.Mintz@canonical.com) |
-[/details]
+(tutorial_tls_termination_using_a_local_ca)=
+
+# TLS termination using a local ca
 
 ## Introduction
 By the end of this tutorial you will have several apps deployed, that you could `curl` via an ingress https url. For simplicity, in this tutorial we will rely on a self-signed certificate issued by a stand-in local CA.
 
-![image|690x321](upload://bEDCXupV8vq4Z9ku4WvS7uw9art.png) 
+```{mermaid}
+flowchart LR
 
-([Edit a copy of this diagram](https://mermaid.live/edit#pako:eNp9kU9v1DAQxb-KNed4lT8b0uQMN7hAT9RVNSSTrFXHjuwxtN3sd6-TCCQkxGls6735zfNcoXcDQQejcb_6C3oWn78qq2yIPyaPy0Xco5-IRW9iYPLKCuGd4x4fFAQyowx6sjTInjzrUffIFBQ8Cinlyib89b4K9uPz1mKrD_ceadTPh1bbyVMIciEvcVlWgSY5Z7Q4HdT_W6LVvIrFu5n4QjH828HHRXoXmVaRAo4JsMUlO2ylj94IeZLrT42CXlJgi-bp4gJbnOmYHzKYyc-oh_Rt1w2kIDFnUtCl40AjRsMKlL0laVyGFP3ToNl56EY0gTLAyO7bq-2hYx_pt-ijxjTR_Ee1oIXuCi_QndtTe1e3dX7-0LZN3mTwCl1RtKeyzpu2OtdNXhVlfcvgzbnUoDiVedXelc25rIumquo6A9pH-HJse1_6Tvi-G3bi7R1IeLQM))
+subgraph Target cluster
+  rootca["self-signed-certificates"] ---|tls-certificates| trfk
+  trfk[Traefik] ---|ingress-per-app| alertmanager
+  trfk[Traefik] ---|ingress-per-unit| prometheus
+  trfk[Traefik] ---|traefik-route| grafana
+
+end
+
+curl -.-|via external_hostname| trfk
+```
 
 ```{note}
 This tutorial assumes you have a Juju controller bootstrapped on a MicroK8s cloud that is ready to use. A typical setup using [snaps](https://snapcraft.io/) can be found in the [Juju docs](https://juju.is/docs/sdk/dev-setup). Follow the instructions there to install Juju and MicroK8s.

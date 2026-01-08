@@ -1,12 +1,15 @@
-(how_to_how_to_enable_basicauth)=
-(how-to-how-to-enable-basicauth)=
+(how_to_enable_basicauth)=
+
 # How to enable BasicAuth
 
-```{note}This feature is available in traefik-k8s starting from revision 206.```
+```{note}
+This feature is available in traefik-k8s starting from revision 206.
+```
 
 In order to enable BasicAuth in `traefik-k8s` you will need to:
 
 # Generate a user string
+
 First you will need to  generate a user string with the right format:
 > `<username>:<hashed-password>`
 

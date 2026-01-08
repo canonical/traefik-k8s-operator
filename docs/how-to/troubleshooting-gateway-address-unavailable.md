@@ -1,6 +1,6 @@
-(how_to_troubleshooting_gateway_address_unavailable)=
-(how-to-troubleshooting-gateway-address-unavailable)=
-# Troubleshooting "Gateway Address Unavailable"
+(how_to_troubleshoot_gateway_address_unavailable)=
+
+# How to troubleshoot "Gateway Address Unavailable"
 
 <!--
 
