@@ -8,6 +8,8 @@ myst:
 
 # Tutorial
 
+The Traefik charm tutorial walks you through a basic Traefik deployment.
+
 ## Configuration
 
 * {ref}`tutorial_tls_termination_using_a_local_ca`

@@ -8,6 +8,8 @@ myst:
 
 # Reference
 
+The pages in this section contain technical information for topics related to the Traefik charm.
+
 ```{toctree}
 cryptographic-documentation-for-cos-lite-charms
 ```

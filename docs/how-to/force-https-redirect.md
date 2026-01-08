@@ -12,6 +12,7 @@ This feature was introduced in revision 127 ([PR#178](https://github.com/canonic
 ## Pack a charm with HTTPS redirection enabled
 
 Let's take [alertmanager](https://github.com/canonical/alertmanager-k8s-operator) for example. It already imports and uses ingress per app:
+
 ```python
 from charms.traefik_k8s.v1.ingress import IngressPerAppRequirer
 
@@ -30,9 +31,9 @@ All you need to do is add another constructor argument:
         )
 ```
 
-## Set up a tls demo model
+## Set up a TLS demo model
 
-Deploy [traefik](https://charmhub.io/traefik-k8s/), [alertmanager](https://charmhub.io/alertmanager-k8s) and [self-signed-certificates](https://charmhub.io/self-signed-certificates), similar to how it is described in the "[TLS termination using a local ca](https://discourse.charmhub.io/t/traefik-k8s-docs-tls-termination-using-a-local-ca/10779)" tutorial.
+Deploy [traefik](https://charmhub.io/traefik-k8s/), [alertmanager](https://charmhub.io/alertmanager-k8s) and [self-signed-certificates](https://charmhub.io/self-signed-certificates), similar to how it is described in the {ref}`TLS termination using a local ca <tutorial_tls_termination_using_a_local_ca>` tutorial.
 
 ```bash
 # Your locally built charm with the new constructor arg
@@ -74,19 +75,21 @@ Moved Permanently
 
 And now curl should be able to reach the endpoint, even though it's `http` and not `https`:
 
-```bash
-$ curl -L \
-     --fail-with-body \
-     --capath /tmp \
-     --cacert /tmp/local.cert \
-     http://demo.local/tls-demo-alertmanager/-/ready
+```{terminal}
+curl -L \
+  --fail-with-body \
+  --capath /tmp \
+  --cacert /tmp/local.cert \
+  http://demo.local/tls-demo-alertmanager/-/ready
+
 OK
 ```
 
 If you're using the `demo.local` example, you may need to temporarily add Traefik's IP to `/etc/hosts` to have `curl` match the cert when following the redirect:
 
-```bash
-$ cat /etc/hosts  
+```{terminal}
+cat /etc/hosts  
+
 # --snip--
 10.43.8.34 demo.local  # $TRAEFIK_IP
 ```

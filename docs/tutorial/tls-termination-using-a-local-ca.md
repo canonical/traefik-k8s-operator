@@ -6,9 +6,10 @@ myst:
 
 (tutorial_tls_termination_using_a_local_ca)=
 
-# TLS termination using a local ca
+# TLS termination using a local CA
 
 ## Introduction
+
 By the end of this tutorial you will have several apps deployed, that you could `curl` via an ingress https url. For simplicity, in this tutorial we will rely on a self-signed certificate issued by a stand-in local CA.
 
 ```{mermaid}
@@ -30,17 +31,21 @@ This tutorial assumes you have a Juju controller bootstrapped on a MicroK8s clou
 ```
 
 ## Configure MicroK8s
-Follow the instructions under the "[Configure MicroK8s](https://discourse.charmhub.io/t/getting-started-on-microk8s/5199)" section to setup MicroK8s with metallb.
+
+Follow the instructions under the "[Configure MicroK8s](https://discourse.charmhub.io/t/getting-started-on-microk8s/5199)" section to set up MicroK8s with metallb.
 
 ## Deploy the apps
-Now, we will deploy traefik, self-signed-certificates (to function as a root CA), and alertmanager, prometheus, and grafana (apps that take an ingress relation).
+
+Now, we will deploy Traefik, self-signed-certificates (to function as a root CA), and alertmanager, prometheus, and grafana (apps that take an ingress relation).
 
 First, create a new model:
+
 ```bash
 juju add-model tls-demo
 ```
 
 Next, save the following bundle as `tls-demo.yaml`:
+
 ```yaml
 ---
 bundle: kubernetes
@@ -82,21 +87,31 @@ relations:
 ```
 
 Finally, deploy the local bundle:
+
 ```bash
 juju deploy --trust ./tls-demo.yaml
 ```
 
 ## Reach an application's endpoint via ingress
+
 ```{note}
 By default, the traefik charm sets up traefik in a way that allows both HTTP and HTTPS access.
-To force HTTPS redirect, see "[Force HTTPS redirect](https://discourse.charmhub.io/t/traefik-k8s-docs-force-https-redirect/10810)".
+To force HTTPS redirect, see {ref}`Force HTTPS redirect <how_to_force_https_redirect>`.
 ```
 
 ### HTTP
 
-First, obtain the ingress url by using a traefik action:
-```bash
-$ juju run traefik/0 show-proxied-endpoints
+First, obtain the ingress URL by using a Traefik action:
+
+```
+juju run traefik/0 show-proxied-endpoints
+```
+
+The terminal output should look something like:
+
+```{terminal}
+:output-only:
+
 Running operation 5 with 1 task
   - task 6 on unit-traefik-0
 
@@ -106,7 +121,9 @@ proxied-endpoints: '{
   "alertmanager": {"url": "http://demo.local:80/tls-demo-alertmanager"}
 }'
 ```
-and Traefik's IP:
+
+Now let's obtain Traefik's IP:
+
 ```bash
 $ TRAEFIK_IP=$(\
   juju status --format json traefik \
@@ -115,17 +132,23 @@ $ TRAEFIK_IP=$(\
 ```
 
 Now, use the ingress URL with the application's API HTTP endpoint:
+
 ```bash
-$ curl --resolve "demo.local:80:$TRAEFIK_IP" \
-   http://demo.local:80/tls-demo-alertmanager/-/ready
+curl --resolve "demo.local:80:$TRAEFIK_IP" \
+  http://demo.local:80/tls-demo-alertmanager/-/ready
+
 OK
-$ curl --resolve "demo.local:80:$TRAEFIK_IP" \
-   http://demo.local:80/tls-demo-prometheus-0/-/ready
+
+curl --resolve "demo.local:80:$TRAEFIK_IP" \
+  http://demo.local:80/tls-demo-prometheus-0/-/ready
+
 Prometheus Server is Ready.
 ```
 
 ### HTTPS
+
 Save the certificate locally:
+
 ```bash
 # TODO avoid literal indexing
 juju show-unit --format json traefik/0 \
@@ -134,15 +157,17 @@ juju show-unit --format json traefik/0 \
   > /tmp/local.cert
 ```
 
-and save Traefik's IP if you haven't done so already:
+Save Traefik's IP:
+
 ```bash
-$ TRAEFIK_IP=$(\
+TRAEFIK_IP=$(\
   juju status --format json traefik \
   | jq -r ".applications.traefik.address"\
 )
 ```
 
 Curl the endpoint:
+
 ```bash
 curl --resolve demo.local:443:$TRAEFIK_IP \
      --fail-with-body \
@@ -150,8 +175,12 @@ curl --resolve demo.local:443:$TRAEFIK_IP \
      --cacert /tmp/local.cert \
      https://demo.local/tls-demo-alertmanager/-/ready
 ```
-This should return
-```text
+
+This should return:
+
+```{terminal}
+:output-only:
+
 OK
 ```
 
