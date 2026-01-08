@@ -10,7 +10,7 @@ myst:
 
 ## Introduction
 
-By the end of this tutorial you will have several apps deployed, that you could `curl` via an ingress HTTPS URL. For simplicity, in this tutorial we will rely on a self-signed certificate issued by a stand-in local CA.
+By the end of this tutorial you will have several apps deployed, that you could `curl` using an ingress HTTPS URL. For simplicity, in this tutorial we will rely on a self-signed certificate issued by a stand-in local CA.
 
 ```{mermaid}
 flowchart LR
@@ -92,7 +92,7 @@ Finally, deploy the local bundle:
 juju deploy --trust ./tls-demo.yaml
 ```
 
-## Reach an application's endpoint via ingress
+## Reach an application's endpoint with ingress
 
 ```{note}
 By default, the Traefik charm sets up Traefik in a way that allows both HTTP and HTTPS access.

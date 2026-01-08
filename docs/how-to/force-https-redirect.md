@@ -11,7 +11,8 @@ This feature was introduced in revision 127 ([PR#178](https://github.com/canonic
 
 ## Pack a charm with HTTPS redirection enabled
 
-Let's take [Alertmanager](https://github.com/canonical/alertmanager-k8s-operator) for example. It already imports and uses ingress per app:
+Let's take [Alertmanager](https://github.com/canonical/alertmanager-k8s-operator) for example.
+It already imports and uses ingress for each app:
 
 ```python
 from charms.traefik_k8s.v1.ingress import IngressPerAppRequirer

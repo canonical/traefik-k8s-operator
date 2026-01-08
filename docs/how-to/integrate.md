@@ -2,26 +2,39 @@
 
 # How to integrate
 
-The [traefik charm](https://charmhub.io/traefik-k8s) is a charm to provide ingress to another charmed application 'the Juju way'. The idea is that if a charm integrates with `traefik-k8s` then you can relate the two applications and your application will receive the URL at which ingress is made available.
+The [traefik charm](https://charmhub.io/traefik-k8s) is a charm to provide ingress to
+another charmed application 'the Juju way'. The idea is that if a charm integrates with
+`traefik-k8s` then you can relate the two applications and your application will
+receive the URL at which ingress is made available.
 
 The Traefik charm supports two standardized interfaces:
 - [ingress](https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/ingress/v2#readme) 
 
-  Using this interface, each charmed application can request a single, cluster-unique URL for ingress. You can choose between a domain-name-based URL (`your.parameters.domain.com`) and a path-based URL (`domain.com\your\parameters`).
-- [ingress-per-unit](https://github.com/canonical/charm-relation-interfaces/blob/main/interfaces/ingress_per_unit/v0/README.md)
+  Using this interface, each charmed application can request a single, cluster-unique URL for ingress.
+  You can choose between a domain-name-based URL (`your.parameters.domain.com`) and a path-based URL (`domain.com\your\parameters`).
+- [`ingress-per-unit`](https://github.com/canonical/charm-relation-interfaces/blob/main/interfaces/ingress_per_unit/v0/README.md)
 
-  Using this interface, each charmed application can request a cluster-unique URL for each existing unit. This is for applications such as Prometheus, where each remote-write endpoint needs to be routed to separately, and database applications who wish to do client-side load-balancing.
+  Using this interface, each charmed application can request a cluster-unique URL for each
+  existing unit. This is for applications such as Prometheus, where each remote-write
+  endpoint needs to be routed to separately, and database applications who wish to do
+  client-side load-balancing.
 
 ## Traefik-route
 
-The [Traefik route charm](https://charmhub.io/traefik-route-k8s) is a proxy charm that sits between Traefik and a charm in need of ingress, and is used to provide low-level access to Traefik configuration, as well as to allow per-relation configuration. 
+The [Traefik route charm](https://charmhub.io/traefik-route-k8s) is a proxy charm that sits
+between Traefik and a charm in need of ingress, and is used to provide low-level access to
+Traefik configuration, as well as to allow configuration for each relation. 
 
-Want to have full access to all the expressive power of [Traefik's routing configuration](https://doc.traefik.io/traefik/routing/overview/)? Want to have one Traefik instance, and provide domain-name-based URL routing to some charms, but path-based URL routing to some others? This is how you do it.
+Want to have full access to all the expressive power of
+[Traefik's routing configuration](https://doc.traefik.io/traefik/routing/overview/)? Want to
+have one Traefik instance, and provide domain-name-based URL routing to some charms, but
+path-based URL routing to some others? This is how you do it.
 
 ## Add ingress to your charm
 
 Traefik owns two charm libraries to facilitate integrating with it over `ingress` and `ingress_per_unit`.
-At the time of writing, the most recent `ingress` version is v2. You can verify what the latest version for the libraries is by visiting the documentation pages on Charmhub:
+At the time of writing, the most recent `ingress` version is v2. You can verify what the
+latest version for the libraries is by visiting the documentation pages on Charmhub:
 
 - [`ingress`](https://charmhub.io/traefik-k8s/libraries/ingress)
 - [`ingress_per_unit`](https://charmhub.io/traefik-k8s/libraries/ingress_per_unit)
@@ -60,12 +73,16 @@ from charms.traefik_k8s.v2.ingress import IngressPerAppRequirer, IngressReadyEve
 
 ```
 
-`IngressPerAppRequirer` will take care of communicating over the `ingress` relation with `traefik-k8s` and notifying the charm whenever Traefik replies with an ingress URL or that URL is revoked for some reason (e.g. the cloud admin removed the relation). 
+`IngressPerAppRequirer` will take care of communicating over the `ingress` relation with
+`traefik-k8s` and notifying the charm whenever Traefik replies with an ingress URL or
+that URL is revoked for some reason (e.g. the cloud admin removed the relation). 
 
 ## Get the proxied endpoint exposed by Traefik
 
-You have added an ingress integration to your charm and you have deployed it alongside `traefik-k8s` and integrated them.
-Run the following command to get a list of the endpoints currently exposed by `traefik`, one for each application integrated over `ingress` and one for each *unit* related over `ingress_per_unit`.
+You have added an ingress integration to your charm and you have deployed it alongside
+`traefik-k8s` and integrated them. Run the following command to get a list of the
+endpoints currently exposed by `traefik`, one for each application integrated over
+`ingress` and one for each *unit* related over `ingress_per_unit`.
 
 ```bash
 juju run traefik/0 show-proxied-endpoints

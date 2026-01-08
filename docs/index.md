@@ -16,8 +16,8 @@ The charm drives the Traefik application, and it can be composed with other oper
 
 The charm offers different kinds of ingress:
 
-- **Ingress per app**: This is the typical use case. The related app has only one ingress URL like `/mymodel-myapp`, and Traefik will load-balance in a round-robin fashion across all units.
-- **Ingress per unit**: Each unit of the related app obtains its own ingress URL, like `/mymodel-myapp-0`.
+- **Ingress for each app**: This is the typical use case. The related app has only one ingress URL like `/mymodel-myapp`, and Traefik will load-balance in a round-robin fashion across all units.
+- **Ingress for each unit**: Each unit of the related app obtains its own ingress URL, like `/mymodel-myapp-0`.
 - **Traefik route**: This is a means to provide a fully custom ingress configuration to Traefik.
 
 ```{note} 

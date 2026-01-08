@@ -1,6 +1,10 @@
 (how_to_troubleshoot_gateway_address_unavailable)=
 
+<!-- vale Canonical.007-Headings-sentence-case = NO -->
+
 # How to troubleshoot "Gateway Address Unavailable"
+
+<!-- vale Canonical.007-Headings-sentence-case = YES -->
 
 <!--
 
@@ -8,16 +12,19 @@
 
 -->
 
-Whenever Traefik is used to ingress your Kubernetes workloads, you risk encountering the dreaded "Gateway Address Unavailable" message. In this article, we'll go through what you can do to remediate it.
+Whenever Traefik is used to ingress your Kubernetes workloads, you risk encountering the dreaded
+"Gateway Address Unavailable" message. In this article, we'll go through what you can do to remediate it.
 
 ```{warning}
-In this article, we will assume that you are running MicroK8s on either a bare-metal or virtual machine. If your setup differs from this, parts of the how-to guide may still apply, although you will need to tailor the exact steps and commands to your setup.
+In this article, we will assume that you are running MicroK8s on either a bare-metal or virtual machine.
+If your setup differs from this, parts of the how-to guide may still apply, although you will need to
+tailor the exact steps and commands to your setup.
 ```
 
 ## Requirements
 
 - You have ran `juju trust <traefik> --scope=cluster`
-- The [metallb microk8s addon](https://microk8s.io/docs/addon-metallb) is enabled.
+- The [metallb MicroK8s addon](https://microk8s.io/docs/addon-metallb) is enabled.
 - Traefik's service type is `LoadBalancer`.
 - An external IP address is assigned to Traefik.
 
