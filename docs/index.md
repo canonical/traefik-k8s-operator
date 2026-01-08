@@ -8,7 +8,8 @@ myst:
 # Traefik operator
 
 A [Juju](https://juju.is/) {ref}`charm <juju:charm>` deploying and managing [Traefik], an ingress
-integrator and reverse proxy for Kubernetes. It is an essential part of the [COS Lite bundle].
+integrator and reverse proxy for Kubernetes. It is an essential part of the [COS Lite bundle]
+and is intended to be used together with certificates provider over the `tls-certificates` interface.
 
 This operator handles instantiation, scaling, configuration, and Day 2 operations specific to Traefik.
 The charm drives the Traefik application, and it can be composed with other operators to deliver a complex application or service.
@@ -23,17 +24,12 @@ The charm offers different kinds of ingress:
 Ingress is a purely in-model concern. Traefik will happily cross-model relate with your remote ingress requirers, but will be unable to actually route to them. [This is a known issue.](https://github.com/canonical/operator/issues/970) 
 ```
 
-This charm is:
-
-- part of the COS Lite bundle
-- intended to be used together with certificates provider over the `tls-certificates` interface
-
 ## In this documentation
 
 | | |
 |-|-|
 | {ref}`Tutorial <tutorial_index>`</br>  Get started - a hands-on introduction for new users deploying the charmed operator.</br> | {ref}`How-to guides <how_to_index>`</br> Step-by-step guides covering key operations and common tasks |
-|                    |  {ref}`Reference <reference_index>`</br> Technical information - specifications, APIs, architecture    |
+| {ref}`Reference <reference_index>`</br> Technical information - specifications, APIs, architecture    |        |
 
 ## Contributing to this documentation
 

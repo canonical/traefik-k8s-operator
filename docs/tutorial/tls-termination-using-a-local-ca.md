@@ -27,7 +27,7 @@ curl -.-|via external_hostname| trfk
 ```
 
 ```{note}
-This tutorial assumes you have a Juju controller bootstrapped on a MicroK8s cloud that is ready to use. A typical setup using [snaps](https://snapcraft.io/) can be found in the [Juju docs](https://juju.is/docs/sdk/dev-setup). Follow the instructions there to install Juju and MicroK8s.
+This tutorial assumes you have a Juju controller bootstrapped on a MicroK8s cloud that is ready to use. A typical setup using [snaps](https://snapcraft.io/) can be found in the {ref}`Juju docs <juju:set-things-up>`. Follow the instructions there to install Juju and MicroK8s.
 ```
 
 ## Configure MicroK8s
@@ -36,7 +36,7 @@ Follow the instructions under the "[Configure MicroK8s](https://discourse.charmh
 
 ## Deploy the apps
 
-Now, we will deploy Traefik, self-signed-certificates (to function as a root CA), and alertmanager, prometheus, and grafana (apps that take an ingress relation).
+Now, we will deploy Traefik, self-signed-certificates (to function as a root CA), and alertmanager, Prometheus, and Grafana (apps that take an ingress relation).
 
 First, create a new model:
 
@@ -95,7 +95,7 @@ juju deploy --trust ./tls-demo.yaml
 ## Reach an application's endpoint via ingress
 
 ```{note}
-By default, the traefik charm sets up traefik in a way that allows both HTTP and HTTPS access.
+By default, the Traefik charm sets up Traefik in a way that allows both HTTP and HTTPS access.
 To force HTTPS redirect, see {ref}`Force HTTPS redirect <how_to_force_https_redirect>`.
 ```
 
@@ -125,7 +125,7 @@ proxied-endpoints: '{
 Now let's obtain Traefik's IP:
 
 ```bash
-$ TRAEFIK_IP=$(\
+TRAEFIK_IP=$(\
   juju status --format json traefik \
   | jq -r ".applications.traefik.address"\
 )
@@ -133,12 +133,14 @@ $ TRAEFIK_IP=$(\
 
 Now, use the ingress URL with the application's API HTTP endpoint:
 
-```bash
+```{terminal}
 curl --resolve "demo.local:80:$TRAEFIK_IP" \
   http://demo.local:80/tls-demo-alertmanager/-/ready
 
 OK
+```
 
+```{terminal}
 curl --resolve "demo.local:80:$TRAEFIK_IP" \
   http://demo.local:80/tls-demo-prometheus-0/-/ready
 

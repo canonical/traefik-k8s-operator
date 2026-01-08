@@ -8,7 +8,7 @@ myst:
 
 # How-to guides
 
-These guides accompany you through the complete `traefik-k8s-operator` operations lifecycle.
+These guides accompany you through the complete Traefik charm operations lifecycle.
 
 ## Configuring
 
