@@ -11,7 +11,7 @@ This feature was introduced in revision 127 ([PR#178](https://github.com/canonic
 
 ## Pack a charm with HTTPS redirection enabled
 
-Let's take [alertmanager](https://github.com/canonical/alertmanager-k8s-operator) for example. It already imports and uses ingress per app:
+Let's take [Alertmanager](https://github.com/canonical/alertmanager-k8s-operator) for example. It already imports and uses ingress per app:
 
 ```python
 from charms.traefik_k8s.v1.ingress import IngressPerAppRequirer
@@ -33,7 +33,7 @@ All you need to do is add another constructor argument:
 
 ## Set up a TLS demo model
 
-Deploy [Traefik](https://charmhub.io/traefik-k8s/), [alertmanager](https://charmhub.io/alertmanager-k8s) and [self-signed-certificates](https://charmhub.io/self-signed-certificates), similar to how it is described in the {ref}`TLS termination using a local CA <tutorial_tls_termination_using_a_local_ca>` tutorial.
+Deploy [Traefik](https://charmhub.io/traefik-k8s/), [Alertmanager](https://charmhub.io/alertmanager-k8s) and [self-signed-certificates](https://charmhub.io/self-signed-certificates), similar to how it is described in the {ref}`TLS termination using a local CA <tutorial_tls_termination_using_a_local_ca>` tutorial.
 
 ```bash
 # Your locally built charm with the new constructor arg

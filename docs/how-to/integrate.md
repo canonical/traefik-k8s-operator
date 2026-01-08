@@ -36,7 +36,8 @@ charmcraft fetch-lib charms.traefik_k8s.v2.ingress
 
 This will download `lib/charms/traefik_k8s/v2/ingress.py`.
 The simplest way to use the library is to instantiate the `IngressPerAppRequirer` object from your charm's constructor.
-You can immediately pass to it the host and port of the server you want to be ingressed (useful if they are static), or you can defer that decision to a later moment by using the `IngressPerAppRequirer.provide_ingress_requirements` API.
+You can immediately pass to it the host and port of the server you want ingress (useful if they are static),
+or you can defer that decision to a later moment by using the `IngressPerAppRequirer.provide_ingress_requirements` API.
 
 ```python
 # src/charm.py

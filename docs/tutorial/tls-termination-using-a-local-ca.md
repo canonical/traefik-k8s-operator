@@ -10,7 +10,7 @@ myst:
 
 ## Introduction
 
-By the end of this tutorial you will have several apps deployed, that you could `curl` via an ingress https url. For simplicity, in this tutorial we will rely on a self-signed certificate issued by a stand-in local CA.
+By the end of this tutorial you will have several apps deployed, that you could `curl` via an ingress HTTPS URL. For simplicity, in this tutorial we will rely on a self-signed certificate issued by a stand-in local CA.
 
 ```{mermaid}
 flowchart LR
@@ -36,7 +36,7 @@ Follow the instructions under the "[Configure MicroK8s](https://discourse.charmh
 
 ## Deploy the apps
 
-Now, we will deploy Traefik, self-signed-certificates (to function as a root CA), and alertmanager, Prometheus, and Grafana (apps that take an ingress relation).
+Now, we will deploy Traefik, self-signed-certificates (to function as a root CA), and Alertmanager, Prometheus, and Grafana (apps that take an ingress relation).
 
 First, create a new model:
 

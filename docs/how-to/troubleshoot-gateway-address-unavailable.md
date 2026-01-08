@@ -36,7 +36,7 @@ IPADDR=$(ip -4 -j route get 2.2.2.2 | jq -r '.[] | .prefsrc')
 microk8s enable metallb:$IPADDR-$IPADDR
 ```
 
-This command will fetch the IPv4 address assigned to your host, and hand it to MetalLB as an assignable IP. If the address range you want to hand to MetalLB differs from your host ip, alter the `$IPADDR` variable to instead specify the range you want to assign, for instance `IPADDR=10.0.0.1-10.0.0.100`.
+This command will fetch the IPv4 address assigned to your host, and hand it to MetalLB as an assignable IP. If the address range you want to hand to MetalLB differs from your host IP, alter the `$IPADDR` variable to instead specify the range you want to assign, for instance `IPADDR=10.0.0.1-10.0.0.100`.
 
 ## No external IP address is assigned to the Traefik service
 
@@ -60,7 +60,7 @@ Check with:
 kubectl get ipaddresspool -n metallb-system -o yaml && kubectl get all -n metallb-system
 ```
 
-You could add more IPs to the range:
+You could add more IP addresses to the range:
 
 ```
 FROM_IP="..."
@@ -100,7 +100,7 @@ cos               traefik                  LoadBalancer   10.152.183.130   10.70
                                                                                 
 ```
 
-Verify that Traefik is functioning correctly by trying to trigger one of your ingressed paths. If you have COS Lite deployed, you may check that if works as expected using the Catalogue charm:
+Verify that Traefik is functioning correctly by trying to trigger one of your paths. If you have COS Lite deployed, you may check that if works as expected using the Catalogue charm:
 
 ```
 curl http://<TRAEFIKS_EXTERNAL_IP>/<YOUR_MODEL_NAME>-catalogue/
