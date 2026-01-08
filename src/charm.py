@@ -1591,7 +1591,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         if self.upstream_ingress.is_ready():
             # Return the address without the scheme
             parsed = urlparse(self.upstream_ingress.url)
-            return parsed.geturl().replace(f"{parsed.scheme}://", "", 1)  # pyright: ignore
+            return parsed.geturl().replace(f"{parsed.scheme}://", "", 1).rstrip("/")  # pyright: ignore
         return self._traefik_external_address
 
     @property
