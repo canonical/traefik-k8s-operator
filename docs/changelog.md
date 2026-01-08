@@ -8,8 +8,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 Each revision is versioned by the date of the revision.
 
+## 2026-01-08
+
+- Migrate documentation to GitHub and set up RTD project.
+
 ## 2025-11-28
 
 ### Changed
 
-- Fixed traefik accessing pebble before container is ready.
+- Fixed Traefik accessing Pebble before container is ready.
