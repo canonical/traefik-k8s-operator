@@ -8,6 +8,7 @@ another charmed application 'the Juju way'. The idea is that if a charm integrat
 receive the URL at which ingress is made available.
 
 The Traefik charm supports two standardized interfaces:
+
 - [ingress](https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/ingress/v2#readme) 
 
   Using this interface, each charmed application can request a single, cluster-unique URL for ingress.
