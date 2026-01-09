@@ -11,3 +11,4 @@ jobs:
     steps:
       - name: Check if CLA signed
         uses: canonical/has-signed-canonical-cla@v2
+

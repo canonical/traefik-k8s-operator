@@ -2,7 +2,7 @@
 
 # How to integrate
 
-The [traefik charm](https://charmhub.io/traefik-k8s) is a charm to provide ingress to
+The [Traefik charm](https://charmhub.io/traefik-k8s) is a charm to provide ingress to
 another charmed application 'the Juju way'. The idea is that if a charm integrates with
 `traefik-k8s` then you can relate the two applications and your application will
 receive the URL at which ingress is made available.
@@ -20,7 +20,7 @@ The Traefik charm supports two standardized interfaces:
   endpoint needs to be routed to separately, and database applications who wish to do
   client-side load-balancing.
 
-## Traefik-route
+## Traefik route
 
 The [Traefik route charm](https://charmhub.io/traefik-route-k8s) is a proxy charm that sits
 between Traefik and a charm in need of ingress, and is used to provide low-level access to

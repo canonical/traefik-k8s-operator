@@ -77,9 +77,7 @@ ogp_image = "https://assets.ubuntu.com/v1/cc828679-docs_illustration.svg"
 
 # html_favicon = '.sphinx/_static/favicon.png'
 
-
-# Dictionary of values to pass into the Sphinx context for all pages:
-# https://www.sphinx-doc.org/en/master/usage/configuration.html#confval-html_context
+# Dictionary of values to pass into the Sphinx context for all pages
 
 html_context = {
     # Product page URL; can be different from product docs URL
