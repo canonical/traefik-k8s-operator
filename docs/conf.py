@@ -8,9 +8,6 @@ import yaml
 # If you're new to Sphinx and don't want any advanced or custom features,
 # just go through the items marked 'TODO'.
 #
-# A complete list of built-in Sphinx configuration values:
-# https://www.sphinx-doc.org/en/master/usage/configuration.html
-#
 # Our starter pack uses the custom Canonical Sphinx extension
 # to keep all documentation based on it consistent and on brand:
 # https://github.com/canonical/canonical-sphinx
@@ -21,18 +18,12 @@ import yaml
 #######################
 
 # Project name
-#
-# TODO: Update with the official name of your project or product
 
-project = "Traefik charm"
+project = "Traefik K8s charm"
 author = "Canonical Ltd."
 
 
 # Sidebar documentation title; best kept reasonably short
-#
-# TODO: To include a version number, add it here (hardcoded or automated).
-#
-# TODO: To disable the title, set to an empty string.
 
 html_title = project + " documentation"
 
@@ -65,8 +56,6 @@ copyright = "%s CC-BY-SA, %s" % (datetime.date.today().year, author)
 
 # Documentation website URL
 #
-# TODO: Update with the official URL of your docs or leave empty if unsure.
-#
 # NOTE: The Open Graph Protocol (OGP) enhances page display in a social graph
 #       and is used by social media platforms; see https://ogp.me/
 
@@ -74,15 +63,10 @@ ogp_site_url = "https://documentation.ubuntu.com/traefik-k8s-charm/"
 
 
 # Preview name of the documentation website
-#
-# TODO: To use a different name for the project in previews, update as needed.
 
 ogp_site_name = project
 
-
 # Preview image URL
-#
-# TODO: To customise the preview image, update as needed.
 
 ogp_image = "https://assets.ubuntu.com/v1/cc828679-docs_illustration.svg"
 
@@ -99,13 +83,6 @@ ogp_image = "https://assets.ubuntu.com/v1/cc828679-docs_illustration.svg"
 
 html_context = {
     # Product page URL; can be different from product docs URL
-    #
-    # TODO: Change to your product website URL,
-    #       dropping the 'https://' prefix, e.g. 'ubuntu.com/lxd'.
-    #
-    # TODO: If there's no such website,
-    #       remove the {{ product_page }} link from the page header template
-    #       (usually .sphinx/_templates/header.html; also, see README.rst).
     "product_page": "charmhub.io/traefik-k8s",
     # Product tag image; the orange part of your logo, shown in the page header
     #
@@ -113,35 +90,25 @@ html_context = {
     # 'product_tag': '_static/tag.png',
     # Your Discourse instance URL
     #
-    # TODO: Change to your Discourse instance URL or leave empty.
-    #
     # NOTE: If set, adding ':discourse: 123' to an .rst file
     #       will add a link to Discourse topic 123 at the bottom of the page.
     "discourse": "https://discourse.charmhub.io",
     # Your Mattermost channel URL
     #
-    # TODO: Change to your Mattermost channel URL or leave empty.
     "mattermost": "",
     # Your Matrix channel URL
     #
-    # TODO: Change to your Matrix channel URL or leave empty.
     "matrix": "https://matrix.to/#/#charmhub-charmdev:ubuntu.com",
     # Your documentation GitHub repository URL
-    #
-    # TODO: Change to your documentation GitHub repository URL or leave empty.
     #
     # NOTE: If set, links for viewing the documentation source files
     #       and creating GitHub issues are added at the bottom of each page.
     "github_url": "https://github.com/canonical/traefik-k8s-operator",
     # Docs branch in the repo; used in links for viewing the source files
     #
-    # TODO: To customise the branch, uncomment and update as needed.
     'repo_default_branch': 'main',
     # Docs location in the repo; used in links for viewing the source files
     #
-
-
-    # TODO: To customise the directory, uncomment and update as needed.
     "repo_folder": "/docs/",
     # TODO: To enable or disable the Previous / Next buttons at the bottom of pages
     # Valid options: none, prev, next, both
@@ -262,8 +229,7 @@ linkcheck_retries = 3
 # myst_enable_extensions = set()
 
 
-# Custom Sphinx extensions; see
-# https://www.sphinx-doc.org/en/master/usage/extensions/index.html
+# Custom Sphinx extensions
 
 # NOTE: The canonical_sphinx extension is required for the starter pack.
 
