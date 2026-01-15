@@ -10,7 +10,8 @@ Each revision is versioned by the date of the revision.
 
 ## 2026-01-08
 
-- Migrate documentation to GitHub and set up RTD project.
+- Migrated documentation to GitHub and set up RTD project.
+- Added workflow to check for CLA compliance.
 
 ## 2025-11-28
 

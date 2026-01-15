@@ -151,8 +151,9 @@ Prometheus Server is Ready.
 
 Save the certificate locally:
 
+<!-- TODO avoid literal indexing -->
+
 ```bash
-# TODO avoid literal indexing
 juju show-unit --format json traefik/0 \
   | jq -r '."traefik/0"."relation-info"[3]."application-data".certificates' \
   | jq -r '.[1].certificate' \

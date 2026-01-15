@@ -29,7 +29,7 @@ admin:$2y$05$ChsVYFWoLO7YbNnRZSS2IeLcKzL1jgfdOdCfyhtz4tcPOvmTkQYPy
 ```
 
 ```{tip}
-Use a strong password.
+Use a strong password (at least 15 characters).
 ```
 
 ## Pass the user string to `traefik-k8s`
