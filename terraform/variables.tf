@@ -25,8 +25,8 @@ variable "constraints" {
   default = "arch=amd64"
 }
 
-variable "model" {
-  description = "Reference to an existing model resource or data source for the model to deploy to"
+variable "model_uuid" {
+  description = "ID of the model to deploy to"
   type        = string
 }
 

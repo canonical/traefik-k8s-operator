@@ -17,13 +17,13 @@ from urllib.parse import urlparse
 
 import pydantic
 import yaml
-from charms.certificate_transfer_interface.v0.certificate_transfer import (
-    CertificateAvailableEvent as CertificateTransferAvailableEvent,
+from charms.certificate_transfer_interface.v1.certificate_transfer import (
+    CertificatesAvailableEvent as CertificateTransferAvailableEvent,
 )
-from charms.certificate_transfer_interface.v0.certificate_transfer import (
-    CertificateRemovedEvent as CertificateTransferRemovedEvent,
+from charms.certificate_transfer_interface.v1.certificate_transfer import (
+    CertificatesRemovedEvent as CertificateTransferRemovedEvent,
 )
-from charms.certificate_transfer_interface.v0.certificate_transfer import (
+from charms.certificate_transfer_interface.v1.certificate_transfer import (
     CertificateTransferRequires,
 )
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
@@ -36,7 +36,10 @@ from charms.oathkeeper.v0.forward_auth import (
 )
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 from charms.tempo_coordinator_k8s.v0.charm_tracing import trace_charm
-from charms.tempo_coordinator_k8s.v0.tracing import TracingEndpointRequirer, charm_tracing_config
+from charms.tempo_coordinator_k8s.v0.tracing import (
+    TracingEndpointRequirer,
+    charm_tracing_config,
+)
 from charms.tls_certificates_interface.v4.tls_certificates import (
     CertificateRequestAttributes,
     Mode,
@@ -47,7 +50,10 @@ from charms.traefik_k8s.v0.traefik_route import (
     TraefikRouteRequirerReadyEvent,
 )
 from charms.traefik_k8s.v1.ingress import IngressPerAppProvider as IPAv1
-from charms.traefik_k8s.v1.ingress_per_unit import DataValidationError, IngressPerUnitProvider
+from charms.traefik_k8s.v1.ingress_per_unit import (
+    DataValidationError,
+    IngressPerUnitProvider,
+)
 from charms.traefik_k8s.v2.ingress import IngressPerAppProvider as IPAv2
 from charms.traefik_k8s.v2.ingress import IngressPerAppRequirer
 from cosl import JujuTopology
@@ -57,7 +63,10 @@ from lightkube.core.exceptions import ApiError
 from lightkube.models.core_v1 import ServicePort, ServiceSpec
 from lightkube.models.meta_v1 import ObjectMeta
 from lightkube.resources.core_v1 import Service
-from lightkube_extensions.batch import KubernetesResourceManager, create_charm_default_labels
+from lightkube_extensions.batch import (
+    KubernetesResourceManager,
+    create_charm_default_labels,
+)
 from ops import EventBase, main
 from ops.charm import (
     ActionEvent,
@@ -69,10 +78,22 @@ from ops.charm import (
     UpdateStatusEvent,
 )
 from ops.framework import StoredState
-from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, Relation, WaitingStatus
+from ops.model import (
+    ActiveStatus,
+    BlockedStatus,
+    MaintenanceStatus,
+    Relation,
+    WaitingStatus,
+)
 from ops.pebble import PathError
 
-from traefik import CA, SERVER_CERT_PATH, RoutingMode, StaticConfigMergeConflictError, Traefik
+from traefik import (
+    CA,
+    SERVER_CERT_PATH,
+    RoutingMode,
+    StaticConfigMergeConflictError,
+    Traefik,
+)
 from utils import is_hostname
 
 # To keep a tidy debug-log, we suppress some DEBUG/INFO logs from some imported libs,
@@ -192,6 +213,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             # external clients.
             scheme=upstream_ingress_route_configuration["scheme"],
             host=upstream_ingress_route_configuration["host"],
+            ip=upstream_ingress_route_configuration["ip"],
         )
         self.framework.observe(
             self.upstream_ingress.on.ready, self._handle_upstream_ingress_changed
@@ -332,13 +354,13 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             self._on_cert_changed,
         )
         observe(
-            self.recv_ca_cert.on.certificate_available,  # pyright: ignore
+            self.recv_ca_cert.on.certificate_set_updated,  # pyright: ignore
             self._on_recv_ca_cert_available,
         )
         observe(
             # Need to observe a managed relation event because a custom wrapper is not available
             # https://github.com/canonical/mutual-tls-interface/issues/5
-            self.recv_ca_cert.on.certificate_removed,  # pyright: ignore
+            self.recv_ca_cert.on.certificates_removed,  # pyright: ignore
             self._on_recv_ca_cert_removed,
         )
 
@@ -557,6 +579,27 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         return ingress_address.hostname or ingress_address.ip
 
     @property
+    def _traefik_loadbalancer_ip(self) -> Optional[str]:
+        try:
+            traefik_service = self.lightkube_client.get(
+                Service, name=self._lb_name, namespace=self.model.name
+            )
+        except ApiError as e:
+            logger.error(f"Failed to fetch LoadBalancer {self._lb_name}: {e}")
+            return None
+
+        if not (status := getattr(traefik_service, "status", None)):
+            return None
+        if not (load_balancer_status := getattr(status, "loadBalancer", None)):
+            return None
+        if not (ingress_addresses := getattr(load_balancer_status, "ingress", None)):
+            return None
+        if not (ingress_address := ingress_addresses[0]):  # pylint: disable=unsubscriptable-object
+            return None
+
+        return ingress_address.ip
+
+    @property
     def _annotations_valid(self) -> bool:
         """Check if the annotations are valid.
 
@@ -588,6 +631,8 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             return
         self._update_received_ca_certs(event)
         self._reconcile_lb()
+        # We need to restart Traefik now
+        self._restart_traefik()
 
     def _update_received_ca_certs(
         self, event: Optional[CertificateTransferAvailableEvent] = None
@@ -601,7 +646,8 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         """
         cas = []
         if event:
-            cas.append(CA(event.ca, uid=event.relation_id))
+            for cert in event.certificates:
+                cas.append(CA(cert, uid=event.relation_id))
         else:
             for relation in self.model.relations.get(self.recv_ca_cert.relationship_name, []):
                 # For some reason, relation.units includes our unit and app. Need to exclude them.
@@ -615,7 +661,9 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
 
     def _on_recv_ca_cert_removed(self, event: CertificateTransferRemovedEvent) -> None:
         # Assuming only one cert per relation (this is in line with the original lib design).
-        self.traefik.remove_cas([event.relation_id])
+        self.traefik.remove_ca(str(event.relation_id))
+        # Since remove_ca will call update_ca_certs in traefik, a restart is needed.
+        self._restart_traefik()
         self._reconcile_lb()
 
     def _is_tls_enabled(self) -> bool:
@@ -650,18 +698,22 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         """Update the server cert, ca, and key configuration files."""
         self.traefik.update_cert_configuration(self._get_certs())
 
+        # update_cert_configuration relies on traefik.update_ca_certs.
+        # Thus, we should restart traefik with the new CA certs.
+        self._restart_traefik()
+
     def _get_certs(self) -> dict:
         """Get all certs to be installed.
 
         Output should be of the form:
         {
           "hostname0": {
-            "cert": "<cert>",
+            "chain": "<cert>",
             "key": "<key>",
             "ca": "<ca>"
           },
           "hostname1": {
-            "cert": "<cert>",
+            "chain": "<cert>",
             "key": "<key>",
             "ca": "<ca>"
           }
@@ -676,7 +728,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             and self.config.get("tls-key", None)
         ):
             certs["local-config"] = {
-                "cert": cast(str, self.config["tls-cert"]),
+                "chain": cast(str, self.config["tls-cert"]),
                 "key": cast(str, self.config["tls-key"]),
                 "ca": cast(str, self.config["tls-ca"]),
             }
@@ -881,8 +933,10 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         self._reconcile_lb()
         if not self.container.can_connect():
             return
+
         self._update_cert_configs()
         self._configure_traefik()
+        self._restart_traefik()
         self._process_status_and_configurations()
 
     def _update_config_if_changed(self) -> None:
@@ -900,6 +954,8 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
                 # changed, we don't need to redo this.
                 self._update_cert_configs()
                 self._configure_traefik()
+
+                self._restart_traefik()
 
             self._process_status_and_configurations()
 
@@ -1082,6 +1138,9 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
 
     def _handle_traefik_route_ready(self, event: TraefikRouteRequirerReadyEvent) -> None:
         """Handle ingress data published by a traefik-route charm."""
+        if not self.container.can_connect():
+            event.defer()
+            return
         if self._static_config_changed:
             # This will regenerate the static configs and reevaluate all dynamic configs,
             # including this one.
@@ -1266,7 +1325,6 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             scheme="http",  # IPL (aka ingress v1) has no https option
             port=data["port"],
             host=data["host"],
-            redirect_https=data.get("redirect-https", False),
             strip_prefix=data.get("strip-prefix", False),
             external_host=self.gateway_address,
             forward_auth_app=self.forward_auth.is_protected_app(app=data.get("name")),
@@ -1299,7 +1357,6 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         config = self.traefik.get_per_app_http_config(
             prefix=prefix,
             scheme=data.app.scheme,
-            redirect_https=data.app.redirect_https,
             strip_prefix=data.app.strip_prefix,
             port=data.app.port,
             external_host=self.gateway_address,
@@ -1358,7 +1415,6 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
                     port=data["port"],
                     scheme=data.get("scheme"),
                     strip_prefix=data.get("strip-prefix"),
-                    redirect_https=data.get("redirect-https"),
                     external_host=self.gateway_address,
                     forward_auth_app=self.forward_auth.is_protected_app(app=data.get("name")),
                     forward_auth_config=self.forward_auth.get_provider_info(),
@@ -1472,6 +1528,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             "scheme": scheme,
             "host": host,
             "port": port,
+            "ip": self._traefik_loadbalancer_ip,
         }
 
     @property
@@ -1534,7 +1591,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         if self.upstream_ingress.is_ready():
             # Return the address without the scheme
             parsed = urlparse(self.upstream_ingress.url)
-            return parsed.geturl().replace(f"{parsed.scheme}://", "", 1)  # pyright: ignore
+            return parsed.geturl().replace(f"{parsed.scheme}://", "", 1).rstrip("/")  # pyright: ignore
         return self._traefik_external_address
 
     @property

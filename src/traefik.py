@@ -277,8 +277,8 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         """
         self._container.push(ca.path, ca.ca, make_dirs=True)
 
-    def remove_cas(self, uids: Iterable[Union[str, int]]) -> None:
-        """Remove all CAs with these UIDs.
+    def remove_ca(self, uid: str) -> None:
+        """Remove CA with this UID.
 
         BEWARE of potential race conditions.
         Traefik watches the dynamic config dir and reloads automatically on change.
@@ -287,20 +287,16 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
 
         Calls update-ca-certificates once done.
         """
-        for uid in uids:
-            ca_path = RECV_CA_TEMPLATE.substitute(rel_id=str(uid))
+        ca_path = RECV_CA_TEMPLATE.substitute(rel_id=uid)
+        try:
             self._container.remove_path(ca_path)
+        except PathError:
+            logger.exception("Error removing cert file %s.", ca_path)
         self.update_ca_certs()
 
     def update_ca_certs(self) -> None:
-        """Update ca certificates and restart traefik."""
+        """Update ca certificates. Traefik will restart from inside charm.py."""
         self._container.exec(["update-ca-certificates", "--fresh"]).wait()
-
-        # Must restart traefik after refreshing certs, otherwise:
-        # - newly added certs will not be loaded and traefik will keep erroring-out with "signed by
-        #   unknown authority".
-        # - old certs will be kept active.
-        self.restart()
 
     def generate_static_config(self, _raise: bool = False) -> Dict[str, Any]:
         """Generate Traefik's static config yaml."""
@@ -320,9 +316,6 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         static_config = {
             "global": {
                 "checknewversion": False,
-                # TODO add juju config to disable anonymous usage
-                # https://github.com/canonical/observability/blob/main/decision-records/2026-06-27--upstream-telemetry.md
-                "sendanonymoususage": True,
             },
             "log": {
                 "level": "DEBUG",
@@ -406,7 +399,6 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         port: int,
         scheme: Optional[str],
         strip_prefix: Optional[bool],
-        redirect_https: Optional[bool],
         external_host: str,
         forward_auth_app: bool,
         forward_auth_config: Optional[ForwardAuthConfig],
@@ -418,7 +410,6 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             lb_servers=lb_servers,
             scheme=scheme,
             strip_prefix=strip_prefix,
-            redirect_https=redirect_https,
             external_host=external_host,
             forward_auth_app=forward_auth_app,
             forward_auth_config=forward_auth_config,
@@ -432,7 +423,6 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         hosts: List[str],
         port: int,
         strip_prefix: Optional[bool],
-        redirect_https: Optional[bool],
         external_host: str,
         forward_auth_app: bool,
         forward_auth_config: Optional[ForwardAuthConfig],
@@ -447,7 +437,6 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             lb_servers=lb_servers,
             scheme=scheme,
             strip_prefix=strip_prefix,
-            redirect_https=redirect_https,
             external_host=external_host,
             forward_auth_app=forward_auth_app,
             forward_auth_config=forward_auth_config,
@@ -462,7 +451,6 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         host: str,
         port: int,
         strip_prefix: bool,
-        redirect_https: bool,
         external_host: str,
         forward_auth_app: bool,
         forward_auth_config: Optional[ForwardAuthConfig],
@@ -474,7 +462,6 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             lb_servers=lb_servers,
             scheme=scheme,
             strip_prefix=strip_prefix,
-            redirect_https=redirect_https,
             external_host=external_host,
             forward_auth_app=forward_auth_app,
             forward_auth_config=forward_auth_config,
@@ -485,7 +472,6 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         prefix: str,
         lb_servers: List[Dict[str, str]],
         scheme: Optional[str],
-        redirect_https: Optional[bool],
         strip_prefix: Optional[bool],
         external_host: str,
         forward_auth_app: bool,
@@ -500,7 +486,6 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         """
         # purge any optionals:
         scheme_: str = scheme if scheme is not None else "http"
-        redirect_https_: bool = redirect_https if redirect_https is not None else False
         strip_prefix_: bool = strip_prefix if strip_prefix is not None else False
 
         host = external_host
@@ -519,11 +504,15 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
                 "entryPoints": ["web"],
             },
         }
-        router_cfg.update(
-            self.generate_tls_config_for_route(
-                traefik_router_name, route_rule, traefik_service_name, external_host=external_host
+        if self._tls_enabled:
+            router_cfg.update(
+                self.generate_tls_config_for_route(
+                    traefik_router_name,
+                    route_rule,
+                    traefik_service_name,
+                    external_host=external_host,
+                )
             )
-        )
 
         # Add the "rootsCAs" section only if TLS is enabled. If the rootCA section
         # is empty or the file does not exist, HTTP requests will fail with
@@ -581,9 +570,7 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             config["http"].update({"serversTransports": transports})
 
         middlewares = self._generate_middleware_config(
-            redirect_https=redirect_https_,
             strip_prefix=strip_prefix_,
-            scheme=scheme_,
             prefix=prefix,
             forward_auth_app=forward_auth_app,
             forward_auth_config=forward_auth_config,
@@ -600,9 +587,7 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
 
     def _generate_middleware_config(  # pylint: disable=too-many-arguments
         self,
-        redirect_https: bool,
         strip_prefix: bool,
-        scheme: str,
         prefix: str,
         forward_auth_app: bool,
         forward_auth_config: Optional[ForwardAuthConfig],
@@ -639,16 +624,10 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
 
         # Condition rendering the https-redirect middleware on the scheme, otherwise we'd get a 404
         # when attempting to reach an http endpoint.
-        redir_scheme_middleware = {}
-        if redirect_https and scheme == "https":
-            redir_scheme_middleware[f"juju-sidecar-redir-https-{prefix}"] = {
-                "redirectScheme": {"scheme": "https", "port": 443, "permanent": True}
-            }
 
         return {
             **forwardauth_middleware,
             **no_prefix_middleware,
-            **redir_scheme_middleware,
             **basicauth_middleware,
         }
 
