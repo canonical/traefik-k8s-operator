@@ -213,6 +213,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             # external clients.
             scheme=upstream_ingress_route_configuration["scheme"],
             host=upstream_ingress_route_configuration["host"],
+            ip=upstream_ingress_route_configuration["ip"],
         )
         self.framework.observe(
             self.upstream_ingress.on.ready, self._handle_upstream_ingress_changed
@@ -576,6 +577,27 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             return None
 
         return ingress_address.hostname or ingress_address.ip
+
+    @property
+    def _traefik_loadbalancer_ip(self) -> Optional[str]:
+        try:
+            traefik_service = self.lightkube_client.get(
+                Service, name=self._lb_name, namespace=self.model.name
+            )
+        except ApiError as e:
+            logger.error(f"Failed to fetch LoadBalancer {self._lb_name}: {e}")
+            return None
+
+        if not (status := getattr(traefik_service, "status", None)):
+            return None
+        if not (load_balancer_status := getattr(status, "loadBalancer", None)):
+            return None
+        if not (ingress_addresses := getattr(load_balancer_status, "ingress", None)):
+            return None
+        if not (ingress_address := ingress_addresses[0]):  # pylint: disable=unsubscriptable-object
+            return None
+
+        return ingress_address.ip
 
     @property
     def _annotations_valid(self) -> bool:
@@ -1506,6 +1528,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             "scheme": scheme,
             "host": host,
             "port": port,
+            "ip": self._traefik_loadbalancer_ip,
         }
 
     @property
@@ -1568,7 +1591,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         if self.upstream_ingress.is_ready():
             # Return the address without the scheme
             parsed = urlparse(self.upstream_ingress.url)
-            return parsed.geturl().replace(f"{parsed.scheme}://", "", 1)  # pyright: ignore
+            return parsed.geturl().replace(f"{parsed.scheme}://", "", 1).rstrip("/")  # pyright: ignore
         return self._traefik_external_address
 
     @property
