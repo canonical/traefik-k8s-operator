@@ -25,7 +25,7 @@ Applicable spec: <link>
 - [ ] The [charm style guide](https://documentation.ubuntu.com/juju/3.6/reference/charm/charm-development-best-practices/) was applied
 - [ ] The [contributing guide](https://github.com/canonical/is-charms-contributing-guide) was applied
 - [ ] The changes are compliant with [ISD054 - Managing Charm Complexity](https://discourse.charmhub.io/t/specification-isd014-managing-charm-complexity/11619)
-- [ ] The documentation for charmhub is updated
+- [ ] The documentation is updated
 - [ ] The PR is tagged with appropriate label (`urgent`, `trivial`, `senior-review-required`, `documentation`)
 - [ ] The `docs/changelog.md` is updated with user-relevant changes.
 
