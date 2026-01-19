@@ -29,7 +29,7 @@ These guides accompany you through the complete Traefik charm operations lifecyc
 
 ## Upgrade
 
-* {ref}`Contribute <how_to_upgrade>`
+* {ref}`Upgrade <how_to_upgrade>`
 
 ```{toctree}
 :hidden:
