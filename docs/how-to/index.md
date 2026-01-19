@@ -27,6 +27,10 @@ These guides accompany you through the complete Traefik charm operations lifecyc
 
 * {ref}`Contribute <how_to_contribute>`
 
+## Upgrade
+
+* {ref}`Contribute <how_to_upgrade>`
+
 ```{toctree}
 :hidden:
 
@@ -36,4 +40,5 @@ Integrate <integrate>
 Troubleshoot "Gateway Address Unavailable" <troubleshoot-gateway-address-unavailable>
 Troubleshoot reachability <troubleshoot-reachability>
 Contribute <contribute>
+Upgrade <upgrade>
 ```
