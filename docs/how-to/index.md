@@ -23,9 +23,14 @@ These guides accompany you through the complete Traefik charm operations lifecyc
 * {ref}`Troubleshoot "Gateway Address Unavailable" <how_to_troubleshoot_gateway_address_unavailable>`
 * {ref}`Troubleshoot reachability <how_to_troubleshoot_reachability>`
 
+## Upgrade
+
+* {ref}`Upgrade <how_to_upgrade>`
+
 ## Contributing
 
 * {ref}`Contribute <how_to_contribute>`
+
 
 ```{toctree}
 :hidden:
@@ -35,5 +40,6 @@ Enable BasicAuth <enable-basicauth>
 Integrate <integrate>
 Troubleshoot "Gateway Address Unavailable" <troubleshoot-gateway-address-unavailable>
 Troubleshoot reachability <troubleshoot-reachability>
+Upgrade <upgrade>
 Contribute <contribute>
 ```
