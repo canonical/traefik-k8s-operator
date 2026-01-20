@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 Each revision is versioned by the date of the revision.
 
+## 2026-01-19
+
+- Add how to upgrade documentation.
+
 ## 2026-01-08
 
 - Migrated documentation to GitHub and set up RTD project.
