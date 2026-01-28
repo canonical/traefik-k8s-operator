@@ -221,21 +221,6 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         self.framework.observe(
             self.upstream_ingress.on.revoked, self._handle_upstream_ingress_changed
         )
-
-        # Setup 'ingress' relation to support ingressing downstream applications
-        #
-        # FIXME: Do not move these lower. They must exist before `_tcp_ports` is called. The
-        # better long-term solution is to allow dynamic modification of the object, and to try
-        # to build the list first from tcp entrypoints on the filesystem, and append later.
-        #
-        # alternatively, a `Callable` could be passed into the KubernetesServicePatch, but the
-        # service spec MUST have TCP/UCP ports listed if the loadbalancer is to send requests
-        # to it.
-        #
-        # TODO
-        # FIXME
-        # stored.tcp_entrypoints would be used for this list instead, but it's never accessed.
-        # intentional or can it be used so we don't need to worry about ordering?
         self.ingress_per_appv1 = IPAv1(charm=self)
         self.ingress_per_appv2 = IPAv2(charm=self)
 
@@ -327,8 +312,6 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
 
         observe = self.framework.observe
 
-        # TODO update init params once auto-renew is implemented
-        # https://github.com/canonical/tls-certificates-interface/issues/24
         observe(
             self._workload_tracing.on.endpoint_changed,  # type: ignore
             self._on_workload_tracing_endpoint_changed,
@@ -358,8 +341,6 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             self._on_recv_ca_cert_available,
         )
         observe(
-            # Need to observe a managed relation event because a custom wrapper is not available
-            # https://github.com/canonical/mutual-tls-interface/issues/5
             self.recv_ca_cert.on.certificates_removed,  # pyright: ignore
             self._on_recv_ca_cert_removed,
         )

@@ -6,7 +6,7 @@ name = "traefik-k8s-operator"
 version = "0.1.0"
 description = "Kubernetes operator for Traefik, managed by Juju."
 authors = ["Canonical Ltd."]
-requires-python = "~=3.8.0"
+requires-python = ">=3.8.0"
 
 dependencies = [
     "cryptography",
