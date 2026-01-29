@@ -14,7 +14,7 @@ class RouteRequirerMock(CharmBase):
             self, self.model.get_relation("traefik-route"), "traefik_route"
         )
         self.framework.observe(self.on.get_external_host_action, self._on_get_external_host_action)
-        if self.traefik_route.is_ready():
+        if self.unit.is_leader() and self.traefik_route.is_ready():
             self.traefik_route.submit_to_traefik(
                 config={"some": "config"},
                 static={"entryPoints": {"test-port": {"address": ":4545"}}},
