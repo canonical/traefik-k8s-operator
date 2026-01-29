@@ -1,6 +1,7 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 import asyncio
+import logging
 import shlex
 import urllib.error
 from subprocess import PIPE, Popen
@@ -77,6 +78,45 @@ async def test_added_entrypoint_reachable(ops_test: OpsTest):
 
     with pytest.raises(urllib.error.HTTPError, match="404"):
         urlopen(req, timeout=60)
+
+
+async def test_scale_and_get_external_host(ops_test: OpsTest):
+    """Test that scaling route tester charm and checking external host values match."""
+    await ops_test.juju("add-unit", TESTER_APP_NAME)
+    await ops_test.model.wait_for_idle([TESTER_APP_NAME], status="active", timeout=1000)
+
+    await ops_test.model.add_relation(
+        f"{TESTER_APP_NAME}:traefik-route", f"{APP_NAME}:traefik-route"
+    )
+    await ops_test.model.wait_for_idle([APP_NAME, TESTER_APP_NAME], status="active")
+
+    unit_0 = ops_test.model.applications[TESTER_APP_NAME].units[0]
+    unit_1 = ops_test.model.applications[TESTER_APP_NAME].units[1]
+
+    action_0 = await unit_0.run_action("get-external-host")
+    action_1 = await unit_1.run_action("get-external-host")
+
+    result_0 = await action_0.wait()
+    result_1 = await action_1.wait()
+
+    # Get the traefik IP for comparison
+    traefik_ip = await get_k8s_service_address(ops_test, f"{APP_NAME}-lb")
+
+    # Both units should return the same external host value
+    external_host_0 = result_0.results.get("external-host")
+    external_host_1 = result_1.results.get("external-host")
+
+    logging.info(f"Unit 0 external host: {external_host_0}")
+    logging.info(f"Unit 1 external host: {external_host_1}")
+    logging.info(f"Traefik IP: {traefik_ip}")
+
+    assert external_host_0 == external_host_1, (
+        f"External host values should match: {external_host_0} vs {external_host_1}"
+    )
+    assert external_host_0 is not None, "External host should not be None"
+    assert external_host_0 == traefik_ip, (
+        f"External host should match traefik IP: {external_host_0} vs {traefik_ip}"
+    )
 
 
 @pytest.mark.teardown
