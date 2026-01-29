@@ -1,7 +1,6 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 import asyncio
-import logging
 import shlex
 import urllib.error
 from subprocess import PIPE, Popen
