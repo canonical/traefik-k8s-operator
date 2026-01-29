@@ -99,10 +99,6 @@ async def test_scale_and_get_external_host(ops_test: OpsTest):
     external_host_0 = result_0.results.get("external-host")
     external_host_1 = result_1.results.get("external-host")
 
-    logging.info(f"Unit 0 external host: {external_host_0}")
-    logging.info(f"Unit 1 external host: {external_host_1}")
-    logging.info(f"Traefik IP: {traefik_ip}")
-
     assert external_host_0 == external_host_1, (
         f"External host values should match: {external_host_0} vs {external_host_1}"
     )
