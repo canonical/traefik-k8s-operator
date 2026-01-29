@@ -81,13 +81,12 @@ async def test_added_entrypoint_reachable(ops_test: OpsTest):
 
 
 async def test_scale_and_get_external_host(ops_test: OpsTest):
-    """Test that scaling route tester charm and checking external host values match."""
+    """Test that traefik application data is available in all units of the route tester charm."""
+    # Scale the route tester application to 2 units
     await ops_test.juju("add-unit", TESTER_APP_NAME)
     await ops_test.model.wait_for_idle([TESTER_APP_NAME], status="active", timeout=1000)
 
-    await ops_test.model.add_relation(
-        f"{TESTER_APP_NAME}:traefik-route", f"{APP_NAME}:traefik-route"
-    )
+    # Wait for both units to be ready and relation to be established
     await ops_test.model.wait_for_idle([APP_NAME, TESTER_APP_NAME], status="active")
 
     unit_0 = ops_test.model.applications[TESTER_APP_NAME].units[0]

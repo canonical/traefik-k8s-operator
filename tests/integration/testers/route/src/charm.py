@@ -21,14 +21,13 @@ class RouteRequirerMock(CharmBase):
             )
         self.unit.status = ActiveStatus("ready")
 
-    def get_external_host(self):
-        """Return the external host from traefik route."""
-        return self.traefik_route.external_host
-
     def _on_get_external_host_action(self, event):
         """Handle get-external-host action."""
-        external_host = self.get_external_host()
-        event.set_results({"external-host": external_host})
+        try:
+            external_host = self.traefik_route.external_host
+            event.set_results({"external-host": external_host})
+        except Exception as e:
+            event.fail(f"Failed to get external host: {e}")
 
 
 if __name__ == "__main__":
