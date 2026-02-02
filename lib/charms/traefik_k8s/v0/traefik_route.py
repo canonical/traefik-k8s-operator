@@ -392,9 +392,6 @@ class TraefikRouteRequirer(Object):
         allows for reuse both when the property is called and if the relation changes, so a
         leader change where the new leader checks the property will do the right thing.
         """
-        if not self._charm.unit.is_leader():
-            return
-
         if self._relation:
             for relation in self._charm.model.relations[self._relation.name]:
                 if not relation.app:
