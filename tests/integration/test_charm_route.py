@@ -79,6 +79,34 @@ async def test_added_entrypoint_reachable(ops_test: OpsTest):
         urlopen(req, timeout=60)
 
 
+async def test_scale_and_get_external_host(ops_test: OpsTest):
+    """Test that traefik application data is available in all units of the route tester charm."""
+    await ops_test.juju("add-unit", TESTER_APP_NAME)
+    await ops_test.model.wait_for_idle([TESTER_APP_NAME], status="active", timeout=1000)
+
+    unit_0 = ops_test.model.applications[TESTER_APP_NAME].units[0]
+    unit_1 = ops_test.model.applications[TESTER_APP_NAME].units[1]
+
+    action_0 = await unit_0.run_action("get-external-host")
+    action_1 = await unit_1.run_action("get-external-host")
+
+    result_0 = await action_0.wait()
+    result_1 = await action_1.wait()
+
+    traefik_ip = await get_k8s_service_address(ops_test, f"{APP_NAME}-lb")
+
+    external_host_0 = result_0.results.get("external-host")
+    external_host_1 = result_1.results.get("external-host")
+
+    assert external_host_0 == external_host_1, (
+        f"External host values should match: {external_host_0} vs {external_host_1}"
+    )
+    assert external_host_0 is not None, "External host should not be None"
+    assert external_host_0 == traefik_ip, (
+        f"External host should match traefik IP: {external_host_0} vs {traefik_ip}"
+    )
+
+
 @pytest.mark.teardown
 async def test_remove_relation(ops_test: OpsTest):
     await ops_test.juju(

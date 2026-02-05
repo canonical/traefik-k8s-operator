@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 Each revision is versioned by the date of the revision.
 
+## 2026-01-29
+
+- Removed leader requirement on `TraefikRouteRequirer` to update the stored state. 
+
 ## 2026-01-27
 
 - Cleaned up the repository to remove stale comments, align `tox.ini` and remove `requirements.txt`.

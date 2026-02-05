@@ -28,5 +28,6 @@ Applicable spec: <link>
 - [ ] The documentation is updated
 - [ ] The PR is tagged with appropriate label (`urgent`, `trivial`, `senior-review-required`, `documentation`)
 - [ ] The `docs/changelog.md` is updated with user-relevant changes.
+- [ ] The `LIBAPI` and `LIBPATCH` values have been incremented for charm libraries owned by this project (if they were modified).
 
 <!-- Explanation for any unchecked items above -->

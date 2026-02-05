@@ -13,12 +13,21 @@ class RouteRequirerMock(CharmBase):
         self.traefik_route = TraefikRouteRequirer(
             self, self.model.get_relation("traefik-route"), "traefik_route"
         )
-        if self.traefik_route.is_ready():
+        self.framework.observe(self.on.get_external_host_action, self._on_get_external_host_action)
+        if self.unit.is_leader() and self.traefik_route.is_ready():
             self.traefik_route.submit_to_traefik(
                 config={"some": "config"},
                 static={"entryPoints": {"test-port": {"address": ":4545"}}},
             )
         self.unit.status = ActiveStatus("ready")
+
+    def _on_get_external_host_action(self, event):
+        """Handle get-external-host action."""
+        try:
+            external_host = self.traefik_route.external_host
+            event.set_results({"external-host": external_host})
+        except Exception as e:
+            event.fail(f"Failed to get external host: {e}")
 
 
 if __name__ == "__main__":
