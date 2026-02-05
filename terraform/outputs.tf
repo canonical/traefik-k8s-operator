@@ -11,6 +11,7 @@ output "endpoints" {
     logging                   = "logging",
     receive_ca_cert           = "receive-ca-cert",
     workload_tracing          = "workload-tracing",
+    upstream-ingress          = "upstream-ingress"
     # Provides
     grafana_dashboard = "grafana-dashboard",
     ingress           = "ingress",

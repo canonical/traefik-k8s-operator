@@ -1,0 +1,3 @@
+get-external-host:
+  description: |
+    Returns the external host from the traefik-route relation.
