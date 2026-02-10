@@ -16,6 +16,25 @@ body:
         If applicable, add screenshots to help explain the problem you are facing.
     validations:
       required: true
+  - type: dropdown
+    id: impact
+    attributes:
+      label: Impact
+      description: How severe is the business impact of this bug?
+      options:
+        - Low (minor issue or cosmetic problem)
+        - Medium (functionality degraded, workaround exists)
+        - High (major functionality broken, no workaround)
+        - Critical (system down, data loss, affecting deployment in production)
+    validations:
+      required: true
+  - type: textarea
+    id: impact-rationale
+    attributes:
+      label: Impact Rationale
+      description: >
+        If impact is high or critical, please provide the rationale behind your assessment, impacted
+        project reference and any relevant project deadline dates which will be affected by this bug.
   - type: textarea
     id: reproduction
     attributes:
@@ -54,4 +73,3 @@ body:
     id: additional-context
     attributes:
       label: Additional context
-
