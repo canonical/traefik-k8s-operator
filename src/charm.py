@@ -94,7 +94,7 @@ from traefik import (
     StaticConfigMergeConflictError,
     Traefik,
 )
-from utils import is_hostname
+from utils import hash, is_hostname
 
 # To keep a tidy debug-log, we suppress some DEBUG/INFO logs from some imported libs,
 # even when charm logging is set to a lower level.
@@ -894,14 +894,14 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         since it can be quite expensive.
         """
         return hash(
-            (
-                self._traefik_external_address,
-                self.config["routing_mode"],
-                self._is_forward_auth_enabled,
-                self._basic_auth_user,
-                self._is_tls_enabled(),
-                # The dict returned by _get_certs is not hashable so use a json str instead.
-                json.dumps(self._get_certs()),
+            str(
+                (
+                    str(self._external_host),
+                    self.config["routing_mode"],
+                    str(self._is_forward_auth_enabled),
+                    str(self._basic_auth_user),
+                    str(self._is_tls_enabled()),
+                )
             )
         )
 
