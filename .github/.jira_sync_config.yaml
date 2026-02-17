@@ -6,7 +6,7 @@ settings:
     not_planned: rejected
     
   components:
-    - Kubernetes ingress
+    - Traefik
 
   add_gh_comment: true
 
