@@ -3,6 +3,7 @@
 # See LICENSE file for licensing details.
 """Utilities."""
 
+import hashlib
 import ipaddress
 from typing import Optional
 
@@ -19,3 +20,13 @@ def is_hostname(value: Optional[str]) -> bool:
     except ValueError:
         # This is not an IP address so assume it's a hostname.
         return bool(value)
+
+
+def hash(content: str) -> int:
+    """Returh the md5 hash of a string.
+
+    Using the builtin `hash` function is not consistent across interpreter
+    runs, as it relies on a pseudo-random salt that is calculated that differs
+    on every run.
+    """
+    return int(hashlib.md5(content.encode()).hexdigest(), 16)
