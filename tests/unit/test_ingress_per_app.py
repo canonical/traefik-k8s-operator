@@ -304,6 +304,47 @@ def test_proxied_endpoints(
         assert charm.ingress_per_unit.proxied_endpoints["remote/0"]["url"]
 
 
+def test_proxied_endpoints_partial_readiness(model, traefik_ctx, traefik_container):
+    """Test that proxied endpoints returns only healthy relations when some aren't ready."""
+    ready_relation = Relation(
+        endpoint="ingress",
+        remote_app_name="ready-app",
+        relation_id=1,
+        remote_app_data=IngressRequirerAppData(
+            model=model.name, name="ready-app/0", port=80, mode="tcp"
+        ).dump(),
+        remote_units_data={0: IngressRequirerUnitData(host="1.1.1.1", ip="0.0.0.1").dump()},
+    )
+
+    not_ready_relation = Relation(
+        endpoint="ingress",
+        remote_app_name="not-ready-app",
+        relation_id=2,
+        remote_app_data={},
+        remote_units_data={},
+    )
+
+    state = State(
+        leader=True,
+        relations=[ready_relation, not_ready_relation],
+        containers=[traefik_container]
+    )
+
+    with traefik_ctx.manager("update-status", state) as mgr:
+        charm = mgr.charm
+
+        charm.ingress_per_appv2.publish_url(
+            charm.model.get_relation("ingress", ready_relation.relation_id), "http://ready-app.com"
+        )
+        # Don't publish URL for not_ready_relation
+
+        endpoints = charm.ingress_per_appv2.proxied_endpoints
+
+        assert len(endpoints) == 1
+        assert "ready-app" in endpoints
+        assert endpoints["ready-app"]["url"] == "http://ready-app.com/"
+
+
 MODEL_NAME = "test-model"
 UNIT_NAME = "nms"
 
