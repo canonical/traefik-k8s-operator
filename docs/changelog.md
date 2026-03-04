@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 Each revision is versioned by the date of the revision.
 
+## 2025-02-26
+
+- Add some more logs and unit tests on the `proxied_endpoints` method.
+
 ## 2026-01-29
 
 - Removed leader requirement on `TraefikRouteRequirer` to update the stored state. 
