@@ -1,0 +1,68 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "automerge": true,
+  "customDatasources": {
+    "charmhub": {
+      "defaultRegistryUrlTemplate": "https://api.charmhub.io/v2/charms/info/{{packageName}}?fields=channel-map",
+      "format": "json",
+      "transformTemplates": [
+        "{\"releases\": [{\"version\": $string($$.(`channel-map`[channel.risk = 'edge' and channel.track = 'latest' and channel.base.architecture = 'amd64' and channel.base.channel = '24.04'].revision.revision))}]}"
+      ]
+    }
+  },
+  "customManagers": [
+    {
+      "customType": "regex",
+      "datasourceTemplate": "docker",
+      "description": "Update base image references",
+      "managerFilePatterns": [
+        "/(^|/)rockcraft.yaml$/"
+      ],
+      "matchStrings": [
+        "# renovate: build-base:\\s+(?<depName>[^:]*):(?<currentValue>[^\\s@]*)(@(?<currentDigest>sha256:[0-9a-f]*))?",
+        "# renovate: base:\\s+(?<depName>[^:]*):(?<currentValue>[^\\s@]*)(@(?<currentDigest>sha256:[0-9a-f]*))?"
+      ],
+      "matchStringsStrategy": "any",
+      "versioningTemplate": "ubuntu"
+    },
+    {
+      "customType": "regex",
+      "fileMatch": ["\\.tftest\\.hcl$", "\\.tf$"],
+      "matchStrings": ["# renovate: depName=\"(?<packageName>[^\"]+)\"\\s*\\n\\s*(?<fieldName>[a-zA-Z0-9_]+)\\s*=\\s*(?<currentValue>\\d+)"],
+      "versioningTemplate": "semver-coerced",
+      "datasourceTemplate": "custom.charmhub"
+    }
+  ],
+  "extends": [
+    "config:recommended",
+    "group:allNonMajor"
+  ],
+  "ignorePaths": [],
+  "packageRules": [
+    {
+      "enabled": true,
+      "matchDatasources": [
+        "docker"
+      ],
+      "pinDigests": true
+    },
+    {
+      "matchDatasources": [
+          "custom.charmhub"
+      ],
+      "automerge": true,
+      "enabled": true
+    },
+    {
+      "enabled": false,
+      "matchFileNames": [
+        "rockcraft.yaml"
+      ],
+      "matchUpdateTypes": [
+        "major",
+        "minor",
+        "patch"
+      ]
+    }
+  ]
+}
