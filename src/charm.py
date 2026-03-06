@@ -250,6 +250,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             container=self.container,
             routing_mode=self._routing_mode,
             tcp_entrypoints=self._tcp_entrypoints(),
+            udp_entrypoints=self._udp_entrypoints(),
             tls_enabled=self._is_tls_enabled(),
             experimental_forward_auth_enabled=self._is_forward_auth_enabled,
             traefik_route_static_configs=self._traefik_route_static_configs(),
@@ -451,9 +452,14 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         service_name = traefik.service_name
         web = ServicePort(traefik.port, name=f"{service_name}")
         websecure = ServicePort(traefik.tls_port, name=f"{service_name}-tls")
-        return [web, websecure] + [
-            ServicePort(int(port), name=name) for name, port in self._tcp_entrypoints().items()
-        ]
+        return (
+            [web, websecure]
+            + [ServicePort(int(port), name=name) for name, port in self._tcp_entrypoints().items()]
+            + [
+                ServicePort(port=int(port), name=name, protocol="UDP")
+                for name, port in self._udp_entrypoints().items()
+            ]
+        )
 
     @property
     def _forward_auth_config(self) -> ForwardAuthRequirerConfig:
@@ -828,9 +834,15 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
                     entrypoint_name = self._get_prefix(data)  # type: ignore
                     entrypoints[entrypoint_name] = data["port"]
 
-        # for each static config sent via traefik_route add provided entryPoints to open a
-        # ServicePort
+        # protocol TCP can be omitted from the port since its the default protocol
+        return {**entrypoints, **self._traefik_route_entrypoints(protocol="tcp")}
+
+    def _traefik_route_entrypoints(self, protocol: str) -> Dict[str, Any]:
+        """Return entryPoints sent via traefik_route."""
+        entrypoints = {}
         static_configs = self._traefik_route_static_configs()
+        # for each static config sent via traefik_route
+        # add provided entryPoints to open a ServicePort
         for config in static_configs:
             if "entryPoints" in config:
                 provided_entrypoints = config["entryPoints"]
@@ -839,9 +851,20 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
                     # We should consider validate and replace.
                     # ref https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#dns-label-names  # noqa
                     if "address" in value:
-                        entrypoints[entrypoint_name] = value["address"].replace(":", "")
+                        if protocol == "tcp":
+                            if "udp" not in value["address"]:
+                                entrypoints[entrypoint_name] = value["address"].replace(":", "")
+                        else:
+                            if "udp" in value["address"]:
+                                entrypoints[entrypoint_name] = (
+                                    value["address"].replace(":", "").replace(f"/{protocol}", "")
+                                )
 
         return entrypoints
+
+    def _udp_entrypoints(self) -> Dict[str, Any]:
+        """Return UDP entryPoints sent via traefik_route."""
+        return self._traefik_route_entrypoints(protocol="udp")
 
     def _configure_traefik(self) -> None:
         self.traefik.configure()
