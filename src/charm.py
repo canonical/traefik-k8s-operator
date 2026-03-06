@@ -837,11 +837,12 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         # protocol TCP can be omitted from the port since its the default protocol
         return {**entrypoints, **self._traefik_route_entrypoints(protocol="tcp")}
 
-    def _traefik_route_entrypoints(self, protocol):
+    def _traefik_route_entrypoints(self, protocol: str) -> Dict[str, Any]:
         """Return entryPoints sent via traefik_route."""
         entrypoints = {}
         static_configs = self._traefik_route_static_configs()
-        # for each static config sent via traefik_route add provided entryPoints to open a ServicePort
+        # for each static config sent via traefik_route
+        # add provided entryPoints to open a ServicePort
         for config in static_configs:
             if "entryPoints" in config:
                 provided_entrypoints = config["entryPoints"]
@@ -861,7 +862,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
 
         return entrypoints
 
-    def _udp_entrypoints(self):
+    def _udp_entrypoints(self) -> Dict[str, Any]:
         """Return UDP entryPoints sent via traefik_route."""
         return self._traefik_route_entrypoints(protocol="udp")
 

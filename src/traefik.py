@@ -120,6 +120,7 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             tls_enabled: If TLS is enabled.
             experimental_forward_auth_enabled: If forward_auth is enabled.
             tcp_entrypoints: TCP entrypoints.
+            udp_entrypoints: UDP entrypoints.
             traefik_route_static_configs: Static config for traefik-route relations.
             topology: Juju topology.
             basic_auth_user: User for basic auth.
