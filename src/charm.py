@@ -273,17 +273,18 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
                 logger.warning(
                     "Filtered out invalid certificate request for common_name: %s", csr.common_name
                 )
-        certs_refresh_events = [
-            self.ingress_per_unit.on.endpoints_updated,
-            self.ingress_per_appv1.on.endpoints_updated,
-            self.ingress_per_appv2.on.endpoints_updated,
-        ]
+        # NOTE: We intentionally do NOT pass endpoints_updated as refresh_events here.
+        # Previously every wipe_ingress_data/publish_url call would emit endpoints_updated,
+        # which triggered TLS cert refresh -> _on_cert_changed -> _configure -> 
+        # _process_status_and_configurations -> wipe+publish again, creating a feedback loop.
+        # Instead, we manually trigger cert refresh only when the set of hostnames changes,
+        # via _refresh_certs_if_needed().
         self.certs = TLSCertificatesRequiresV4(
             charm=self,
             relationship_name=CERTIFICATES_RELATION_NAME,
             certificate_requests=self.csrs,
             mode=Mode.UNIT,
-            refresh_events=certs_refresh_events,
+            refresh_events=[],
         )
 
         # Observability integrations
@@ -671,6 +672,39 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             return False
         return True
 
+    def _refresh_certs_if_needed(self) -> None:
+        """Recompute cert requests and only trigger TLS refresh if hostnames changed."""
+        new_csrs = self._get_cert_requests()
+        new_valid = sorted(
+            [c for c in new_csrs if c.is_valid()],
+            key=lambda c: c.common_name,
+        )
+        old_valid = sorted(self.csrs, key=lambda c: c.common_name)
+
+        # Compare by common_name + sans sets
+        def _csr_key(c: CertificateRequestAttributes) -> tuple:
+            return (c.common_name, c.sans_dns, c.sans_ip)
+
+        new_keys = {_csr_key(c) for c in new_valid}
+        old_keys = {_csr_key(c) for c in old_valid}
+
+        if new_keys != old_keys:
+            logger.info(
+                "Certificate hostnames changed (old=%d, new=%d). Refreshing certs.",
+                len(old_keys),
+                len(new_keys),
+            )
+            self.csrs = new_valid
+            # Update the existing TLS requirer's certificate_requests in-place
+            # and call sync() to send new CSRs / clean up stale ones.
+            # We do NOT reinstantiate TLSCertificatesRequiresV4 here because
+            # that would register duplicate event observers and violates the
+            # convention that library objects are only instantiated in __init__.
+            self.certs.certificate_requests = self.csrs
+            self.certs.sync()
+        else:
+            logger.debug("Certificate hostnames unchanged (%d); skipping cert refresh.", len(old_keys))
+
     def _on_cert_changed(self, _: EventBase) -> None:
         # On slow machines, this event may come up before pebble is ready
         self._configure()
@@ -1020,6 +1054,9 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         self.unit.status = MaintenanceStatus("updating ingress configurations")
         self._update_ingress_configurations()
 
+        # After processing all ingress relations, check if cert hostnames changed
+        self._refresh_certs_if_needed()
+
     def _update_ingress_configurations(self) -> None:
         # step 1: determine whether the STATIC config should be changed and traefik restarted.
 
@@ -1094,9 +1131,17 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             return
         self._process_ingress_relation(event.relation)
 
-        # Without the following line, traefik.STATIC_CONFIG_PATH is updated with TCP endpoints only
-        # on update-status.
-        self._process_status_and_configurations()
+        # Only run the full _process_status_and_configurations if the static config
+        # has changed (e.g. new TCP entrypoints). Previously this re-processed ALL
+        # relations on every single relation event, causing O(N^2) processing.
+        if self.container.can_connect() and self._static_config_changed:
+            logger.debug("Static config changed after ingress data provided; reprocessing all.")
+            # _process_status_and_configurations calls _refresh_certs_if_needed at the end
+            self._process_status_and_configurations()
+        else:
+            # No static config change, but a new hostname may have appeared.
+            # Check and refresh certs if the hostname set changed.
+            self._refresh_certs_if_needed()
 
         if isinstance(self.unit.status, MaintenanceStatus):
             self.unit.status = ActiveStatus(self.serving_message())
