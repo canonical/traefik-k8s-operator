@@ -1130,18 +1130,10 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             event.defer()
             return
         self._process_ingress_relation(event.relation)
-
-        # Only run the full _process_status_and_configurations if the static config
-        # has changed (e.g. new TCP entrypoints). Previously this re-processed ALL
-        # relations on every single relation event, causing O(N^2) processing.
-        if self.container.can_connect() and self._static_config_changed:
-            logger.debug("Static config changed after ingress data provided; reprocessing all.")
-            # _process_status_and_configurations calls _refresh_certs_if_needed at the end
-            self._process_status_and_configurations()
-        else:
-            # No static config change, but a new hostname may have appeared.
-            # Check and refresh certs if the hostname set changed.
-            self._refresh_certs_if_needed()
+        
+        # Without the following line, traefik.STATIC_CONFIG_PATH is updated with TCP endpoints only
+        # on update-status.
+        self._process_status_and_configurations()
 
         if isinstance(self.unit.status, MaintenanceStatus):
             self.unit.status = ActiveStatus(self.serving_message())
