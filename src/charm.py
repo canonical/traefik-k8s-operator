@@ -262,23 +262,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             ),
         )
 
-        # Certs Relation
-        all_csrs = self._get_cert_requests()
-        # Filter out any invalid certificate requests to prevent TLSCertificatesError
-        self.csrs = []
-        for csr in all_csrs:
-            if csr.is_valid():
-                self.csrs.append(csr)
-            else:
-                logger.warning(
-                    "Filtered out invalid certificate request for common_name: %s", csr.common_name
-                )
-        # NOTE: We intentionally do NOT pass endpoints_updated as refresh_events here.
-        # Previously every wipe_ingress_data/publish_url call would emit endpoints_updated,
-        # which triggered TLS cert refresh -> _on_cert_changed -> _configure -> 
-        # _process_status_and_configurations -> wipe+publish again, creating a feedback loop.
-        # Instead, we manually trigger cert refresh only when the set of hostnames changes,
-        # via _refresh_certs_if_needed().
+        self.csrs = self._get_valid_csrs()
         self.certs = TLSCertificatesRequiresV4(
             charm=self,
             relationship_name=CERTIFICATES_RELATION_NAME,
@@ -382,6 +366,20 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         as we refactor the charm to be more hollistic.
         """
         self.traefik.cleanup_tls_configuration()
+
+    def _get_valid_csrs(self) -> List[CertificateRequestAttributes]:
+        """Return a list of valid certificate requests."""
+        all_csrs = self._get_cert_requests()
+        # Filter out any invalid certificate requests to prevent TLSCertificatesError
+        valid_csrs = []
+        for csr in all_csrs:
+            if csr.is_valid():
+                valid_csrs.append(csr)
+            else:
+                logger.warning(
+                    "Filtered out invalid certificate request for common_name: %s", csr.common_name
+                )
+        return valid_csrs
 
     def _get_cert_requests(self) -> list:
         # For a TCP route there will be no scheme which will cause urlparse()
@@ -674,11 +672,8 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
 
     def _refresh_certs_if_needed(self) -> None:
         """Recompute cert requests and only trigger TLS refresh if hostnames changed."""
-        new_csrs = self._get_cert_requests()
-        new_valid = sorted(
-            [c for c in new_csrs if c.is_valid()],
-            key=lambda c: c.common_name,
-        )
+        new_csrs = self._get_valid_csrs()
+        new_valid = sorted(new_csrs, key=lambda c: c.common_name)
         old_valid = sorted(self.csrs, key=lambda c: c.common_name)
 
         # Compare by common_name + sans sets
@@ -695,11 +690,6 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
                 len(new_keys),
             )
             self.csrs = new_valid
-            # Update the existing TLS requirer's certificate_requests in-place
-            # and call sync() to send new CSRs / clean up stale ones.
-            # We do NOT reinstantiate TLSCertificatesRequiresV4 here because
-            # that would register duplicate event observers and violates the
-            # convention that library objects are only instantiated in __init__.
             self.certs.certificate_requests = self.csrs
             self.certs.sync()
         else:
@@ -1130,7 +1120,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             event.defer()
             return
         self._process_ingress_relation(event.relation)
-        
+
         # Without the following line, traefik.STATIC_CONFIG_PATH is updated with TCP endpoints only
         # on update-status.
         self._process_status_and_configurations()
