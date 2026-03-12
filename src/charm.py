@@ -854,12 +854,12 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
                 if "address" not in value:
                     continue
                 if protocol == "tcp":
-                    if "udp" not in value["address"]:
+                    if not value["address"].endswith("/udp"):
                         entrypoints[entrypoint_name] = value["address"].replace(":", "")
                 else:
-                    if "udp" in value["address"]:
+                    if value["address"].endswith("/udp"):
                         entrypoints[entrypoint_name] = (
-                            value["address"].replace(":", "").replace(f"/{protocol}", "")
+                            value["address"].replace(":", "").replace("/udp", "")
                         )
 
         return entrypoints
