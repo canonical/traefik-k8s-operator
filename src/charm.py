@@ -369,19 +369,19 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
 
     def _get_valid_csrs(self) -> List[CertificateRequestAttributes]:
         """Return a list of valid certificate requests."""
-        all_csrs = self._get_cert_requests()
+        all_csrs: List[CertificateRequestAttributes] = self._get_cert_requests()
         # Filter out any invalid certificate requests to prevent TLSCertificatesError
-        valid_csrs = []
+        valid_csrs: List[CertificateRequestAttributes] = []
         for csr in all_csrs:
             if csr.is_valid():
                 valid_csrs.append(csr)
             else:
                 logger.warning(
-                    "Filtered out invalid certificate request for common_name: %s", csr.common_name
+                    "Filtered out invalid certificate request for csr: %s", csr
                 )
         return valid_csrs
 
-    def _get_cert_requests(self) -> list:
+    def _get_cert_requests(self) -> List[CertificateRequestAttributes]:
         # For a TCP route there will be no scheme which will cause urlparse()
         # hostname to return None. Therefore we should catch the TCP routes here.
         addrs = {
@@ -389,7 +389,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             for endpoint in self._get_proxied_endpoints(use_gateway_address=True).values()
             if "url" in endpoint and urlparse(endpoint["url"]).scheme
         }
-        csrs = []
+        csrs: List[CertificateRequestAttributes] = []
         for addr in addrs:
             # Additional validation - addr should not be None or empty
             if not addr:
