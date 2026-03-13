@@ -4,6 +4,7 @@ import asyncio
 import shlex
 import socket
 import urllib.error
+from pathlib import Path
 from subprocess import PIPE, Popen
 from urllib.request import Request, urlopen
 
@@ -17,6 +18,12 @@ from tests.integration.helpers import get_k8s_service_address, remove_applicatio
 APP_NAME = "traefik"
 TESTER_APP_NAME = "route"
 
+route_charm_root = (Path(__file__).parent / "testers" / "route").absolute()
+route_charm_meta = yaml.safe_load((route_charm_root / "metadata.yaml").read_text())
+route_charm_resources = {
+    name: val["upstream-source"] for name, val in route_charm_meta["resources"].items()
+}
+
 
 @pytest.mark.abort_on_fail
 @pytest.mark.setup
@@ -25,7 +32,7 @@ async def test_deployment(ops_test: OpsTest, traefik_charm, route_tester_charm):
         ops_test.model.deploy(
             traefik_charm, application_name=APP_NAME, resources=trfk_resources, trust=True
         ),
-        ops_test.model.deploy(route_tester_charm, TESTER_APP_NAME),
+        ops_test.model.deploy(route_tester_charm, TESTER_APP_NAME, resources=route_charm_resources),
     )
 
     await ops_test.model.wait_for_idle([APP_NAME, TESTER_APP_NAME], status="active", timeout=1000)
@@ -76,19 +83,17 @@ async def test_static_config_updated(ops_test: OpsTest):
 async def test_added_entrypoint_reachable(ops_test: OpsTest):
     traefik_ip = await get_k8s_service_address(ops_test, f"{APP_NAME}-lb")
 
+    payload = b"traefik-route-udp-echo"
+
     udp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     udp_sock.settimeout(60)
     try:
-        udp_sock.sendto(b"", (traefik_ip, 4646))
-        udp_sock.recvfrom(512)
-        udp_reachable = True
-    except socket.timeout:
-        udp_reachable = True
-    except ConnectionRefusedError:
-        udp_reachable = False
+        udp_sock.sendto(payload, (traefik_ip, 4646))
+        response, _ = udp_sock.recvfrom(512)
     finally:
         udp_sock.close()
-    assert udp_reachable
+
+    assert response == payload
 
     req = Request(f"http://{traefik_ip}:4545")
 
