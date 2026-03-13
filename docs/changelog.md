@@ -8,9 +8,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 Each revision is versioned by the date of the revision.
 
-## 2026-03-10
+## 2026-03-13
 
 - Add support for UDP entrypoints in the `traefik-route` relation.
+
+## 2025-03-12
+
+- Updated charm code to trigger certificate refresh conditionally rather than through refresh hooks.
 
 ## 2025-02-26
 
