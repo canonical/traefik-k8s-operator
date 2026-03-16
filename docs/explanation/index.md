@@ -8,7 +8,7 @@ myst:
 
 # Explanation
 
-The following guides cover key processes and common tasks for managing and using the Traefik charms.
+The following guides cover key processes and common tasks for managing and using the Traefik charm.
 
 ```{toctree}
 :maxdepth: 1
