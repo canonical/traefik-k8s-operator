@@ -29,4 +29,13 @@ If Traefik serves HTTP, the traffic between Traefik and the clients will be unen
 #### Best practices
 
 - Always enable HTTPS by integrating with a charm providing the [`certificates`](https://charmhub.io/traefik-k8s/integrations#certificates) integration to configure TLS.
+- [Force HTTPS redirect](https://documentation.ubuntu.com/traefik-k8s-charm/latest/how-to/force-https-redirect/) unless you need unencrypted traffic to be supported.
+- Consider encrypting in-cluster traffik, specially if your cluster is multitenant.
 
+### Authentication
+
+The Traefik charm supports both [BasicAuth](https://doc.traefik.io/traefik/reference/routing-configuration/http/middlewares/basicauth/).
+
+#### Best practices
+
+- Consider [enabling BasicAuth](https://documentation.ubuntu.com/traefik-k8s-charm/latest/how-to/enable-basicauth/) if you want access to the backend workloads to be authenticated.
