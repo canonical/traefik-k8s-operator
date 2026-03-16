@@ -10,7 +10,7 @@ The following items include descriptions of the risks, their corresponding best 
 
 ### Security vulnerabilities
 
-Running HTTP request Lego provider with one or more weaknesses that can be exploited by attackers.
+Running Traefik with one or more weaknesses that can be exploited by attackers.
 
 #### Best practices
 
