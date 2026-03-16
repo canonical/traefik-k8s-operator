@@ -20,7 +20,7 @@ Running Traefik with one or more weaknesses that can be exploited by attackers.
 
 #### Best practices
 
-- Keep the Juju and the charm updated. See more about Juju updates in the [documentation](https://documentation.ubuntu.com/juju/latest/explanation/juju-security/index.html#regular-updates-and-patches).
+- Keep the Juju and the charm updated. See {ref}`how_to_upgrade`, and learn more about Juju updates in the {ref}`documentation <juju:controls-regular-updates>`.
 
 ### Unencrypted traffic
 
