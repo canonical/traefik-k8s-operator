@@ -2,7 +2,7 @@
 
 # Security overview
 
-This document outlines common risks and possible best practices for the HTTP request Lego provider charm. It focuses on configurations and protections available through the charm itself.
+This document outlines common risks and possible best practices for the Traefik charm. It focuses on configurations and protections available through the charm itself.
 
 ## Risks
 
