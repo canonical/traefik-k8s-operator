@@ -34,7 +34,7 @@ If Traefik serves HTTP, the traffic between Traefik and the clients will be unen
 
 ### Authentication
 
-The Traefik charm supports both [BasicAuth](https://doc.traefik.io/traefik/reference/routing-configuration/http/middlewares/basicauth/).
+The Traefik charm supports [BasicAuth](https://doc.traefik.io/traefik/reference/routing-configuration/http/middlewares/basicauth/).
 
 #### Best practices
 
