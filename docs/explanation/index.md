@@ -4,7 +4,7 @@ myst:
     "description lang=en": "Explanation material explaining key concepts about the Traefik charm."
 ---
 
-(explanation)=
+(explanation_index)=
 
 # Explanation
 
