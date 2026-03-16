@@ -1,3 +1,9 @@
+---
+myst:
+  html_meta:
+    "description lang=en": "Learn more about the common security risks and best practices for the Traefik charm."
+---
+
 (explanation_security)=
 
 # Security overview
