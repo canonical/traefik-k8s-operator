@@ -22,6 +22,5 @@ If Traefik serves HTTP, the traffic between Traefik and the clients will be unen
 
 #### Best practices
 
-- Always enable HTTPS by setting the [`tls-ca`](https://charmhub.io/traefik-k8s/configurations#tls-ca), [`tls-cert`](https://charmhub.io/traefik-k8s/configurations#tls-cert)
-and [`tls-key`](https://charmhub.io/traefik-k8s/configurations#tls-key) configuration options.
+- Always enable HTTPS by integrating with a charm providing the [`certificates`](https://charmhub.io/traefik-k8s/integrations#certificates) integration to configure TLS.
 
