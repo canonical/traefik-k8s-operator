@@ -38,4 +38,4 @@ The Traefik charm supports [BasicAuth](https://doc.traefik.io/traefik/reference/
 
 #### Best practices
 
-- Consider [enabling BasicAuth](https://documentation.ubuntu.com/traefik-k8s-charm/latest/how-to/enable-basicauth/) if you want access to the backend workloads to be authenticated.
+- Consider {ref}`enabling BasicAuth <how_to_enable_basicauth>` if you want access to the backend workloads to be authenticated.
