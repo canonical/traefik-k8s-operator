@@ -12,6 +12,10 @@ Each revision is versioned by the date of the revision.
 
 - Changed certificate mode from `UNIT` to `APP` mode.
 
+## 2026-03-16
+
+- Add security documentation.
+
 ## 2025-03-12
 
 - Updated charm code to trigger certificate refresh conditionally rather than through refresh hooks.
