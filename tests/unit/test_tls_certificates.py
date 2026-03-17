@@ -102,8 +102,8 @@ class TlsWithExternalHostname(unittest.TestCase):
         self.harness.add_relation_unit(self.rel_id, "root-ca/0")
 
         # THEN a CSR is sent
-        unit_databag = self.harness.get_relation_data(self.rel_id, self.harness.charm.unit.name)
-        self.assertIsNotNone(unit_databag.get("certificate_signing_requests"))
+        app_databag = self.harness.get_relation_data(self.rel_id, self.harness.charm.app.name)
+        self.assertIsNotNone(app_databag.get("certificate_signing_requests"))
 
     def test_external_hostname_is_set_before_relation_joins(self):
         # GIVEN an external hostname is set
@@ -115,9 +115,8 @@ class TlsWithExternalHostname(unittest.TestCase):
         self.harness.add_relation_unit(self.rel_id, "root-ca/0")
 
         # THEN a CSR is sent
-        unit_databag = self.harness.get_relation_data(self.rel_id, self.harness.charm.unit.name)
-        print(unit_databag)
-        self.assertIsNotNone(unit_databag.get("certificate_signing_requests"))
+        app_databag = self.harness.get_relation_data(self.rel_id, self.harness.charm.app.name)
+        self.assertIsNotNone(app_databag.get("certificate_signing_requests"))
 
 
 def test_get_certs(monkeypatch: pytest.MonkeyPatch, mock_provider_certificate):

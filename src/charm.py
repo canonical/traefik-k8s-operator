@@ -267,7 +267,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             charm=self,
             relationship_name=CERTIFICATES_RELATION_NAME,
             certificate_requests=self.csrs,
-            mode=Mode.UNIT,
+            mode=Mode.APP,
             refresh_events=[],
         )
 
