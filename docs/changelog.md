@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 Each revision is versioned by the date of the revision.
 
+## 2026-03-13
+
+- Add support for UDP entrypoints in the `traefik-route` relation.
+
 ## 2026-03-16
 
 - Add security documentation.

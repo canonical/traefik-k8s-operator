@@ -8,3 +8,13 @@ requires:
   traefik-route:
     interface: traefik_route
     limit: 1
+
+containers:
+  udp-echo-server:
+    resource: udp-echo-server-image
+
+resources:
+  udp-echo-server-image:
+    type: oci-image
+    description: OCI image for udp-echo-server
+    upstream-source: python:slim-buster
