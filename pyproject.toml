@@ -50,7 +50,7 @@ dev = [
 package = false
 
 [tool.uv.sources]
-lightkube-extensions = { git = "https://github.com/canonical/lightkube-extensions.git", rev = "main" }
+lightkube-extensions = { git = "https://github.com/canonical/lightkube-extensions.git", rev = "8d37be9ba40b156a6a1648c12e3ed21209cc4360" }
 
 # Testing tools configuration
 [tool.coverage.run]
