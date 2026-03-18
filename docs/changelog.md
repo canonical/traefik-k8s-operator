@@ -12,6 +12,10 @@ Each revision is versioned by the date of the revision.
 
 - Changed certificate mode from `UNIT` to `APP` mode.
 
+## 2026-03-13
+
+- Add support for UDP entrypoints in the `traefik-route` relation.
+
 ## 2026-03-16
 
 - Add security documentation.

@@ -152,6 +152,7 @@ def test_cleanup_tls_configuration(tls_enabled: bool):
         tls_enabled=tls_enabled,
         experimental_forward_auth_enabled=False,
         tcp_entrypoints={},
+        udp_entrypoints={},
         traefik_route_static_configs=[],
         topology=MagicMock(),
     )
