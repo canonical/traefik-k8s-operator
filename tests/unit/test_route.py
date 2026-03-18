@@ -214,6 +214,7 @@ def test_static_config(harness: Harness[TraefikIngressCharm], topology: JujuTopo
         container=charm.container,
         routing_mode=charm._routing_mode,
         tcp_entrypoints=charm._tcp_entrypoints(),
+        udp_entrypoints=charm._udp_entrypoints(),
         tls_enabled=charm._is_tls_enabled(),
         experimental_forward_auth_enabled=charm._is_forward_auth_enabled,
         traefik_route_static_configs=charm._traefik_route_static_configs(),
@@ -263,6 +264,7 @@ def test_static_config_broken(harness: Harness[TraefikIngressCharm], topology: J
         container=charm.container,
         routing_mode=charm._routing_mode,
         tcp_entrypoints=charm._tcp_entrypoints(),
+        udp_entrypoints=charm._udp_entrypoints(),
         tls_enabled=charm._is_tls_enabled(),
         experimental_forward_auth_enabled=charm._is_forward_auth_enabled,
         traefik_route_static_configs=charm._traefik_route_static_configs(),
@@ -301,6 +303,7 @@ def test_static_config_partially_broken(
         container=charm.container,
         routing_mode=charm._routing_mode,
         tcp_entrypoints=charm._tcp_entrypoints(),
+        udp_entrypoints=charm._udp_entrypoints(),
         tls_enabled=charm._is_tls_enabled(),
         experimental_forward_auth_enabled=charm._is_forward_auth_enabled,
         traefik_route_static_configs=[
@@ -311,7 +314,7 @@ def test_static_config_partially_broken(
             # GOOD: this config won't conflict with any other
             {"foo": {"bar": "baz"}},
             # GOOD: this one won't conflict with other entrypoints
-            {"entryPoints": {"shondaland": {"address": ":6767"}}},
+            {"entryPoints": {"shondaland": {"address": ":6767"}, "shondaplace": {"address": ":6767/udp"}}},
         ],
         topology=topology,
     )
@@ -358,6 +361,7 @@ def test_static_config_updates_tcp_entrypoints(
         container=charm.container,
         routing_mode=charm._routing_mode,
         tcp_entrypoints=charm._tcp_entrypoints(),
+        udp_entrypoints=charm._udp_entrypoints(),
         tls_enabled=charm._is_tls_enabled(),
         experimental_forward_auth_enabled=charm._is_forward_auth_enabled,
         traefik_route_static_configs=charm._traefik_route_static_configs(),
@@ -373,6 +377,45 @@ def test_static_config_updates_tcp_entrypoints(
     # AND that shows up in the service ports
     assert [p for p in charm._service_ports if p.port == 6767][0]
 
+def test_static_config_updates_udp_entrypoints(
+    harness: Harness[TraefikIngressCharm], topology: JujuTopology
+):
+    tr_relation_id, relation = initialize_and_setup_tr_relation(harness)
+    config = yaml.dump(CONFIG)
+    static = yaml.safe_dump({"entryPoints": {"shondaland": {"address": ":6767/udp"}}})
+
+    with harness.hooks_disabled():
+        # don't emit yet: we need to reinitialize Traefik first.
+        harness.update_relation_data(
+            tr_relation_id,
+            REMOTE_APP_NAME,
+            {
+                "config": config,
+                "static": static,
+            },
+        )
+
+    # reinitialize Traefik, else _traefik_route_static_configs won't be passed to Traefik on init.
+    charm = harness.charm
+    charm.traefik = Traefik(
+        container=charm.container,
+        routing_mode=charm._routing_mode,
+        tcp_entrypoints=charm._tcp_entrypoints(),
+        udp_entrypoints=charm._udp_entrypoints(),
+        tls_enabled=charm._is_tls_enabled(),
+        experimental_forward_auth_enabled=charm._is_forward_auth_enabled,
+        traefik_route_static_configs=charm._traefik_route_static_configs(),
+        topology=topology,
+    )
+
+    charm.traefik_route.on.ready.emit(charm.model.get_relation("traefik-route"))
+
+    # THEN Traefik can list the provided entrypoints
+    udp_entrypoints = charm._udp_entrypoints()
+    assert udp_entrypoints["shondaland"] == "6767"
+
+    # AND that shows up in the service ports
+    assert [p for p in charm._service_ports if p.port == 6767][0]
 
 @pytest.mark.parametrize(
     "input_config, raw_flag, expected_config",
