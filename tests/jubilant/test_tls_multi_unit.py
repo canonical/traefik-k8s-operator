@@ -10,7 +10,6 @@ from pathlib import Path
 
 import jubilant
 import requests
-
 from conftest import MOCK_HOSTNAME
 from helper import DNSResolverHTTPSAdapter
 
