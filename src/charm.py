@@ -139,8 +139,7 @@ LB_LABEL = "traefik-loadbalancer"
 PYDANTIC_IS_V1 = int(pydantic.version.VERSION.split(".")[0]) < 2  # pylint: disable=no-member
 
 CERTIFICATES_RELATION_NAME = "certificates"
-
-CERTIFICATES_RELATION_NAME = "certificates"
+PEER_RELATION_NAME = "peers"
 
 
 class _IngressRelationType(enum.Enum):
@@ -269,7 +268,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             relationship_name=CERTIFICATES_RELATION_NAME,
             certificate_requests=self.csrs,
             mode=Mode.APP,
-            refresh_events=[],
+            refresh_events=[self.on.config_changed],
         )
 
         # Observability integrations
@@ -333,6 +332,9 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
 
         observe(self.forward_auth.on.auth_config_changed, self._on_forward_auth_config_changed)
         observe(self.forward_auth.on.auth_config_removed, self._on_forward_auth_config_removed)
+
+        # Observe peer relation changed so non-leader units pick up certs shared by the leader
+        observe(self.on[PEER_RELATION_NAME].relation_changed, self._on_peer_relation_changed)
 
         # observe data_provided and data_removed events for all types of ingress we offer:
         for ingress in (self.ingress_per_unit, self.ingress_per_appv1, self.ingress_per_appv2):
@@ -701,6 +703,14 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         else:
             logger.debug("Certificate hostnames unchanged (%d); skipping cert refresh.", len(old_keys))
 
+    def _on_peer_relation_changed(self, _: EventBase) -> None:
+        """Handle peer relation changed.
+
+        Non-leader units use this to pick up certificates shared by the leader.
+        """
+        if not self.unit.is_leader():
+            self._configure()
+
     def _on_cert_changed(self, _: EventBase) -> None:
         # On slow machines, this event may come up before pebble is ready
         self._configure()
@@ -729,9 +739,16 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             "ca": "<ca>"
           }
         }
+
+        In APP mode, only the leader can access certificates from the TLS relation.
+        The leader shares resolved certs via the peer relation app databag so that
+        non-leader units can install them in their traefik containers.
         """
         certs: Dict[str, Dict[str, str]] = {}
         if not self._is_tls_enabled():
+            # If TLS is disabled, clear any stale certs from peer databag
+            if self.unit.is_leader():
+                self._publish_certs_to_peer_databag({})
             return certs
         if (
             self.config.get("tls-ca", None)
@@ -743,6 +760,21 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
                 "key": cast(str, self.config["tls-key"]),
                 "ca": cast(str, self.config["tls-ca"]),
             }
+
+        if self.unit.is_leader():
+            # Leader: resolve certs from TLS relation and share via peer databag
+            relation_certs = self._get_certs_from_relation()
+            certs.update(relation_certs)
+            self._publish_certs_to_peer_databag(relation_certs)
+        else:
+            # Non-leader: read certs shared by the leader from peer databag
+            certs.update(self._get_certs_from_peer_databag())
+
+        return certs
+
+    def _get_certs_from_relation(self) -> Dict[str, Dict[str, str]]:
+        """Get certificates from the TLS certificates relation (leader only)."""
+        certs: Dict[str, Dict[str, str]] = {}
         for csr in self.csrs:
             cert, private_key = self.certs.get_assigned_certificate(certificate_request=csr)
             if cert is None:
@@ -758,6 +790,29 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
                 "ca": str(cert.ca),
             }
         return certs
+
+    def _publish_certs_to_peer_databag(self, certs: Dict[str, Dict[str, str]]) -> None:
+        """Write resolved certificates to the peer relation app databag."""
+        peer_rel = self.model.get_relation(PEER_RELATION_NAME)
+        if not peer_rel:
+            logger.debug("Peer relation not available; cannot share certs.")
+            return
+        peer_rel.data[self.app]["tls_certs"] = json.dumps(certs)
+
+    def _get_certs_from_peer_databag(self) -> Dict[str, Dict[str, str]]:
+        """Read certificates shared by the leader from the peer relation app databag."""
+        peer_rel = self.model.get_relation(PEER_RELATION_NAME)
+        if not peer_rel:
+            logger.debug("Peer relation not available; cannot read shared certs.")
+            return {}
+        raw = peer_rel.data[self.app].get("tls_certs")
+        if not raw:
+            return {}
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError:
+            logger.warning("Invalid tls_certs data in peer databag.")
+            return {}
 
     def _on_show_proxied_endpoints(self, event: ActionEvent) -> None:
         event.set_results(
