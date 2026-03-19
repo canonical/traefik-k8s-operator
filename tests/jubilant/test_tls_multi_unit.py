@@ -2,13 +2,7 @@
 # Copyright 2026 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-"""Integration test: TLS certificates work on all traefik units (not just the leader).
-
-In APP mode the TLS library only lets the leader access certs from the relation.
-The leader shares certs to non-leader units via the peer relation app databag.
-This test verifies that HTTPS (curl) succeeds when targeting each individual
-traefik unit IP.
-"""
+"""Integration test: TLS certificates work on all traefik units."""
 
 import json
 import logging
@@ -26,10 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 def test_tls_on_all_units(juju: jubilant.Juju, traefik_app, ssc_app, alertmanager_app, tmp_path: Path):
-    """Curl HTTPS endpoints through every traefik unit IP.
-
-    Verifies TLS handshake succeeds on leader AND non-leader units.
-    """
+    """HTTPS endpoints are accessible through every traefik unit IP."""
     juju.add_unit(traefik_app, num_units=1)
     juju.wait(jubilant.all_active, timeout=600)
 
