@@ -31,7 +31,7 @@ dev = [
     "coverage[toml]",
     "ipdb",
     "pytest==8.2.2",
-    "pytest-asyncio==0.26.0",
+    "pytest-asyncio==0.24.0",
     "pytest-operator",
     "juju",
     "tenacity==8.3.0",
