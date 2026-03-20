@@ -4,7 +4,8 @@ requires-python = ">=3.8.0"
 resolution-markers = [
     "python_full_version >= '3.12'",
     "python_full_version == '3.11.*'",
-    "python_full_version >= '3.8.6' and python_full_version < '3.11'",
+    "python_full_version >= '3.9' and python_full_version < '3.11'",
+    "python_full_version >= '3.8.6' and python_full_version < '3.9'",
     "python_full_version >= '3.8.1' and python_full_version < '3.8.6'",
     "python_full_version > '3.8' and python_full_version < '3.8.1'",
     "python_full_version <= '3.8'",
@@ -688,7 +689,7 @@ name = "exceptiongroup"
 version = "1.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "typing-extensions", marker = "python_full_version < '3.11'" },
+    { name = "typing-extensions", marker = "python_full_version < '3.13'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/0b/9f/a65090624ecf468cdca03533906e7c69ed7588582240cfe7cc9e770b50eb/exceptiongroup-1.3.0.tar.gz", hash = "sha256:b241f5885f560bc56a59ee63ca4c6a8bfa46ae4ad651af316d4e81817bb9fd88", size = 29749, upload-time = "2025-05-10T17:42:51.123Z" }
 wheels = [
@@ -805,7 +806,7 @@ name = "importlib-resources"
 version = "6.4.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "zipp", marker = "python_full_version < '3.10'" },
+    { name = "zipp", marker = "python_full_version < '3.9'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/98/be/f3e8c6081b684f176b761e6a2fef02a0be939740ed6f54109a2951d806f3/importlib_resources-6.4.5.tar.gz", hash = "sha256:980862a1d16c9e147a59603677fa2aa5fd82b87f223b6cb870695bcfce830065", size = 43372, upload-time = "2024-09-09T17:03:14.677Z" }
 wheels = [
@@ -953,7 +954,8 @@ source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
     "python_full_version >= '3.12'",
     "python_full_version == '3.11.*'",
-    "python_full_version >= '3.8.6' and python_full_version < '3.11'",
+    "python_full_version >= '3.9' and python_full_version < '3.11'",
+    "python_full_version >= '3.8.6' and python_full_version < '3.9'",
 ]
 dependencies = [
     { name = "backports-datetime-fromisoformat", marker = "python_full_version >= '3.8.6'" },
@@ -1150,7 +1152,8 @@ source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
     "python_full_version >= '3.12'",
     "python_full_version == '3.11.*'",
-    "python_full_version >= '3.8.6' and python_full_version < '3.11'",
+    "python_full_version >= '3.9' and python_full_version < '3.11'",
+    "python_full_version >= '3.8.6' and python_full_version < '3.9'",
     "python_full_version >= '3.8.1' and python_full_version < '3.8.6'",
     "python_full_version > '3.8' and python_full_version < '3.8.1'",
 ]
@@ -2152,7 +2155,8 @@ source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
     "python_full_version >= '3.12'",
     "python_full_version == '3.11.*'",
-    "python_full_version >= '3.8.6' and python_full_version < '3.11'",
+    "python_full_version >= '3.9' and python_full_version < '3.11'",
+    "python_full_version >= '3.8.6' and python_full_version < '3.9'",
     "python_full_version >= '3.8.1' and python_full_version < '3.8.6'",
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/59/52/f43920223c93e31874677c681b8603d36a40d3d8502d3a37f80d3995d43e/sh-2.2.2.tar.gz", hash = "sha256:653227a7c41a284ec5302173fbc044ee817c7bad5e6e4d8d55741b9aeb9eb65b", size = 345866, upload-time = "2025-02-24T07:16:25.363Z" }
@@ -2194,11 +2198,11 @@ wheels = [
 
 [[package]]
 name = "tenacity"
-version = "8.3.0"
+version = "8.5.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/32/6c/57df6196ce52c464cf8556e8f697fec5d3469bb8cd319c1685c0a090e0b4/tenacity-8.3.0.tar.gz", hash = "sha256:953d4e6ad24357bceffbc9707bc74349aca9d245f68eb65419cf0c249a1949a2", size = 43608, upload-time = "2024-05-07T08:48:17.099Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/a3/4d/6a19536c50b849338fcbe9290d562b52cbdcf30d8963d3588a68a4107df1/tenacity-8.5.0.tar.gz", hash = "sha256:8bc6c0c8a09b31e6cad13c47afbed1a567518250a9a171418582ed8d9c20ca78", size = 47309, upload-time = "2024-07-05T07:25:31.836Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/61/a1/6bb0cbebefb23641f068bb58a2bc56da9beb2b1c550242e3c540b37698f3/tenacity-8.3.0-py3-none-any.whl", hash = "sha256:3649f6443dbc0d9b01b9d8020a9c4ec7a1ff5f6f3c6c8a036ef371f573fe9185", size = 25934, upload-time = "2024-05-07T08:48:14.696Z" },
+    { url = "https://files.pythonhosted.org/packages/d2/3f/8ba87d9e287b9d385a02a7114ddcef61b26f86411e121c9003eb509a1773/tenacity-8.5.0-py3-none-any.whl", hash = "sha256:b594c2a5945830c267ce6b79a166228323ed52718f30302c1359836112346687", size = 28165, upload-time = "2024-07-05T07:25:29.591Z" },
 ]
 
 [[package]]
@@ -2334,7 +2338,7 @@ requires-dist = [
     { name = "pytest-subtests", marker = "extra == 'dev'" },
     { name = "ruff", marker = "extra == 'dev'" },
     { name = "sh", marker = "extra == 'dev'" },
-    { name = "tenacity", marker = "extra == 'dev'", specifier = "==8.3.0" },
+    { name = "tenacity", marker = "extra == 'dev'", specifier = "==8.5.0" },
     { name = "types-pyyaml", marker = "extra == 'dev'", specifier = ">=6.0.12.20241230" },
 ]
 provides-extras = ["dev"]
