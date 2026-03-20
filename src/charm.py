@@ -793,19 +793,27 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
 
     def _publish_certs_to_peer_databag(self, certs: Dict[str, Dict[str, str]]) -> None:
         """Write resolved certificates to the peer relation app databag."""
-        peer_rel = self.model.get_relation(PEER_RELATION_NAME)
-        if not peer_rel:
+        peer_relation = self.model.get_relation(PEER_RELATION_NAME)
+        if not peer_relation:
             logger.debug("Peer relation not available; cannot share certs.")
             return
-        peer_rel.data[self.app]["tls_certs"] = json.dumps(certs)
+        app_data = peer_relation.data.get(self.app)
+        if app_data is None:
+            logger.debug("App data not available in peer relation; cannot share certs.")
+            return
+        app_data["tls_certs"] = json.dumps(certs)
 
     def _get_certs_from_peer_databag(self) -> Dict[str, Dict[str, str]]:
         """Read certificates shared by the leader from the peer relation app databag."""
-        peer_rel = self.model.get_relation(PEER_RELATION_NAME)
-        if not peer_rel:
+        peer_relation = self.model.get_relation(PEER_RELATION_NAME)
+        if not peer_relation:
             logger.debug("Peer relation not available; cannot read shared certs.")
             return {}
-        raw = peer_rel.data[self.app].get("tls_certs")
+        app_data = peer_relation.data.get(self.app)
+        if app_data is None:
+            logger.debug("App data not available in peer relation; cannot read shared certs.")
+            return {}
+        raw = app_data.get("tls_certs")
         if not raw:
             return {}
         try:

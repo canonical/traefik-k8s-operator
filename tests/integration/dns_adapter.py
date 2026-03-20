@@ -1,8 +1,7 @@
-# Copyright 2025 Canonical Ltd.
+# Copyright 2026 Canonical Ltd.
 # See LICENSE file for licensing details.
-# pylint: disable=duplicate-code
 
-"""Helper methods for integration tests."""
+"""DNS resolver adapter for HTTPS requests in integration tests."""
 
 from urllib.parse import urlparse
 
@@ -12,17 +11,7 @@ from requests.adapters import DEFAULT_POOLBLOCK, DEFAULT_POOLSIZE, DEFAULT_RETRI
 class DNSResolverHTTPSAdapter(HTTPAdapter):
     """A simple mounted DNS resolver for HTTP requests."""
 
-    def __init__(
-        self,
-        hostname,
-        ip,
-    ):
-        """Initialize the dns resolver.
-
-        Args:
-            hostname: DNS entry to resolve.
-            ip: Target IP address.
-        """
+    def __init__(self, hostname, ip):
         self.hostname = hostname
         self.ip = ip
         super().__init__(
@@ -32,23 +21,10 @@ class DNSResolverHTTPSAdapter(HTTPAdapter):
             pool_block=DEFAULT_POOLBLOCK,
         )
 
-    # Ignore pylint rule as this is the parent method signature
     def send(
         self, request, stream=False, timeout=None, verify=True, cert=None, proxies=None
     ):  # pylint: disable=too-many-arguments, too-many-positional-arguments
-        """Wrap HTTPAdapter send to modify the outbound request.
-
-        Args:
-            request: Outbound HTTP request.
-            stream: argument used by parent method.
-            timeout: argument used by parent method.
-            verify: argument used by parent method.
-            cert: argument used by parent method.
-            proxies: argument used by parent method.
-
-        Returns:
-            Response: HTTP response after modification.
-        """
+        """Wrap HTTPAdapter send to resolve hostname to a specific IP."""
         connection_pool_kwargs = self.poolmanager.connection_pool_kw
 
         result = urlparse(request.url)
