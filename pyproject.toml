@@ -38,7 +38,7 @@ dev = [
     "sh",
     "minio",
     "pyright==1.1.318",
-    "ops-scenario==7.23.2",
+    "ops-scenario~=6.0",
     "pytest-interface-tester>0.3",
     "types-pyyaml>=6.0.12.20241230",
     "mypy>=1.14.1",

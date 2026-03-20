@@ -1343,15 +1343,15 @@ wheels = [
 
 [[package]]
 name = "ops-scenario"
-version = "7.23.2"
+version = "6.1.6"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "ops" },
     { name = "pyyaml" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ee/e7/1514b9c27b9364ec1d04791b0fb76d1a629c8cc73f90fbf6dd867457c914/ops_scenario-7.23.2.tar.gz", hash = "sha256:327dda8b3c871ccf16246ed4f8c7e093526af42093549976596cede58cbc8488", size = 70017, upload-time = "2026-02-11T03:58:16.553Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/7e/8b/6517c5ca97b30b7a1f41320766b9784569c6b03b0e4f526cc69738f0589c/ops_scenario-6.1.6.tar.gz", hash = "sha256:3937d63e31d101cb9bd6f44ba98927eac67b1e5d6b0e3fe13905a32306b129dd", size = 247423, upload-time = "2024-08-26T20:45:56.999Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/01/15/3b59993cad1b2838c9bb20f6f2ed5297fcf490025b1ffecc27d06be1daba/ops_scenario-7.23.2-py3-none-any.whl", hash = "sha256:024b638e0ea94e8f2e3c642d4f96031b0c7ac4f39117b97107dc9a09503651b4", size = 64328, upload-time = "2026-02-11T03:58:14.916Z" },
+    { url = "https://files.pythonhosted.org/packages/74/fe/ea00273eee42859f449ecfa02b17e01ee41f2bc06053f24e3b0ac92b08ca/ops_scenario-6.1.6-py3-none-any.whl", hash = "sha256:f853ebc6c6b6abd5f887e01ecca833e47fe15ad0680f8fbace79032f921a3880", size = 69179, upload-time = "2024-08-26T20:45:55.406Z" },
 ]
 
 [[package]]
@@ -2328,7 +2328,7 @@ requires-dist = [
     { name = "opentelemetry-api", specifier = "==1.21.0" },
     { name = "opentelemetry-exporter-otlp-proto-http", specifier = "==1.21.0" },
     { name = "ops", specifier = ">=2.10.0" },
-    { name = "ops-scenario", marker = "extra == 'dev'", specifier = "==7.23.2" },
+    { name = "ops-scenario", marker = "extra == 'dev'", specifier = "~=6.0" },
     { name = "pydantic", specifier = ">=2" },
     { name = "pylint", marker = "extra == 'dev'", specifier = ">=3.2.7" },
     { name = "pylint-pydantic", marker = "extra == 'dev'", specifier = ">=0.3.5" },
