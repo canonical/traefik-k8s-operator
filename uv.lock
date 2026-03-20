@@ -924,6 +924,18 @@ wheels = [
 ]
 
 [[package]]
+name = "jubilant"
+version = "1.7.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pyyaml" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/cc/0b/275edac8b57b0aac34f84073997660ebf536f97d2fa0d85a2cc3321047b6/jubilant-1.7.0.tar.gz", hash = "sha256:46b7c29a4f3336ab16d77d88418dbf8c9d0746e3f80ef42ee4c2d103eff79650", size = 32455, upload-time = "2026-01-29T02:40:10.335Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/86/d5/5b95ae9ab5abf283e33c802d286045abda7d826396ba417d5d3a20201b24/jubilant-1.7.0-py3-none-any.whl", hash = "sha256:1dcd70eb10299a95ae9fab405a3ce5f01a15513776b7f8eb4cf7b02808c93cdf", size = 33396, upload-time = "2026-01-29T02:40:09.222Z" },
+]
+
+[[package]]
 name = "juju"
 version = "3.5.2.1"
 source = { registry = "https://pypi.org/simple" }
@@ -2286,6 +2298,7 @@ dev = [
     { name = "black" },
     { name = "coverage", extra = ["toml"] },
     { name = "ipdb" },
+    { name = "jubilant" },
     { name = "juju", version = "3.5.2.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.8.6'" },
     { name = "juju", version = "3.6.1.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.8.6'" },
     { name = "minio", version = "7.2.7", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version <= '3.8'" },
@@ -2317,6 +2330,7 @@ requires-dist = [
     { name = "importlib-metadata", specifier = "==6.0.0" },
     { name = "ipdb", marker = "extra == 'dev'" },
     { name = "jsonschema" },
+    { name = "jubilant", marker = "extra == 'dev'" },
     { name = "juju", marker = "extra == 'dev'" },
     { name = "lightkube", specifier = ">=0.8.1" },
     { name = "lightkube-extensions", git = "https://github.com/canonical/lightkube-extensions.git?rev=8d37be9ba40b156a6a1648c12e3ed21209cc4360" },

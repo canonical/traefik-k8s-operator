@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 Each revision is versioned by the date of the revision.
 
+## 2025-03-17
+
+- Changed certificate mode from `UNIT` to `APP` mode.
+
 ## 2026-03-13
 
 - Add support for UDP entrypoints in the `traefik-route` relation.
