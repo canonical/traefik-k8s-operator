@@ -37,7 +37,7 @@ dev = [
     "tenacity==8.5.0",
     "sh",
     "minio",
-    "pyright==1.1.408",
+    "pyright==1.1.318",
     "ops-scenario~=6.0",
     "pytest-interface-tester>0.3",
     "types-pyyaml>=6.0.12.20241230",

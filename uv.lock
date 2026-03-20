@@ -1777,15 +1777,14 @@ wheels = [
 
 [[package]]
 name = "pyright"
-version = "1.1.408"
+version = "1.1.318"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "nodeenv" },
-    { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/74/b2/5db700e52554b8f025faa9c3c624c59f1f6c8841ba81ab97641b54322f16/pyright-1.1.408.tar.gz", hash = "sha256:f28f2321f96852fa50b5829ea492f6adb0e6954568d1caa3f3af3a5f555eb684", size = 4400578, upload-time = "2026-01-08T08:07:38.795Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/7c/ce/58f6e45a1c8d5a09b755dec1dfc5aaf6b0dd3102218c5e67b00182fea899/pyright-1.1.318.tar.gz", hash = "sha256:69dcf9c32d5be27d531750de627e76a7cadc741d333b547c09044278b508db7b", size = 16823, upload-time = "2023-07-21T09:35:53.859Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/0c/82/a2c93e32800940d9573fb28c346772a14778b84ba7524e691b324620ab89/pyright-1.1.408-py3-none-any.whl", hash = "sha256:090b32865f4fdb1e0e6cd82bf5618480d48eecd2eb2e70f960982a3d9a4c17c1", size = 6399144, upload-time = "2026-01-08T08:07:37.082Z" },
+    { url = "https://files.pythonhosted.org/packages/28/2d/da1e79917b71298d5b1f8b492735ced8b00df9466a7daefac1a3e435b12a/pyright-1.1.318-py3-none-any.whl", hash = "sha256:056c1b2e711c3526e32919de1684ae599d34b7ec27e94398858a43f56ac9ba9b", size = 17624, upload-time = "2023-07-21T09:35:52.702Z" },
 ]
 
 [[package]]
@@ -2324,7 +2323,7 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2" },
     { name = "pylint", marker = "extra == 'dev'", specifier = ">=3.2.7" },
     { name = "pylint-pydantic", marker = "extra == 'dev'", specifier = ">=0.3.5" },
-    { name = "pyright", marker = "extra == 'dev'", specifier = "==1.1.408" },
+    { name = "pyright", marker = "extra == 'dev'", specifier = "==1.1.318" },
     { name = "pytest", marker = "extra == 'dev'", specifier = "==8.3.5" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = "==0.24.0" },
     { name = "pytest-interface-tester", marker = "extra == 'dev'", specifier = ">0.3" },
