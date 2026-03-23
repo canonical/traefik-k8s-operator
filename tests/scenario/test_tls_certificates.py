@@ -292,7 +292,7 @@ class TestLeaderPublishesCerts:
         peer_out = out.get_relations("peers")[0]
         assert "tls_certs" not in peer_out.local_app_data
 
-        # Secret should be removed 
+        # Secret should be removed
         tls_secrets = [s for s in out.secrets if s.label == TLS_KEY_LABEL]
         if tls_secrets:
             # The scenario mock may keep the object with empty contents
