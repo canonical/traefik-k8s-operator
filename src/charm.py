@@ -748,7 +748,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         }
 
         In APP mode, only the leader can access certificates from the TLS relation.
-        The leader shares resolved certs via the peer relation app databag and a 
+        The leader shares resolved certs via the peer relation app databag and a
         juju secret so that non-leader units can install them in their traefik containers.
         """
         certs: Dict[str, Dict[str, str]] = {}
