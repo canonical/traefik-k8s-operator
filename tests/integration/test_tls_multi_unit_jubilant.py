@@ -13,7 +13,6 @@ import jubilant
 import pytest
 import requests
 import yaml
-
 from dns_adapter import DNSResolverHTTPSAdapter
 
 logger = logging.getLogger(__name__)
