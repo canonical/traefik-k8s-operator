@@ -232,6 +232,7 @@ class TestLeaderPublishesCerts:
                 "get_assigned_certificate",
                 return_value=(_mock_provider_certificate(), MOCK_KEY),
             ):
+                charm._sync_certs_to_peer_databag()
                 certs = charm._get_certs()
 
             # Verify certs were returned correctly
@@ -285,21 +286,17 @@ class TestLeaderPublishesCerts:
             secrets=[existing_secret],
         )
 
-        with traefik_ctx.manager("config_changed", state) as mgr:
-            charm = mgr.charm
-            certs = charm._get_certs()
+        out = traefik_ctx.run("config_changed", state)
 
-            # Certs should be empty (TLS disabled)
-            assert certs == {}
+        # tls_certs should be removed from peer app databag
+        peer_out = out.get_relations("peers")[0]
+        assert "tls_certs" not in peer_out.local_app_data
 
-            # tls_certs should be removed from databag
-            peer_relation = charm.model.get_relation("peers")
-            assert "tls_certs" not in peer_relation.data[charm.app]
-
-            # Secret content should be cleared (empty dict)
-            secret = charm.model.get_secret(label=TLS_KEY_LABEL)
-            content = secret.get_content(refresh=True)
-            assert json.loads(content["private-keys"]) == {}
+        # Secret should be removed 
+        tls_secrets = [s for s in out.secrets if s.label == TLS_KEY_LABEL]
+        if tls_secrets:
+            # The scenario mock may keep the object with empty contents
+            assert tls_secrets[0].contents == {}
 
 
 @patch("charm.TraefikIngressCharm._ingressed_address", PropertyMock(return_value="10.0.0.1"))

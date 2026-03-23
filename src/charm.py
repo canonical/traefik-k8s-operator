@@ -724,11 +724,26 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
 
     def _update_cert_configs(self) -> None:
         """Update the server cert, ca, and key configuration files."""
+        self._sync_certs_to_peer_databag()
         self.traefik.update_cert_configuration(self._get_certs())
 
         # update_cert_configuration relies on traefik.update_ca_certs.
         # Thus, we should restart traefik with the new CA certs.
         self._restart_traefik()
+
+    def _sync_certs_to_peer_databag(self) -> None:
+        """Sync certificates to the peer databag (leader only).
+
+        When TLS is enabled, the leader publishes resolved certs so non-leader
+        units can read them.  When TLS is disabled, stale data is cleaned up.
+        """
+        if not self.unit.is_leader():
+            return
+        if not self._is_tls_enabled():
+            self._publish_certs_to_peer_databag({})
+            return
+        relation_certs = self._get_certs_from_relation()
+        self._publish_certs_to_peer_databag(relation_certs)
 
     def _get_certs(self) -> dict:
         """Get all certs to be installed.
@@ -748,14 +763,10 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         }
 
         In APP mode, only the leader can access certificates from the TLS relation.
-        The leader shares resolved certs via the peer relation app databag and a
-        juju secret so that non-leader units can install them in their traefik containers.
+        Non-leader units read certs shared by the leader from the peer databag.
         """
         certs: Dict[str, Dict[str, str]] = {}
         if not self._is_tls_enabled():
-            # If TLS is disabled, clear any stale certs from peer databag
-            if self.unit.is_leader():
-                self._publish_certs_to_peer_databag({})
             return certs
         if (
             self.config.get("tls-ca", None)
@@ -769,10 +780,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             }
 
         if self.unit.is_leader():
-            # Leader: resolve certs from TLS relation and share via peer databag
-            relation_certs = self._get_certs_from_relation()
-            certs.update(relation_certs)
-            self._publish_certs_to_peer_databag(relation_certs)
+            certs.update(self._get_certs_from_relation())
         else:
             # Non-leader: read certs shared by the leader from peer databag
             try:
@@ -821,11 +829,11 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             return
 
         if not certs:
-            # TLS disabled: clean up databag and secret content
+            # TLS disabled: clean up databag and secret
             app_data.pop("tls_certs", None)
             try:
                 secret = self.model.get_secret(label=TLS_KEY_LABEL)
-                secret.set_content({"private-keys": "{}"})
+                secret.remove_all_revisions()
             except SecretNotFoundError:
                 pass
             return
