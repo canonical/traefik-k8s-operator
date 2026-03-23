@@ -339,8 +339,8 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         observe(self.forward_auth.on.auth_config_changed, self._on_forward_auth_config_changed)
         observe(self.forward_auth.on.auth_config_removed, self._on_forward_auth_config_removed)
 
-        observe(self.on[PEER_RELATION_NAME].relation_created, self._on_peer_relation_changed)
         # Observe peer relation changed so non-leader units pick up certs shared by the leader
+        observe(self.on[PEER_RELATION_NAME].relation_created, self._on_peer_relation_changed)
         observe(self.on[PEER_RELATION_NAME].relation_changed, self._on_peer_relation_changed)
 
         # observe data_provided and data_removed events for all types of ingress we offer:
@@ -847,8 +847,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             secret = self.model.get_secret(label=TLS_KEY_LABEL)
             secret.set_content(secret_content)
         except SecretNotFoundError:
-            secret = self.app.add_secret(secret_content, label=TLS_KEY_LABEL)
-            secret.grant(peer_relation)
+            self.app.add_secret(secret_content, label=TLS_KEY_LABEL)
 
     def _get_certs_from_peer_databag(self) -> Dict[str, Dict[str, str]]:
         """Read certificates shared by the leader from the peer relation.
