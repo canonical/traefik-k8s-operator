@@ -740,7 +740,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         if not self.unit.is_leader():
             return
         if not self._is_tls_enabled():
-            self._publish_certs_to_peer_databag({})
+            self._clear_certs_from_peer_databag()
             return
         relation_certs = self._get_certs_from_relation()
         self._publish_certs_to_peer_databag(relation_certs)
@@ -829,13 +829,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             return
 
         if not certs:
-            # TLS disabled: clean up databag and secret
-            app_data.pop("tls_certs", None)
-            try:
-                secret = self.model.get_secret(label=TLS_KEY_LABEL)
-                secret.remove_all_revisions()
-            except SecretNotFoundError:
-                pass
+            logger.warning("No certs to publish to peer databag.")
             return
 
         # Store public cert data (chain + CA) in the databag
@@ -856,6 +850,23 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             secret.set_content(secret_content)
         except SecretNotFoundError:
             self.app.add_secret(secret_content, label=TLS_KEY_LABEL)
+
+    def _clear_certs_from_peer_databag(self) -> None:
+        """Clean up TLS certificate data and secrets from the peer databag."""
+        peer_relation = self.model.get_relation(PEER_RELATION_NAME)
+        if not peer_relation:
+            logger.debug("Peer relation not available; nothing to clean up.")
+            return
+        app_data = peer_relation.data.get(self.app)
+        if app_data is None:
+            logger.debug("App data not available in peer relation; nothing to clean up.")
+            return
+        app_data.pop("tls_certs", None)
+        try:
+            secret = self.model.get_secret(label=TLS_KEY_LABEL)
+            secret.remove_all_revisions()
+        except SecretNotFoundError:
+            pass
 
     def _get_certs_from_peer_databag(self) -> Dict[str, Dict[str, str]]:
         """Read certificates shared by the leader from the peer relation.
