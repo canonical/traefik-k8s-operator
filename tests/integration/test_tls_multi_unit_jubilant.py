@@ -106,13 +106,18 @@ def test_tls_on_all_units(
     """HTTPS endpoints are accessible through every traefik unit IP."""
     juju.add_unit(traefik_app, num_units=NUM_TRAEFIK_UNITS - 1)
 
-    def all_active_with_expected_units(status):
+    def all_active_and_idle_with_expected_units(status):
         app = status.apps.get(TRAEFIK_APP_NAME)
         if app is None or len(app.units) < NUM_TRAEFIK_UNITS:
             return False
-        return jubilant.all_active(status)
+        if not jubilant.all_active(status):
+            return False
+        for unit in app.units.values():
+            if unit.juju_status.current != "idle":
+                return False
+        return True
 
-    juju.wait(all_active_with_expected_units, timeout=600)
+    juju.wait(all_active_and_idle_with_expected_units, timeout=600)
 
     # Pull the CA certificate from the SSC charm.
     ca_cert_path = tmp_path / "ca.cert"
