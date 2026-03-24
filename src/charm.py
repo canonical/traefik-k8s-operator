@@ -83,6 +83,7 @@ from ops.model import (
     BlockedStatus,
     MaintenanceStatus,
     Relation,
+    SecretNotFoundError,
     WaitingStatus,
 )
 from ops.pebble import PathError
@@ -139,8 +140,8 @@ LB_LABEL = "traefik-loadbalancer"
 PYDANTIC_IS_V1 = int(pydantic.version.VERSION.split(".")[0]) < 2  # pylint: disable=no-member
 
 CERTIFICATES_RELATION_NAME = "certificates"
-
-CERTIFICATES_RELATION_NAME = "certificates"
+PEER_RELATION_NAME = "peers"
+TLS_KEY_LABEL = "tls-key"
 
 
 class _IngressRelationType(enum.Enum):
@@ -155,6 +156,10 @@ class IngressSetupError(Exception):
 
 class ExternalHostNotReadyError(Exception):
     """Raised when the ingress hostname is not ready but is assumed to be."""
+
+
+class CertificatesUnavailableError(Exception):
+    """Raised when certificates are not available."""
 
 
 @trace_charm(
@@ -268,8 +273,8 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             charm=self,
             relationship_name=CERTIFICATES_RELATION_NAME,
             certificate_requests=self.csrs,
-            mode=Mode.UNIT,
-            refresh_events=[],
+            mode=Mode.APP,
+            refresh_events=[self.on.config_changed],
         )
 
         # Observability integrations
@@ -333,6 +338,10 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
 
         observe(self.forward_auth.on.auth_config_changed, self._on_forward_auth_config_changed)
         observe(self.forward_auth.on.auth_config_removed, self._on_forward_auth_config_removed)
+
+        # Observe peer relation changed so non-leader units pick up certs shared by the leader
+        observe(self.on[PEER_RELATION_NAME].relation_created, self._on_peer_relation_changed)
+        observe(self.on[PEER_RELATION_NAME].relation_changed, self._on_peer_relation_changed)
 
         # observe data_provided and data_removed events for all types of ingress we offer:
         for ingress in (self.ingress_per_unit, self.ingress_per_appv1, self.ingress_per_appv2):
@@ -701,17 +710,40 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         else:
             logger.debug("Certificate hostnames unchanged (%d); skipping cert refresh.", len(old_keys))
 
+    def _on_peer_relation_changed(self, _: EventBase) -> None:
+        """Handle peer relation changed.
+
+        Non-leader units use this to pick up certificates shared by the leader.
+        """
+        if not self.unit.is_leader():
+            self._configure()
+
     def _on_cert_changed(self, _: EventBase) -> None:
         # On slow machines, this event may come up before pebble is ready
         self._configure()
 
     def _update_cert_configs(self) -> None:
         """Update the server cert, ca, and key configuration files."""
+        self._sync_certs_to_peer_databag()
         self.traefik.update_cert_configuration(self._get_certs())
 
         # update_cert_configuration relies on traefik.update_ca_certs.
         # Thus, we should restart traefik with the new CA certs.
         self._restart_traefik()
+
+    def _sync_certs_to_peer_databag(self) -> None:
+        """Sync certificates to the peer databag (leader only).
+
+        When TLS is enabled, the leader publishes resolved certs so non-leader
+        units can read them.  When TLS is disabled, stale data is cleaned up.
+        """
+        if not self.unit.is_leader():
+            return
+        if not self._is_tls_enabled():
+            self._clear_certs_from_peer_databag()
+            return
+        relation_certs = self._get_certs_from_relation()
+        self._publish_certs_to_peer_databag(relation_certs)
 
     def _get_certs(self) -> dict:
         """Get all certs to be installed.
@@ -729,6 +761,9 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             "ca": "<ca>"
           }
         }
+
+        In APP mode, only the leader can access certificates from the TLS relation.
+        Non-leader units read certs shared by the leader from the peer databag.
         """
         certs: Dict[str, Dict[str, str]] = {}
         if not self._is_tls_enabled():
@@ -743,6 +778,24 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
                 "key": cast(str, self.config["tls-key"]),
                 "ca": cast(str, self.config["tls-ca"]),
             }
+
+        if self.unit.is_leader():
+            certs.update(self._get_certs_from_relation())
+        else:
+            # Non-leader: read certs shared by the leader from peer databag
+            try:
+                certs.update(self._get_certs_from_peer_databag())
+            except CertificatesUnavailableError as e:
+                logger.warning("Failed to read certificates from peer databag: %s", e)
+                self.unit.status = BlockedStatus(
+                    "Certificates unavailable from peer relation; waiting for leader."
+                )
+
+        return certs
+
+    def _get_certs_from_relation(self) -> Dict[str, Dict[str, str]]:
+        """Get certificates from the TLS certificates relation (leader only)."""
+        certs: Dict[str, Dict[str, str]] = {}
         for csr in self.csrs:
             cert, private_key = self.certs.get_assigned_certificate(certificate_request=csr)
             if cert is None:
@@ -756,6 +809,130 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
                 "chain": "\n\n".join(chain),
                 "key": str(private_key),
                 "ca": str(cert.ca),
+            }
+        return certs
+
+    def _publish_certs_to_peer_databag(self, certs: Dict[str, Dict[str, str]]) -> None:
+        """Share resolved certificates with peer units.
+
+        Public certificate data is stored in the peer app databag.
+        Private keys are stored in a Juju secret (looked up by label) to avoid
+        exposing them in plain text.
+        """
+        peer_relation = self.model.get_relation(PEER_RELATION_NAME)
+        if not peer_relation:
+            logger.debug("Peer relation not available; cannot share certs.")
+            return
+        app_data = peer_relation.data.get(self.app)
+        if app_data is None:
+            logger.debug("App data not available in peer relation; cannot share certs.")
+            return
+
+        if not certs:
+            logger.warning("No certs to publish to peer databag.")
+            return
+
+        # Store public cert data (chain + CA) in the databag
+        public_certs = {
+            hostname: {"chain": data["chain"], "ca": data["ca"]}
+            for hostname, data in certs.items()
+        }
+        app_data["tls_certs"] = json.dumps(public_certs)
+
+        # Store private keys in a Juju secret
+        private_keys = {
+            hostname: data["key"]
+            for hostname, data in certs.items()
+        }
+        secret_content = {"private-keys": json.dumps(private_keys)}
+        try:
+            secret = self.model.get_secret(label=TLS_KEY_LABEL)
+            secret.set_content(secret_content)
+        except SecretNotFoundError:
+            self.app.add_secret(secret_content, label=TLS_KEY_LABEL)
+
+    def _clear_certs_from_peer_databag(self) -> None:
+        """Clean up TLS certificate data and secrets from the peer databag."""
+        peer_relation = self.model.get_relation(PEER_RELATION_NAME)
+        if not peer_relation:
+            logger.debug("Peer relation not available; nothing to clean up.")
+            return
+        app_data = peer_relation.data.get(self.app)
+        if app_data is None:
+            logger.debug("App data not available in peer relation; nothing to clean up.")
+            return
+        app_data.pop("tls_certs", None)
+        try:
+            secret = self.model.get_secret(label=TLS_KEY_LABEL)
+            secret.remove_all_revisions()
+        except SecretNotFoundError:
+            pass
+
+    def _get_certs_from_peer_databag(self) -> Dict[str, Dict[str, str]]:
+        """Read certificates shared by the leader from the peer relation.
+
+        Public cert data is read from the peer app databag.
+        Private keys are read from a Juju secret looked up by label.
+
+        Raises:
+            CertificatesUnavailableError: If certificates are unavailable.
+        """
+        peer_relation = self.model.get_relation(PEER_RELATION_NAME)
+        if not peer_relation:
+            raise CertificatesUnavailableError(
+                "Peer relation not available; cannot read shared certs."
+            )
+        app_data = peer_relation.data.get(self.app)
+        if app_data is None:
+            raise CertificatesUnavailableError(
+                "App data not available in peer relation; cannot read shared certs."
+            )
+
+        # Read public cert data from databag
+        raw_certs = app_data.get("tls_certs")
+        if not raw_certs:
+            raise CertificatesUnavailableError(
+                "No TLS certificate data found in peer databag."
+            )
+        try:
+            public_certs = json.loads(raw_certs)
+        except json.JSONDecodeError as e:
+            raise CertificatesUnavailableError(
+                "Invalid TLS certificate data in peer databag."
+            ) from e
+
+        # Read private keys from Juju secret by label
+        try:
+            secret = self.model.get_secret(label=TLS_KEY_LABEL)
+            secret_content = secret.get_content(refresh=True)
+        except SecretNotFoundError as e:
+            raise CertificatesUnavailableError(
+                "TLS private keys secret not found."
+            ) from e
+        raw_keys = secret_content.get("private-keys")
+        if not raw_keys:
+            raise CertificatesUnavailableError(
+                "No private keys found in secret."
+            )
+        try:
+            private_keys = json.loads(raw_keys)
+        except json.JSONDecodeError as e:
+            raise CertificatesUnavailableError(
+                "Invalid private keys data in secret."
+            ) from e
+
+        # Reassemble full cert dicts
+        certs: Dict[str, Dict[str, str]] = {}
+        for hostname, pub_data in public_certs.items():
+            key = private_keys.get(hostname)
+            if not key:
+                raise CertificatesUnavailableError(
+                    f"No private key found for hostname {hostname}."
+                )
+            certs[hostname] = {
+                "chain": pub_data["chain"],
+                "key": key,
+                "ca": pub_data["ca"],
             }
         return certs
 
