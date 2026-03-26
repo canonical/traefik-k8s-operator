@@ -16,7 +16,7 @@ dependencies = [
     "lightkube-models>=1.22.0.4",
     "lightkube-extensions",
     "ops>=2.10.0",
-    "importlib-metadata==6.0.0",
+    "importlib-metadata==8.5.0",
     "opentelemetry-exporter-otlp-proto-http==1.21.0",
     "opentelemetry-api==1.21.0",
     "pydantic>=2",
@@ -49,6 +49,9 @@ dev = [
 
 [tool.uv]
 package = false
+override-dependencies = [
+    "importlib-metadata==8.5.0",
+]
 
 [tool.uv.sources]
 lightkube-extensions = { git = "https://github.com/canonical/lightkube-extensions.git", rev = "8d37be9ba40b156a6a1648c12e3ed21209cc4360" }
