@@ -33,6 +33,7 @@ dev = [
     "pytest==8.3.5",
     "pytest-asyncio==0.24.0",
     "pytest-operator",
+    "jubilant",
     "juju",
     "tenacity==8.5.0",
     "sh",
@@ -48,6 +49,9 @@ dev = [
 
 [tool.uv]
 package = false
+override-dependencies = [
+    "importlib-metadata==8.5.0",
+]
 
 [tool.uv.sources]
 lightkube-extensions = { git = "https://github.com/canonical/lightkube-extensions.git", rev = "8d37be9ba40b156a6a1648c12e3ed21209cc4360" }
