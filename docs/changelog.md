@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 Each revision is versioned by the date of the revision.
 
+## 2026-03-30
+
+- Added support for release notes.
+
 ## 2025-03-17
 
 - Changed certificate mode from `UNIT` to `APP` mode.
