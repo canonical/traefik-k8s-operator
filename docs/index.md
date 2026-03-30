@@ -60,5 +60,4 @@ how-to/index.md
 reference/index.md
 explanation/index.md
 Release notes <release-notes/index.md>
-changelog.md
 ```
