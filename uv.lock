@@ -4,11 +4,15 @@ requires-python = ">=3.8.0"
 resolution-markers = [
     "python_full_version >= '3.12'",
     "python_full_version == '3.11.*'",
-    "python_full_version >= '3.8.6' and python_full_version < '3.11'",
+    "python_full_version >= '3.9' and python_full_version < '3.11'",
+    "python_full_version >= '3.8.6' and python_full_version < '3.9'",
     "python_full_version >= '3.8.1' and python_full_version < '3.8.6'",
     "python_full_version > '3.8' and python_full_version < '3.8.1'",
     "python_full_version <= '3.8'",
 ]
+
+[manifest]
+overrides = [{ name = "importlib-metadata", specifier = "==8.5.0" }]
 
 [[package]]
 name = "annotated-types"
@@ -479,6 +483,7 @@ version = "8.1.8"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "colorama", marker = "sys_platform == 'win32'" },
+    { name = "importlib-metadata" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/b9/2e/0090cbf739cee7d23781ad4b89a9894a41538e4fcf4c31dcdd705b78eb8b/click-8.1.8.tar.gz", hash = "sha256:ed53c9d8990d83c2a27deae68e4ee337473f6330c040a31d4225c9574d16096a", size = 226593, upload-time = "2024-12-21T18:38:44.339Z" }
 wheels = [
@@ -790,14 +795,14 @@ wheels = [
 
 [[package]]
 name = "importlib-metadata"
-version = "6.0.0"
+version = "8.5.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "zipp" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/90/07/6397ad02d31bddf1841c9ad3ec30a693a3ff208e09c2ef45c9a8a5f85156/importlib_metadata-6.0.0.tar.gz", hash = "sha256:e354bedeb60efa6affdcc8ae121b73544a7aa74156d047311948f6d711cd378d", size = 49776, upload-time = "2023-01-01T18:03:09.345Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/cd/12/33e59336dca5be0c398a7482335911a33aa0e20776128f038019f1a95f1b/importlib_metadata-8.5.0.tar.gz", hash = "sha256:71522656f0abace1d072b9e5481a48f07c138e00f079c38c8f883823f9c26bd7", size = 55304, upload-time = "2024-09-11T14:56:08.937Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/26/a7/9da7d5b23fc98ab3d424ac2c65613d63c1f401efb84ad50f2fa27b2caab4/importlib_metadata-6.0.0-py3-none-any.whl", hash = "sha256:7efb448ec9a5e313a57655d35aa54cd3e01b7e1fbcf72dce1bf06119420f5bad", size = 21859, upload-time = "2023-01-01T18:03:07.879Z" },
+    { url = "https://files.pythonhosted.org/packages/a0/d9/a1e041c5e7caa9a05c925f4bdbdfb7f006d1f74996af53467bc394c97be7/importlib_metadata-8.5.0-py3-none-any.whl", hash = "sha256:45e54197d28b7a7f1559e60b95e7c567032b602131fbd588f1497f47880aa68b", size = 26514, upload-time = "2024-09-11T14:56:07.019Z" },
 ]
 
 [[package]]
@@ -805,7 +810,7 @@ name = "importlib-resources"
 version = "6.4.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "zipp", marker = "python_full_version < '3.10'" },
+    { name = "zipp", marker = "python_full_version < '3.9'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/98/be/f3e8c6081b684f176b761e6a2fef02a0be939740ed6f54109a2951d806f3/importlib_resources-6.4.5.tar.gz", hash = "sha256:980862a1d16c9e147a59603677fa2aa5fd82b87f223b6cb870695bcfce830065", size = 43372, upload-time = "2024-09-09T17:03:14.677Z" }
 wheels = [
@@ -923,6 +928,18 @@ wheels = [
 ]
 
 [[package]]
+name = "jubilant"
+version = "1.7.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pyyaml" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/cc/0b/275edac8b57b0aac34f84073997660ebf536f97d2fa0d85a2cc3321047b6/jubilant-1.7.0.tar.gz", hash = "sha256:46b7c29a4f3336ab16d77d88418dbf8c9d0746e3f80ef42ee4c2d103eff79650", size = 32455, upload-time = "2026-01-29T02:40:10.335Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/86/d5/5b95ae9ab5abf283e33c802d286045abda7d826396ba417d5d3a20201b24/jubilant-1.7.0-py3-none-any.whl", hash = "sha256:1dcd70eb10299a95ae9fab405a3ce5f01a15513776b7f8eb4cf7b02808c93cdf", size = 33396, upload-time = "2026-01-29T02:40:09.222Z" },
+]
+
+[[package]]
 name = "juju"
 version = "3.5.2.1"
 source = { registry = "https://pypi.org/simple" }
@@ -953,7 +970,8 @@ source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
     "python_full_version >= '3.12'",
     "python_full_version == '3.11.*'",
-    "python_full_version >= '3.8.6' and python_full_version < '3.11'",
+    "python_full_version >= '3.9' and python_full_version < '3.11'",
+    "python_full_version >= '3.8.6' and python_full_version < '3.9'",
 ]
 dependencies = [
     { name = "backports-datetime-fromisoformat", marker = "python_full_version >= '3.8.6'" },
@@ -1150,7 +1168,8 @@ source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
     "python_full_version >= '3.12'",
     "python_full_version == '3.11.*'",
-    "python_full_version >= '3.8.6' and python_full_version < '3.11'",
+    "python_full_version >= '3.9' and python_full_version < '3.11'",
+    "python_full_version >= '3.8.6' and python_full_version < '3.9'",
     "python_full_version >= '3.8.1' and python_full_version < '3.8.6'",
     "python_full_version > '3.8' and python_full_version < '3.8.1'",
 ]
@@ -2152,7 +2171,8 @@ source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
     "python_full_version >= '3.12'",
     "python_full_version == '3.11.*'",
-    "python_full_version >= '3.8.6' and python_full_version < '3.11'",
+    "python_full_version >= '3.9' and python_full_version < '3.11'",
+    "python_full_version >= '3.8.6' and python_full_version < '3.9'",
     "python_full_version >= '3.8.1' and python_full_version < '3.8.6'",
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/59/52/f43920223c93e31874677c681b8603d36a40d3d8502d3a37f80d3995d43e/sh-2.2.2.tar.gz", hash = "sha256:653227a7c41a284ec5302173fbc044ee817c7bad5e6e4d8d55741b9aeb9eb65b", size = 345866, upload-time = "2025-02-24T07:16:25.363Z" }
@@ -2194,11 +2214,11 @@ wheels = [
 
 [[package]]
 name = "tenacity"
-version = "8.3.0"
+version = "8.5.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/32/6c/57df6196ce52c464cf8556e8f697fec5d3469bb8cd319c1685c0a090e0b4/tenacity-8.3.0.tar.gz", hash = "sha256:953d4e6ad24357bceffbc9707bc74349aca9d245f68eb65419cf0c249a1949a2", size = 43608, upload-time = "2024-05-07T08:48:17.099Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/a3/4d/6a19536c50b849338fcbe9290d562b52cbdcf30d8963d3588a68a4107df1/tenacity-8.5.0.tar.gz", hash = "sha256:8bc6c0c8a09b31e6cad13c47afbed1a567518250a9a171418582ed8d9c20ca78", size = 47309, upload-time = "2024-07-05T07:25:31.836Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/61/a1/6bb0cbebefb23641f068bb58a2bc56da9beb2b1c550242e3c540b37698f3/tenacity-8.3.0-py3-none-any.whl", hash = "sha256:3649f6443dbc0d9b01b9d8020a9c4ec7a1ff5f6f3c6c8a036ef371f573fe9185", size = 25934, upload-time = "2024-05-07T08:48:14.696Z" },
+    { url = "https://files.pythonhosted.org/packages/d2/3f/8ba87d9e287b9d385a02a7114ddcef61b26f86411e121c9003eb509a1773/tenacity-8.5.0-py3-none-any.whl", hash = "sha256:b594c2a5945830c267ce6b79a166228323ed52718f30302c1359836112346687", size = 28165, upload-time = "2024-07-05T07:25:29.591Z" },
 ]
 
 [[package]]
@@ -2282,6 +2302,7 @@ dev = [
     { name = "black" },
     { name = "coverage", extra = ["toml"] },
     { name = "ipdb" },
+    { name = "jubilant" },
     { name = "juju", version = "3.5.2.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.8.6'" },
     { name = "juju", version = "3.6.1.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.8.6'" },
     { name = "minio", version = "7.2.7", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version <= '3.8'" },
@@ -2310,9 +2331,10 @@ requires-dist = [
     { name = "coverage", extras = ["toml"], marker = "extra == 'dev'" },
     { name = "cryptography" },
     { name = "deepmerge" },
-    { name = "importlib-metadata", specifier = "==6.0.0" },
+    { name = "importlib-metadata", specifier = "==8.5.0" },
     { name = "ipdb", marker = "extra == 'dev'" },
     { name = "jsonschema" },
+    { name = "jubilant", marker = "extra == 'dev'" },
     { name = "juju", marker = "extra == 'dev'" },
     { name = "lightkube", specifier = ">=0.8.1" },
     { name = "lightkube-extensions", git = "https://github.com/canonical/lightkube-extensions.git?rev=8d37be9ba40b156a6a1648c12e3ed21209cc4360" },
@@ -2334,7 +2356,7 @@ requires-dist = [
     { name = "pytest-subtests", marker = "extra == 'dev'" },
     { name = "ruff", marker = "extra == 'dev'" },
     { name = "sh", marker = "extra == 'dev'" },
-    { name = "tenacity", marker = "extra == 'dev'", specifier = "==8.3.0" },
+    { name = "tenacity", marker = "extra == 'dev'", specifier = "==8.5.0" },
     { name = "types-pyyaml", marker = "extra == 'dev'", specifier = ">=6.0.12.20241230" },
 ]
 provides-extras = ["dev"]
