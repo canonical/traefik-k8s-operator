@@ -11,11 +11,8 @@ myst:
 Release notes for the `latest/stable` track of Traefik, summarizing new features,
 bug fixes and backwards-incompatible changes in each revision.
 
-<!--
-TODO: add upgrade documentation
-For upgrading the charm, see [How to upgrade](link to upgrade documentation).
+For upgrading the charm, see [How to upgrade](how_to_upgrade).
 For instructions on a specific release, see the corresponding release notes.
--->
 
 ## Release policy and schedule
 
