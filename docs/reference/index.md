@@ -12,5 +12,5 @@ The pages in this section contain technical information for topics related to th
 
 ```{toctree}
 cryptographic-documentation-for-cos-lite-charms
-changelog.md
+../changelog.md
 ```
