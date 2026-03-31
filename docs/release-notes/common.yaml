@@ -1,0 +1,5 @@
+# --- Common information that applies to all releases ----
+
+charm_name: Traefik
+release_condition: latest/stable
+show_internal: true
