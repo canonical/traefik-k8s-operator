@@ -693,7 +693,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
 
         # Compare by common_name + sans sets
         def _csr_key(c: CertificateRequestAttributes) -> tuple:
-            return (c.common_name, c.sans_dns, c.sans_ip)
+            return (c.common_name, frozenset(c.sans_dns or ()), frozenset(c.sans_ip or ()))
 
         new_keys = {_csr_key(c) for c in new_valid}
         old_keys = {_csr_key(c) for c in old_valid}
