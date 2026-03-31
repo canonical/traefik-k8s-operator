@@ -11,6 +11,9 @@ resolution-markers = [
     "python_full_version <= '3.8'",
 ]
 
+[manifest]
+overrides = [{ name = "importlib-metadata", specifier = "==8.5.0" }]
+
 [[package]]
 name = "annotated-types"
 version = "0.7.0"
@@ -480,6 +483,7 @@ version = "8.1.8"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "colorama", marker = "sys_platform == 'win32'" },
+    { name = "importlib-metadata" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/b9/2e/0090cbf739cee7d23781ad4b89a9894a41538e4fcf4c31dcdd705b78eb8b/click-8.1.8.tar.gz", hash = "sha256:ed53c9d8990d83c2a27deae68e4ee337473f6330c040a31d4225c9574d16096a", size = 226593, upload-time = "2024-12-21T18:38:44.339Z" }
 wheels = [
@@ -791,14 +795,14 @@ wheels = [
 
 [[package]]
 name = "importlib-metadata"
-version = "6.0.0"
+version = "8.5.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "zipp" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/90/07/6397ad02d31bddf1841c9ad3ec30a693a3ff208e09c2ef45c9a8a5f85156/importlib_metadata-6.0.0.tar.gz", hash = "sha256:e354bedeb60efa6affdcc8ae121b73544a7aa74156d047311948f6d711cd378d", size = 49776, upload-time = "2023-01-01T18:03:09.345Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/cd/12/33e59336dca5be0c398a7482335911a33aa0e20776128f038019f1a95f1b/importlib_metadata-8.5.0.tar.gz", hash = "sha256:71522656f0abace1d072b9e5481a48f07c138e00f079c38c8f883823f9c26bd7", size = 55304, upload-time = "2024-09-11T14:56:08.937Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/26/a7/9da7d5b23fc98ab3d424ac2c65613d63c1f401efb84ad50f2fa27b2caab4/importlib_metadata-6.0.0-py3-none-any.whl", hash = "sha256:7efb448ec9a5e313a57655d35aa54cd3e01b7e1fbcf72dce1bf06119420f5bad", size = 21859, upload-time = "2023-01-01T18:03:07.879Z" },
+    { url = "https://files.pythonhosted.org/packages/a0/d9/a1e041c5e7caa9a05c925f4bdbdfb7f006d1f74996af53467bc394c97be7/importlib_metadata-8.5.0-py3-none-any.whl", hash = "sha256:45e54197d28b7a7f1559e60b95e7c567032b602131fbd588f1497f47880aa68b", size = 26514, upload-time = "2024-09-11T14:56:07.019Z" },
 ]
 
 [[package]]
@@ -921,6 +925,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/f8/b9/cc0cc592e7c195fb8a650c1d5990b10175cf13b4c97465c72ec841de9e4b/jsonschema_specifications-2023.12.1.tar.gz", hash = "sha256:48a76787b3e70f5ed53f1160d2b81f586e4ca6d1548c5de7085d1682674764cc", size = 13983, upload-time = "2023-12-25T15:16:53.63Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/ee/07/44bd408781594c4d0a027666ef27fab1e441b109dc3b76b4f836f8fd04fe/jsonschema_specifications-2023.12.1-py3-none-any.whl", hash = "sha256:87e4fdf3a94858b8a2ba2778d9ba57d8a9cafca7c7489c46ba0d30a8bc6a9c3c", size = 18482, upload-time = "2023-12-25T15:16:51.997Z" },
+]
+
+[[package]]
+name = "jubilant"
+version = "1.7.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pyyaml" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/cc/0b/275edac8b57b0aac34f84073997660ebf536f97d2fa0d85a2cc3321047b6/jubilant-1.7.0.tar.gz", hash = "sha256:46b7c29a4f3336ab16d77d88418dbf8c9d0746e3f80ef42ee4c2d103eff79650", size = 32455, upload-time = "2026-01-29T02:40:10.335Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/86/d5/5b95ae9ab5abf283e33c802d286045abda7d826396ba417d5d3a20201b24/jubilant-1.7.0-py3-none-any.whl", hash = "sha256:1dcd70eb10299a95ae9fab405a3ce5f01a15513776b7f8eb4cf7b02808c93cdf", size = 33396, upload-time = "2026-01-29T02:40:09.222Z" },
 ]
 
 [[package]]
@@ -1798,7 +1814,7 @@ wheels = [
 
 [[package]]
 name = "pytest"
-version = "8.2.2"
+version = "8.3.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "colorama", marker = "sys_platform == 'win32'" },
@@ -1808,9 +1824,9 @@ dependencies = [
     { name = "pluggy" },
     { name = "tomli", marker = "python_full_version < '3.11'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/a6/58/e993ca5357553c966b9e73cb3475d9c935fe9488746e13ebdf9b80fae508/pytest-8.2.2.tar.gz", hash = "sha256:de4bb8104e201939ccdc688b27a89a7be2079b22e2bd2b07f806b6ba71117977", size = 1427980, upload-time = "2024-06-04T13:38:09.274Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ae/3c/c9d525a414d506893f0cd8a8d0de7706446213181570cdbd766691164e40/pytest-8.3.5.tar.gz", hash = "sha256:f4efe70cc14e511565ac476b57c279e12a855b11f48f212af1080ef2263d3845", size = 1450891, upload-time = "2025-03-02T12:54:54.503Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/4e/e7/81ebdd666d3bff6670d27349b5053605d83d55548e6bd5711f3b0ae7dd23/pytest-8.2.2-py3-none-any.whl", hash = "sha256:c434598117762e2bd304e526244f67bf66bbd7b5d6cf22138be51ff661980343", size = 339873, upload-time = "2024-06-04T13:38:05.285Z" },
+    { url = "https://files.pythonhosted.org/packages/30/3d/64ad57c803f1fa1e963a7946b6e0fea4a70df53c1a7fed304586539c2bac/pytest-8.3.5-py3-none-any.whl", hash = "sha256:c69214aa47deac29fad6c2a4f590b9c4a9fdb16a403176fe154b79c0b4d4d820", size = 343634, upload-time = "2025-03-02T12:54:52.069Z" },
 ]
 
 [[package]]
@@ -2288,6 +2304,7 @@ dev = [
     { name = "black" },
     { name = "coverage", extra = ["toml"] },
     { name = "ipdb" },
+    { name = "jubilant" },
     { name = "juju", version = "3.5.2.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.8.6'" },
     { name = "juju", version = "3.6.1.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.8.6'" },
     { name = "minio", version = "7.2.7", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version <= '3.8'" },
@@ -2316,9 +2333,10 @@ requires-dist = [
     { name = "coverage", extras = ["toml"], marker = "extra == 'dev'" },
     { name = "cryptography" },
     { name = "deepmerge" },
-    { name = "importlib-metadata", specifier = "==6.0.0" },
+    { name = "importlib-metadata", specifier = "==8.5.0" },
     { name = "ipdb", marker = "extra == 'dev'" },
     { name = "jsonschema" },
+    { name = "jubilant", marker = "extra == 'dev'" },
     { name = "juju", marker = "extra == 'dev'" },
     { name = "lightkube", specifier = ">=0.8.1" },
     { name = "lightkube-extensions", git = "https://github.com/canonical/lightkube-extensions.git?rev=8d37be9ba40b156a6a1648c12e3ed21209cc4360" },
@@ -2333,7 +2351,7 @@ requires-dist = [
     { name = "pylint", marker = "extra == 'dev'", specifier = ">=3.2.7" },
     { name = "pylint-pydantic", marker = "extra == 'dev'", specifier = ">=0.3.5" },
     { name = "pyright", marker = "extra == 'dev'", specifier = "==1.1.318" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = "==8.2.2" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = "==8.3.5" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = "==0.21.2" },
     { name = "pytest-interface-tester", marker = "extra == 'dev'", specifier = ">0.3" },
     { name = "pytest-operator", marker = "extra == 'dev'" },

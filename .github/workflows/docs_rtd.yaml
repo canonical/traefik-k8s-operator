@@ -9,4 +9,5 @@ jobs:
     secrets: inherit
     with:
       enable-sphinx-python-dependency-build-checks: false
+      python-version: '3.11'
 
