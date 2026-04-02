@@ -1,0 +1,20 @@
+name: 'Create release notes'
+
+on:
+  push:
+    branches:
+      - 'main'
+    paths:
+      - 'docs/release-notes/releases/*'
+
+jobs:
+  release-notes:
+    uses: canonical/release-notes-automation/.github/workflows/action.yml@main
+    secrets: inherit
+    with:
+        change-artifact-dir: docs/release-notes/artifacts
+        release-output-dir: docs/release-notes
+        release-artifact-dir: docs/release-notes/releases
+        common-file: docs/release-notes/common.yaml
+        template-dir: docs/release-notes/template
+        template-file-name: release-template.md.j2

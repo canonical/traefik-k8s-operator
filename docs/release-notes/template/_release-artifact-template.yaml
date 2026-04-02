@@ -1,0 +1,15 @@
+# --- Information about release ----
+
+version_schema: 2
+
+# name of workload and version in the release
+workload_with_version:
+
+# list of change artifacts included in the release
+included_changes:
+
+# earliest revision included in the release
+earliest_revision:
+
+# latest revision included in the release
+latest_revision:
