@@ -1,0 +1,14 @@
+# --- Release notes artifact ----
+
+schema_version: 1
+changes:
+  - title: Added support for release notes
+    author: arturo.seijas
+    type: minor
+    description: Now you can add release notes and get them published for every release.
+    urls: 
+      pr: https://github.com/canonical/traefik-k8s-operator/pull/637
+      related_doc: 
+      related_issue: 
+    visibility: public
+    highlight: false

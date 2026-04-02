@@ -1,0 +1,16 @@
+# Version of the artifact schema
+version_schema: 2
+
+# The key holding the change(s)
+changes:
+- title: # Use past tense; keep it concise and specific
+  author: # GitHub profile (no emails, no @)
+  type: # options: major, minor, bugfix, breaking, deprecated
+  description: # Use past tense; describe how the change will affect users
+  urls:
+    pr: 
+      - "" # provide one or more links to relevant PRs
+    related_doc: # only applicable if there are documentation changes
+    related_issue: # only applicable if there's a corresponding GitHub issue
+  visibility: # options: public, internal, hidden
+  highlight: # should this change be highlighted in the introduction?

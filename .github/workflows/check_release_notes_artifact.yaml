@@ -1,0 +1,11 @@
+name: 'Check for release notes artifact'
+
+on:
+  pull_request:
+
+jobs:
+  check-change-artifacts:
+    uses: canonical/release-notes-automation/.github/workflows/pr-compliance.yml@main
+    secrets: inherit
+    with:
+      change-artifact-dir: docs/release-notes/artifacts
