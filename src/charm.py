@@ -803,8 +803,16 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
                 logger.debug(f"No cert found for csr: {csr}")
                 continue
             chain = [str(certificate) for certificate in cert.chain]
-            if str(chain[0]) != str(cert.certificate):
-                chain.reverse()
+            leaf = str(cert.certificate)
+            if leaf in chain:
+                # Leaf is in the chain; ensure it's first.
+                # Some versions of the tls library return the chain reversed.
+                if chain[0] != leaf:
+                    chain.reverse()
+            else:
+                # Some providers (e.g. Vault intermediate CA) don't include
+                # the leaf in the chain, only the CA chain. Prepend it.
+                chain.insert(0, leaf)
             certs[csr.common_name] = {
                 "chain": "\n\n".join(chain),
                 "key": str(private_key),

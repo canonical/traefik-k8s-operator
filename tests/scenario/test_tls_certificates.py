@@ -170,6 +170,55 @@ def test_get_certs(traefik_ctx, traefik_container, mock_provider_certificate):
         )
 
 
+@patch("charm.TraefikIngressCharm.version", PropertyMock(return_value="0.0.0"))
+@patch("traefik.Traefik.update_cert_configuration", MagicMock())
+def test_get_certs_intermediate_ca(traefik_ctx, traefik_container):
+    """Verify _get_certs puts the leaf cert first when chain has only CA certs (Vault scenario)."""
+    leaf = "-----BEGIN CERTIFICATE-----leaf-----END CERTIFICATE-----"
+    intermediate_ca = "-----BEGIN CERTIFICATE-----intermediate ca-----END CERTIFICATE-----"
+    root_ca = "-----BEGIN CERTIFICATE-----root ca-----END CERTIFICATE-----"
+
+    provider_cert = MagicMock()
+    provider_cert.certificate = leaf
+    provider_cert.ca = intermediate_ca
+    # Vault-style chain: only CA certs, no leaf
+    provider_cert.chain = [intermediate_ca, root_ca]
+
+    certs_rel = Relation(
+        endpoint="certificates",
+        remote_app_name="certificates_provider",
+    )
+    peer_rel = PeerRelation(endpoint="peers")
+
+    state = State(
+        leader=True,
+        config={"routing_mode": "path"},
+        relations=[certs_rel, peer_rel],
+        containers=[traefik_container],
+    )
+
+    with traefik_ctx.manager(certs_rel.changed_event, state) as mgr:
+        charm = mgr.charm
+        mock_csr = MagicMock()
+        mock_csr.common_name = "example.com"
+        charm.csrs = [mock_csr]
+
+        with patch.object(
+            charm.certs,
+            "get_assigned_certificate",
+            return_value=(provider_cert, "mock private key"),
+        ):
+            certs = charm._get_certs()
+
+        chain_str = certs["example.com"]["chain"]
+        chain_parts = chain_str.split("\n\n")
+        # Leaf must be first
+        assert chain_parts[0] == leaf
+        # Followed by the CA chain
+        assert chain_parts[1] == intermediate_ca
+        assert chain_parts[2] == root_ca
+
+
 @pytest.mark.parametrize("tls_enabled", [(True,), (False)])
 def test_cleanup_tls_configuration(tls_enabled: bool):
     container_mock = MagicMock(spec=Container)
