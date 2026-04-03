@@ -1,0 +1,14 @@
+# --- Release notes artifact ----
+
+schema_version: 1
+changes:
+  - title: Fixed TLS certificate chain when using Vault intermediate CA
+    author: gboutry
+    type: bugfix
+    description: Fixed an issue where traefik served the CA certificate instead of the leaf certificate when using Vault as an intermediate CA provider.
+    urls:
+      pr: https://github.com/canonical/traefik-k8s-operator/pull/641
+      related_doc:
+      related_issue: https://github.com/canonical/traefik-k8s-operator/issues/639
+    visibility: public
+    highlight: false
