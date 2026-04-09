@@ -188,6 +188,86 @@ def test_ingress_per_app_requirer_with_auto_data(host, ip, port, model, evt_name
         }
 
 
+def test_ingress_config_preserved_when_provider_not_ready(
+    model, traefik_ctx, traefik_container, tmp_path
+):
+    """Verify that existing ingress config is NOT wiped when provider is temporarily not ready.
+
+    This tests the fix for the wipe cascade described in the DIAGNOSTICS: when some requirer units
+    have not yet written their host/ip data (e.g. due to deep hook queues in HA deployments),
+    traefik should preserve any previously-valid configuration rather than wiping it.
+    """
+    relation_id = 42
+    filename = f"juju_ingress_ingress_{relation_id}_remote.yaml"
+    cfg_file = tmp_path.joinpath("traefik", "juju", filename)
+    cfg_file.parent.mkdir(parents=True)
+
+    # A valid config that was previously written to disk (simulates an already-established relation)
+    existing_cfg = {
+        "http": {
+            "routers": {
+                "juju-test-model-remote-0-router": {
+                    "entryPoints": ["web"],
+                    "rule": "PathPrefix(`/test-model-remote-0`)",
+                    "service": "juju-test-model-remote-0-service",
+                },
+            },
+            "services": {
+                "juju-test-model-remote-0-service": {
+                    "loadBalancer": {"servers": [{"url": "http://1.2.3.4:42"}]}
+                }
+            },
+        }
+    }
+    cfg_file.write_text(yaml.safe_dump(existing_cfg))
+
+    traefik_container = traefik_container.replace(mounts={"opt": Mount("/opt/", tmp_path)})
+
+    # An ingress relation where the app data is present but unit data is INCOMPLETE:
+    # unit 0 has host/ip, but unit 1 (which has joined from traefik's perspective) does not.
+    # This simulates the situation where a new unit joined but hasn't processed its
+    # ingress-relation-joined hook yet due to a deep hook queue.
+    not_ready_ipa = Relation(
+        endpoint="ingress",
+        remote_app_name="remote",
+        relation_id=relation_id,
+        remote_app_data={
+            "model": json.dumps(model.name),
+            "name": json.dumps("remote/0"),
+            "port": json.dumps(42),
+            "scheme": json.dumps("http"),
+            "strip-prefix": json.dumps(False),
+            "redirect-https": json.dumps(False),
+        },
+        remote_units_data={
+            0: {"host": json.dumps("1.2.3.4"), "ip": json.dumps("1.2.3.4")},
+            # unit 1 has joined (it's in remote_units_data) but hasn't written host/ip yet
+            1: {},
+        },
+    )
+
+    state = State(
+        model=model,
+        config={"routing_mode": "path", "external_hostname": "foo.com"},
+        containers=[traefik_container],
+        relations=[not_ready_ipa],
+        leader=True,
+    )
+
+    # WHEN an ingress-relation-changed fires while provider is not ready
+    traefik_ctx.run(not_ready_ipa.changed_event, state)
+
+    # THEN the existing config file is preserved (NOT wiped)
+    vfs_root = traefik_container.get_filesystem(traefik_ctx)
+    config_path = vfs_root / "opt" / "traefik" / "juju" / filename
+    assert config_path.exists(), (
+        "Existing ingress config was wiped when provider was not ready. "
+        "This causes route interruption when HA units are slow to write their host/ip data."
+    )
+    preserved_cfg = yaml.safe_load(config_path.read_text())
+    assert preserved_cfg == existing_cfg, "Existing ingress config was modified unexpectedly."
+
+
 def test_ingress_per_app_cleanup_on_remove(model, traefik_ctx, traefik_container):
     """Check that config file is removed when a relation is."""
     ipa = create_ingress_relation()
