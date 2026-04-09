@@ -1395,9 +1395,11 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         provider = self._provider_from_relation(relation)
 
         if not provider.is_ready(relation):
-            logger.debug(f"Provider {provider} not ready; resetting ingress configurations.")
-            self._wipe_ingress_for_relation(relation)
-            raise IngressSetupError(f"provider is not ready: ingress for {relation} wiped.")
+            logger.debug(
+                f"Provider {provider} not ready yet; skipping ingress configuration update "
+                f"for {relation} to preserve any existing valid configuration."
+            )
+            return
 
         rel = f"{relation.name}:{relation.id}"
 
