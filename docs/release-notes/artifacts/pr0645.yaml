@@ -1,0 +1,14 @@
+# --- Release notes artifact ----
+
+schema_version: 1
+changes:
+  - title: Revert the changes introduced in PR [580](https://github.com/canonical/traefik-k8s-operator/pull/580).
+    author: swetha1654
+    type: minor
+    description: This PR was updating the charm libraries and was automerged by renovate without the integration tests running.
+    urls: 
+      pr: https://github.com/canonical/traefik-k8s-operator/pull/645
+      related_doc: 
+      related_issue: 
+    visibility: public
+    highlight: false
