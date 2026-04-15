@@ -197,8 +197,8 @@ def test_ingress_per_app_cleanup_on_remove(model, traefik_ctx, traefik_container
     juju_dir.mkdir(parents=True)
 
     # Pre-create the merged file with this relation's config.
-    dummy_config = {"http": {"routers": {"r": {"rule": "Host(`test`)"}}}}
-    (juju_dir / "juju_ingress.yaml").write_text(yaml.safe_dump(dummy_config))
+    sample_config = {"http": {"routers": {"r": {"rule": "Host(`test`)"}}}}
+    (juju_dir / "juju_ingress.yaml").write_text(yaml.safe_dump(sample_config))
 
     traefik_container = traefik_container.replace(mounts={"conf": Mount("/opt/traefik/", td.name)})
 
