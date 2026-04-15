@@ -6,7 +6,6 @@
 
 import dataclasses
 import enum
-import hashlib
 import logging
 import os
 import re
@@ -216,8 +215,6 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
 
     def update_cert_configuration(self, certs: dict) -> None:
         """Update the server cert, ca, and key configuration files."""
-        hash_before = self._ca_certs_hash()
-
         # Remove certs that are no longer needed.
         if certs:
             CERTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -236,8 +233,6 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             self._container.push(
                 CA_CERTS_DIR / f"{hostname}.traefik-charm.crt", cert["ca"], make_dirs=True
             )
-
-        self.update_ca_certs(hash_before=hash_before)
 
     def _clean_up_certificates_in_traefik_container(self, excluded_certs: dict) -> None:
         """Clean up certificates in the remote traefik container.
@@ -269,14 +264,9 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
                     continue
 
     def add_cas(self, cas: Iterable[CA]) -> None:
-        """Add any number of CAs to Traefik.
-
-        Calls update-ca-certificates once done.
-        """
-        hash_before = self._ca_certs_hash()
+        """Add any number of CAs to Traefik."""
         for ca in cas:
             self._add_ca(ca)
-        self.update_ca_certs(hash_before=hash_before)
 
     def _add_ca(self, ca: CA) -> None:
         """Add a ca.
@@ -294,42 +284,28 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         So make sure any traefik config depending on the certificates being there is updated
         **before** the certs are removed, otherwise you might have some downtime.
 
-        Calls update-ca-certificates once done.
         """
         ca_path = RECV_CA_TEMPLATE.substitute(rel_id=uid)
-        hash_before = self._ca_certs_hash()
         try:
             self._container.remove_path(ca_path)
         except PathError:
             logger.exception("Error removing cert file %s.", ca_path)
-        self.update_ca_certs(hash_before=hash_before)
 
-    def _ca_certs_hash(self) -> str:
-        """Compute a hash of all CA cert files in the CA certs directory."""
-        hasher = hashlib.md5()  # noqa: S324
-        try:
-            for f in sorted(self._container.list_files(CA_CERTS_DIR), key=lambda x: x.path):
-                hasher.update(f.path.encode())
-                hasher.update(str(f.size).encode())
-                hasher.update(str(f.last_modified).encode())
-        except Exception:  # noqa: BLE001
-            pass
-        return hasher.hexdigest()
+    def _collect_root_ca_paths(self) -> List[str]:
+        """Collect all CA certificate file paths from the CA certs directory.
 
-    def update_ca_certs(self, hash_before: Optional[str] = None) -> None:
-        """Update ca certificates only if CA files have changed.
-
-        Args:
-            hash_before: Hash of CA certs dir taken before modifications.
-                         If provided and matches current state, the exec is skipped.
+        This includes both pre-bundled CAs from the container image and
+        charm-managed CAs (from TLS and receive-ca-cert relations).
         """
-        if hash_before is not None:
-            hash_after = self._ca_certs_hash()
-            if hash_before == hash_after:
-                logger.debug("CA certs unchanged (hash=%s); skipping update-ca-certificates.", hash_after)
-                return
-        self._container.exec(["update-ca-certificates", "--fresh"]).wait()
-        logger.debug("Ran update-ca-certificates.")
+        ca_paths: List[str] = []
+        try:
+            if self._container.can_connect() and self._container.isdir(str(CA_CERTS_DIR)):
+                for f in self._container.list_files(str(CA_CERTS_DIR)):
+                    if f.name.endswith(".crt"):
+                        ca_paths.append(f.path)
+        except Exception:  # noqa: BLE001
+            logger.debug("Could not list CA certs directory.")
+        return sorted(ca_paths)
 
     def generate_static_config(self, _raise: bool = False) -> Dict[str, Any]:
         """Generate Traefik's static config yaml."""
@@ -397,6 +373,17 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
                         "endpoint": f"{self._tracing_endpoint}/api/traces?format=jaeger.thrift"
                     },
                 }
+            }
+
+        # Configure rootCAs for outbound backend certificate verification.
+        # This collects all CA certs from /usr/local/share/ca-certificates/
+        # (pre-bundled in the container image + charm-managed CAs) and sets them
+        # in the static serversTransport so Traefik can verify backend server
+        # certificates when proxying to HTTPS services.
+        root_ca_paths = self._collect_root_ca_paths()
+        if root_ca_paths:
+            static_config["serversTransport"] = {
+                "rootCAs": root_ca_paths,
             }
 
         # we attempt to put together the base config with whatever the user
@@ -586,8 +573,8 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
 
         elif is_end_to_end:
             # We cannot assume traefik's CA is the same CA that signed the proxied apps.
-            # Since we use the update_ca_certificates machinery, we don't need to specify the
-            # "rootCAs" entry.
+            # The static serversTransport.rootCAs includes all known CAs, so we don't
+            # need to specify "rootCAs" per-transport here.
             # Keeping the serverTransports section anyway because it is informative ("endToEndTLS"
             # vs "reverseTerminationTransport") when inspecting the config file in production.
             transport_name = "endToEndTLS"
@@ -774,16 +761,39 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         self._dynamic_configs[key] = config
 
     def flush_dynamic_configs(self) -> None:
-        """Merge all buffered configs and push a single file to the container."""
+        """Merge all buffered configs and push a single file to the container.
+
+        Merges follow upstream Traefik's file-provider directory-mode semantics:
+        - Named entries (routers, services, middlewares, serversTransports) are
+          merged by key.  The first occurrence wins; duplicates are logged and skipped.
+        - List-valued sections (e.g. tls.certificates) are concatenated.
+        """
         merged: Dict[str, Any] = {}
-        for config in self._dynamic_configs.values():
-            for protocol in ("http", "tcp", "udp"):
+        for rel_key, config in self._dynamic_configs.items():
+            for protocol in ("http", "tcp", "udp", "tls"):
                 if protocol not in config:
                     continue
                 merged.setdefault(protocol, {})
                 for section, entries in config[protocol].items():
                     if isinstance(entries, dict):
-                        merged[protocol].setdefault(section, {}).update(entries)
+                        merged[protocol].setdefault(section, {})
+                        for name, conf in entries.items():
+                            if name in merged[protocol][section]:
+                                logger.warning(
+                                    "%s.%s.%s already configured (from a previous relation), "
+                                    "skipping duplicate from %s",
+                                    protocol, section, name, rel_key,
+                                )
+                            else:
+                                merged[protocol][section][name] = conf
+                    elif isinstance(entries, list):
+                        merged[protocol].setdefault(section, [])
+                        merged[protocol][section].extend(entries)
+                    else:
+                        logger.warning(
+                            "Unexpected type for %s.%s: %s; skipping",
+                            protocol, section, type(entries).__name__,
+                        )
 
         if merged:
             self._container.push(MERGED_INGRESS_PATH, yaml.safe_dump(merged), make_dirs=True)

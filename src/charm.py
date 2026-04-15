@@ -517,7 +517,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         """
         return cast(Optional[str], self.config.get("basic_auth_user", None))
 
-    @property
+    @functools.cached_property
     def _loadbalancer_annotations(self) -> Optional[Dict[str, str]]:
         """Parses and returns annotations to apply to the LoadBalancer service.
 
@@ -573,7 +573,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             resources_list.append(self._construct_lb())
         klm.reconcile(resources_list)
 
-    @property
+    @functools.cached_property
     def _get_loadbalancer_status(self) -> Optional[str]:
         try:
             traefik_service = self.lightkube_client.get(
@@ -594,7 +594,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
 
         return ingress_address.hostname or ingress_address.ip
 
-    @property
+    @functools.cached_property
     def _traefik_loadbalancer_ip(self) -> Optional[str]:
         try:
             traefik_service = self.lightkube_client.get(
@@ -649,7 +649,8 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         if not self.container.can_connect():
             return
         self._update_received_ca_certs(event)
-        # We need to restart Traefik now
+        # Regenerate static config so rootCAs picks up the new CA, then restart.
+        self.traefik.configure()
         self._restart_traefik()
 
     def _update_received_ca_certs(
@@ -681,7 +682,8 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
     def _on_recv_ca_cert_removed(self, event: CertificateTransferRemovedEvent) -> None:
         # Assuming only one cert per relation (this is in line with the original lib design).
         self.traefik.remove_ca(str(event.relation_id))
-        # Since remove_ca will call update_ca_certs in traefik, a restart is needed.
+        # Regenerate static config so rootCAs reflects the removed CA, then restart.
+        self.traefik.configure()
         self._restart_traefik()
 
     def _is_tls_enabled(self) -> bool:
@@ -1098,10 +1100,13 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
     def _on_traefik_pebble_ready(self, _: PebbleReadyEvent) -> None:
         # If the Traefik container comes up, e.g., after a pod churn, we
         # ignore the unit status and start fresh.
-        self._clear_all_configs_and_restart_traefik()
+        # Wipe stale dynamic configs that may have survived on the storage volume.
+        self.traefik.delete_dynamic_config()
+        # Restore CA certs from relations before configuring, so that
+        # generate_static_config() picks them up in rootCAs.
+        self._update_received_ca_certs()
         # push the (fresh new) configs.
         self._configure()
-        self._update_received_ca_certs()
         self._set_workload_version()
 
     def _clear_all_configs_and_restart_traefik(self) -> None:
@@ -1742,7 +1747,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             "ip": self._traefik_loadbalancer_ip,
         }
 
-    @property
+    @functools.cached_property
     def _traefik_external_address(self) -> Optional[str]:
         """Return the address used to ingress directly through this Traefik's gateway.
 
@@ -1759,7 +1764,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
 
         return self._get_loadbalancer_status
 
-    @property
+    @functools.cached_property
     def gateway_address(self) -> str:
         """Return the address used to ingress directly through this Traefik's gateway.
 
