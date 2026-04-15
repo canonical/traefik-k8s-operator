@@ -15,7 +15,6 @@ class TestUpstreamIngressStrip(unittest.TestCase):
         self.harness = Harness(TraefikIngressCharm)
         self.harness.set_model_name("test-model")
         self.addCleanup(self.harness.cleanup)
-        self.harness.handle_exec("traefik", ["update-ca-certificates", "--fresh"], result=0)
         self.harness.handle_exec(
             "traefik", ["find", "/opt/traefik/juju", "-name", "*.yaml", "-delete"], result=0
         )

@@ -152,7 +152,6 @@ class TestTraefikIngressCharm(unittest.TestCase):
         self.harness: Harness[TraefikIngressCharm] = Harness(TraefikIngressCharm)
         self.harness.set_model_name("test-model")
         self.addCleanup(self.harness.cleanup)
-        self.harness.handle_exec("traefik", ["update-ca-certificates", "--fresh"], result=0)
         self.harness.handle_exec(
             "traefik", ["find", "/opt/traefik/juju", "-name", "*.yaml", "-delete"], result=0
         )
@@ -575,16 +574,16 @@ class TestTraefikCertTransferInterface(unittest.TestCase):
         self.addCleanup(patcher.stop)
         self.container_name = "traefik"
 
-    @patch("ops.model.Container.exec")
     @patch(
         "charm.TraefikIngressCharm._get_loadbalancer_status",
         new_callable=PropertyMock,
         return_value="10.0.0.1",
     )
-    def test_transferred_ca_certs_are_updated(self, mock_get_loadbalancer_status, patch_exec):
-        # Given container is ready, when receive-ca-cert relation joins,
-        # then ca certs are updated.
+    def test_transferred_ca_certs_are_updated(self, mock_get_loadbalancer_status):
+        # Given container is ready, when receive-ca-cert relation joins with cert data,
+        # then the CA cert is added via add_cas.
         provider_app = "self-signed-certificates"
+        ca_cert = "-----BEGIN CERTIFICATE-----\nMIIFake\n-----END CERTIFICATE-----"
         self.harness.set_leader(True)
         self.harness.begin_with_initial_hooks()
         self.harness.set_can_connect(container=self.container_name, val=True)
@@ -594,8 +593,21 @@ class TestTraefikCertTransferInterface(unittest.TestCase):
         self.harness.add_relation_unit(
             relation_id=certificate_transfer_rel_id, remote_unit_name=f"{provider_app}/0"
         )
-        call_list = patch_exec.call_args_list
-        assert ["update-ca-certificates", "--fresh"] in [call.args[0] for call in call_list]
+        # Use v1 app databag format as expected by the certificate_transfer lib.
+        with patch("traefik.Traefik.add_cas") as mock_add_cas:
+            self.harness.update_relation_data(
+                certificate_transfer_rel_id,
+                provider_app,
+                {
+                    "certificates": json.dumps(sorted([ca_cert])),
+                    "version": "1",
+                },
+            )
+            mock_add_cas.assert_called_once()
+            cas = mock_add_cas.call_args[0][0]
+            assert len(cas) == 1
+            assert cas[0].ca == ca_cert
+            assert cas[0].uid == certificate_transfer_rel_id
 
     @patch("ops.model.Container.exec")
     @patch(
@@ -623,7 +635,6 @@ class TestConfigOptionsValidation(unittest.TestCase):
         self.harness: Harness[TraefikIngressCharm] = Harness(TraefikIngressCharm)
         self.harness.set_model_name("test-model")
         self.addCleanup(self.harness.cleanup)
-        self.harness.handle_exec("traefik", ["update-ca-certificates", "--fresh"], result=0)
         self.harness.handle_exec(
             "traefik", ["find", "/opt/traefik/juju", "-name", "*.yaml", "-delete"], result=0
         )

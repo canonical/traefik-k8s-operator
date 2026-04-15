@@ -58,7 +58,6 @@ def traefik_container(tmp_path):
         can_connect=True,
         layers={"traefik": layer},
         exec_mock={
-            ("update-ca-certificates", "--fresh"): ExecOutput(),
             ("/usr/bin/traefik", "version"): ExecOutput(stdout="42.42"),
         },
         service_status={"traefik": pebble.ServiceStatus.ACTIVE},

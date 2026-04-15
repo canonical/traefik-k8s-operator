@@ -303,7 +303,7 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
                 for f in self._container.list_files(str(CA_CERTS_DIR)):
                     if f.name.endswith(".crt"):
                         ca_paths.append(f.path)
-        except Exception:  # noqa: BLE001
+        except Exception:  # noqa: BLE001  # pylint: disable=broad-exception-caught
             logger.debug("Could not list CA certs directory.")
         return sorted(ca_paths)
 
@@ -760,6 +760,34 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         """
         self._dynamic_configs[key] = config
 
+    @staticmethod
+    def _merge_protocol_section(
+        target: Dict[str, Any],
+        section: str,
+        entries: Any,
+        rel_key: str,
+    ) -> None:
+        """Merge a single section of a protocol config into the target dict."""
+        if isinstance(entries, dict):
+            target.setdefault(section, {})
+            for name, conf in entries.items():
+                if name in target[section]:
+                    logger.warning(
+                        "%s.%s already configured (from a previous relation), "
+                        "skipping duplicate from %s",
+                        section, name, rel_key,
+                    )
+                else:
+                    target[section][name] = conf
+        elif isinstance(entries, list):
+            target.setdefault(section, [])
+            target[section].extend(entries)
+        else:
+            logger.warning(
+                "Unexpected type for %s: %s; skipping",
+                section, type(entries).__name__,
+            )
+
     def flush_dynamic_configs(self) -> None:
         """Merge all buffered configs and push a single file to the container.
 
@@ -775,25 +803,7 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
                     continue
                 merged.setdefault(protocol, {})
                 for section, entries in config[protocol].items():
-                    if isinstance(entries, dict):
-                        merged[protocol].setdefault(section, {})
-                        for name, conf in entries.items():
-                            if name in merged[protocol][section]:
-                                logger.warning(
-                                    "%s.%s.%s already configured (from a previous relation), "
-                                    "skipping duplicate from %s",
-                                    protocol, section, name, rel_key,
-                                )
-                            else:
-                                merged[protocol][section][name] = conf
-                    elif isinstance(entries, list):
-                        merged[protocol].setdefault(section, [])
-                        merged[protocol][section].extend(entries)
-                    else:
-                        logger.warning(
-                            "Unexpected type for %s.%s: %s; skipping",
-                            protocol, section, type(entries).__name__,
-                        )
+                    self._merge_protocol_section(merged[protocol], section, entries, rel_key)
 
         if merged:
             self._container.push(MERGED_INGRESS_PATH, yaml.safe_dump(merged), make_dirs=True)

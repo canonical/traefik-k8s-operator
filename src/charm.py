@@ -14,7 +14,7 @@ import json
 import logging
 import re
 import socket
-from typing import Any, Dict, List, Optional, Union, cast
+from typing import Any, Callable, Dict, List, Optional, Union, cast
 from urllib.parse import urlparse
 
 import pydantic
@@ -163,11 +163,11 @@ class CertificatesUnavailableError(Exception):
     """Raised when certificates are not available."""
 
 
-def profiling_hook(method):
+def profiling_hook(method: Callable) -> Callable:
     """Decorator that profiles a hook handler with cProfile and dumps a pstats file to /tmp/."""
 
     @functools.wraps(method)
-    def wrapper(self, event, *args, **kwargs):
+    def wrapper(self: Any, event: Any, *args: Any, **kwargs: Any) -> Any:
         hook_name = type(event).__name__
         unit = self.unit.name.replace("/", "-")
         filename = f"/tmp/profile_{unit}_{hook_name}.pstats"
@@ -1098,6 +1098,8 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
 
     @profiling_hook
     def _on_traefik_pebble_ready(self, _: PebbleReadyEvent) -> None:
+        if not self.container.can_connect():
+            return
         # If the Traefik container comes up, e.g., after a pod churn, we
         # ignore the unit status and start fresh.
         # Wipe stale dynamic configs that may have survived on the storage volume.
@@ -1199,6 +1201,8 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
 
     # pylint: disable=too-many-return-statements
     def _process_status_and_configurations(self) -> None:
+        if not self.container.can_connect():
+            return
         self._reconcile_lb()
         if (
             self.config.get("tls-ca", None)
