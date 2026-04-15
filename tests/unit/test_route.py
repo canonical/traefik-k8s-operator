@@ -11,7 +11,7 @@ from cosl import JujuTopology
 from ops.testing import Harness
 
 from charm import TraefikIngressCharm
-from traefik import StaticConfigMergeConflictError, Traefik
+from traefik import MERGED_INGRESS_PATH, StaticConfigMergeConflictError, Traefik
 
 MODEL_NAME = "test-model"
 REMOTE_APP_NAME = "traefikRouteApp"
@@ -233,8 +233,9 @@ def test_static_config(harness: Harness[TraefikIngressCharm], topology: JujuTopo
     assert conf["foo"] == "bar"
 
     # verify the dynamic config is there too
-    file = f"/opt/traefik/juju/juju_ingress_{relation.name}_{relation.id}_{relation.app.name}.yaml"
-    assert yaml.safe_load(charm.container.pull(file).read()) == CONFIG_WITH_TLS
+
+    dynamic_config = yaml.safe_load(charm.container.pull(MERGED_INGRESS_PATH).read())
+    assert dynamic_config == CONFIG_WITH_TLS
 
 
 def test_static_config_broken(harness: Harness[TraefikIngressCharm], topology: JujuTopology):
@@ -287,8 +288,8 @@ def test_static_config_broken(harness: Harness[TraefikIngressCharm], topology: J
     assert conf["log"] == {"level": "DEBUG"}
 
     # THEN  the dynamic config is there too
-    file = f"/opt/traefik/juju/juju_ingress_{relation.name}_{relation.id}_{relation.app.name}.yaml"
-    assert yaml.safe_load(charm.container.pull(file).read()) == CONFIG_WITH_TLS
+    dynamic_config = yaml.safe_load(charm.container.pull(MERGED_INGRESS_PATH).read())
+    assert dynamic_config == CONFIG_WITH_TLS
 
 
 def test_static_config_partially_broken(
@@ -447,11 +448,8 @@ def test_tls_configuration_parametrized(
     assert charm.traefik_route.is_ready(relation)
     assert charm.traefik_route.get_config(relation) == config_yaml
 
-    # Pull the dynamic configuration written to the container.
-    file_path = (
-        f"/opt/traefik/juju/juju_ingress_{relation.name}_{relation.id}_{relation.app.name}.yaml"
-    )
-    dynamic_config = yaml.safe_load(charm.container.pull(file_path).read())
+    # Pull the merged dynamic configuration written to the container.
+    dynamic_config = yaml.safe_load(charm.container.pull(MERGED_INGRESS_PATH).read())
 
     # Validate that the dynamic config matches the expected configuration.
     assert dynamic_config == expected_config

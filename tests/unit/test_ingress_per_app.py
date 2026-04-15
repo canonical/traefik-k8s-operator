@@ -44,7 +44,7 @@ def test_ingress_per_app_created(
 
     generated_config = yaml.safe_load(
         traefik_container.get_filesystem(traefik_ctx)
-        .joinpath(f"opt/traefik/juju/juju_ingress_ingress_{ipa.relation_id}_remote.yaml")
+        .joinpath("opt/traefik/juju/juju_ingress.yaml")
         .read_text()
     )
 
@@ -76,7 +76,7 @@ def test_ingress_per_app_scale(
     relation_id = 42
     unit_id = 0
     cfg_file = tmp_path.joinpath(
-        "traefik", "juju", f"juju_ingress_ingress_{relation_id}_remote.yaml"
+        "traefik", "juju", "juju_ingress.yaml"
     )
     cfg_file.parent.mkdir(parents=True)
 
@@ -189,13 +189,16 @@ def test_ingress_per_app_requirer_with_auto_data(host, ip, port, model, evt_name
 
 
 def test_ingress_per_app_cleanup_on_remove(model, traefik_ctx, traefik_container):
-    """Check that config file is removed when a relation is."""
+    """Check that merged config is updated when a relation is removed."""
     ipa = create_ingress_relation()
 
     td = tempfile.TemporaryDirectory()
-    filename = f"juju_ingress_ingress_{ipa.relation_id}_remote.yaml"
-    conf_file = Path(td.name).joinpath(filename)
-    conf_file.write_text("foobar")
+    juju_dir = Path(td.name) / "juju"
+    juju_dir.mkdir(parents=True)
+
+    # Pre-create the merged file with this relation's config.
+    dummy_config = {"http": {"routers": {"r": {"rule": "Host(`test`)"}}}}
+    (juju_dir / "juju_ingress.yaml").write_text(yaml.safe_dump(dummy_config))
 
     traefik_container = traefik_container.replace(mounts={"conf": Mount("/opt/traefik/", td.name)})
 
@@ -209,11 +212,8 @@ def test_ingress_per_app_cleanup_on_remove(model, traefik_ctx, traefik_container
     # WHEN the relation goes
     traefik_ctx.run(ipa.broken_event, state)
 
-    # THEN the config file was deleted
-    mock_dynamic_config_folder = traefik_container.get_filesystem(traefik_ctx).joinpath(
-        "opt", "traefik", "juju", filename
-    )
-    assert not mock_dynamic_config_folder.exists()
+    # THEN the merged config file should be gone (no remaining relations)
+    assert not (juju_dir / "juju_ingress.yaml").exists()
 
 
 @pytest.mark.parametrize("rel_id", (1, 2, 3))

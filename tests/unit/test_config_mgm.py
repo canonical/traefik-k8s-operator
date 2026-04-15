@@ -1,3 +1,4 @@
+import yaml
 from scenario import Relation, State
 
 
@@ -25,27 +26,29 @@ def test_dynamic_config_create(traefik_container, traefik_ctx, tmp_path):
     )
     dynamic_config_dir = tmp_path / "traefik" / "juju"
     assert dynamic_config_dir.exists()
-    files = list(dynamic_config_dir.iterdir())
-    assert len(files) == 1
-    assert files[0].name == f"juju_ingress_ingress-per-unit_{rel.relation_id}_remote.yaml"
+    merged_file = dynamic_config_dir / "juju_ingress.yaml"
+    assert merged_file.exists()
+    # Merged file should contain valid traefik config
+    merged_config = yaml.safe_load(merged_file.read_text())
+    assert "http" in merged_config or "tcp" in merged_config
 
 
 def test_dynamic_config_remove_on_broken(traefik_container, traefik_ctx, tmp_path):
     dynamic_config_dir = tmp_path / "traefik" / "juju"
     rel = ipu()
     dynamic_config_dir.mkdir(parents=True)
-    ingress_config_fname = (
-        dynamic_config_dir / f"juju_ingress_ingress-per-unit_{rel.relation_id}_remote.yaml"
-    )
-    ingress_config_fname.touch()
+
+    # Pre-create the merged file with this relation's config.
+    dummy_config = {"http": {"routers": {"r": {"rule": "Host(`test`)"}}}}
+    (dynamic_config_dir / "juju_ingress.yaml").write_text(yaml.safe_dump(dummy_config))
 
     traefik_ctx.run(
         rel.broken_event, State(relations=[rel], containers=[traefik_container], leader=True)
     )
 
     assert dynamic_config_dir.exists()
-    files = list(dynamic_config_dir.iterdir())
-    assert len(files) == 0
+    # No remaining relations, so merged file should be gone.
+    assert not (dynamic_config_dir / "juju_ingress.yaml").exists()
 
 
 def test_dynamic_config_remove_on_departed(traefik_container, traefik_ctx, tmp_path):
@@ -53,10 +56,10 @@ def test_dynamic_config_remove_on_departed(traefik_container, traefik_ctx, tmp_p
     rel = ipu().replace(remote_units_data={})
 
     dynamic_config_dir.mkdir(parents=True)
-    ingress_config_fname = (
-        dynamic_config_dir / f"juju_ingress_ingress-per-unit_{rel.relation_id}_remote.yaml"
-    )
-    ingress_config_fname.touch()
+
+    # Pre-create the merged file with this relation's config.
+    dummy_config = {"http": {"routers": {"r": {"rule": "Host(`test`)"}}}}
+    (dynamic_config_dir / "juju_ingress.yaml").write_text(yaml.safe_dump(dummy_config))
 
     traefik_ctx.run(
         rel.departed_event(remote_unit_id=0),
@@ -64,5 +67,5 @@ def test_dynamic_config_remove_on_departed(traefik_container, traefik_ctx, tmp_p
     )
 
     assert dynamic_config_dir.exists()
-    files = list(dynamic_config_dir.iterdir())
-    assert len(files) == 0
+    # No remaining relations, so merged file should be gone.
+    assert not (dynamic_config_dir / "juju_ingress.yaml").exists()

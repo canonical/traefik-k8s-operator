@@ -99,6 +99,22 @@ def _render_middlewares(*, strip_prefix: bool = False, redirect_https: bool = Fa
     )
 
 
+# In production, ops creates a fresh charm instance per hook, so cached_property works correctly.
+# Harness reuses the same instance across events, requiring manual cache invalidation.
+_CACHED_PROPERTIES = (
+    "_loadbalancer_annotations",
+    "_get_loadbalancer_status",
+    "_traefik_loadbalancer_ip",
+    "_traefik_external_address",
+    "gateway_address",
+)
+
+
+def _invalidate_cached_properties(charm):
+    for attr in _CACHED_PROPERTIES:
+        charm.__dict__.pop(attr, None)
+
+
 class _RequirerMock:
     local_app: Application = None
     relation: Relation = None
@@ -262,6 +278,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
         )
         self.assertIsInstance(self.harness.charm.unit.status, ActiveStatus)
 
+        _invalidate_cached_properties(self.harness.charm)
         self.harness.update_config({"external_hostname": "testhostname"})
 
         self.assertEqual(
@@ -295,6 +312,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
         )
         self.assertIsInstance(self.harness.charm.unit.status, ActiveStatus)
 
+        _invalidate_cached_properties(self.harness.charm)
         self.harness.update_config(unset=["external_hostname"])
 
         self.assertEqual(
@@ -342,6 +360,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
     def test_show_proxied_endpoints_action_no_relations(self, mock_get_loadbalancer_status):
         self.harness.begin_with_initial_hooks()
         action_event = Mock(spec=ActionEvent)
+        _invalidate_cached_properties(self.harness.charm)
         self.harness.update_config({"external_hostname": "foo"})
         self.harness.charm._on_show_proxied_endpoints(action_event)
         action_event.set_results.assert_called_once_with(
@@ -600,12 +619,7 @@ class TestTraefikCertTransferInterface(unittest.TestCase):
 
 
 class TestConfigOptionsValidation(unittest.TestCase):
-    @patch(
-        "charm.TraefikIngressCharm._get_loadbalancer_status",
-        new_callable=PropertyMock,
-        return_value="10.0.0.1",
-    )
-    def setUp(self, mock_get_loadbalancer_status):
+    def setUp(self):
         self.harness: Harness[TraefikIngressCharm] = Harness(TraefikIngressCharm)
         self.harness.set_model_name("test-model")
         self.addCleanup(self.harness.cleanup)
@@ -617,6 +631,14 @@ class TestConfigOptionsValidation(unittest.TestCase):
         patcher = patch.object(TraefikIngressCharm, "version", property(lambda *_: "0.0.0"))
         self.mock_version = patcher.start()
         self.addCleanup(patcher.stop)
+
+        lb_patcher = patch(
+            "charm.TraefikIngressCharm._get_loadbalancer_status",
+            new_callable=PropertyMock,
+            return_value="10.0.0.1",
+        )
+        self.mock_get_loadbalancer_status = lb_patcher.start()
+        self.addCleanup(lb_patcher.stop)
 
         self.harness.set_leader(True)
         self.harness.begin_with_initial_hooks()
@@ -631,6 +653,7 @@ class TestConfigOptionsValidation(unittest.TestCase):
         self.assertEqual(requirer.urls, {"remote/0": "http://10.0.0.1/test-model-remote-0"})
 
     def test_when_external_hostname_is_set_use_it_with_port_80(self):
+        _invalidate_cached_properties(self.harness.charm)
         self.harness.update_config({"external_hostname": "testhostname"})
         self.assertEqual(requirer.urls, {"remote/0": "http://testhostname/test-model-remote-0"})
 
@@ -641,6 +664,7 @@ class TestConfigOptionsValidation(unittest.TestCase):
             "testhostname/prefix",
         ]:
             with self.subTest(invalid_hostname=invalid_hostname):
+                _invalidate_cached_properties(self.harness.charm)
                 self.harness.update_config({"external_hostname": invalid_hostname})
                 self.assertIsInstance(
                     self.harness.charm.unit.status, BlockedStatus, invalid_hostname
@@ -688,6 +712,7 @@ class TestConfigOptionsValidation(unittest.TestCase):
 
         for annotations, expected_result in test_cases:
             with self.subTest(annotations=annotations, expected_result=expected_result):
+                _invalidate_cached_properties(self.harness.charm)
                 # Update the config with the test annotation string
                 self.harness.update_config({"loadbalancer_annotations": annotations})
                 # Check if the _loadbalancer_annotations property returns the expected result

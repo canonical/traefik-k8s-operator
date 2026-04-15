@@ -6,6 +6,7 @@
 
 import dataclasses
 import enum
+import hashlib
 import logging
 import os
 import re
@@ -29,6 +30,7 @@ STATIC_CONFIG_DIR = "/etc/traefik"
 STATIC_CONFIG_PATH = f"{STATIC_CONFIG_DIR}/traefik.yaml"
 DYNAMIC_CERTS_PATH = f"{DYNAMIC_CONFIG_DIR}/certificates.yaml"
 DYNAMIC_TRACING_PATH = f"{DYNAMIC_CONFIG_DIR}/tracing.yaml"
+MERGED_INGRESS_PATH = f"{DYNAMIC_CONFIG_DIR}/juju_ingress.yaml"
 SERVER_CERT_PATH = f"{DYNAMIC_CONFIG_DIR}/server.cert"
 SERVER_KEY_PATH = f"{DYNAMIC_CONFIG_DIR}/server.key"
 CERTS_DIR = Path(DYNAMIC_CONFIG_DIR)
@@ -148,6 +150,7 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         self._topology = topology
         self._basic_auth_user = basic_auth_user
         self._tracing_endpoint = tracing_endpoint
+        self._dynamic_configs: Dict[str, Dict[str, Any]] = {}
 
     @property
     def scrape_jobs(self) -> list:
@@ -213,6 +216,8 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
 
     def update_cert_configuration(self, certs: dict) -> None:
         """Update the server cert, ca, and key configuration files."""
+        hash_before = self._ca_certs_hash()
+
         # Remove certs that are no longer needed.
         if certs:
             CERTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -232,7 +237,7 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
                 CA_CERTS_DIR / f"{hostname}.traefik-charm.crt", cert["ca"], make_dirs=True
             )
 
-        self.update_ca_certs()
+        self.update_ca_certs(hash_before=hash_before)
 
     def _clean_up_certificates_in_traefik_container(self, excluded_certs: dict) -> None:
         """Clean up certificates in the remote traefik container.
@@ -268,9 +273,10 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
 
         Calls update-ca-certificates once done.
         """
+        hash_before = self._ca_certs_hash()
         for ca in cas:
             self._add_ca(ca)
-        self.update_ca_certs()
+        self.update_ca_certs(hash_before=hash_before)
 
     def _add_ca(self, ca: CA) -> None:
         """Add a ca.
@@ -291,15 +297,39 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         Calls update-ca-certificates once done.
         """
         ca_path = RECV_CA_TEMPLATE.substitute(rel_id=uid)
+        hash_before = self._ca_certs_hash()
         try:
             self._container.remove_path(ca_path)
         except PathError:
             logger.exception("Error removing cert file %s.", ca_path)
-        self.update_ca_certs()
+        self.update_ca_certs(hash_before=hash_before)
 
-    def update_ca_certs(self) -> None:
-        """Update ca certificates. Traefik will restart from inside charm.py."""
+    def _ca_certs_hash(self) -> str:
+        """Compute a hash of all CA cert files in the CA certs directory."""
+        hasher = hashlib.md5()  # noqa: S324
+        try:
+            for f in sorted(self._container.list_files(CA_CERTS_DIR), key=lambda x: x.path):
+                hasher.update(f.path.encode())
+                hasher.update(str(f.size).encode())
+                hasher.update(str(f.last_modified).encode())
+        except Exception:  # noqa: BLE001
+            pass
+        return hasher.hexdigest()
+
+    def update_ca_certs(self, hash_before: Optional[str] = None) -> None:
+        """Update ca certificates only if CA files have changed.
+
+        Args:
+            hash_before: Hash of CA certs dir taken before modifications.
+                         If provided and matches current state, the exec is skipped.
+        """
+        if hash_before is not None:
+            hash_after = self._ca_certs_hash()
+            if hash_before == hash_after:
+                logger.debug("CA certs unchanged (hash=%s); skipping update-ca-certificates.", hash_after)
+                return
         self._container.exec(["update-ca-certificates", "--fresh"]).wait()
+        logger.debug("Ran update-ca-certificates.")
 
     def generate_static_config(self, _raise: bool = False) -> Dict[str, Any]:
         """Generate Traefik's static config yaml."""
@@ -725,29 +755,48 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             logger.debug("restarting %r", self.service_name)
             self._container.restart(self.service_name)
 
-    def delete_dynamic_configs(self) -> None:
-        """Delete **ALL** yamls from the dynamic config dir."""
-        # instead of multiple calls to self._container.remove_path(), delete all files in a swoop
-        self._container.exec(["find", DYNAMIC_CONFIG_DIR, "-name", "*.yaml", "-delete"])
-        logger.debug("Deleted all dynamic configuration files.")
+    def delete_dynamic_config(self) -> None:
+        """Delete the merged ingress config file and clear the in-memory buffer."""
+        self._dynamic_configs.clear()
+        try:
+            self._container.remove_path(MERGED_INGRESS_PATH)
+        except (PathError, FileNotFoundError):
+            pass
+        logger.debug("Deleted merged ingress configuration file.")
 
-    def delete_dynamic_config(self, file_name: str) -> None:
-        """Delete a specific yaml from the dynamic config dir."""
-        self._container.remove_path(Path(DYNAMIC_CONFIG_DIR) / file_name)
-        logger.debug("Deleted dynamic configuration file: %s", file_name)
+    def add_dynamic_config(self, key: str, config: Dict[str, Any]) -> None:
+        """Store a relation's dynamic config for later flushing.
 
-    def add_dynamic_config(self, file_name: str, config: str) -> None:
-        """Push a yaml to the dynamic config dir.
-
-        The dynamic config dir is assumed to exist already.
+        Args:
+            key: A unique identifier for the relation (e.g. relation name + id).
+            config: The dynamic config dict for this relation.
         """
-        # make_dirs is technically not necessary at runtime, since traefik.configure() should
-        # guarantee that the dynamic config dir exists. However, it simplifies testing as it means
-        # we don't have to worry about setting up manually the traefik container every time we
-        # simulate an event.
-        self._container.push(Path(DYNAMIC_CONFIG_DIR) / file_name, config, make_dirs=True)
+        self._dynamic_configs[key] = config
 
-        logger.debug("Updated dynamic configuration file: %s", file_name)
+    def flush_dynamic_configs(self) -> None:
+        """Merge all buffered configs and push a single file to the container."""
+        merged: Dict[str, Any] = {}
+        for config in self._dynamic_configs.values():
+            for protocol in ("http", "tcp", "udp"):
+                if protocol not in config:
+                    continue
+                merged.setdefault(protocol, {})
+                for section, entries in config[protocol].items():
+                    if isinstance(entries, dict):
+                        merged[protocol].setdefault(section, {}).update(entries)
+
+        if merged:
+            self._container.push(MERGED_INGRESS_PATH, yaml.safe_dump(merged), make_dirs=True)
+        else:
+            # No configs left — remove the file so traefik doesn't serve stale routes.
+            try:
+                self._container.remove_path(MERGED_INGRESS_PATH)
+            except (PathError, FileNotFoundError):
+                pass
+        logger.debug(
+            "Pushed merged ingress config with %d relations.",
+            len(self._dynamic_configs),
+        )
 
     @property
     def version(self) -> Optional[str]:

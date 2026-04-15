@@ -80,7 +80,7 @@ def test_ingress_per_app_created(
 
     generated_config = yaml.safe_load(
         traefik_container.get_filesystem(traefik_ctx)
-        .joinpath(f"opt/traefik/juju/juju_ingress_ingress_{ipa.relation_id}_remote.yaml")
+        .joinpath("opt/traefik/juju/juju_ingress.yaml")
         .read_text()
     )
 
@@ -96,7 +96,7 @@ def test_ingress_per_app_scale(
     traefik_ctx, host, port, model, traefik_container, tmp_path, n_units, caplog
 ):
     """Check the config when a new ingress per leader unit joins."""
-    cfg_file = tmp_path.joinpath("traefik", "juju", "juju_ingress_ingress_1_remote.yaml")
+    cfg_file = tmp_path.joinpath("traefik", "juju", "juju_ingress.yaml")
     cfg_file.parent.mkdir(parents=True)
 
     # config that would have been generated from mock_data_0

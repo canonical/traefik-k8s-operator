@@ -6,7 +6,9 @@
 """Charmed traefik operator."""
 
 import contextlib
+import cProfile
 import enum
+import functools
 import itertools
 import json
 import logging
@@ -86,7 +88,6 @@ from ops.model import (
     SecretNotFoundError,
     WaitingStatus,
 )
-from ops.pebble import PathError
 
 from traefik import (
     CA,
@@ -160,6 +161,26 @@ class ExternalHostNotReadyError(Exception):
 
 class CertificatesUnavailableError(Exception):
     """Raised when certificates are not available."""
+
+
+def profiling_hook(method):
+    """Decorator that profiles a hook handler with cProfile and dumps a pstats file to /tmp/."""
+
+    @functools.wraps(method)
+    def wrapper(self, event, *args, **kwargs):
+        hook_name = type(event).__name__
+        unit = self.unit.name.replace("/", "-")
+        filename = f"/tmp/profile_{unit}_{hook_name}.pstats"
+        profiler = cProfile.Profile()
+        profiler.enable()
+        try:
+            return method(self, event, *args, **kwargs)
+        finally:
+            profiler.disable()
+            profiler.dump_stats(filename)
+            logger.info("Profile for %s saved to %s", hook_name, filename)
+
+    return wrapper
 
 
 @trace_charm(
@@ -605,6 +626,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             return False
         return True
 
+    @profiling_hook
     def _on_forward_auth_config_changed(self, _: AuthConfigChangedEvent) -> None:
         if self._is_forward_auth_enabled:
             if self.forward_auth.is_ready():
@@ -617,15 +639,16 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
                 )
             )
 
+    @profiling_hook
     def _on_forward_auth_config_removed(self, _: AuthConfigRemovedEvent) -> None:
         self._process_status_and_configurations()
 
+    @profiling_hook
     def _on_recv_ca_cert_available(self, event: CertificateTransferAvailableEvent) -> None:
         # Assuming only one cert per relation (this is in line with the original lib design).
         if not self.container.can_connect():
             return
         self._update_received_ca_certs(event)
-        self._reconcile_lb()
         # We need to restart Traefik now
         self._restart_traefik()
 
@@ -654,12 +677,12 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
 
         self.traefik.add_cas(cas)
 
+    @profiling_hook
     def _on_recv_ca_cert_removed(self, event: CertificateTransferRemovedEvent) -> None:
         # Assuming only one cert per relation (this is in line with the original lib design).
         self.traefik.remove_ca(str(event.relation_id))
         # Since remove_ca will call update_ca_certs in traefik, a restart is needed.
         self._restart_traefik()
-        self._reconcile_lb()
 
     def _is_tls_enabled(self) -> bool:
         """Return True if TLS is enabled."""
@@ -673,9 +696,11 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             return True
         return False
 
+    @profiling_hook
     def _on_workload_tracing_endpoint_removed(self, _: EventBase) -> None:
         self._update_config_if_changed()
 
+    @profiling_hook
     def _on_workload_tracing_endpoint_changed(self, _: EventBase) -> None:
         self._update_config_if_changed()
 
@@ -710,6 +735,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         else:
             logger.debug("Certificate hostnames unchanged (%d); skipping cert refresh.", len(old_keys))
 
+    @profiling_hook
     def _on_peer_relation_changed(self, _: EventBase) -> None:
         """Handle peer relation changed.
 
@@ -718,6 +744,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         if not self.unit.is_leader():
             self._configure()
 
+    @profiling_hook
     def _on_cert_changed(self, _: EventBase) -> None:
         # On slow machines, this event may come up before pebble is ready
         self._configure()
@@ -726,10 +753,6 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         """Update the server cert, ca, and key configuration files."""
         self._sync_certs_to_peer_databag()
         self.traefik.update_cert_configuration(self._get_certs())
-
-        # update_cert_configuration relies on traefik.update_ca_certs.
-        # Thus, we should restart traefik with the new CA certs.
-        self._restart_traefik()
 
     def _sync_certs_to_peer_databag(self) -> None:
         """Sync certificates to the peer databag (leader only).
@@ -936,6 +959,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             }
         return certs
 
+    @profiling_hook
     def _on_show_proxied_endpoints(self, event: ActionEvent) -> None:
         event.set_results(
             {
@@ -945,6 +969,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             }
         )
 
+    @profiling_hook
     def _on_show_external_endpoints(self, event: ActionEvent) -> None:
         event.set_results(
             {
@@ -1069,9 +1094,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         """Return UDP entryPoints sent via traefik_route."""
         return self._traefik_route_entrypoints(protocol="udp")
 
-    def _configure_traefik(self) -> None:
-        self.traefik.configure()
-
+    @profiling_hook
     def _on_traefik_pebble_ready(self, _: PebbleReadyEvent) -> None:
         # If the Traefik container comes up, e.g., after a pod churn, we
         # ignore the unit status and start fresh.
@@ -1086,26 +1109,30 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         # configuration files on a storage volume that survives the pod churn, before
         # we start traefik we clean up all Juju-generated config files to avoid spurious
         # routes.
-        self.traefik.delete_dynamic_configs()
+        self.traefik.delete_dynamic_config()
 
         # we push the config
         self._update_cert_configs()
-        self._configure_traefik()
+        self.traefik.configure()
         # now we restart traefik
         self._restart_traefik()
 
+    @profiling_hook
     def _on_start(self, _: StartEvent) -> None:
         self._process_status_and_configurations()
 
+    @profiling_hook
     def _on_stop(self, _: EventBase) -> None:
         # If obtaining the workload version after an upgrade fails, we do not want juju to display
         # the workload version from before the upgrade.
         self.unit.set_workload_version("")
 
+    @profiling_hook
     def _on_remove(self, _: EventBase) -> None:
         klm = self._get_lb_resource_manager()
         klm.delete()
 
+    @profiling_hook
     def _on_update_status(self, _: UpdateStatusEvent) -> None:
         self._process_status_and_configurations()
         self._set_workload_version()
@@ -1131,18 +1158,18 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             )
         )
 
+    @profiling_hook
     def _on_change(self, _: EventBase) -> None:
         """General event handler for any change to config."""
         self._configure()
 
     def _configure(self) -> None:
         """Configure the traefik charm."""
-        self._reconcile_lb()
         if not self.container.can_connect():
             return
 
         self._update_cert_configs()
-        self._configure_traefik()
+        self.traefik.configure()
         self._restart_traefik()
         self._process_status_and_configurations()
 
@@ -1151,7 +1178,6 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         # has changed. If the config hash has changed since we last calculated it, we need to
         # recompute our state from scratch, based on all data sent over the relations and all
         # configs.
-        self._reconcile_lb()
         new_config_hash = self._config_hash
         if self._stored.config_hash != new_config_hash:
             self._stored.config_hash = new_config_hash
@@ -1160,7 +1186,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
                 # we keep this nested under the hash-check because, unless the tls config has
                 # changed, we don't need to redo this.
                 self._update_cert_configs()
-                self._configure_traefik()
+                self.traefik.configure()
 
                 self._restart_traefik()
 
@@ -1288,6 +1314,8 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
                 )
                 errors = True
 
+        self.traefik.flush_dynamic_configs()
+
         if errors:
             logger.debug("unit in %r: %s", self.unit.status.name, self.unit.status.message)
             self.unit.status = BlockedStatus("setup of some ingress relation failed")
@@ -1316,58 +1344,45 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             return False
         return True
 
+    @profiling_hook
     def _handle_ingress_data_provided(self, event: RelationEvent) -> None:
         """Handle data provided by an unit requesting ingress."""
         if not self.ready:
             event.defer()
             return
-        self._process_ingress_relation(event.relation)
 
-        # Without the following line, traefik.STATIC_CONFIG_PATH is updated with TCP endpoints only
-        # on update-status.
         self._process_status_and_configurations()
 
         if isinstance(self.unit.status, MaintenanceStatus):
             self.unit.status = ActiveStatus(self.serving_message())
 
+    @profiling_hook
     def _handle_ingress_data_removed(self, event: RelationEvent) -> None:
         """Handle data removal for ingress."""
-        self._wipe_ingress_for_relation(
+        self._wipe_ingress_data_for_relation(
             event.relation, wipe_rel_data=not isinstance(event, RelationBrokenEvent)
         )
 
-        # FIXME? on relation broken, data is still there so cannot simply call
-        #  self._process_status_and_configurations(). For this reason, the static config in
-        #  traefik.STATIC_CONFIG_PATH will be updated only on update-status.
-        #  https://github.com/canonical/operator/issues/888
-        self._reconcile_lb()
+        # Note: during relation-broken the departing relation's data is still
+        # visible, so _process_status_and_configurations will briefly re-process
+        # it.  The stale config is cleaned up on the next hook invocation.
+        self._process_status_and_configurations()
 
     def _handle_upstream_ingress_changed(self, _: RelationEvent) -> None:
         """Handle change in the upstream ingress relation."""
         self._process_status_and_configurations()
 
+    @profiling_hook
     def _handle_traefik_route_ready(self, event: TraefikRouteRequirerReadyEvent) -> None:
         """Handle ingress data published by a traefik-route charm."""
         if not self.container.can_connect():
             event.defer()
             return
-        if self._static_config_changed:
-            # This will regenerate the static configs and reevaluate all dynamic configs,
-            # including this one.
-            self._update_ingress_configurations()
 
-        else:
-            try:
-                self._process_ingress_relation(event.relation)
-            except IngressSetupError as e:
-                err_msg = e.args[0]
-                logger.error(
-                    "failed processing the ingress relation for "
-                    f"traefik-route ready with: {err_msg!r}"
-                )
-
-                self.unit.status = ActiveStatus("traefik-route relation degraded")
-                return
+        # With the merged-file approach, every flush must represent the complete
+        # state.  Always rebuild all relations — _update_ingress_configurations
+        # handles the static-config-changed branch internally.
+        self._update_ingress_configurations()
 
         try:
             self.traefik.generate_static_config(_raise=True)
@@ -1396,12 +1411,11 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
 
         if not provider.is_ready(relation):
             logger.debug(f"Provider {provider} not ready; resetting ingress configurations.")
-            self._wipe_ingress_for_relation(relation)
+            self._wipe_ingress_data_for_relation(relation)
             raise IngressSetupError(f"provider is not ready: ingress for {relation} wiped.")
 
         rel = f"{relation.name}:{relation.id}"
 
-        self.unit.status = MaintenanceStatus(f"updating ingress configuration for '{rel}'")
         logger.debug("Updating ingress for relation '%s'", rel)
 
         if provider is self.traefik_route:
@@ -1642,10 +1656,10 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
 
     def _push_configurations(self, relation: Relation, config: Union[Dict[str, Any], str]) -> None:
         if config:
-            yaml_config = yaml.dump(config) if not isinstance(config, str) else config
-            self.traefik.add_dynamic_config(self._relation_config_file(relation), yaml_config)
+            config_dict = yaml.safe_load(config) if isinstance(config, str) else config
+            self.traefik.add_dynamic_config(self._relation_config_key(relation), config_dict)
         else:
-            self._wipe_ingress_for_relation(relation)
+            self._wipe_ingress_data_for_relation(relation)
 
     @staticmethod
     def _get_prefix(data: Dict[str, Any]) -> str:
@@ -1661,26 +1675,18 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
 
     def _wipe_ingress_for_all_relations(self) -> None:
         self.unit.status = MaintenanceStatus("resetting all ingress relations")
-        for relation in self.model.relations["ingress"] + self.model.relations["ingress-per-unit"]:
-            self._wipe_ingress_for_relation(relation)
 
-    def _wipe_ingress_for_relation(
+        if self.container.can_connect():
+            self.traefik.delete_dynamic_config()
+
+        # Still need to wipe relation data for each relation.
+        for relation in self.model.relations["ingress"] + self.model.relations["ingress-per-unit"]:
+            self._wipe_ingress_data_for_relation(relation)
+
+    def _wipe_ingress_data_for_relation(
         self, relation: Relation, *, wipe_rel_data: bool = True
     ) -> None:
         logger.debug("Wiping ingress for the '%s:%d' relation", relation.name, relation.id)
-
-        # Delete configuration files for the relation. In case of Traefik pod
-        # churns, and depending on the event ordering, we might be executing this
-        # logic before pebble in the traefik container is up and running. If that
-        # is the case, nevermind, we will wipe the dangling config files anyhow
-        # during _on_traefik_pebble_ready .
-        if self.container.can_connect() and relation.app:
-            name = self._relation_config_file(relation)
-            try:
-                self.traefik.delete_dynamic_config(name)
-                logger.debug("Deleted %s ingress configuration file", name)
-            except (PathError, FileNotFoundError):
-                logger.debug("Configurations for '%s:%s' not found", relation.name, relation.id)
 
         # Wipe URLs sent to the requesting apps and units, as they are based on a gateway
         # address that is no longer valid.
@@ -1691,17 +1697,12 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             provider.wipe_ingress_data(relation)  # type: ignore
 
     @staticmethod
-    def _relation_config_file(relation: Relation) -> str:
-        # Using both the relation id and the app name in the file to facilitate
-        # the debugging experience somewhat when snooping into the container at runtime:
-        # Apps not in the same model as Traefik (i.e., if `relation` is a CRM) will have
-        # some `remote_...` as app name. Relation name and id are handy when one is
-        # troubleshooting via `juju run 'relation_ids'...` and the like.`
+    def _relation_config_key(relation: Relation) -> str:
+        """Return a unique key identifying this relation's dynamic config."""
         assert relation.app, "no app in relation (shouldn't happen)"  # for type checker
-        return f"juju_ingress_{relation.name}_{relation.id}_{relation.app.name}.yaml"
+        return f"juju_ingress_{relation.name}_{relation.id}_{relation.app.name}"
 
     def _restart_traefik(self) -> None:
-        self.unit.status = MaintenanceStatus("restarting traefik...")
         self.traefik.restart()
 
     def _provider_from_relation(self, relation: Relation) -> Any:
