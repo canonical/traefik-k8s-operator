@@ -61,8 +61,8 @@ def traefik_fixture(juju, traefik_charm):
         TRAEFIK_APP_NAME,
         resources=TRAEFIK_RESOURCES,
         trust=True,
-    )
-    juju.config(TRAEFIK_APP_NAME, {"external_hostname": MOCK_HOSTNAME})
+    log=False)
+    juju.config(TRAEFIK_APP_NAME, {"external_hostname": MOCK_HOSTNAME}, log=False)
     juju.wait(jubilant.all_active, timeout=600)
     return TRAEFIK_APP_NAME
 
@@ -75,7 +75,7 @@ def alertmanager_fixture(juju, traefik_app):
         ALERTMANAGER_APP_NAME,
         channel="2/edge",
         trust=True,
-    )
+    log=False)
     juju.wait(jubilant.all_active, timeout=600)
     juju.integrate(f"{ALERTMANAGER_APP_NAME}:ingress", TRAEFIK_APP_NAME)
     juju.wait(jubilant.all_active, timeout=600)
@@ -90,7 +90,7 @@ def ssc_fixture(juju, traefik_app):
         SSC_APP_NAME,
         channel="1/stable",
         trust=True,
-    )
+    log=False)
     juju.wait(jubilant.all_active, timeout=600)
     juju.integrate(f"{SSC_APP_NAME}:certificates", TRAEFIK_APP_NAME)
     juju.wait(jubilant.all_active, timeout=600)
