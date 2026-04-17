@@ -360,7 +360,7 @@ class TraefikRouteRequirer(Object):
         if self._raw:
             log.warning(
                 "Raw mode enabled: TLS routes for ALL protocols will not be auto-generated. "
-                "Enable this only if you fully understand and intend to bypass the additional"
+                "Enable this only if you fully understand and intend to bypass the additional "
                 "TLS configuration."
             )
 
