@@ -4,7 +4,7 @@ import pytest
 import yaml
 from scenario import Relation, State
 
-from tests.unit._utils import _render_config, create_ingress_relation
+from tests.unit._utils import _render_config, create_ingress_relation, find_ingress_config
 
 
 def _create_tls_relation(*, app_name: str, strip_prefix: bool, redirect_https: bool):

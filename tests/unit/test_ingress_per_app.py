@@ -18,7 +18,7 @@ from conftest import MOCK_LB_ADDRESS
 from ops import CharmBase, Framework
 from scenario import Context, Model, Mount, Relation, State
 
-from tests.unit._utils import create_ingress_relation
+from tests.unit._utils import create_ingress_relation, find_ingress_config, find_ingress_config_files
 
 
 @pytest.mark.parametrize(
@@ -42,10 +42,8 @@ def test_ingress_per_app_created(
     event = getattr(ipa, f"{event_name}_event")
     traefik_ctx.run(event, state)
 
-    generated_config = yaml.safe_load(
-        traefik_container.get_filesystem(traefik_ctx)
-        .joinpath("opt/traefik/juju/juju_ingress.yaml")
-        .read_text()
+    generated_config = find_ingress_config(
+        traefik_container.get_filesystem(traefik_ctx) / "opt" / "traefik" / "juju"
     )
 
     service_def = {
@@ -75,10 +73,11 @@ def test_ingress_per_app_scale(
     """Check the config when a new ingress per app unit joins."""
     relation_id = 42
     unit_id = 0
-    cfg_file = tmp_path.joinpath(
-        "traefik", "juju", "juju_ingress.yaml"
-    )
-    cfg_file.parent.mkdir(parents=True)
+    cfg_dir = tmp_path / "traefik" / "juju"
+    cfg_dir.mkdir(parents=True)
+
+    # Pre-create a per-relation config file matching relation_id and app name.
+    cfg_file = cfg_dir / f"juju_ingress_ingress_{relation_id}_remote.yaml"
 
     # config that would have been generated from mock_data_0
     # same as config output of the previous test
@@ -189,16 +188,16 @@ def test_ingress_per_app_requirer_with_auto_data(host, ip, port, model, evt_name
 
 
 def test_ingress_per_app_cleanup_on_remove(model, traefik_ctx, traefik_container):
-    """Check that merged config is updated when a relation is removed."""
-    ipa = create_ingress_relation()
+    """Check that per-relation config files are cleaned up when a relation is removed."""
+    ipa = create_ingress_relation(rel_id=0)
 
     td = tempfile.TemporaryDirectory()
     juju_dir = Path(td.name) / "juju"
     juju_dir.mkdir(parents=True)
 
-    # Pre-create the merged file with this relation's config.
+    # Pre-create a per-relation config file.
     sample_config = {"http": {"routers": {"r": {"rule": "Host(`test`)"}}}}
-    (juju_dir / "juju_ingress.yaml").write_text(yaml.safe_dump(sample_config))
+    (juju_dir / "juju_ingress_ingress_0_remote.yaml").write_text(yaml.safe_dump(sample_config))
 
     traefik_container = traefik_container.replace(mounts={"conf": Mount("/opt/traefik/", td.name)})
 
@@ -212,8 +211,8 @@ def test_ingress_per_app_cleanup_on_remove(model, traefik_ctx, traefik_container
     # WHEN the relation goes
     traefik_ctx.run(ipa.broken_event, state)
 
-    # THEN the merged config file should be gone (no remaining relations)
-    assert not (juju_dir / "juju_ingress.yaml").exists()
+    # THEN the per-relation config files should be gone (no remaining relations)
+    assert not find_ingress_config_files(juju_dir)
 
 
 @pytest.mark.parametrize("rel_id", (1, 2, 3))

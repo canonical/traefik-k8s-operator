@@ -1,7 +1,32 @@
 import json
+from pathlib import Path
 from typing import List
 
 from scenario import Relation
+
+from traefik import INGRESS_CONFIG_PREFIX
+
+
+def find_ingress_config(config_dir: Path):
+    """Return the parsed YAML of the first per-relation ingress config in *config_dir*.
+
+    Raises ``FileNotFoundError`` if no matching file is found.
+    """
+    import yaml  # local import to avoid circular issues at collection time
+
+    for p in sorted(config_dir.iterdir()):
+        if p.name.startswith(INGRESS_CONFIG_PREFIX) and p.name.endswith(".yaml"):
+            return yaml.safe_load(p.read_text())
+    raise FileNotFoundError(f"No per-relation ingress config file found in {config_dir}")
+
+
+def find_ingress_config_files(config_dir: Path):
+    """Return a list of per-relation ingress config file paths in *config_dir*."""
+    return [
+        p
+        for p in config_dir.iterdir()
+        if p.name.startswith(INGRESS_CONFIG_PREFIX) and p.name.endswith(".yaml")
+    ]
 
 
 def _render_middlewares(*, strip_prefix: bool = False) -> dict:
