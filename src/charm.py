@@ -91,6 +91,7 @@ from ops.model import (
 
 from traefik import (
     CA,
+    INGRESS_CONFIG_PREFIX,
     SERVER_CERT_PATH,
     RoutingMode,
     StaticConfigMergeConflictError,
@@ -1709,7 +1710,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
     def _relation_config_key(relation: Relation) -> str:
         """Return a unique key identifying this relation's dynamic config."""
         assert relation.app, "no app in relation (shouldn't happen)"  # for type checker
-        return f"juju_ingress_{relation.name}_{relation.id}_{relation.app.name}"
+        return f"{INGRESS_CONFIG_PREFIX}{relation.name}_{relation.id}_{relation.app.name}"
 
     def _restart_traefik(self) -> None:
         self.traefik.restart()
