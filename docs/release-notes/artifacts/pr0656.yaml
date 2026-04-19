@@ -1,0 +1,17 @@
+# --- Release notes artifact ----
+
+schema_version: 1
+changes:
+  - title: Removed redundant relation-created and relation-joined event observers from ingress libraries.
+    author: swetha1654
+    type: minor
+    description: |
+      The ingress v1 and v2 libraries no longer observe relation-created and relation-joined
+      events. Ingress processing now triggers only on relation-changed, reducing redundant handler
+      invocations during relation setup.
+    urls: 
+      pr: https://github.com/canonical/traefik-k8s-operator/pull/656
+      related_doc: 
+      related_issue: https://github.com/canonical/traefik-k8s-operator/issues/612
+    visibility: public
+    highlight: false
