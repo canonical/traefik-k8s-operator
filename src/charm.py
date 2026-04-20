@@ -7,6 +7,7 @@
 
 import contextlib
 import enum
+import functools
 import itertools
 import json
 import logging
@@ -496,7 +497,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         """
         return cast(Optional[str], self.config.get("basic_auth_user", None))
 
-    @property
+    @functools.cached_property
     def _loadbalancer_annotations(self) -> Optional[Dict[str, str]]:
         """Parses and returns annotations to apply to the LoadBalancer service.
 
@@ -552,7 +553,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             resources_list.append(self._construct_lb())
         klm.reconcile(resources_list)
 
-    @property
+    @functools.cached_property
     def _get_loadbalancer_status(self) -> Optional[str]:
         try:
             traefik_service = self.lightkube_client.get(
@@ -573,7 +574,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
 
         return ingress_address.hostname or ingress_address.ip
 
-    @property
+    @functools.cached_property
     def _traefik_loadbalancer_ip(self) -> Optional[str]:
         try:
             traefik_service = self.lightkube_client.get(
@@ -1741,7 +1742,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             "ip": self._traefik_loadbalancer_ip,
         }
 
-    @property
+    @functools.cached_property
     def _traefik_external_address(self) -> Optional[str]:
         """Return the address used to ingress directly through this Traefik's gateway.
 
@@ -1758,7 +1759,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
 
         return self._get_loadbalancer_status
 
-    @property
+    @functools.cached_property
     def gateway_address(self) -> str:
         """Return the address used to ingress directly through this Traefik's gateway.
 
