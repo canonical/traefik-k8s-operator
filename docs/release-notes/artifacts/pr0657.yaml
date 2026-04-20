@@ -1,0 +1,18 @@
+# --- Release notes artifact ----
+
+schema_version: 1
+changes:
+  - title: Replaced `@property` with `@functools.cached_property` on expensive charm attributes.
+    author: swetha1654
+    type: minor
+    description: |
+     Converted five frequently accessed charm properties (`_loadbalancer_annotations`, 
+     `_get_loadbalancer_status`, `_traefik_loadbalancer_ip`, `_traefik_external_address`, 
+     `gateway_address`) to `@functools.cached_property` to avoid redundant recomputation within a 
+     single event handler.
+    urls: 
+      pr: https://github.com/canonical/traefik-k8s-operator/pull/657
+      related_doc: 
+      related_issue: 
+    visibility: public
+    highlight: false
