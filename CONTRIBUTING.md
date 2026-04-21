@@ -26,7 +26,7 @@ This document explains the processes and practices recommended for contributing 
 - Once your pull request is approved, we squash and merge your pull request branch onto
   the `main` branch. This creates a linear Git commit history.
 - For further information on contributing, please refer to our
-  [Contributing Guide](https://github.com/canonical/is-charms-contributing-guide).
+  [Contributing Guide](https://github.com/canonical/platform-engineering-contributing-guide).
 
 ## Code of conduct
 
