@@ -1430,11 +1430,16 @@ class TLSCertificatesRequiresV4(Object):
         """Return the private key."""
         if self._private_key:
             return self._private_key
+        try:
+            return self._private_key_cache
+        except AttributeError:
+            pass
         if not self._private_key_generated():
             return None
         secret = self.charm.model.get_secret(label=self._get_private_key_secret_label())
         private_key = secret.get_content(refresh=True)["private-key"]
-        return PrivateKey.from_string(private_key)
+        self._private_key_cache = PrivateKey.from_string(private_key)
+        return self._private_key_cache
 
     def _ensure_private_key(self) -> None:
         """Make sure there is a private key to be used.
