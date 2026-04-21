@@ -4,7 +4,7 @@ import pytest
 import yaml
 from scenario import Relation, State
 
-from tests.unit._utils import _render_config, create_ingress_relation
+from tests.unit._utils import _render_config, create_ingress_relation, find_ingress_config
 
 
 def _create_tls_relation(*, app_name: str, strip_prefix: bool, redirect_https: bool):
@@ -79,7 +79,7 @@ def test_middleware_config(
 
     # THEN the rendered config file contains middlewares
     with out.get_container("traefik").get_filesystem(traefik_ctx).joinpath(
-        f"opt/traefik/juju/juju_ingress_ingress_{rel_id}_{app_name}.yaml",
+        "opt/traefik/juju/juju_ingress.yaml",
     ) as f:
         config_file = f.read_text()
     expected = _render_config(

@@ -47,15 +47,9 @@ async def test_relate(ops_test: OpsTest):
 
 
 async def test_dynamic_config_created(ops_test: OpsTest):
-    relation = [
-        r
-        for r in ops_test.model.relations
-        if r.matches(f"{TESTER_APP_NAME}:traefik-route", f"{APP_NAME}:traefik-route")
-    ][0]
-    relation_id = relation.entity_id
     cmd = (
         f"juju ssh -m {ops_test.model_name} --container traefik {APP_NAME}/0 "
-        f"cat /opt/traefik/juju/juju_ingress_traefik-route_{relation_id}_route.yaml"
+        f"cat /opt/traefik/juju/juju_ingress.yaml"
     )
     proc = Popen(shlex.split(cmd), stdout=PIPE, text=True)
     contents = proc.stdout.read()

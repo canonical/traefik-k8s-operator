@@ -86,7 +86,7 @@ LIBAPI = 2
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 19
+LIBPATCH = 20
 
 PYDEPS = ["pydantic"]
 
@@ -385,8 +385,6 @@ class _IngressPerAppBase(Object):
 
         observe = self.framework.observe
         rel_events = charm.on[relation_name]
-        observe(rel_events.relation_created, self._handle_relation)
-        observe(rel_events.relation_joined, self._handle_relation)
         observe(rel_events.relation_changed, self._handle_relation)
         observe(rel_events.relation_departed, self._handle_relation)
         observe(rel_events.relation_broken, self._handle_relation_broken)

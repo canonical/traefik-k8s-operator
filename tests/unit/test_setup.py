@@ -58,12 +58,11 @@ def test_start_traefik_no_hostname(*_, traefik_ctx):
 
 
 @patch("charm.TraefikIngressCharm._ingressed_address", PropertyMock(return_value="foo.bar"))
-@patch("traefik.Traefik.is_ready", PropertyMock(return_value=True))
 @patch("charm.TraefikIngressCharm._static_config_changed", PropertyMock(return_value=False))
-def test_start_traefik_active(*_, traefik_ctx):
+def test_start_traefik_active(*_, traefik_ctx, traefik_container):
     state = State(
         config={"routing_mode": "path"},
-        containers=[Container(name="traefik", can_connect=False)],
+        containers=[traefik_container],
     )
     out = Context(charm_type=TraefikIngressCharm).run("start", state)
     assert out.unit_status == ("active", "Serving at http://foo.bar")

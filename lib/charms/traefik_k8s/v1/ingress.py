@@ -131,8 +131,6 @@ class _IngressPerAppBase(Object):
 
         observe = self.framework.observe
         rel_events = charm.on[relation_name]
-        observe(rel_events.relation_created, self._handle_relation)
-        observe(rel_events.relation_joined, self._handle_relation)
         observe(rel_events.relation_changed, self._handle_relation)
         observe(rel_events.relation_broken, self._handle_relation_broken)
         observe(charm.on.leader_elected, self._handle_upgrade_or_leader)  # type: ignore

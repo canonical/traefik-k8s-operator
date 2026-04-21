@@ -1,6 +1,8 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 """Helpers for unit testing charms which use this library."""
+import io
+import tarfile
 import uuid
 from unittest.mock import Mock, patch
 
@@ -11,7 +13,7 @@ from cosl import JujuTopology
 from ops.testing import Harness
 
 from charm import TraefikIngressCharm
-from traefik import StaticConfigMergeConflictError, Traefik
+from traefik import DYNAMIC_CONFIG_DIR, INGRESS_CONFIG_PREFIX, StaticConfigMergeConflictError, Traefik
 
 MODEL_NAME = "test-model"
 REMOTE_APP_NAME = "traefikRouteApp"
@@ -117,16 +119,46 @@ TCP_CONFIG_WITH_TLS = {
 def harness() -> Harness[TraefikIngressCharm]:
     harness = Harness(TraefikIngressCharm)
     harness.set_model_name(MODEL_NAME)
-    harness.handle_exec("traefik", ["update-ca-certificates", "--fresh"], result=0)
     harness.handle_exec(
         "traefik", ["find", "/opt/traefik/juju", "-name", "*.yaml", "-delete"], result=0
     )
+
+    def _tar_extract_handler(args):
+        """Simulate tar extraction by reading the archive from the mock container."""
+        archive_path = args.command[2]  # tar -xzf <path> -C <dir>
+        container = harness.charm.unit.get_container("traefik")
+        raw = container.pull(archive_path).read()
+        if isinstance(raw, str):
+            raw = raw.encode("latin-1")
+        buf = io.BytesIO(raw)
+        with tarfile.open(fileobj=buf, mode="r:gz") as tar:
+            for member in tar.getmembers():
+                f = tar.extractfile(member)
+                if f:
+                    container.push(
+                        f"{DYNAMIC_CONFIG_DIR}/{member.name}",
+                        f.read().decode("utf-8"),
+                        make_dirs=True,
+                    )
+
+    harness.handle_exec("traefik", ["tar"], handler=_tar_extract_handler)
 
     patcher = patch.object(TraefikIngressCharm, "version", property(lambda *_: "0.0.0"))
     patcher.start()
 
     yield harness
     harness.cleanup()
+
+
+def _pull_ingress_dynamic_config(container):
+    """Pull the per-relation ingress dynamic config from the container.
+
+    Returns the parsed YAML of the first ``juju_ingress_*.yaml`` file found.
+    """
+    for entry in container.list_files(DYNAMIC_CONFIG_DIR):
+        if entry.name.startswith(INGRESS_CONFIG_PREFIX) and entry.name.endswith(".yaml"):
+            return yaml.safe_load(container.pull(entry.path).read())
+    raise FileNotFoundError("No per-relation ingress config file found in container")
 
 
 @pytest.fixture(scope="function")
@@ -233,8 +265,9 @@ def test_static_config(harness: Harness[TraefikIngressCharm], topology: JujuTopo
     assert conf["foo"] == "bar"
 
     # verify the dynamic config is there too
-    file = f"/opt/traefik/juju/juju_ingress_{relation.name}_{relation.id}_{relation.app.name}.yaml"
-    assert yaml.safe_load(charm.container.pull(file).read()) == CONFIG_WITH_TLS
+
+    dynamic_config = _pull_ingress_dynamic_config(charm.container)
+    assert dynamic_config == CONFIG_WITH_TLS
 
 
 def test_static_config_broken(harness: Harness[TraefikIngressCharm], topology: JujuTopology):
@@ -287,8 +320,8 @@ def test_static_config_broken(harness: Harness[TraefikIngressCharm], topology: J
     assert conf["log"] == {"level": "DEBUG"}
 
     # THEN  the dynamic config is there too
-    file = f"/opt/traefik/juju/juju_ingress_{relation.name}_{relation.id}_{relation.app.name}.yaml"
-    assert yaml.safe_load(charm.container.pull(file).read()) == CONFIG_WITH_TLS
+    dynamic_config = _pull_ingress_dynamic_config(charm.container)
+    assert dynamic_config == CONFIG_WITH_TLS
 
 
 def test_static_config_partially_broken(
@@ -447,11 +480,8 @@ def test_tls_configuration_parametrized(
     assert charm.traefik_route.is_ready(relation)
     assert charm.traefik_route.get_config(relation) == config_yaml
 
-    # Pull the dynamic configuration written to the container.
-    file_path = (
-        f"/opt/traefik/juju/juju_ingress_{relation.name}_{relation.id}_{relation.app.name}.yaml"
-    )
-    dynamic_config = yaml.safe_load(charm.container.pull(file_path).read())
+    # Pull the per-relation dynamic configuration written to the container.
+    dynamic_config = _pull_ingress_dynamic_config(charm.container)
 
     # Validate that the dynamic config matches the expected configuration.
     assert dynamic_config == expected_config

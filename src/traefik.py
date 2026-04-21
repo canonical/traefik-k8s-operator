@@ -6,10 +6,12 @@
 
 import dataclasses
 import enum
+import io
 import logging
 import os
 import re
 import socket
+import tarfile
 from copy import deepcopy
 from pathlib import Path
 from string import Template
@@ -29,6 +31,7 @@ STATIC_CONFIG_DIR = "/etc/traefik"
 STATIC_CONFIG_PATH = f"{STATIC_CONFIG_DIR}/traefik.yaml"
 DYNAMIC_CERTS_PATH = f"{DYNAMIC_CONFIG_DIR}/certificates.yaml"
 DYNAMIC_TRACING_PATH = f"{DYNAMIC_CONFIG_DIR}/tracing.yaml"
+INGRESS_CONFIG_PREFIX = "juju_ingress_"
 SERVER_CERT_PATH = f"{DYNAMIC_CONFIG_DIR}/server.cert"
 SERVER_KEY_PATH = f"{DYNAMIC_CONFIG_DIR}/server.key"
 CERTS_DIR = Path(DYNAMIC_CONFIG_DIR)
@@ -148,6 +151,7 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         self._topology = topology
         self._basic_auth_user = basic_auth_user
         self._tracing_endpoint = tracing_endpoint
+        self._dynamic_configs: Dict[str, Dict[str, Any]] = {}
 
     @property
     def scrape_jobs(self) -> list:
@@ -232,8 +236,6 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
                 CA_CERTS_DIR / f"{hostname}.traefik-charm.crt", cert["ca"], make_dirs=True
             )
 
-        self.update_ca_certs()
-
     def _clean_up_certificates_in_traefik_container(self, excluded_certs: dict) -> None:
         """Clean up certificates in the remote traefik container.
 
@@ -264,13 +266,9 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
                     continue
 
     def add_cas(self, cas: Iterable[CA]) -> None:
-        """Add any number of CAs to Traefik.
-
-        Calls update-ca-certificates once done.
-        """
+        """Add any number of CAs to Traefik."""
         for ca in cas:
             self._add_ca(ca)
-        self.update_ca_certs()
 
     def _add_ca(self, ca: CA) -> None:
         """Add a ca.
@@ -288,18 +286,28 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         So make sure any traefik config depending on the certificates being there is updated
         **before** the certs are removed, otherwise you might have some downtime.
 
-        Calls update-ca-certificates once done.
         """
         ca_path = RECV_CA_TEMPLATE.substitute(rel_id=uid)
         try:
             self._container.remove_path(ca_path)
         except PathError:
             logger.exception("Error removing cert file %s.", ca_path)
-        self.update_ca_certs()
 
-    def update_ca_certs(self) -> None:
-        """Update ca certificates. Traefik will restart from inside charm.py."""
-        self._container.exec(["update-ca-certificates", "--fresh"]).wait()
+    def _collect_root_ca_paths(self) -> List[str]:
+        """Collect all CA certificate file paths from the CA certs directory.
+
+        This includes both pre-bundled CAs from the container image and
+        charm-managed CAs (from TLS and receive-ca-cert relations).
+        """
+        ca_paths: List[str] = []
+        try:
+            if self._container.can_connect() and self._container.isdir(str(CA_CERTS_DIR)):
+                for f in self._container.list_files(str(CA_CERTS_DIR)):
+                    if f.name.endswith(".crt"):
+                        ca_paths.append(f.path)
+        except Exception:  # noqa: BLE001  # pylint: disable=broad-exception-caught
+            logger.debug("Could not list CA certs directory.")
+        return sorted(ca_paths)
 
     def generate_static_config(self, _raise: bool = False) -> Dict[str, Any]:
         """Generate Traefik's static config yaml."""
@@ -367,6 +375,17 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
                         "endpoint": f"{self._tracing_endpoint}/api/traces?format=jaeger.thrift"
                     },
                 }
+            }
+
+        # Configure rootCAs for outbound backend certificate verification.
+        # This collects all CA certs from /usr/local/share/ca-certificates/
+        # (pre-bundled in the container image + charm-managed CAs) and sets them
+        # in the static serversTransport so Traefik can verify backend server
+        # certificates when proxying to HTTPS services.
+        root_ca_paths = self._collect_root_ca_paths()
+        if root_ca_paths:
+            static_config["serversTransport"] = {
+                "rootCAs": root_ca_paths,
             }
 
         # we attempt to put together the base config with whatever the user
@@ -556,8 +575,8 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
 
         elif is_end_to_end:
             # We cannot assume traefik's CA is the same CA that signed the proxied apps.
-            # Since we use the update_ca_certificates machinery, we don't need to specify the
-            # "rootCAs" entry.
+            # The static serversTransport.rootCAs includes all known CAs, so we don't
+            # need to specify "rootCAs" per-transport here.
             # Keeping the serverTransports section anyway because it is informative ("endToEndTLS"
             # vs "reverseTerminationTransport") when inspecting the config file in production.
             transport_name = "endToEndTLS"
@@ -725,29 +744,72 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             logger.debug("restarting %r", self.service_name)
             self._container.restart(self.service_name)
 
-    def delete_dynamic_configs(self) -> None:
-        """Delete **ALL** yamls from the dynamic config dir."""
-        # instead of multiple calls to self._container.remove_path(), delete all files in a swoop
-        self._container.exec(["find", DYNAMIC_CONFIG_DIR, "-name", "*.yaml", "-delete"])
-        logger.debug("Deleted all dynamic configuration files.")
+    def delete_dynamic_config(self) -> None:
+        """Delete all per-relation ingress config files from the container and clear the buffer."""
+        self._dynamic_configs.clear()
+        try:
+            self._container.exec(
+                ["find", DYNAMIC_CONFIG_DIR, "-name", f"{INGRESS_CONFIG_PREFIX}*.yaml", "-delete"]
+            ).wait()
+        except (PathError, FileNotFoundError, Exception):  # noqa: BLE001
+            pass
+        logger.debug("Deleted per-relation ingress configuration files.")
 
-    def delete_dynamic_config(self, file_name: str) -> None:
-        """Delete a specific yaml from the dynamic config dir."""
-        self._container.remove_path(Path(DYNAMIC_CONFIG_DIR) / file_name)
-        logger.debug("Deleted dynamic configuration file: %s", file_name)
+    def add_dynamic_config(self, key: str, config: Dict[str, Any]) -> None:
+        """Store a relation's dynamic config for later flushing.
 
-    def add_dynamic_config(self, file_name: str, config: str) -> None:
-        """Push a yaml to the dynamic config dir.
-
-        The dynamic config dir is assumed to exist already.
+        Args:
+            key: A unique identifier for the relation (e.g. relation name + id).
+            config: The dynamic config dict for this relation.
         """
-        # make_dirs is technically not necessary at runtime, since traefik.configure() should
-        # guarantee that the dynamic config dir exists. However, it simplifies testing as it means
-        # we don't have to worry about setting up manually the traefik container every time we
-        # simulate an event.
-        self._container.push(Path(DYNAMIC_CONFIG_DIR) / file_name, config, make_dirs=True)
+        self._dynamic_configs[key] = config
 
-        logger.debug("Updated dynamic configuration file: %s", file_name)
+    def flush_dynamic_configs(self) -> None:
+        """Write per-relation config files locally, archive them, and push to the container.
+
+        Each relation gets its own file so that Traefik's native file-provider
+        merge logic is used instead of a custom merge.  All files are packed
+        into a tar.gz archive and pushed in a single ``container.push`` call,
+        then extracted in the container to minimise Pebble round-trips.
+
+        Stale config files (from relations that no longer have configs) are
+        removed before extracting the new archive.
+        """
+        # Remove all existing per-relation config files first; the archive
+        # extraction below will recreate the wanted ones.
+        try:
+            self._container.exec(
+                ["find", DYNAMIC_CONFIG_DIR, "-name", f"{INGRESS_CONFIG_PREFIX}*.yaml", "-delete"]
+            ).wait()
+        except (PathError, FileNotFoundError, Exception):  # noqa: BLE001
+            pass
+
+        if not self._dynamic_configs:
+            logger.debug("No dynamic configs to push.")
+            return
+
+        # Build a tar.gz archive in memory containing one YAML file per relation.
+        buf = io.BytesIO()
+        with tarfile.open(fileobj=buf, mode="w:gz") as tar:
+            for key, config in self._dynamic_configs.items():
+                yaml_bytes = yaml.safe_dump(config).encode("utf-8")
+                info = tarfile.TarInfo(name=f"{key}.yaml")
+                info.size = len(yaml_bytes)
+                tar.addfile(info, io.BytesIO(yaml_bytes))
+        archive_data = buf.getvalue()
+
+        # Push the archive as a single blob, then extract in one exec call.
+        archive_path = f"{DYNAMIC_CONFIG_DIR}/_ingress_configs.tar.gz"
+        self._container.push(archive_path, archive_data, make_dirs=True)
+        self._container.exec(
+            ["tar", "-xzf", archive_path, "-C", DYNAMIC_CONFIG_DIR]
+        ).wait()
+        self._container.remove_path(archive_path)
+
+        logger.debug(
+            "Pushed %d per-relation ingress config files via archive.",
+            len(self._dynamic_configs),
+        )
 
     @property
     def version(self) -> Optional[str]:

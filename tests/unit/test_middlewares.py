@@ -94,7 +94,7 @@ def test_middleware_config(
 
     # THEN the rendered config file contains middlewares
     with out.get_container("traefik").get_filesystem(traefik_ctx).joinpath(
-        f"opt/traefik/juju/juju_ingress_{rel_name}_0_{app_name}.yaml",
+        "opt/traefik/juju/juju_ingress.yaml",
     ) as f:
         config_file = f.read_text()
     expected = _render_config(
@@ -122,12 +122,9 @@ def test_basicauth_config(traefik_ctx: scenario.Context, traefik_container):
     # WHEN we process a config-changed event
     state_out = traefik_ctx.run("config_changed", state)
 
-    # THEN traefik writes a dynamic config file with the expected basicauth middleware
+    # THEN traefik writes a merged dynamic config file with the expected basicauth middleware
     traefik_fs = state_out.get_container("traefik").get_filesystem(traefik_ctx)
-    dynamic_config_path = (
-        Path(str(traefik_fs) + DYNAMIC_CONFIG_DIR)
-        / f"juju_ingress_{ingress.endpoint}_{ingress.relation_id}_{ingress.remote_app_name}.yaml"
-    )
+    dynamic_config_path = Path(str(traefik_fs) + DYNAMIC_CONFIG_DIR) / "juju_ingress.yaml"
     assert dynamic_config_path.exists()
     http_cfg = yaml.safe_load(dynamic_config_path.read_text())["http"]
     assert http_cfg["middlewares"]["juju-basic-auth-test-model-remote-0"] == {
