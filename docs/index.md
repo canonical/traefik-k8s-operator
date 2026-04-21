@@ -30,6 +30,7 @@ Ingress is a purely in-model concern. Traefik will happily cross-model relate wi
 |-|-|
 | {ref}`Tutorial <tutorial_index>`</br>  Get started - a hands-on introduction for new users deploying the charmed operator.</br> | {ref}`How-to guides <how_to_index>`</br> Step-by-step guides covering key operations and common tasks |
 | {ref}`Reference <reference_index>`</br> Technical information - specifications, APIs, architecture    | {ref}`Explanation <explanation_index>`</br> Concepts - discussion and clarification of key topics  |
+| {ref}`Release notes <release_notes_index>`</br> History of stable releases – new features, bug fixes and breaking changes | |
 
 ## Contributing to this documentation
 
@@ -58,5 +59,5 @@ tutorial/index.md
 how-to/index.md
 reference/index.md
 explanation/index.md
-changelog.md
+Release notes <release-notes/index.md>
 ```
