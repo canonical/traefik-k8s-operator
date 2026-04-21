@@ -46,11 +46,7 @@ Some examples of valid AI assistance includes:
 * Checking that your contribution aligns with the Canonical style guide
 
 We have created instructions and tools that you can provide AI while preparing
-your contribution in `copilot-collections <https://github.com/canonical/copilot-collections>`_: 
-
-* `Documentation instructions <https://github.com/canonical/copilot-collections/tree/main/assets/instructions/documentation>`_
-* `Documentation skills <https://github.com/canonical/copilot-collections/tree/main/assets/skills>`_
-
+your contribution in `copilot-collections <https://github.com/canonical/copilot-collections>`_.
 While it isn't necessary to use ``copilot-collections`` while preparing your
 contribution, these files contain details about our documentation standards and
 practices that will help the AI avoid common pitfalls when interacting with our
