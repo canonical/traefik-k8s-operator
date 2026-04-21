@@ -50,6 +50,44 @@ also, reference the issue or bug number when you submit the changes.
 
 Your changes will be reviewed in due time; if approved, they will be eventually merged.
 
+### Signing commits
+
+To improve contribution tracking,
+we use the [Canonical contributor license agreement](https://assets.ubuntu.com/v1/ff2478d1-Canonical-HA-CLA-ANY-I_v1.2.pdf)
+(CLA) as a legal sign-off, and we require all commits to have verified signatures.
+
+#### Canonical contributor agreement
+
+Canonical welcomes contributions to the Traefik Operator. Please check out our
+[contributor agreement](https://ubuntu.com/legal/contributors) if you're interested in contributing to the solution.
+
+The CLA sign-off is simple line at the
+end of the commit message certifying that you wrote it
+or have the right to commit it as an open-source contribution.
+
+#### Verified signatures on commits
+
+All commits in a pull request must have cryptographic (verified) signatures.
+To add signatures on your commits, follow the
+[GitHub documentation](https://docs.github.com/en/authentication/managing-commit-signature-verification/signing-commits).
+
+### Release notes
+
+This repository uses an [automated workflow](https://github.com/canonical/traefik-k8s-operator/blob/main/.github/workflows/release_notes_automation.yaml)
+for preparing and publishing release notes.
+The workflow uses YAML artifacts summarizing project changes and releases
+to generate the release notes corresponding to stable revisions of the charm.
+
+When preparing your pull request, please add a change artifact following
+[`_change-artifact-template.yaml`](https://github.com/canonical/traefik-k8s-operator/blob/main/docs/release-notes/template/_change-artifact-template.yaml)
+that summarizes the feature, bug fix, or other change you're making to the project.
+
+To enforce the creation of change artifacts, this project includes a
+[compliance workflow](https://github.com/canonical/traefik-k8s-operator/blob/main/.github/workflows/check_release_notes_artifact.yaml)
+that will run over your pull request and fail if no artifact exists.
+If your pull request doesn't necessitate a change artifact, use the `no-release-note`
+label on your pull request to opt out of the compliance workflow.
+
 ### AI
 
 You are free to use any tools you want while preparing your contribution, including
@@ -75,27 +113,6 @@ Avoid submitting contributions that you don't fully understand.
 You are responsible for the entire contribution, including the AI-assisted portions.
 You must be willing to engage in discussion and respond to any questions, comments,
 or suggestions we may have. 
-
-### Signing commits
-
-To improve contribution tracking,
-we use the [Canonical contributor license agreement](https://assets.ubuntu.com/v1/ff2478d1-Canonical-HA-CLA-ANY-I_v1.2.pdf)
-(CLA) as a legal sign-off, and we require all commits to have verified signatures.
-
-#### Canonical contributor agreement
-
-Canonical welcomes contributions to the Traefik Operator. Please check out our
-[contributor agreement](https://ubuntu.com/legal/contributors) if you're interested in contributing to the solution.
-
-The CLA sign-off is simple line at the
-end of the commit message certifying that you wrote it
-or have the right to commit it as an open-source contribution.
-
-#### Verified signatures on commits
-
-All commits in a pull request must have cryptographic (verified) signatures.
-To add signatures on your commits, follow the
-[GitHub documentation](https://docs.github.com/en/authentication/managing-commit-signature-verification/signing-commits).
 
 ## Develop
 
