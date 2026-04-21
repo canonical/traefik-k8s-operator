@@ -114,6 +114,20 @@ You are responsible for the entire contribution, including the AI-assisted porti
 You must be willing to engage in discussion and respond to any questions, comments,
 or suggestions we may have. 
 
+## Notable design decisions
+
+Traefik is a cluster-less proxy: each unit is performing its own routing decisions and keeping track of the health of upstreams (i.e., the addresses it routes requests for).
+Each Traefik operator listens to changes in the `ingress-per-unit` relations and generates their own configurations.
+Only the leader unit of the Traefik operator, however, communicates "back" with the application on the other side of the relation by providing the URL at which the units are reachable.
+
+**Limitation:** Since follower (i.e., "non-leader") units of a Juju application _cannot_ access their application databag in the relation (see [this Juju bug report](https://bugs.launchpad.net/juju/+bug/1911010)), it can be the case that follower units starts routing to units that have not yet been notified by the leader unit of the Traefik operator, what their externally-reachable URL is.
+
+In order to configure Traefik, we use its [File provider](https://doc.traefik.io/traefik/providers/file/), which uses `inotify` mechanisms to know when new files are created or modified in the filesystem.
+Unfortunately, `inotify` does not work in the [upstream Traefik image](https://hub.docker.com/_/traefik), which is why we resorted to:
+
+* storing the unit configuration in a _mounted volume_
+* run the Traefik process on a custom container image built on the [`ubuntu` base image](https://hub.docker.com/_/ubuntu), see the [Container image](#container-image) section.
+
 ## Develop
 
 To make contributions to this charm, you'll need a working
@@ -125,27 +139,30 @@ The code for this charm can be downloaded as follows:
 git clone https://github.com/canonical/traefik-k8s-operator
 ```
 
-Make sure to install [`uv`](https://docs.astral.sh/uv/). For example, you can install `uv` on Ubuntu using:
+These instructions assume you will run the charm on [`microk8s`](https://microk8s.io), and relies on the `dns`, `storage`, `registry` and `metallb` plugins:
 
-```bash
-sudo snap install astral-uv --classic
+```sh
+sudo snap install microk8s --classic
+microk8s enable storage dns
+microk8s enable metallb 192.168.0.10-192.168.0.100  # You will likely want to change these IP ranges
 ```
 
-For other systems, follow the [`uv` installation guide](https://docs.astral.sh/uv/getting-started/installation/).
+The `storage` and `dns` plugins are required machinery for most Juju charms running on K8s.
+This charm is no different.
+The `metallb` plugin is needed so that the Traefik ingress will receive on its service, which is of type `LoadBalancer`, an external IP it can propagate to the proxied applications.
 
-Then install `tox` with its extensions, and install a range of Python versions:
+The setup for Juju consists as follows:
 
-```bash
-uv python install
-uv tool install tox --with tox-uv
-uv tool update-shell
+```sh
+sudo snap install juju --classic
+juju bootstrap microk8s development
 ```
 
-To create a development environment, run:
+You can use the environments created by `tox` for development:
 
-```bash
-uv sync --all-groups
-source .venv/bin/activate
+```shell
+tox --notest -e unit
+source .tox/unit/bin/activate
 ```
 
 ### Test
@@ -153,33 +170,13 @@ source .venv/bin/activate
 This project uses `tox` for managing test environments. There are some pre-configured environments
 that can be used for linting and formatting code when you're preparing contributions to the charm:
 
-* ``tox``: Executes all of the basic checks and tests (``lint``, ``unit``, ``static``, and ``coverage-report``).
-* ``tox -e fmt``: Runs formatting using ``ruff``.
+* ``tox``: Executes all of the basic checks and tests (``lint`` and ``unit``).
+* ``tox -e fmt``: Update your code according to linting rules.
 * ``tox -e lint``: Runs a range of static code analysis to check the code.
-* ``tox -e static``: Runs other checks such as ``bandit`` for security issues.
 * ``tox -e unit``: Runs the unit tests.
 * ``tox -e integration``: Runs the integration tests.
 
-### Build the rock and charm
-
-Use [Rockcraft](https://documentation.ubuntu.com/rockcraft/stable/) to create an
-OCI image for the Traefik app, and then upload the image to a MicroK8s registry,
-which stores OCI archives so they can be downloaded and deployed.
-
-Enable the MicroK8s registry:
-
-```bash
-microk8s enable registry
-```
-
-The following commands pack the OCI image and push it into
-the MicroK8s registry:
-
-```bash
-cd <project_dir>
-rockcraft pack
-skopeo --insecure-policy copy --dest-tls-verify=false oci-archive:<rock-name>.rock docker://localhost:32000/<app-name>:latest
-```
+### Build the charm
 
 Build the charm in this git repository using:
 
@@ -187,16 +184,20 @@ Build the charm in this git repository using:
 charmcraft pack
 ```
 
+### Container image
+
+We are using an Ubuntu-based image built from [this repository](https://github.com/jnsgruk/traefik-oci-image).
+
+The reason **not** to use the [upstream Traefik image](https://hub.docker.com/_/traefik), is that the [File provider](https://doc.traefik.io/traefik/providers/file/) the charm uses (see [Notable design decisions](#notable design-decisions) section) does not seem to work in the upstream, busybox-based Traefik image.
+
 ### Deploy
 
-```bash
+```sh
 # Create a model
-juju add-model charm-dev
+juju add-model dev
 # Enable DEBUG logging
 juju model-config logging-config="<root>=INFO;unit=DEBUG"
-# Deploy the charm
-juju deploy ./traefik-k8s*.charm 
+juju deploy ./traefik-k8s_ubuntu-20.04-amd64.charm traefik-ingress --trust --resource traefik-image=docker.io/jnsgruk/traefik:2.6.1
 ```
-
 
 
