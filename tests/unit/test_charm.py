@@ -668,22 +668,21 @@ class TestConfigOptionsValidation(unittest.TestCase):
                 "key=value,key.sub-key=value-with-hyphen",
                 {"key": "value", "key.sub-key": "value-with-hyphen"},
             ),
+            ("key=val=ueWithEqual", {"key": "val=ueWithEqual"}),
+            ("kubernetes/key_with_empty_val=", {"kubernetes/key_with_empty_val": ""}),
+            ("key=https://url.com", {"key": "https://url.com"}),
             # Invalid cases
-            ("key1=value1,key2=value2,key=value3,key4=", None),  # Missing value for key4
             (
                 "kubernetes.io/description=this-is-valid,custom.io/key=value",
                 None,
             ),  # Reserved prefix used
             ("key1=value1,key2", None),
             ("key1=value1,example..com/key2=value2", None),  # Invalid domain format (double dot)
-            ("key1=value1,key=value2,key3=", None),  # Trailing equals for key3
             ("key1=value1,=value2", None),  # Missing key
-            ("key1=value1,key=val=ue2", None),  # Extra equals in value
             ("a" * 256 + "=value", None),  # Key exceeds max length (256 characters)
             ("key@=value", None),  # Invalid character in key
             ("key. =value", None),  # Space in key
             ("key,value", None),  # Missing '=' delimiter
-            ("kubernetes/description=", None),  # Key with no value
         ]
 
         for annotations, expected_result in test_cases:
