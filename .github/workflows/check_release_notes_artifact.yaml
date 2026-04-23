@@ -5,7 +5,9 @@ on:
 
 jobs:
   check-change-artifacts:
-    uses: canonical/release-notes-automation/.github/workflows/pr-compliance.yml@main
+    permissions:
+      contents: write
+    uses: canonical/release-notes-automation/.github/workflows/pr-compliance.yml@chore/update-pr-compliance-workflow
     secrets: inherit
     with:
       change-artifact-dir: docs/release-notes/artifacts
