@@ -12,6 +12,7 @@
 - [ ] I added or updated tests as needed (unit and integration)
 - [ ] **If this PR involves a Grafana dashboard:** I added a screenshot of the dashboard
 - [ ] **If this PR involves Terraform:** `terraform fmt` passes and `tflint` reports no errors
+- [ ] **If this PR modifies charm libraries owned by this project**: I incremented the `LIBAPI` and `LIBPATCH` values
 
 <!--  
 You can adjust the checklist to match the project.
