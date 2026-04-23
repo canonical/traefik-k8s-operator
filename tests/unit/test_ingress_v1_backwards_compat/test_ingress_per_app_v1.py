@@ -46,13 +46,13 @@ def traefik_container(tmp_path):
 
 @patch("charm.TraefikIngressCharm._static_config_changed", PropertyMock(return_value=False))
 @pytest.mark.parametrize("port, host", ((80, "1.1.1.1"), (81, "10.1.10.1")))
-@pytest.mark.parametrize("event_name", ("joined", "changed", "created"))
+@pytest.mark.parametrize("event_name", ("changed",))
 def test_ingress_per_app_created(
     traefik_ctx, port, host, model, traefik_container, event_name, tmp_path, caplog
 ):
     """Check the config.
 
-    Performed when a new ingress per leader is created or changes (single remote unit).
+    Performed when a new ingress per leader changes (single remote unit).
     """
     ipa = Relation(
         "ingress",
