@@ -5,6 +5,8 @@ on:
 
 jobs:
   check-change-artifacts:
+    permissions:
+      contents: write
     uses: canonical/release-notes-automation/.github/workflows/pr-compliance.yml@main
     secrets: inherit
     with:
