@@ -11,7 +11,7 @@ on:
 jobs:
   measure-deploy-time:
     name: Deploy bundle and measure traefik activation time
-    runs-on: [self-hosted, 2xlarge-extra]
+    runs-on: [self-hosted, 2xlarge-extra, amd64]
     timeout-minutes: 60
 
     steps:
