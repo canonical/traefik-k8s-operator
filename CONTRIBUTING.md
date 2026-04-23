@@ -96,6 +96,10 @@ that will run over your pull request and fail if no artifact exists.
 If your pull request doesn't necessitate a change artifact, use the `no-release-note`
 label on your pull request to opt out of the compliance workflow.
 
+Change artifacts include a key, `pr`, to capture the URL of your pull request.
+You may leave this key empty in your change artifact; the compliance workflow
+will automatically push a commit to your pull request to update the key.
+
 ### AI
 
 You are free to use any tools you want while preparing your contribution, including
