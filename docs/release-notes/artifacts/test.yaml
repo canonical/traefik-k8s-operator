@@ -1,15 +1,15 @@
 # Version of the artifact schema
 version_schema: 2
-
 # The key holding the change(s)
 changes:
-- title: Tested PR compliance workflow
-  author: erinecon
-  type: minor
-  description: Hello this is a test
-  urls:
-    pr: 
-    related_doc: # only applicable if there are documentation changes
-    related_issue: # only applicable if there's a corresponding GitHub issue
-  visibility: hidden
-  highlight: false
+  - title: Tested PR compliance workflow
+    author: erinecon
+    type: minor
+    description: Hello this is a test
+    urls:
+      pr:
+        - https://github.com/canonical/traefik-k8s-operator/pull/662
+      related_doc: # only applicable if there are documentation changes
+      related_issue: # only applicable if there's a corresponding GitHub issue
+    visibility: hidden
+    highlight: false
