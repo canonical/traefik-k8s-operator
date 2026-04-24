@@ -6,11 +6,13 @@ myst:
 
 (tutorial_index)=
 
-# Tutorial
+# Tutorials
 
-The Traefik charm tutorial walks you through a basic Traefik deployment.
+This section contains a step-by-step guide to help you start exploring how to deploy and configure the Traefik charm to provide ingress to a backend application.
 
-## Configuration
+## Get started
+
+This tutorial walks through a basic deployment of the Traefik charm.
 
 * {ref}`tutorial_tls_termination_using_a_local_ca`
 
