@@ -52,8 +52,9 @@ jobs:
           echo "Bundle deploy command issued at $(date --iso-8601=seconds)"
 
           echo "Waiting for all traefik applications to reach active status..."
-          juju wait-for application \
-            --query='startsWith(unit.name, "traefik") && status=="active"' \
+          juju wait-for application traefik --query='status=="active"' \
+            --timeout=10m
+          juju wait-for application traefik-rgw --query='status=="active"' \
             --timeout=10m
 
           END=$(date +%s)
@@ -61,9 +62,7 @@ jobs:
 
           echo "All traefik applications became active in ${ELAPSED} seconds"
           echo "ELAPSED=${ELAPSED}" >> "$GITHUB_ENV"
-      - name: tmate
-        if: always()
-        uses: canonical/action-tmate@main
+
       - name: Write job summary
         run: |
           echo "## Traefik K8s Activation Time" >> "$GITHUB_STEP_SUMMARY"
