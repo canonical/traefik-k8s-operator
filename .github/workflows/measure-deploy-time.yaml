@@ -54,6 +54,7 @@ jobs:
           echo "Waiting for all traefik applications to reach active status..."
           COUNT=0
           while [ 3 -gt $COUNT ]; do
+            sleep 10s
             juju wait-for application traefik --query='status=="active"' --timeout=10m
             RES1=$?
             juju wait-for application traefik-rgw --query='status=="active"' --timeout=10m
@@ -65,7 +66,6 @@ jobs:
               COUNT=0
               echo "At least one application is not active. Reset count: $COUNT"
             fi
-            sleep 10s
           done
 
           END=$(date +%s)
