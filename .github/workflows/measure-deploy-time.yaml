@@ -52,9 +52,7 @@ jobs:
           echo "Bundle deploy command issued at $(date --iso-8601=seconds)"
 
           echo "Waiting for all traefik applications to reach active status..."
-          juju wait-for application traefik --query='status=="active"' \
-            --timeout=10m
-          juju wait-for application traefik-rgw --query='status=="active"' \
+          juju wait-for model testing --query='applications.traefik.status=="active" && applications.traefik-rgw.status=="active"' \
             --timeout=10m
 
           END=$(date +%s)
