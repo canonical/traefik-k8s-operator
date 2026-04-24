@@ -65,7 +65,7 @@ jobs:
               COUNT=0
               echo "At least one application is not active. Reset count: $COUNT"
             fi
-            sleep 10
+            sleep 10s
           done
 
           END=$(date +%s)
