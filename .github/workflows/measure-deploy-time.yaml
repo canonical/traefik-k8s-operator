@@ -52,9 +52,16 @@ jobs:
           echo "Bundle deploy command issued at $(date --iso-8601=seconds)"
 
           echo "Waiting for all traefik applications to reach active status..."
-          juju wait-for model testing \
-            --query='forEach(applications, app => (app.name == "traefik" || app.name == "traefik-rgw") ? app.status == "active" : true)' \
-            --timeout=10m
+          COUNT=0
+          while [ 3 -lt $COUNT ]; do
+            if juju wait-for application traefik --query='status=="active"' --timeout=10m && \
+            juju wait-for application traefik-rgw --query='status=="active"' --timeout=10m; then
+              ((COUNT++))
+            else
+              COUNT=0
+            fi
+            sleep 10
+          done
 
           END=$(date +%s)
           ELAPSED=$((END - START))
