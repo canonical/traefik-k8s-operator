@@ -54,7 +54,11 @@ jobs:
           echo "Waiting for all traefik applications to reach active status..."
           COUNT=0
           while [ 3 -gt $COUNT ]; do
-            if juju wait-for application traefik --query='status=="active"' --timeout=10m && juju wait-for application traefik-rgw --query='status=="active"' --timeout=10m ; then
+            juju wait-for application traefik --query='status=="active"' --timeout=10m
+            RES1=$?
+            juju wait-for application traefik-rgw --query='status=="active"' --timeout=10m
+            RES2=$?
+            if [ $RES1 -eq 0 ] && [ $RES2 -eq 0 ]; then
               ((COUNT++))
               echo "Both applications are active. Current count: $COUNT"
             else
