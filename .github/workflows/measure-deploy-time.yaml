@@ -1,0 +1,84 @@
+# Copyright 2026 Canonical Ltd.
+# See LICENSE file for licensing details.
+
+name: Measure Traefik Activation Time
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  measure-deploy-time:
+    name: Deploy bundle and measure traefik activation time
+    runs-on: [self-hosted, 2xlarge-extra, amd64]
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install microk8s
+        run: |
+          sudo snap install microk8s --classic --channel=1.32/stable
+          sudo microk8s status --wait-ready --timeout=120
+          sudo microk8s enable dns storage
+
+      - name: Enable metallb
+        run: |
+          # Derive a small IP range from the host's primary interface subnet
+          HOST_IP=$(ip -4 route get 1.1.1.1 | grep -oP 'src \K\S+')
+          PREFIX=$(echo "$HOST_IP" | cut -d. -f1-3)
+          METALLB_RANGE="${PREFIX}.200-${PREFIX}.210"
+          echo "Using metallb range: $METALLB_RANGE"
+          sudo microk8s enable metallb:"$METALLB_RANGE"
+
+      - name: Install Juju
+        run: |
+          sudo snap install juju --channel=3.6/stable
+          mkdir -p ~/.local/share/juju
+
+      - name: Bootstrap Juju controller on microk8s
+        run: |
+          sudo microk8s config | juju add-k8s mk8s --client
+          juju bootstrap mk8s controller
+          juju add-model testing
+
+      - name: Deploy bundle and measure traefik activation time
+        run: |
+          echo "Deploying bundle..."
+          START=$(date +%s)
+          juju deploy ./traefik.bundle --trust
+          echo "Bundle deploy command issued at $(date --iso-8601=seconds)"
+
+          echo "Waiting for all traefik applications to reach active status..."
+          COUNT=0
+          while [ "$COUNT" -lt 3 ]; do
+            sleep 10s
+            if juju wait-for application traefik --query='status=="active"' --timeout=10m \
+              && juju wait-for application traefik-rgw --query='status=="active"' --timeout=10m; then
+              COUNT=$((COUNT + 1))
+              echo "Both applications are active. Current count: $COUNT"
+            else
+              COUNT=0
+              echo "At least one application is not active. Reset count: $COUNT"
+            fi
+          done
+
+          END=$(date +%s)
+          ELAPSED=$((END - START))
+
+          echo "All traefik applications became active in ${ELAPSED} seconds"
+          echo "ELAPSED=${ELAPSED}" >> "$GITHUB_ENV"
+
+      - name: Write job summary
+        run: |
+          echo "## Traefik K8s Activation Time" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Metric | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| --- | --- |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Time from \`juju deploy\` to traefik active | **${ELAPSED}s** |" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Show final juju status
+        if: always()
+        run: juju status --relations
