@@ -53,8 +53,8 @@ jobs:
 
           echo "Waiting for all traefik applications to reach active status..."
           juju wait-for model testing \
-            --query='forEach(applications, app => startsWith(app.name, "traefik") || app.status=="active")' \
-            --timeout=30m
+            --query='forEach(applications, app => not(startsWith(app.name, "traefik")) || app.status=="active")' \
+            --timeout=10m
 
           END=$(date +%s)
           ELAPSED=$((END - START))
