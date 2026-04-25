@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 Each revision is versioned by the date of the revision.
 
+## 2026-04-25
+
+- Fixed a missing space in the Raw mode warning log message in the `traefik_route` charm library.
+
 ## 2026-03-30
 
 - Added support for release notes.
