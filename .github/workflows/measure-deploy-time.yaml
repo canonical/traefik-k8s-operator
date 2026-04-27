@@ -53,7 +53,7 @@ jobs:
 
           echo "Waiting for all traefik applications to reach active status..."
           COUNT=0
-          while [ "$COUNT" -lt 3 ]; do
+          while [ "$COUNT" -lt 4 ]; do
             sleep 10s
             if juju wait-for application traefik --query='status=="active"' --timeout=10m \
               && juju wait-for application traefik-rgw --query='status=="active"' --timeout=10m; then
@@ -66,7 +66,8 @@ jobs:
           done
 
           END=$(date +%s)
-          ELAPSED=$((END - START))
+          # Subtract 30 seconds to account for the time taken looping the juju wait-for commands
+          ELAPSED=$((END - START - 30))
 
           echo "All traefik applications became active in ${ELAPSED} seconds"
           echo "ELAPSED=${ELAPSED}" >> "$GITHUB_ENV"
