@@ -8,7 +8,6 @@ changes:
     description: Hello this is a test
     urls:
       pr:
-        - https://github.com/canonical/traefik-k8s-operator/pull/662
       related_doc: # only applicable if there are documentation changes
       related_issue: # only applicable if there's a corresponding GitHub issue
     visibility: hidden
