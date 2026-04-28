@@ -11,7 +11,6 @@ changes:
     usage policy and more information about the release notes process.
   urls:
     pr: 
-      - https://github.com/canonical/traefik-k8s-operator/pull/636
     related_doc: https://github.com/canonical/traefik-k8s-operator/blob/main/CONTRIBUTING.md
     related_issue: https://github.com/canonical/traefik-k8s-operator/issues/654
   visibility: hidden
