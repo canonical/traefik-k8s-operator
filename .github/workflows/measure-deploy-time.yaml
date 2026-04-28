@@ -71,6 +71,9 @@ jobs:
 
           echo "All traefik applications became active in ${ELAPSED} seconds"
           echo "ELAPSED=${ELAPSED}" >> "$GITHUB_ENV"
+      - name: Tmate session
+        if: always()
+        uses: canonical/action-tmate
 
       - name: Write job summary
         run: |
