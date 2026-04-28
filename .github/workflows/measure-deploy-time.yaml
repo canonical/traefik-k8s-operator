@@ -73,7 +73,7 @@ jobs:
           echo "ELAPSED=${ELAPSED}" >> "$GITHUB_ENV"
       - name: Tmate session
         if: always()
-        uses: canonical/action-tmate
+        uses: canonical/action-tmate@main
 
       - name: Write job summary
         run: |
