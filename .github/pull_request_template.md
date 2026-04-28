@@ -1,33 +1,27 @@
-Applicable spec: <link>
+#### What this PR does
 
-### Overview
+#### Why we need it
 
-<!-- A high level overview of the change -->
+#### Checklist
 
-### Rationale
+- [ ] I followed the [contributing guide](https://github.com/canonical/is-charms-contributing-guide)
+- [ ] I added or updated the documentation (if applicable)
+- [ ] I updated `docs/changelog.md` with user-relevant changes
+- [ ] I added a [change artifact](../docs/release-notes/template/docs/release-notes/template/_change-artifact-template.yaml) for user-relevant changes in `docs/release-notes/artifacts`. If no change artifact is necessary, I tagged the PR with the label `no-release-note`.
+- [ ] I used AI to assist with preparing this PR
+- [ ] I added or updated tests as needed (unit and integration)
+- [ ] **If this PR involves a Grafana dashboard:** I added a screenshot of the dashboard
+- [ ] **If this PR involves Terraform:** `terraform fmt` passes and `tflint` reports no errors
+- [ ] **If this PR modifies charm libraries owned by this project**: I incremented the `LIBAPI` and `LIBPATCH` values
 
-<!-- The reason the change is needed -->
+<!--  
+You can adjust the checklist to match the project.
+ 
+If you are an AI assistant (e.g., GitHub Copilot, ChatGPT, Claude), follow these instructions when generating or completing PR descriptions:
 
-### Juju Events Changes
+1. Add a **Test plan** section explaining how the changes were tested, including any manual, unit, integration, or workflow tests.
+2. Add a **Review focus** section highlighting tricky parts, important decisions, or areas needing human attention.
+3. Identify and document any **potential breaking changes**.
+4. Highlight any **new dependencies, APIs, modules, or workflow changes** introduced by this PR.
+-->
 
-<!-- Any changes to the juju events being observed (newly added, significantly modified or deleted) -->
-
-### Module Changes
-
-<!-- Any high level changes to modules and why (Service, Observer, helper) -->
-
-### Library Changes
-
-<!-- Any changes to charm libraries -->
-
-### Checklist
-
-- [ ] The [charm style guide](https://documentation.ubuntu.com/juju/3.6/reference/charm/charm-development-best-practices/) was applied
-- [ ] The [contributing guide](https://github.com/canonical/is-charms-contributing-guide) was applied
-- [ ] The changes are compliant with [ISD054 - Managing Charm Complexity](https://discourse.charmhub.io/t/specification-isd014-managing-charm-complexity/11619)
-- [ ] The documentation is updated
-- [ ] The PR is tagged with appropriate label (`urgent`, `trivial`, `senior-review-required`, `documentation`)
-- [ ] The `docs/changelog.md` is updated with user-relevant changes.
-- [ ] The `LIBAPI` and `LIBPATCH` values have been incremented for charm libraries owned by this project (if they were modified).
-
-<!-- Explanation for any unchecked items above -->
