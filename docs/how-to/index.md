@@ -29,16 +29,11 @@ This section contains how-to guides for troubleshooting actions during normal op
 * {ref}`Troubleshoot "Gateway Address Unavailable" <how_to_troubleshoot_gateway_address_unavailable>`
 * {ref}`Troubleshoot reachability <how_to_troubleshoot_reachability>`
 
-## Upgrade
+## Maintenance and development
 
-This section contains how-to guides for maintenance actions that you might need to take while operating the charm.
+Upgrades and community contributions ensure the Traefik charm stays current and benefits from ongoing improvements.
 
 * {ref}`Upgrade <how_to_upgrade>`
-
-## Contributing
-
-This section contains how-to guides for contributing to the project.
-
 * {ref}`Contribute <how_to_contribute>`
 
 
