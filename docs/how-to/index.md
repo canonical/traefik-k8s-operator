@@ -10,16 +10,11 @@ myst:
 
 These guides accompany you through the complete Traefik charm operations lifecycle.
 
-## Configuring
+## Configuring and Integrating
 
 Once you've set up the charm, you can take advantage of the built-in features and capabilities to customize the charm based on your specific needs and use cases.
 
 * {ref}`Force HTTPS redirect <how_to_force_https_redirect>`
-
-## Integrating via the `traefik-route` relation
-
-In more advanced cases where the default `ingress` relation is not flexible enough, you can integrate your backend application via the `traefik-route` relation.
-
 * {ref}`Integrate with traefik and traefik-route <how_to_integrate>`
 
 ## Troubleshooting
