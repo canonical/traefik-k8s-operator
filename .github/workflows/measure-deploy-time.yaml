@@ -4,9 +4,9 @@
 name: Measure Traefik Activation Time
 
 on:
-  pull_request:
-    branches:
-      - main
+  workflow_dispatch:
+    inputs:
+      # No inputs for now, but this allows manual triggering of the workflow
 
 jobs:
   measure-deploy-time:
