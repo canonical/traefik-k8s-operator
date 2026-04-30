@@ -11,6 +11,7 @@ changes:
     urls:
       pr:
         - https://github.com/canonical/traefik-k8s-operator/pull/636
+        - https://github.com/canonical/debug-traefik-k8s-operator/pull/2
       related_doc: https://github.com/canonical/traefik-k8s-operator/blob/main/CONTRIBUTING.md
       related_issue: https://github.com/canonical/traefik-k8s-operator/issues/654
     visibility: hidden
