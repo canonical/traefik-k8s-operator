@@ -1,0 +1,276 @@
+bundle: kubernetes
+
+applications:
+  traefik:
+    charm: ch:traefik-k8s
+    channel: latest/candidate
+    base: ubuntu@20.04
+    scale: 3
+    trust: true
+    options:
+      kubernetes-service-annotations: metallb.universe.tf/address-pool=public
+  traefik-rgw:
+    charm: ch:traefik-k8s
+    channel: latest/candidate
+    base: ubuntu@20.04
+    scale: 3
+    trust: true
+    options:
+      kubernetes-service-annotations: metallb.universe.tf/address-pool=public
+  mysql:
+    charm: ch:mysql-k8s
+    channel: 8.0/stable
+    base: ubuntu@22.04
+    scale: 1
+    trust: true
+    options:
+      profile-limit-memory: 6202
+      experimental-max-connections: 466
+  tls-operator:
+    charm: self-signed-certificates
+    channel: latest/beta
+    base: ubuntu@22.04
+    scale: 1
+    options:
+      ca-common-name: internal-ca
+  rabbitmq:
+    charm: ch:rabbitmq-k8s
+    channel: 3.12/edge
+    base: ubuntu@24.04
+    scale: 1
+    trust: true
+    options:
+      minimum-replicas: 1
+  ovn-central:
+    charm: ch:ovn-central-k8s
+    channel: 24.03/edge
+    base: ubuntu@24.04
+    scale: 1
+    trust: true
+    resources:
+      ovn-sb-db-server-image: ghcr.io/canonical/ovn-consolidated:24.03-24.04_edge
+      ovn-nb-db-server-image: ghcr.io/canonical/ovn-consolidated:24.03-24.04_edge
+      ovn-northd-image: ghcr.io/canonical/ovn-consolidated:24.03-24.04_edge
+  ovn-relay:
+    charm: ch:ovn-relay-k8s
+    channel: 24.03/edge
+    base: ubuntu@24.04
+    scale: 1
+    trust: true
+    resources:
+      ovn-sb-db-server-image: ghcr.io/canonical/ovn-consolidated:24.03-24.04_edge
+  keystone:
+    charm: ch:keystone-k8s
+    channel: 2024.1/edge
+    base: ubuntu@24.04
+    scale: 3
+    trust: true
+    storage:
+      fernet-keys: 5M
+      credential-keys: 5M
+    resources:
+      keystone-image: ghcr.io/canonical/keystone:2024.1-24.04_edge
+  glance:
+    charm: ch:glance-k8s
+    channel: 2024.1/edge
+    base: ubuntu@24.04
+    scale: 3
+    trust: true
+    storage:
+      local-repository: 10G
+    resources:
+      glance-api-image: ghcr.io/canonical/glance-api:2024.1-24.04_edge
+  nova:
+    charm: ch:nova-k8s
+    channel: 2024.1/edge
+    base: ubuntu@24.04
+    scale: 3
+    trust: true
+    resources:
+      nova-api-image: ghcr.io/canonical/nova-consolidated:2024.1-24.04_edge
+      nova-scheduler-image: ghcr.io/canonical/nova-consolidated:2024.1-24.04_edge
+      nova-conductor-image: ghcr.io/canonical/nova-consolidated:2024.1-24.04_edge
+      nova-spiceproxy-image: ghcr.io/canonical/nova-consolidated:2024.1-24.04_edge
+  placement:
+    charm: ch:placement-k8s
+    channel: 2024.1/edge
+    base: ubuntu@24.04
+    scale: 3
+    trust: true
+    resources:
+      placement-api-image: ghcr.io/canonical/placement-api:2024.1-24.04_edge
+  neutron:
+    charm: ch:neutron-k8s
+    channel: 2024.1/edge
+    base: ubuntu@24.04
+    scale: 3
+    trust: true
+    options:
+      debug: true
+    resources:
+      neutron-server-image: ghcr.io/canonical/neutron-server:2024.1-24.04_edge
+  cinder-router:
+    charm: ch:mysql-router-k8s
+    channel: 8.0/edge
+    base: ubuntu@22.04
+    scale: 1
+    trust: true
+    options:
+      expose-external: loadbalancer
+  cinder:
+    charm: ch:cinder-k8s
+    channel: 2024.1/edge
+    base: ubuntu@24.04
+    scale: 3
+    trust: true
+    resources:
+      cinder-api-image: ghcr.io/canonical/cinder-consolidated:2024.1-24.04_edge
+      cinder-scheduler-image: ghcr.io/canonical/cinder-consolidated:2024.1-24.04_edge
+  horizon:
+    charm: ch:horizon-k8s
+    channel: 2024.1/edge
+    base: ubuntu@24.04
+    scale: 3
+    trust: true
+    resources:
+      horizon-image: ghcr.io/canonical/horizon:2024.1-24.04_edge
+
+relations:
+- - tls-operator:certificates
+  - ovn-central:certificates
+
+- - tls-operator:certificates
+  - ovn-relay:certificates
+- - ovn-relay:ovsdb-cms
+  - ovn-central:ovsdb-cms
+
+- - mysql:database
+  - keystone:database
+- - traefik:ingress
+  - keystone:ingress-internal
+- - rabbitmq:amqp
+  - keystone:amqp
+
+- - mysql:database
+  - glance:database
+- - keystone:identity-service
+  - glance:identity-service
+- - rabbitmq:amqp
+  - glance:amqp
+- - traefik:ingress
+  - glance:ingress-internal
+- - keystone:send-ca-cert
+  - glance:receive-ca-cert
+
+- - mysql:database
+  - nova:database
+- - mysql:database
+  - nova:api-database
+- - mysql:database
+  - nova:cell-database
+- - rabbitmq:amqp
+  - nova:amqp
+- - keystone:identity-service
+  - nova:identity-service
+- - traefik:ingress
+  - nova:ingress-internal
+- - traefik:traefik-route
+  - nova:traefik-route-internal
+- - keystone:send-ca-cert
+  - nova:receive-ca-cert
+- - placement:placement
+  - nova:placement
+
+- - mysql:database
+  - placement:database
+- - keystone:identity-service
+  - placement:identity-service
+- - traefik:ingress
+  - placement:ingress-internal
+- - keystone:send-ca-cert
+  - placement:receive-ca-cert
+
+- - mysql:database
+  - neutron:database
+- - rabbitmq:amqp
+  - neutron:amqp
+- - keystone:identity-service
+  - neutron:identity-service
+- - traefik:ingress
+  - neutron:ingress-internal
+- - tls-operator:certificates
+  - neutron:certificates
+- - neutron:ovsdb-cms
+  - ovn-central:ovsdb-cms
+- - keystone:send-ca-cert
+  - neutron:receive-ca-cert
+
+- - mysql:database
+  - cinder-router:backend-database
+- - cinder:database
+  - cinder-router:database
+- - cinder:amqp
+  - rabbitmq:amqp
+- - keystone:identity-service
+  - cinder:identity-service
+- - traefik:ingress
+  - cinder:ingress-internal
+- - keystone:send-ca-cert
+  - cinder:receive-ca-cert
+- - glance:image-service
+  - cinder:image-service
+
+- - mysql:database
+  - horizon:database
+- - keystone:identity-credentials
+  - horizon:identity-credentials
+- - traefik:ingress
+  - horizon:ingress-internal
+- - keystone:send-ca-cert
+  - horizon:receive-ca-cert
+- - keystone:identity-endpoints
+  - horizon:identity-endpoints
+
+---
+applications:
+  tls-operator:
+    offers:
+      certificates:
+        endpoints:
+          - certificates
+  rabbitmq:
+    offers:
+      amqp:
+        endpoints:
+          - amqp
+  ovn-relay:
+    offers:
+      ovsdb-cms:
+        endpoints:
+          - ovsdb-cms-relay
+  keystone:
+    offers:
+      identity-service:
+        endpoints:
+          - identity-service
+      identity-credentials:
+        endpoints:
+          - identity-credentials
+      send-ca-cert:
+        endpoints:
+          - send-ca-cert
+  nova:
+    offers:
+      nova-service:
+        endpoints:
+          - nova-service
+  cinder-router:
+    offers:
+      cinder-database:
+        endpoints:
+          - database
+  traefik-rgw:
+    offers:
+      traefik-route-rgw:
+        endpoints:
+          - traefik-route
