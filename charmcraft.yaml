@@ -4,6 +4,7 @@
 type: charm
 
 platforms:
+  ubuntu@24.04:amd64:
   ubuntu@20.04:amd64:
 
 parts:
