@@ -6,9 +6,10 @@ changes:
     author: mostafaCamel
     type: trivial
     description: This PR removes unecessary k8s annotation values as k8s itself does not do such a validation and allows urls as values
-    urls: 
-      pr: https://github.com/canonical/traefik-k8s-operator/pull/653
-      related_doc: 
+    urls:
+      pr:
+        - https://github.com/canonical/debug-traefik-k8s-operator/pull/2
+      related_doc:
       related_issue: https://github.com/canonical/traefik-k8s-operator/issues/647
     visibility: public
     highlight: false
