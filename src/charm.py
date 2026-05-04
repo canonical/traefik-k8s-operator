@@ -641,7 +641,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
                     # Note: this nested loop handles the case of multi-unit CA, each unit providing
                     # a different ca cert, but that is not currently supported by the lib itself.
                     if ca := relation.data[unit].get("ca"):
-                        cas.append(CA(ca, uid=relation.id))
+                        cas.append(CA(json.loads(ca), uid=relation.id))
 
         self.traefik.add_cas(cas)
 
