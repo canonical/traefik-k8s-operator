@@ -10,25 +10,25 @@ myst:
 
 These guides accompany you through the complete Traefik charm operations lifecycle.
 
-## Configuring
+## Configuring and Integrating
+
+Once you've set up the charm, you can take advantage of the built-in features and capabilities to customize the charm based on your specific needs and use cases.
 
 * {ref}`Force HTTPS redirect <how_to_force_https_redirect>`
-
-## Integrating
-
 * {ref}`Integrate with traefik and traefik-route <how_to_integrate>`
 
 ## Troubleshooting
 
+This section contains how-to guides for troubleshooting actions during normal operation.
+
 * {ref}`Troubleshoot "Gateway Address Unavailable" <how_to_troubleshoot_gateway_address_unavailable>`
 * {ref}`Troubleshoot reachability <how_to_troubleshoot_reachability>`
 
-## Upgrade
+## Maintenance and development
+
+Upgrades and community contributions ensure the Traefik charm stays current and benefits from ongoing improvements.
 
 * {ref}`Upgrade <how_to_upgrade>`
-
-## Contributing
-
 * {ref}`Contribute <how_to_contribute>`
 
 

@@ -105,15 +105,6 @@ logger = logging.getLogger(__name__)
 
 _TRAEFIK_CONTAINER_NAME = "traefik"
 
-
-# Regex for Kubernetes annotation values:
-# - Allows alphanumeric characters, dots (.), dashes (-), and underscores (_)
-# - Matches the entire string
-# - Does not allow empty strings
-# - Example valid: "value1", "my-value", "value.name", "value_name"
-# - Example invalid: "value@", "value#", "value space"
-ANNOTATION_VALUE_PATTERN = re.compile(r"^[\w.\-_]+$")
-
 # Based on https://github.com/kubernetes/apimachinery/blob/v0.31.3/pkg/util/validation/validation.go#L204  # noqa  # pylint: disable=line-too-long
 # Regex for DNS1123 subdomains:
 # - Starts with a lowercase letter or number ([a-z0-9])
@@ -1919,18 +1910,6 @@ def validate_annotation_key(key: str) -> bool:
 
     return True
 
-
-def validate_annotation_value(value: str) -> bool:
-    """Validate the annotation value."""
-    if not ANNOTATION_VALUE_PATTERN.match(value):
-        logger.error(
-            "Invalid annotation value: '%s'. Must follow Kubernetes annotation syntax.", value
-        )
-        return False
-
-    return True
-
-
 def parse_annotations(annotations: Optional[str]) -> Optional[Dict[str, str]]:
     """Parse and validate annotations from a string.
 
@@ -1955,8 +1934,8 @@ def parse_annotations(annotations: Optional[str]) -> Optional[Dict[str, str]]:
         return None
 
     # Validate each key-value pair
-    for key, value in parsed_annotations.items():
-        if not validate_annotation_key(key) or not validate_annotation_value(value):
+    for key, _ in parsed_annotations.items():
+        if not validate_annotation_key(key):
             return None
 
     return parsed_annotations
