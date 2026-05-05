@@ -1,0 +1,17 @@
+# --- Release notes artifact ----
+
+schema_version: 1
+changes:
+  - title: Ensure hosts ordering in the dynamic configuration files
+    author: swetha1654
+    type: trivial
+    description: |
+      This PR ensures that the hosts are ordered alphabetically, which is important for consistency 
+      and predictability when managing Traefik configurations. This especially helps when host ordering
+      causes traefik to push different dynamic configurations, resulting in unnecessary reset of traefik health checks.
+    urls: 
+      pr: https://github.com/canonical/traefik-k8s-operator/pull/673
+      related_doc: 
+      related_issue: https://github.com/canonical/traefik-k8s-operator/issues/665
+    visibility: public
+    highlight: false
