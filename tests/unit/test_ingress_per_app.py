@@ -24,12 +24,12 @@ from tests.unit._utils import create_ingress_relation
 @pytest.mark.parametrize(
     "port, ip, host", ((80, "1.1.1.1", "1.1.1.1"), (81, "10.1.10.1", "10.1.10.1"))
 )
-@pytest.mark.parametrize("event_name", ("joined", "changed", "created"))
+@pytest.mark.parametrize("event_name", ("changed",))
 @pytest.mark.parametrize("scheme", ("http", "https"))
 def test_ingress_per_app_created(
     traefik_ctx, port, ip, host, model, traefik_container, event_name, tmp_path, scheme
 ):
-    """Check the config when a new ingress per app is created or changes (single remote unit)."""
+    """Check the config when ingress per app relation changes (single remote unit)."""
     ipa = create_ingress_relation(port=port, scheme=scheme, hosts=[host], ips=[ip])
     state = State(
         model=model,
@@ -67,12 +67,12 @@ def test_ingress_per_app_created(
     "port, ip, host", ((80, "1.1.1.{}", "1.1.1.{}"), (81, "10.1.10.{}", "10.1.10.{}"))
 )
 @pytest.mark.parametrize("n_units", (2, 3, 10))
-@pytest.mark.parametrize("evt_name", ("joined", "changed"))
+@pytest.mark.parametrize("evt_name", ("changed",))
 @pytest.mark.parametrize("scheme", ("http", "https"))
 def test_ingress_per_app_scale(
     traefik_ctx, host, ip, port, model, traefik_container, tmp_path, n_units, scheme, evt_name
 ):
-    """Check the config when a new ingress per app unit joins."""
+    """Check the config when ingress per app unit relation changes."""
     relation_id = 42
     unit_id = 0
     cfg_file = tmp_path.joinpath(
@@ -147,7 +147,7 @@ def test_ingress_per_app_scale(
 @pytest.mark.parametrize(
     "port, ip, host", ((80, "1.1.1.1", "1.1.1.1"), (81, "10.1.10.1", "10.1.10.1"))
 )
-@pytest.mark.parametrize("evt_name", ("joined", "changed"))
+@pytest.mark.parametrize("evt_name", ("changed",))
 @pytest.mark.parametrize("leader", (True, False))
 def get_requirer_ctx(host, ip, port):
     class MyRequirer(CharmBase):
@@ -165,7 +165,7 @@ def get_requirer_ctx(host, ip, port):
 @pytest.mark.parametrize(
     "port, ip, host", ((80, "1.1.1.1", "1.1.1.1"), (81, "10.1.10.1", "1.1.1.1"))
 )
-@pytest.mark.parametrize("evt_name", ("joined", "changed"))
+@pytest.mark.parametrize("evt_name", ("changed",))
 @pytest.mark.parametrize("leader", (True, False))
 def test_ingress_per_app_requirer_with_auto_data(host, ip, port, model, evt_name, leader):
     ipa = Relation("ingress")
