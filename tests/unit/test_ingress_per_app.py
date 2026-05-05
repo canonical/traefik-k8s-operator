@@ -393,3 +393,34 @@ def test_ingress_with_hostname_and_routing_mode(
     # event = getattr(ipa, f"changed_event")
     state_out = traefik_ctx.run("config-changed", state)
     assert state_out.relations[0].local_app_data == expected_local_app_data
+
+
+def test_ingress_per_app_servers_are_sorted(traefik_ctx, model, traefik_container):
+    """Check that load-balancer servers are listed in sorted host order."""
+    # GIVEN a multi-unit app whose hosts arrive in reverse alphabetical order
+    hosts = ["z.unit.svc", "m.unit.svc", "a.unit.svc"]
+    ips = ["1.0.0.3", "1.0.0.2", "1.0.0.1"]
+    ipa = create_ingress_relation(port=80, hosts=hosts, ips=ips)
+
+    state = State(
+        model=model,
+        config={"routing_mode": "path", "external_hostname": "foo.com"},
+        containers=[traefik_container],
+        relations=[ipa],
+    )
+
+    # WHEN the relation changed event fires
+    traefik_ctx.run(ipa.changed_event, state)
+
+    generated_config = yaml.safe_load(
+        traefik_container.get_filesystem(traefik_ctx)
+        .joinpath(f"opt/traefik/juju/juju_ingress_ingress_{ipa.relation_id}_remote.yaml")
+        .read_text()
+    )
+
+    servers = generated_config["http"]["services"]["juju-test-model-remote-0-service"][
+        "loadBalancer"
+    ]["servers"]
+
+    # THEN the servers appear in sorted host order regardless of relation-data order
+    assert servers == [{"url": f"http://{h}:80"} for h in sorted(hosts)]
