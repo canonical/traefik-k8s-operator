@@ -12,6 +12,10 @@ Each revision is versioned by the date of the revision.
 
 - Fixed reading the CA certificates from the `certificate-transfer` relation.
 
+## 2026-05-05
+
+- Ensure hosts ordering in the dynamic configuration files.
+
 ## 2026-04-19
 
 - Removed redundant `relation-created` and `relation-joined` event observers from the ingress v1 and v2 libraries; ingress processing now triggers only on `relation-changed`.
