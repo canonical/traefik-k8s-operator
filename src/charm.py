@@ -7,6 +7,7 @@
 
 import contextlib
 import enum
+import functools
 import itertools
 import json
 import logging
@@ -487,7 +488,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         """
         return cast(Optional[str], self.config.get("basic_auth_user", None))
 
-    @property
+    @functools.cached_property
     def _loadbalancer_annotations(self) -> Optional[Dict[str, str]]:
         """Parses and returns annotations to apply to the LoadBalancer service.
 
@@ -543,7 +544,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             resources_list.append(self._construct_lb())
         klm.reconcile(resources_list)
 
-    @property
+    @functools.cached_property
     def _get_loadbalancer_status(self) -> Optional[str]:
         try:
             traefik_service = self.lightkube_client.get(
@@ -564,7 +565,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
 
         return ingress_address.hostname or ingress_address.ip
 
-    @property
+    @functools.cached_property
     def _traefik_loadbalancer_ip(self) -> Optional[str]:
         try:
             traefik_service = self.lightkube_client.get(
@@ -636,12 +637,8 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
                 cas.append(CA(cert, uid=event.relation_id))
         else:
             for relation in self.model.relations.get(self.recv_ca_cert.relationship_name, []):
-                # For some reason, relation.units includes our unit and app. Need to exclude them.
-                for unit in set(relation.units).difference([self.app, self.unit]):
-                    # Note: this nested loop handles the case of multi-unit CA, each unit providing
-                    # a different ca cert, but that is not currently supported by the lib itself.
-                    if ca := relation.data[unit].get("ca"):
-                        cas.append(CA(ca, uid=relation.id))
+                for cert in self.recv_ca_cert.get_all_certificates(relation.id):
+                    cas.append(CA(cert, uid=relation.id))
 
         self.traefik.add_cas(cas)
 
@@ -1561,7 +1558,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             strip_prefix=data.app.strip_prefix,
             port=data.app.port,
             external_host=self.gateway_address,
-            hosts=[udata.host for udata in data.units],
+            hosts=sorted([udata.host for udata in data.units]),
             forward_auth_app=self.forward_auth.is_protected_app(app=data.app.name),
             forward_auth_config=self.forward_auth.get_provider_info(),
             healthcheck_params=(
@@ -1732,7 +1729,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             "ip": self._traefik_loadbalancer_ip,
         }
 
-    @property
+    @functools.cached_property
     def _traefik_external_address(self) -> Optional[str]:
         """Return the address used to ingress directly through this Traefik's gateway.
 
@@ -1749,7 +1746,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
 
         return self._get_loadbalancer_status
 
-    @property
+    @functools.cached_property
     def gateway_address(self) -> str:
         """Return the address used to ingress directly through this Traefik's gateway.
 
