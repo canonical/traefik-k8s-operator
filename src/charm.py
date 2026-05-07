@@ -636,12 +636,8 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
                 cas.append(CA(cert, uid=event.relation_id))
         else:
             for relation in self.model.relations.get(self.recv_ca_cert.relationship_name, []):
-                # For some reason, relation.units includes our unit and app. Need to exclude them.
-                for unit in set(relation.units).difference([self.app, self.unit]):
-                    # Note: this nested loop handles the case of multi-unit CA, each unit providing
-                    # a different ca cert, but that is not currently supported by the lib itself.
-                    if ca := relation.data[unit].get("ca"):
-                        cas.append(CA(ca, uid=relation.id))
+                for cert in self.recv_ca_cert.get_all_certificates(relation.id):
+                    cas.append(CA(cert, uid=relation.id))
 
         self.traefik.add_cas(cas)
 

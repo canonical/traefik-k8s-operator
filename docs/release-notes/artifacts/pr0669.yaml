@@ -1,0 +1,18 @@
+# Version of the artifact schema
+version_schema: 2
+# The key holding the change(s)
+changes:
+  - title: Fix reading the CA certificates from the `certificate-transfer` relation.
+    author: sinapah
+    type: minor
+    description: |
+      `_update_received_ca_certs` now reads the CA certificates from the relation data using the
+      `get_all_certificates` method from the `certificate-transfer` library instead of reading the
+      unit databag directly.
+    urls:
+      pr:
+        - https://github.com/canonical/traefik-k8s-operator/pull/669
+      related_doc:
+      related_issue: https://github.com/canonical/traefik-k8s-operator/issues/668
+    visibility: hidden
+    highlight: false

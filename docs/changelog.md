@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 Each revision is versioned by the date of the revision.
 
+## 2025-05-07
+
+- Fixed reading the CA certificates from the `certificate-transfer` relation.
+
 ## 2026-05-05
 
 - Ensure hosts ordering in the dynamic configuration files.
