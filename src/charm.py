@@ -1091,8 +1091,9 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         self.unit.set_workload_version("")
 
     def _on_remove(self, _: EventBase) -> None:
-        klm = self._get_lb_resource_manager()
-        klm.delete()
+        if self.app.planned_units() == 0:
+            klm = self._get_lb_resource_manager()
+            klm.delete(ignore_missing=True)
 
     def _on_update_status(self, _: UpdateStatusEvent) -> None:
         self._process_status_and_configurations()

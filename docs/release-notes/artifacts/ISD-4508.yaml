@@ -1,0 +1,16 @@
+# Version of the artifact schema
+version_schema: 2
+# The key holding the change(s)
+changes:
+  - title: Fixed LoadBalancer deletion during scale down
+    author: swetha1654
+    type: bugfix
+    description: |
+      Fixed the `_on_remove` handler to delete the LoadBalancer resource only when the 
+      application is fully removed.
+    urls:
+      pr:
+      related_doc:
+      related_issue:
+    visibility: public
+    highlight: false
