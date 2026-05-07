@@ -1561,7 +1561,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             strip_prefix=data.app.strip_prefix,
             port=data.app.port,
             external_host=self.gateway_address,
-            hosts=[udata.host for udata in data.units],
+            hosts=sorted([udata.host for udata in data.units]),
             forward_auth_app=self.forward_auth.is_protected_app(app=data.app.name),
             forward_auth_config=self.forward_auth.get_provider_info(),
             healthcheck_params=(
