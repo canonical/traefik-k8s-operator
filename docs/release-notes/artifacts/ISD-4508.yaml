@@ -5,11 +5,10 @@ changes:
   - title: Fixed LoadBalancer deletion during scale down
     author: swetha1654
     type: bugfix
-    description: |
-      Fixed the `_on_remove` handler to delete the LoadBalancer resource only when the 
-      application is fully removed.
+    description: "Fixed the `_on_remove` handler to delete the LoadBalancer resource only when the \napplication is fully removed.\n"
     urls:
       pr:
+        - https://github.com/canonical/traefik-k8s-operator/pull/674
       related_doc:
       related_issue:
     visibility: public
