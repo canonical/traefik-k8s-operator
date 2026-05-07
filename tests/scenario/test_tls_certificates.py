@@ -454,6 +454,3 @@ class TestNonLeaderReadsCerts:
 
             assert "testhostname" not in certs
             assert isinstance(charm.unit.status, BlockedStatus)
-
-    assert not written_content.endswith('"')
-    assert written_content == ca_cert
