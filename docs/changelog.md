@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 Each revision is versioned by the date of the revision.
 
+## 2026-05-07
+
+- Fixed `_on_remove` to only delete the LoadBalancer resource when the application is fully removed (0 planned units), preventing accidental LB deletion during scale-down.
+
 ## 2026-04-20
 
 - Replaced `@property` with `@functools.cached_property` on frequently accessed charm attributes.
