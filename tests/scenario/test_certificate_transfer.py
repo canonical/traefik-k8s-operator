@@ -1,5 +1,7 @@
 import json
+
 from scenario import Relation, State
+
 
 def test_ca_cert_written_from_unit_databag_on_pebble_ready(traefik_ctx, traefik_container):
     """On pebble-ready, CA certs read from the relation databag should not have extra quotes."""
