@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 Each revision is versioned by the date of the revision.
 
+## 2026-04-20
+
+- Replaced `@property` with `@functools.cached_property` on frequently accessed charm attributes.
+
 ## 2025-05-07
 
 - Fixed reading the CA certificates from the `certificate-transfer` relation.
