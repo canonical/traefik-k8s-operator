@@ -1,0 +1,14 @@
+# --- Release notes artifact ----
+
+schema_version: 1
+changes:
+  - title: Fix missing space in raw-mode TLS warning log
+    author: mvanhorn
+    type: patch
+    description: The `v0/traefik_route.py` raw-mode warning was assembled from three adjacent string literals where the first two concatenated without a space, so the charm log emitted "additionalTLS configuration" instead of "additional TLS configuration". Cosmetic log-message fix, no behavior change.
+    urls:
+      pr: https://github.com/canonical/traefik-k8s-operator/pull/652
+      related_doc:
+      related_issue: https://github.com/canonical/traefik-k8s-operator/issues/651
+    visibility: public
+    highlight: false
