@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 from scenario import State
 
-from traefik import CA_CERTS_DIR, CERTS_DIR
+from traefik import CERTS_DIR
 
 
 def test_container_cleanup_keeps_excluded_cert_key_and_ca(traefik_ctx, traefik_container):
