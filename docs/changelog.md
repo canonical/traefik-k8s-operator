@@ -8,6 +8,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 Each revision is versioned by the date of the revision.
 
+## 2026-05-08
+
+- Added `wipe_ingress_data` method to `TraefikRouteProvider` to clear ingress data on traefik-route relations during ingress resets.
+- Simplified the `_handle_traefik_route_ready` handler to delegate to `_process_status_and_configurations`.
+- Included `traefik-route` relations in `_wipe_ingress_for_all_relations` so that route ingress data is also cleared during full resets.
+
 ## 2026-05-07
 
 - Fixed `_on_remove` to only delete the LoadBalancer resource when the application is fully removed (0 planned units), preventing accidental LB deletion during scale-down.

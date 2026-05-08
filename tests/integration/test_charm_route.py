@@ -137,5 +137,32 @@ async def test_remove_relation(ops_test: OpsTest):
     await ops_test.model.wait_for_idle([APP_NAME], status="active")
 
 
+async def test_ingress_data_wiped_after_relation_removed(ops_test: OpsTest):
+    """After relation removal, re-relate and verify fresh data is published."""
+    # Re-add the relation
+    await ops_test.model.add_relation(
+        f"{TESTER_APP_NAME}:traefik-route", f"{APP_NAME}:traefik-route"
+    )
+    await ops_test.model.wait_for_idle([APP_NAME, TESTER_APP_NAME], status="active", timeout=1000)
+
+    # Verify the requirer can obtain the external host again after re-relating
+    unit = ops_test.model.applications[TESTER_APP_NAME].units[0]
+    action = await unit.run_action("get-external-host")
+    result = await action.wait()
+    external_host = result.results.get("external-host")
+    assert external_host, "External host should be set after re-relating"
+
+    traefik_ip = await get_k8s_service_address(ops_test, f"{APP_NAME}-lb")
+    assert external_host == traefik_ip, (
+        f"External host should match traefik IP after re-relate: {external_host} vs {traefik_ip}"
+    )
+
+    # Clean up: remove the relation again
+    await ops_test.juju(
+        "remove-relation", f"{TESTER_APP_NAME}:traefik-route", f"{APP_NAME}:traefik-route"
+    )
+    await ops_test.model.wait_for_idle([APP_NAME], status="active")
+
+
 async def test_cleanup(ops_test):
     await remove_application(ops_test, APP_NAME, timeout=60)

@@ -1340,24 +1340,6 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         if not self.container.can_connect():
             event.defer()
             return
-        if self._static_config_changed:
-            # This will regenerate the static configs and reevaluate all dynamic configs,
-            # including this one.
-            self._update_ingress_configurations()
-
-        else:
-            try:
-                self._process_ingress_relation(event.relation)
-            except IngressSetupError as e:
-                err_msg = e.args[0]
-                logger.error(
-                    "failed processing the ingress relation for "
-                    f"traefik-route ready with: {err_msg!r}"
-                )
-
-                self.unit.status = ActiveStatus("traefik-route relation degraded")
-                return
-
         try:
             self.traefik.generate_static_config(_raise=True)
         except StaticConfigMergeConflictError:
@@ -1368,8 +1350,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
                 "Failed to merge traefik-route static configs. Check logs for details."
             )
             return
-        self._reconcile_lb()
-        self.unit.status = ActiveStatus(self.serving_message())
+        self._process_status_and_configurations()
 
     def _process_ingress_relation(self, relation: Relation) -> None:
         # There's a chance that we're processing a relation event which was deferred until after
@@ -1650,7 +1631,11 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
 
     def _wipe_ingress_for_all_relations(self) -> None:
         self.unit.status = MaintenanceStatus("resetting all ingress relations")
-        for relation in self.model.relations["ingress"] + self.model.relations["ingress-per-unit"]:
+        for relation in (
+            self.model.relations["ingress"]
+            + self.model.relations["ingress-per-unit"]
+            + self.model.relations["traefik-route"]
+        ):
             self._wipe_ingress_for_relation(relation)
 
     def _wipe_ingress_for_relation(
@@ -1673,10 +1658,8 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
 
         # Wipe URLs sent to the requesting apps and units, as they are based on a gateway
         # address that is no longer valid.
-        # Skip this for traefik-route because it doesn't have a `wipe_ingress_data` method.
         provider = self._provider_from_relation(relation)
-        if wipe_rel_data and self.unit.is_leader() and provider != self.traefik_route:
-            # this is an ingress-type relation
+        if wipe_rel_data and self.unit.is_leader():
             provider.wipe_ingress_data(relation)  # type: ignore
 
     @staticmethod

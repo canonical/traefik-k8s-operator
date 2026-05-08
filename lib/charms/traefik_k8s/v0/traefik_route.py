@@ -108,6 +108,7 @@ class TraefikRouteCharm(CharmBase):
 import logging
 from typing import Optional
 
+from ops import ModelError
 import yaml
 from ops.charm import CharmBase, CharmEvents, RelationEvent
 from ops.framework import EventSource, Object, StoredState
@@ -121,7 +122,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 7
+LIBPATCH = 8
 
 log = logging.getLogger(__name__)
 
@@ -275,6 +276,28 @@ class TraefikRouteProvider(Object):
         # state.
         self._stored.external_host = external_host
         self._stored.scheme = scheme
+    
+    def wipe_ingress_data(self, relation: Relation) -> None:
+        """Clear the provider-side external_host and scheme for a relation.
+
+        This signals to the requirer that the ingress route is no longer active.
+        Only the leader unit is allowed to modify app data.
+        """
+        if not self._charm.unit.is_leader():
+            return
+
+        try:
+            relation.data
+        except ModelError as e:
+            log.warning(
+                "error {} accessing relation data for {!r}. ".format(e, relation.name)
+            )
+            return
+        relation.data[self._charm.app].pop("external_host", None)
+        relation.data[self._charm.app].pop("scheme", None)
+
+        self._stored.external_host = None
+        self._stored.scheme = None
 
     def is_ready(self, relation: Relation) -> bool:
         """Whether TraefikRoute is ready on this relation.

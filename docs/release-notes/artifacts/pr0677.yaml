@@ -1,0 +1,15 @@
+# Version of the artifact schema
+version_schema: 2
+# The key holding the change(s)
+changes:
+  - title: Added wipe_ingress_data to TraefikRouteProvider and included traefik-route in ingress resets
+    author: swetha1654
+    type: bugfix
+    description: "Added a `wipe_ingress_data` method to `TraefikRouteProvider` so that traefik-route \nrelations are properly cleared during ingress resets. Simplified the `_handle_traefik_route_ready` \nhandler and included traefik-route relations in `_wipe_ingress_for_all_relations`.\n"
+    urls:
+      pr:
+        - https://github.com/canonical/traefik-k8s-operator/pull/677
+      related_doc:
+      related_issue:
+    visibility: public
+    highlight: false
