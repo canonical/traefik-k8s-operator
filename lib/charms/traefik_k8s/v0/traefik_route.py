@@ -121,7 +121,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 6
+LIBPATCH = 7
 
 log = logging.getLogger(__name__)
 
@@ -304,6 +304,21 @@ class TraefikRouteProvider(Object):
         if not self.is_ready(relation):
             return False
         return relation.data[relation.app].get("raw") == "True"
+
+    def wipe_ingress_data(self, relation: Relation) -> None:
+        """Clear the provider-side external_host and scheme for a relation.
+
+        This signals to the requirer that the ingress route is no longer active.
+        Only the leader unit is allowed to modify app data.
+        """
+        if not self._charm.unit.is_leader():
+            return
+
+        relation.data[self._charm.app].pop("external_host", None)
+        relation.data[self._charm.app].pop("scheme", None)
+
+        self._stored.external_host = None
+        self._stored.scheme = None
 
     def get_static_config(self, relation: Relation) -> Optional[str]:
         """Retrieve the static config published by the remote application."""

@@ -59,7 +59,7 @@ def traefik_container(tmp_path):
         layers={"traefik": layer},
         exec_mock={
             ("update-ca-certificates", "--fresh"): ExecOutput(),
-            ("find", "/opt/traefik/juju", "-name", "*.yaml", "-delete"): ExecOutput(),
+            ("find", "/opt/traefik/juju", "-name", "juju_ingress_*.yaml", "-delete"): ExecOutput(),
             ("/usr/bin/traefik", "version"): ExecOutput(stdout="42.42"),
         },
         service_status={"traefik": pebble.ServiceStatus.ACTIVE},

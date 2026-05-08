@@ -87,10 +87,10 @@ from ops.model import (
     SecretNotFoundError,
     WaitingStatus,
 )
-from ops.pebble import PathError
 
 from traefik import (
     CA,
+    INGRESS_CONFIG_PREFIX,
     SERVER_CERT_PATH,
     RoutingMode,
     StaticConfigMergeConflictError,
@@ -1074,9 +1074,12 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         self.traefik.configure()
 
     def _on_traefik_pebble_ready(self, _: PebbleReadyEvent) -> None:
+        if not self.container.can_connect():
+            return
         # If the Traefik container comes up, e.g., after a pod churn, we
         # ignore the unit status and start fresh.
-        self._clear_all_configs_and_restart_traefik()
+        # Wipe stale dynamic configs that may have survived on the storage volume.
+        self.traefik.delete_dynamic_configs()
         # push the (fresh new) configs.
         self._configure()
         self._update_received_ca_certs()
@@ -1289,6 +1292,8 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
                 )
                 errors = True
 
+        self.traefik.flush_dynamic_configs()
+
         if errors:
             logger.debug("unit in %r: %s", self.unit.status.name, self.unit.status.message)
             self.unit.status = BlockedStatus("setup of some ingress relation failed")
@@ -1352,24 +1357,6 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         if not self.container.can_connect():
             event.defer()
             return
-        if self._static_config_changed:
-            # This will regenerate the static configs and reevaluate all dynamic configs,
-            # including this one.
-            self._update_ingress_configurations()
-
-        else:
-            try:
-                self._process_ingress_relation(event.relation)
-            except IngressSetupError as e:
-                err_msg = e.args[0]
-                logger.error(
-                    "failed processing the ingress relation for "
-                    f"traefik-route ready with: {err_msg!r}"
-                )
-
-                self.unit.status = ActiveStatus("traefik-route relation degraded")
-                return
-
         try:
             self.traefik.generate_static_config(_raise=True)
         except StaticConfigMergeConflictError:
@@ -1380,8 +1367,8 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
                 "Failed to merge traefik-route static configs. Check logs for details."
             )
             return
-        self._reconcile_lb()
-        self.unit.status = ActiveStatus(self.serving_message())
+
+        self._process_status_and_configurations()
 
     def _process_ingress_relation(self, relation: Relation) -> None:
         # There's a chance that we're processing a relation event which was deferred until after
@@ -1643,10 +1630,8 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
 
     def _push_configurations(self, relation: Relation, config: Union[Dict[str, Any], str]) -> None:
         if config:
-            yaml_config = yaml.dump(config) if not isinstance(config, str) else config
-            self.traefik.add_dynamic_config(self._relation_config_file(relation), yaml_config)
-        else:
-            self._wipe_ingress_for_relation(relation)
+            config_dict = yaml.safe_load(config) if isinstance(config, str) else config
+            self.traefik.add_dynamic_config(self._relation_config_key(relation), config_dict)
 
     @staticmethod
     def _get_prefix(data: Dict[str, Any]) -> str:
@@ -1662,8 +1647,18 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
 
     def _wipe_ingress_for_all_relations(self) -> None:
         self.unit.status = MaintenanceStatus("resetting all ingress relations")
-        for relation in self.model.relations["ingress"] + self.model.relations["ingress-per-unit"]:
-            self._wipe_ingress_for_relation(relation)
+
+        if self.container.can_connect():
+            self.traefik.delete_dynamic_configs()
+
+        # Still need to wipe relation data for each relation.
+        for relation in (
+            self.model.relations["ingress"]
+            + self.model.relations["ingress-per-unit"]
+            + self.model.relations["traefik-route"]
+        ):
+            provider = self._provider_from_relation(relation)
+            provider.wipe_ingress_data(relation)  # type: ignore
 
     def _wipe_ingress_for_relation(
         self, relation: Relation, *, wipe_rel_data: bool = True
@@ -1676,30 +1671,20 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         # is the case, nevermind, we will wipe the dangling config files anyhow
         # during _on_traefik_pebble_ready .
         if self.container.can_connect() and relation.app:
-            name = self._relation_config_file(relation)
-            try:
-                self.traefik.delete_dynamic_config(name)
-                logger.debug("Deleted %s ingress configuration file", name)
-            except (PathError, FileNotFoundError):
-                logger.debug("Configurations for '%s:%s' not found", relation.name, relation.id)
+            key = self._relation_config_key(relation)
+            self.traefik.delete_dynamic_config(key)
 
         # Wipe URLs sent to the requesting apps and units, as they are based on a gateway
         # address that is no longer valid.
-        # Skip this for traefik-route because it doesn't have a `wipe_ingress_data` method.
         provider = self._provider_from_relation(relation)
-        if wipe_rel_data and self.unit.is_leader() and provider != self.traefik_route:
-            # this is an ingress-type relation
+        if wipe_rel_data and self.unit.is_leader():
             provider.wipe_ingress_data(relation)  # type: ignore
 
     @staticmethod
-    def _relation_config_file(relation: Relation) -> str:
-        # Using both the relation id and the app name in the file to facilitate
-        # the debugging experience somewhat when snooping into the container at runtime:
-        # Apps not in the same model as Traefik (i.e., if `relation` is a CRM) will have
-        # some `remote_...` as app name. Relation name and id are handy when one is
-        # troubleshooting via `juju run 'relation_ids'...` and the like.`
+    def _relation_config_key(relation: Relation) -> str:
+        """Return a unique key identifying this relation's dynamic config."""
         assert relation.app, "no app in relation (shouldn't happen)"  # for type checker
-        return f"juju_ingress_{relation.name}_{relation.id}_{relation.app.name}.yaml"
+        return f"{INGRESS_CONFIG_PREFIX}{relation.name}_{relation.id}_{relation.app.name}"
 
     def _restart_traefik(self) -> None:
         self.unit.status = MaintenanceStatus("restarting traefik...")

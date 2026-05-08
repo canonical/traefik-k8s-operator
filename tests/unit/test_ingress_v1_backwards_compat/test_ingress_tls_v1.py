@@ -3,7 +3,7 @@ from unittest.mock import PropertyMock, patch
 
 import pytest
 import yaml
-from scenario import Container, Mount, Relation, State
+from scenario import Container, ExecOutput, Mount, Relation, State
 
 from tests.unit._utils import _render_config
 
@@ -52,6 +52,9 @@ def test_middleware_config(traefik_ctx, routing_mode, strip_prefix, redirect_htt
         Container(
             name="traefik",
             can_connect=True,
+            exec_mock={
+                ("find", "/opt/traefik/juju", "-name", "juju_ingress_*.yaml", "-delete"): ExecOutput(),
+            },
             mounts={"configurations": Mount("/opt/traefik/", td.name)},
         )
     ]
