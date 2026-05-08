@@ -9,6 +9,7 @@ changes:
     urls:
       pr:
         - https://github.com/canonical/traefik-k8s-operator/pull/677
+        - https://github.com/canonical/traefik-k8s-operator/pull/678
       related_doc:
       related_issue:
     visibility: public
