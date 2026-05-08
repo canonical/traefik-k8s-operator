@@ -218,7 +218,7 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             CERTS_DIR.mkdir(parents=True, exist_ok=True)
         if CERTS_DIR.is_dir():
             for path in CERTS_DIR.iterdir():
-                if path.name.endswith(".cert") and path.name[:5] not in certs:
+                if path.name.endswith(".cert") and path.name[:-5] not in certs:
                     path.unlink()
 
         self._clean_up_certificates_in_traefik_container(excluded_certs=certs)
@@ -243,9 +243,9 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         if self._container.isdir(CERTS_DIR):
             for path in self._container.list_files(CERTS_DIR):
                 try:
-                    if path.name.endswith(".cert") and path.name[:5] not in excluded_certs:
+                    if path.name.endswith(".cert") and path.name[:-5] not in excluded_certs:
                         self._container.remove_path(path.path)
-                    if path.name.endswith(".key") and path.name[:4] not in excluded_certs:
+                    if path.name.endswith(".key") and path.name[:-4] not in excluded_certs:
                         self._container.remove_path(path.path)
                 except PathError:
                     logger.exception("Error removing cert file.")
@@ -256,7 +256,7 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
                 try:
                     if (
                         path.name.endswith(".traefik-charm.crt")
-                        and path.name[:18] not in excluded_certs
+                        and path.name[:-18] not in excluded_certs
                     ):
                         self._container.remove_path(path.path)
                 except PathError:
