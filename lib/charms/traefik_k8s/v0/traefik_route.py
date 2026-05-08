@@ -246,11 +246,9 @@ class TraefikRouteProvider(Object):
                 self._stored.scheme = ""
                 return
             external_host = relation.data[relation.app].get("external_host", "")
-            self._stored.external_host = (
-                external_host or self._stored.external_host  # pyright: ignore
-            )
+            self._stored.external_host = external_host
             scheme = relation.data[relation.app].get("scheme", "")
-            self._stored.scheme = scheme or self._stored.scheme  # pyright: ignore
+            self._stored.scheme = scheme
 
     def _on_relation_changed(self, event: RelationEvent) -> None:
         if self.is_ready(event.relation):
