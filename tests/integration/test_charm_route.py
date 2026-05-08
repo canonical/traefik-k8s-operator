@@ -129,35 +129,41 @@ async def test_scale_and_get_external_host(ops_test: OpsTest):
     )
 
 
-@pytest.mark.teardown
-async def test_remove_relation(ops_test: OpsTest):
-    await ops_test.juju(
-        "remove-relation", f"{TESTER_APP_NAME}:traefik-route", f"{APP_NAME}:traefik-route"
-    )
-    await ops_test.model.wait_for_idle([APP_NAME], status="active")
+async def test_wipe_ingress_data_on_config_invalidation(ops_test: OpsTest):
+    """Verify traefik-route relation data is wiped when _wipe_ingress_for_all_relations fires.
 
-
-async def test_ingress_data_wiped_after_relation_removed(ops_test: OpsTest):
-    """After relation removal, re-relate and verify fresh data is published."""
-    # Re-add the relation
-    await ops_test.model.add_relation(
-        f"{TESTER_APP_NAME}:traefik-route", f"{APP_NAME}:traefik-route"
-    )
-    await ops_test.model.wait_for_idle([APP_NAME, TESTER_APP_NAME], status="active", timeout=1000)
-
-    # Verify the requirer can obtain the external host again after re-relating
+    Previously, traefik-route relations were excluded from the wipe. This test
+    confirms the new behavior: setting an invalid config (subdomain mode without
+    external_hostname) triggers a wipe that clears external_host on the
+    traefik-route relation.
+    """
+    # Confirm external_host is published to the requirer (relation is already active)
     unit = ops_test.model.applications[TESTER_APP_NAME].units[0]
     action = await unit.run_action("get-external-host")
     result = await action.wait()
     external_host = result.results.get("external-host")
-    assert external_host, "External host should be set after re-relating"
+    assert external_host, "External host should be set before config invalidation"
 
-    traefik_ip = await get_k8s_service_address(ops_test, f"{APP_NAME}-lb")
-    assert external_host == traefik_ip, (
-        f"External host should match traefik IP after re-relate: {external_host} vs {traefik_ip}"
+    # Trigger _wipe_ingress_for_all_relations by setting routing_mode=subdomain
+    # without external_hostname — this puts traefik into BlockedStatus and wipes all relations.
+    await ops_test.model.applications[APP_NAME].set_config({"routing_mode": "subdomain"})
+    await ops_test.model.wait_for_idle([APP_NAME], status="blocked", timeout=300)
+
+    # Verify that external_host is now cleared on the requirer side
+    action = await unit.run_action("get-external-host")
+    result = await action.wait()
+    external_host_after = result.results.get("external-host")
+    assert not external_host_after, (
+        f"External host should be empty after wipe, got: {external_host_after!r}"
     )
 
-    # Clean up: remove the relation again
+    # Restore valid config
+    await ops_test.model.applications[APP_NAME].set_config({"routing_mode": "path"})
+    await ops_test.model.wait_for_idle([APP_NAME, TESTER_APP_NAME], status="active", timeout=1000)
+
+
+@pytest.mark.teardown
+async def test_remove_relation(ops_test: OpsTest):
     await ops_test.juju(
         "remove-relation", f"{TESTER_APP_NAME}:traefik-route", f"{APP_NAME}:traefik-route"
     )

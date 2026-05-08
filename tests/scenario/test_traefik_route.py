@@ -2,9 +2,8 @@
 # See LICENSE file for licensing details.
 """Scenario tests for TraefikRouteProvider and related changes."""
 
-from unittest.mock import MagicMock, PropertyMock, patch
+from unittest.mock import PropertyMock, patch
 
-import pytest
 import yaml
 from scenario import Relation, State
 

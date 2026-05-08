@@ -108,8 +108,8 @@ class TraefikRouteCharm(CharmBase):
 import logging
 from typing import Optional
 
-from ops import ModelError
 import yaml
+from ops import ModelError
 from ops.charm import CharmBase, CharmEvents, RelationEvent
 from ops.framework import EventSource, Object, StoredState
 from ops.model import Relation
@@ -276,7 +276,7 @@ class TraefikRouteProvider(Object):
         # state.
         self._stored.external_host = external_host
         self._stored.scheme = scheme
-    
+
     def wipe_ingress_data(self, relation: Relation) -> None:
         """Clear the provider-side external_host and scheme for a relation.
 
