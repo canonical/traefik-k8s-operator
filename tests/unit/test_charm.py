@@ -10,7 +10,7 @@ import ops.testing
 import yaml
 from charms.traefik_k8s.v2.ingress import IngressRequirerAppData, IngressRequirerUnitData
 from ops.charm import ActionEvent
-from ops.model import ActiveStatus, Application, BlockedStatus, Relation
+from ops.model import ActiveStatus, Application, BlockedStatus, MaintenanceStatus, Relation
 from ops.pebble import PathError
 from ops.testing import Harness
 
@@ -617,6 +617,47 @@ class TestTraefikCertTransferInterface(unittest.TestCase):
             relation_id=certificate_transfer_rel_id, remote_unit_name=f"{provider_app}/0"
         )
         patch_exec.assert_not_called()
+
+    @patch("ops.model.Container.exec")
+    @patch(
+        "charm.TraefikIngressCharm._get_loadbalancer_status",
+        new_callable=PropertyMock,
+        return_value="10.0.0.1",
+    )
+    def test_relation_add_does_not_leave_status_in_restart(
+        self, mock_get_loadbalancer_status, patch_exec
+    ):
+        provider_app = "self-signed-certificates"
+        self.harness.set_leader(True)
+        self.harness.begin_with_initial_hooks()
+        self.harness.set_can_connect(container=self.container_name, val=True)
+
+        relation_id = self.harness.add_relation("receive-ca-cert", provider_app)
+        self.harness.add_relation_unit(relation_id, f"{provider_app}/0")
+
+        assert not isinstance(self.harness.charm.unit.status, MaintenanceStatus)
+        assert self.harness.charm.unit.status.message != "restarting traefik..."
+
+    @patch("ops.model.Container.exec")
+    @patch(
+        "charm.TraefikIngressCharm._get_loadbalancer_status",
+        new_callable=PropertyMock,
+        return_value="10.0.0.1",
+    )
+    def test_relation_remove_does_not_leave_status_in_restart(
+        self, mock_get_loadbalancer_status, patch_exec
+    ):
+        provider_app = "self-signed-certificates"
+        self.harness.set_leader(True)
+        self.harness.begin_with_initial_hooks()
+        self.harness.set_can_connect(container=self.container_name, val=True)
+
+        relation_id = self.harness.add_relation("receive-ca-cert", provider_app)
+        self.harness.add_relation_unit(relation_id, f"{provider_app}/0")
+        self.harness.remove_relation(relation_id)
+
+        assert not isinstance(self.harness.charm.unit.status, MaintenanceStatus)
+        assert self.harness.charm.unit.status.message != "restarting traefik..."
 
 
 class TestConfigOptionsValidation(unittest.TestCase):
