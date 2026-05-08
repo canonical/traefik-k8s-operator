@@ -7,10 +7,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 Each revision is versioned by the date of the revision.
+## 2026-05-08
+
+- Push all dynamic configurations together in the end rather than individual pushes.
+
+## 2026-05-07
+
+- Fixed `_on_remove` to only delete the LoadBalancer resource when the application is fully removed (0 planned units), preventing accidental LB deletion during scale-down.
 
 ## 2026-04-20
 
 - Replaced `@property` with `@functools.cached_property` on frequently accessed charm attributes.
+
+## 2025-05-07
+
+- Fixed reading the CA certificates from the `certificate-transfer` relation.
+
+## 2026-05-05
+
+- Ensure hosts ordering in the dynamic configuration files.
 
 ## 2026-04-19
 

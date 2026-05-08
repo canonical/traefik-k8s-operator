@@ -106,15 +106,6 @@ logger = logging.getLogger(__name__)
 
 _TRAEFIK_CONTAINER_NAME = "traefik"
 
-
-# Regex for Kubernetes annotation values:
-# - Allows alphanumeric characters, dots (.), dashes (-), and underscores (_)
-# - Matches the entire string
-# - Does not allow empty strings
-# - Example valid: "value1", "my-value", "value.name", "value_name"
-# - Example invalid: "value@", "value#", "value space"
-ANNOTATION_VALUE_PATTERN = re.compile(r"^[\w.\-_]+$")
-
 # Based on https://github.com/kubernetes/apimachinery/blob/v0.31.3/pkg/util/validation/validation.go#L204  # noqa  # pylint: disable=line-too-long
 # Regex for DNS1123 subdomains:
 # - Starts with a lowercase letter or number ([a-z0-9])
@@ -646,12 +637,8 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
                 cas.append(CA(cert, uid=event.relation_id))
         else:
             for relation in self.model.relations.get(self.recv_ca_cert.relationship_name, []):
-                # For some reason, relation.units includes our unit and app. Need to exclude them.
-                for unit in set(relation.units).difference([self.app, self.unit]):
-                    # Note: this nested loop handles the case of multi-unit CA, each unit providing
-                    # a different ca cert, but that is not currently supported by the lib itself.
-                    if ca := relation.data[unit].get("ca"):
-                        cas.append(CA(ca, uid=relation.id))
+                for cert in self.recv_ca_cert.get_all_certificates(relation.id):
+                    cas.append(CA(cert, uid=relation.id))
 
         self.traefik.add_cas(cas)
 
@@ -1107,8 +1094,9 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         self.unit.set_workload_version("")
 
     def _on_remove(self, _: EventBase) -> None:
-        klm = self._get_lb_resource_manager()
-        klm.delete()
+        if self.app.planned_units() == 0:
+            klm = self._get_lb_resource_manager()
+            klm.delete(ignore_missing=True)
 
     def _on_update_status(self, _: UpdateStatusEvent) -> None:
         self._process_status_and_configurations()
@@ -1558,7 +1546,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             strip_prefix=data.app.strip_prefix,
             port=data.app.port,
             external_host=self.gateway_address,
-            hosts=[udata.host for udata in data.units],
+            hosts=sorted([udata.host for udata in data.units]),
             forward_auth_app=self.forward_auth.is_protected_app(app=data.app.name),
             forward_auth_config=self.forward_auth.get_provider_info(),
             healthcheck_params=(
@@ -1905,18 +1893,6 @@ def validate_annotation_key(key: str) -> bool:
 
     return True
 
-
-def validate_annotation_value(value: str) -> bool:
-    """Validate the annotation value."""
-    if not ANNOTATION_VALUE_PATTERN.match(value):
-        logger.error(
-            "Invalid annotation value: '%s'. Must follow Kubernetes annotation syntax.", value
-        )
-        return False
-
-    return True
-
-
 def parse_annotations(annotations: Optional[str]) -> Optional[Dict[str, str]]:
     """Parse and validate annotations from a string.
 
@@ -1941,8 +1917,8 @@ def parse_annotations(annotations: Optional[str]) -> Optional[Dict[str, str]]:
         return None
 
     # Validate each key-value pair
-    for key, value in parsed_annotations.items():
-        if not validate_annotation_key(key) or not validate_annotation_value(value):
+    for key, _ in parsed_annotations.items():
+        if not validate_annotation_key(key):
             return None
 
     return parsed_annotations
