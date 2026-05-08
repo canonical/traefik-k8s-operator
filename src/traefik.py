@@ -730,23 +730,25 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             self._container.restart(self.service_name)
 
     def delete_dynamic_configs(self) -> None:
-        """Delete **ALL** yamls from the dynamic config dir."""
-        # instead of multiple calls to self._container.remove_path(), delete all files in a swoop
-        self._container.exec(
-            ["find", DYNAMIC_CONFIG_DIR, "-name", "*.yaml", "-delete"],
-            timeout=60,
-        ).wait()
-        logger.debug("Deleted all dynamic configuration files.")
+        """Delete **ALL** yamls from the dynamic config dir and clear internal state."""
+        self._dynamic_configs.clear()
+        try:
+            self._container.exec(
+                ["find", DYNAMIC_CONFIG_DIR, "-name", f"{INGRESS_CONFIG_PREFIX}*.yaml", "-delete"]
+            ).wait()
+            logger.debug("Deleted all dynamic configuration files.")
+        except ExecError as e:
+            logger.error(f"Error deleting existing per-relation config files: {e}")
 
     def delete_dynamic_config(self, key: str) -> None:
-        """Delete a specific yaml from the dynamic config dir."""
+        """Delete a specific yaml from the dynamic config dir and remove it from internal state."""
         self._dynamic_configs.pop(key, None)
         file_name = f"{key}.yaml"
         try:
             self._container.remove_path(Path(DYNAMIC_CONFIG_DIR) / file_name)
+            logger.debug("Deleted dynamic configuration file: %s", file_name)
         except PathError as e:
             logger.error(f"Could not delete dynamic config file {file_name}; {e}")
-        logger.debug("Deleted dynamic configuration file: %s", file_name)
 
     def add_dynamic_config(self, key: str, config: Dict[str, Any]) -> None:
         """Store a relation's dynamic config for later flushing.
@@ -769,8 +771,9 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             self._container.exec(
                 ["find", DYNAMIC_CONFIG_DIR, "-name", f"{INGRESS_CONFIG_PREFIX}*.yaml", "-delete"]
             ).wait()
-        except ExecError:
-            pass
+        except ExecError as e:
+            logger.error(f"Error deleting existing per-relation config files: {e}")
+        logger.debug("Deleted all dynamic configuration files.")
 
         if not self._dynamic_configs:
             logger.debug("No dynamic configs to push.")

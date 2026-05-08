@@ -715,10 +715,6 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         self._sync_certs_to_peer_databag()
         self.traefik.update_cert_configuration(self._get_certs())
 
-        # update_cert_configuration relies on traefik.update_ca_certs.
-        # Thus, we should restart traefik with the new CA certs.
-        self._restart_traefik()
-
     def _sync_certs_to_peer_databag(self) -> None:
         """Sync certificates to the peer databag (leader only).
 
