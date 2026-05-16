@@ -391,6 +391,19 @@ wheels = [
 ]
 
 [[package]]
+name = "charmed-service-mesh-helpers"
+version = "0.6.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "ops" },
+    { name = "pydantic" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/b9/b1/01f400a87af69198f90abfd74d4f9e53878fb015e6ccb61ebbc4370dcf6b/charmed_service_mesh_helpers-0.6.0.tar.gz", hash = "sha256:2a606679c467c68744d439641aa8fe9fc533eebfaea97fc3662e87266fd0d786", size = 16869, upload-time = "2026-03-17T12:19:59Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b9/57/f3432cace60a3116bb7f9b98aae42638278777da3fdf78aa49e974d43920/charmed_service_mesh_helpers-0.6.0-py3-none-any.whl", hash = "sha256:7160e5c1585efd2e369ccc6257c8e5964bbc52bce21a053ccba010e29b1fb12a", size = 16436, upload-time = "2026-03-17T12:19:59.667Z" },
+]
+
+[[package]]
 name = "charset-normalizer"
 version = "3.4.2"
 source = { registry = "https://pypi.org/simple" }
@@ -1031,8 +1044,9 @@ wheels = [
 [[package]]
 name = "lightkube-extensions"
 version = "999.999.999"
-source = { git = "https://github.com/canonical/lightkube-extensions.git?rev=8d37be9ba40b156a6a1648c12e3ed21209cc4360#8d37be9ba40b156a6a1648c12e3ed21209cc4360" }
+source = { git = "https://github.com/canonical/lightkube-extensions.git?rev=37b32d699dffe9e1f796d5d8e431fd57849c248e#37b32d699dffe9e1f796d5d8e431fd57849c248e" }
 dependencies = [
+    { name = "charmed-service-mesh-helpers" },
     { name = "jinja2" },
     { name = "lightkube" },
 ]
@@ -2337,7 +2351,7 @@ requires-dist = [
     { name = "jubilant", marker = "extra == 'dev'" },
     { name = "juju", marker = "extra == 'dev'" },
     { name = "lightkube", specifier = ">=0.8.1" },
-    { name = "lightkube-extensions", git = "https://github.com/canonical/lightkube-extensions.git?rev=8d37be9ba40b156a6a1648c12e3ed21209cc4360" },
+    { name = "lightkube-extensions", git = "https://github.com/canonical/lightkube-extensions.git?rev=37b32d699dffe9e1f796d5d8e431fd57849c248e" },
     { name = "lightkube-models", specifier = ">=1.22.0.4" },
     { name = "minio", marker = "extra == 'dev'" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.14.1" },
