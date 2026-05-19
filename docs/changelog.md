@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 Each revision is versioned by the date of the revision.
 
+## 2026-05-19
+
+- Added the `resources` variable to the Terraform charm module so users can pin images for Traefik.
+
 ## 2026-05-07
 
 - Fixed `_on_remove` to only delete the LoadBalancer resource when the application is fully removed (0 planned units), preventing accidental LB deletion during scale-down.
