@@ -1063,7 +1063,9 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
     def _on_traefik_pebble_ready(self, event: PebbleReadyEvent) -> None:
         # If the Traefik container comes up, e.g., after a pod churn, we
         # ignore the unit status and start fresh.
-        if not self.traefik.is_ready:
+        # We need to defer the event if the container is not reachable, as we don't want to lose
+        # the event in a non-wholistic charm.
+        if not self.container.can_connect():
             event.defer()
             return
         self._clear_all_configs_and_restart_traefik()
