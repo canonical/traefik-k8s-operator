@@ -1066,7 +1066,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         # We need to defer the event if the container is not reachable, as we don't want to lose
         # the event in a non-holistic charm.
         if not self.container.can_connect():
-            event.defer()
+            logger.debug("Container is unreachable")
             return
         self._clear_all_configs_and_restart_traefik()
         # push the (fresh new) configs.
