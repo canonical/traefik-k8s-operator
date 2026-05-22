@@ -1077,7 +1077,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         # configuration files on a storage volume that survives the pod churn, before
         # we start traefik we clean up all Juju-generated config files to avoid spurious
         # routes.
-            
+
         self.traefik.delete_dynamic_configs()
 
         # we push the config
