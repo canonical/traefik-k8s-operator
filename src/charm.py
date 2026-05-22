@@ -1064,7 +1064,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         # If the Traefik container comes up, e.g., after a pod churn, we
         # ignore the unit status and start fresh.
         # We need to defer the event if the container is not reachable, as we don't want to lose
-        # the event in a non-wholistic charm.
+        # the event in a non-holistic charm.
         if not self.container.can_connect():
             event.defer()
             return
