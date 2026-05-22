@@ -727,6 +727,12 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
 
     def delete_dynamic_configs(self) -> None:
         """Delete **ALL** yamls from the dynamic config dir."""
+        if not self._container.exists(DYNAMIC_CONFIG_DIR):
+            logger.debug(
+                "Dynamic config dir %s does not exist; nothing to delete.",
+                DYNAMIC_CONFIG_DIR,
+            )
+            return
         # instead of multiple calls to self._container.remove_path(), delete all files in a swoop
         self._container.exec(
             ["find", DYNAMIC_CONFIG_DIR, "-name", "*.yaml", "-delete"],
@@ -736,7 +742,11 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
 
     def delete_dynamic_config(self, file_name: str) -> None:
         """Delete a specific yaml from the dynamic config dir."""
-        self._container.remove_path(Path(DYNAMIC_CONFIG_DIR) / file_name)
+        config_path = Path(DYNAMIC_CONFIG_DIR) / file_name
+        if not self._container.exists(config_path):
+            logger.debug("Dynamic config file %s does not exist; nothing to delete.", config_path)
+            return
+        self._container.remove_path(config_path)
         logger.debug("Deleted dynamic configuration file: %s", file_name)
 
     def add_dynamic_config(self, file_name: str, config: str) -> None:
