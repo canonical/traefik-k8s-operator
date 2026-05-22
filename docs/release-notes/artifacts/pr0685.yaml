@@ -1,0 +1,20 @@
+# Version of the artifact schema
+version_schema: 2
+# The key holding the change(s)
+changes:
+  - title: Fixed crash when dynamic config directory does not exist
+    author: swetha1654
+    type: bugfix
+    description: |
+      Added existence guards in `delete_dynamic_configs` and `delete_dynamic_config` to prevent
+      `ExecError` when `/opt/traefik/juju` does not exist on first container start or after a
+      pod churn. Additionally, added a guard in the `_on_traefik_pebble_ready` handler to 
+      defer the event until the container is ready.
+    urls:
+      pr:
+        - https://github.com/canonical/traefik-k8s-operator/pull/685
+      related_doc:
+      related_issue:
+        - https://github.com/canonical/traefik-k8s-operator/issues/684
+    visibility: public
+    highlight: false

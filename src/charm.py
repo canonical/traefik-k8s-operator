@@ -1060,9 +1060,12 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
     def _configure_traefik(self) -> None:
         self.traefik.configure()
 
-    def _on_traefik_pebble_ready(self, _: PebbleReadyEvent) -> None:
+    def _on_traefik_pebble_ready(self, event: PebbleReadyEvent) -> None:
         # If the Traefik container comes up, e.g., after a pod churn, we
         # ignore the unit status and start fresh.
+        if not self.traefik.is_ready:
+            event.defer()
+            return
         self._clear_all_configs_and_restart_traefik()
         # push the (fresh new) configs.
         self._configure()
@@ -1074,6 +1077,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         # configuration files on a storage volume that survives the pod churn, before
         # we start traefik we clean up all Juju-generated config files to avoid spurious
         # routes.
+            
         self.traefik.delete_dynamic_configs()
 
         # we push the config
