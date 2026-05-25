@@ -17,6 +17,7 @@ The module offers the following configurable inputs:
 | `config`| map(string) | Map of the charm configuration options | {} |
 | `constraints`| string | String listing constraints for this application | arch=amd64 |
 | `model`| string | Reference to an existing model resource or data source for the model to deploy to |  |
+| `resources`| map(string) | The charm's resources i.e., a resource revision number from CharmHub or a custom OCI image resource | {} |
 | `revision`| number | Revision number of the charm |  |
 | `storage_directives`| map(string) | Map of storage used by the application, which defaults to 1 GB, allocated by Juju. | {} |
 | `units`| number | Unit count/scale | 1 |
