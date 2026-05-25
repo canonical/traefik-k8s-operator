@@ -8,7 +8,7 @@ execute: |
     PYTEST_ARGS=$(opcli pytest expand -e "${TOX_ENV:-integration}" -- -k "$MODULE")
     CHARM_FILE=$(echo "$PYTEST_ARGS" | grep -oP '(?<=--charm-file=)\S+')
     if [ -n "$CHARM_FILE" ]; then
-      export CHARM_PATH="$CHARM_FILE"
+      export CHARM_PATH="$(realpath "$CHARM_FILE")"
     fi
 
     # Run the test as ubuntu user with CHARM_PATH forwarded
