@@ -5,6 +5,7 @@ warn-timeout: 1m
 backends:
   integration-test:
     type: integration-test
+    pytest-invocation-mode: observability
     systems:
     - ubuntu-24.04
 environment:
