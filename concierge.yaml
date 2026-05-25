@@ -1,0 +1,14 @@
+juju:
+  channel: 3.6/stable
+
+providers:
+  microk8s:
+    enable: true
+    bootstrap: true
+    addons:
+      - hostpath-storage
+      - dns
+
+host:
+  snaps:
+    charmcraft:

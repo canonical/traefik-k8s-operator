@@ -1,0 +1,15 @@
+summary: integration tests
+
+execute: |
+    cd "${SPREAD_PATH}"
+
+    # Extract the charm path from opcli and export as CHARM_PATH
+    # (traefik-k8s conftest uses CHARM_PATH env var, not --charm-file flag)
+    PYTEST_ARGS=$(opcli pytest expand -e "${TOX_ENV:-integration}" -- -k "$MODULE")
+    CHARM_FILE=$(echo "$PYTEST_ARGS" | grep -oP '(?<=--charm-file=)\S+')
+    if [ -n "$CHARM_FILE" ]; then
+      export CHARM_PATH="$CHARM_FILE"
+    fi
+
+    # Run the test as ubuntu user with CHARM_PATH forwarded
+    runuser -l ubuntu -c "cd '${SPREAD_PATH}' && CHARM_PATH='${CHARM_PATH:-}' tox -e ${TOX_ENV:-integration} -- -k '$MODULE'"

@@ -1,0 +1,38 @@
+project: traefik-k8s-operator
+path: /home/ubuntu/proj
+kill-timeout: 60m
+warn-timeout: 1m
+backends:
+  integration-test:
+    type: integration-test
+    systems:
+    - ubuntu-24.04
+environment:
+  CONCIERGE: '$(HOST: echo "${CONCIERGE:-concierge.yaml}")'
+  OPCLI_GIT_REF: '$(HOST: echo "${OPCLI_GIT_REF:-main}")'
+exclude:
+- .git
+- .tox
+- .venv
+- .*_cache
+suites:
+  tests/integration/:
+    summary: integration tests
+    backends:
+    - integration-test
+    environment:
+      MODULE/test_basic_auth: test_basic_auth
+      MODULE/test_charm_health: test_charm_health
+      MODULE/test_charm_ipa: test_charm_ipa
+      MODULE/test_charm_ipu: test_charm_ipu
+      MODULE/test_charm_route: test_charm_route
+      MODULE/test_charm_tcp: test_charm_tcp
+      MODULE/test_forward_auth: test_forward_auth
+      MODULE/test_pebble_restart_after_cert_relation_joined: 
+        test_pebble_restart_after_cert_relation_joined
+      MODULE/test_tcp_ipa_compatibility: test_tcp_ipa_compatibility
+      MODULE/test_tcp_ipu_compatibility: test_tcp_ipu_compatibility
+      MODULE/test_tls: test_tls
+      MODULE/test_tls_multi_unit_jubilant: test_tls_multi_unit_jubilant
+      MODULE/test_upstream_ingress: test_upstream_ingress
+      MODULE/test_workload_tracing: test_workload_tracing
