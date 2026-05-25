@@ -54,7 +54,7 @@ override-dependencies = [
 ]
 
 [tool.uv.sources]
-lightkube-extensions = { git = "https://github.com/canonical/lightkube-extensions.git", rev = "8d37be9ba40b156a6a1648c12e3ed21209cc4360" }
+lightkube-extensions = { git = "https://github.com/canonical/lightkube-extensions.git", rev = "37b32d699dffe9e1f796d5d8e431fd57849c248e" }
 
 # Testing tools configuration
 [tool.coverage.run]
