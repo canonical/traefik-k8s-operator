@@ -1,14 +1,28 @@
 juju:
   channel: 3.6/stable
+  model-defaults:
+    test-mode: "true"
+    automatically-retry-hooks: "true"
+  extra-bootstrap-args: --config agent-stream=proposed
 
 providers:
-  microk8s:
+  lxd:
+    enable: true
+  k8s:
     enable: true
     bootstrap: true
-    addons:
-      - hostpath-storage
-      - dns
+    bootstrap-constraints:
+      root-disk: "2G"
+    features:
+      load-balancer:
+        l2-mode: "true"
+        cidrs: "10.43.45.0/28"
+      local-storage: {}
+      network: {}
 
 host:
+  packages:
+    - gnome-keyring
   snaps:
-    charmcraft:
+    jq:
+    yq:

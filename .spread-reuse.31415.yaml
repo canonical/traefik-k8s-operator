@@ -1,0 +1,7 @@
+backends:
+  integration-test-local:
+    systems:
+    - ubuntu-24.04:
+        username: ubuntu
+        password: 5af0872280fcd4d7
+        address: 10.198.156.33

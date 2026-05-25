@@ -1,0 +1,9 @@
+version: 1
+rocks: []
+charms:
+- name: traefik-k8s
+  charmcraft-yaml: charmcraft.yaml
+  builds:
+  - arch: amd64
+    path: ./traefik-k8s_ubuntu-20.04-amd64.charm
+snaps: []
