@@ -24,5 +24,7 @@ host:
   packages:
     - gnome-keyring
   snaps:
+    charmcraft:
+      channel: 3.x/candidate
     jq:
     yq:
