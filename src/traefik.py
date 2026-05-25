@@ -730,22 +730,31 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             self._container.restart(self.service_name)
 
     def delete_dynamic_configs(self) -> None:
-        """Delete **ALL** yamls from the dynamic config dir and clear internal state."""
+        """Delete **ALL** yamls from the dynamic config dir."""
+        if not self._container.exists(DYNAMIC_CONFIG_DIR):
+            logger.debug(
+                "Dynamic config dir %s does not exist; nothing to delete.",
+                DYNAMIC_CONFIG_DIR,
+            )
+            return
+        # instead of multiple calls to self._container.remove_path(), delete all files in a swoop
         self._dynamic_configs.clear()
-        try:
-            self._container.exec(
-                ["find", DYNAMIC_CONFIG_DIR, "-name", f"{INGRESS_CONFIG_PREFIX}*.yaml", "-delete"]
-            ).wait()
-            logger.debug("Deleted all dynamic configuration files.")
-        except ExecError as e:
-            logger.error(f"Error deleting existing per-relation config files: {e}")
+        self._container.exec(
+            ["find", DYNAMIC_CONFIG_DIR, "-name", "*.yaml", "-delete"],
+            timeout=60,
+        ).wait()
+        logger.debug("Deleted all dynamic configuration files.")
 
     def delete_dynamic_config(self, key: str) -> None:
         """Delete a specific yaml from the dynamic config dir and remove it from internal state."""
         self._dynamic_configs.pop(key, None)
         file_name = f"{key}.yaml"
+        config_path = Path(DYNAMIC_CONFIG_DIR) / file_name
+        if not self._container.exists(config_path):
+            logger.debug("Dynamic config file %s does not exist; nothing to delete.", config_path)
+            return
         try:
-            self._container.remove_path(Path(DYNAMIC_CONFIG_DIR) / file_name)
+            self._container.remove_path(config_path)
             logger.debug("Deleted dynamic configuration file: %s", file_name)
         except PathError as e:
             logger.error(f"Could not delete dynamic config file {file_name}; {e}")
