@@ -1635,18 +1635,8 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
 
     def _wipe_ingress_for_all_relations(self) -> None:
         self.unit.status = MaintenanceStatus("resetting all ingress relations")
-
-        if self.container.can_connect():
-            self.traefik.delete_dynamic_configs()
-
-        # Still need to wipe relation data for each relation.
-        for relation in (
-            self.model.relations["ingress"]
-            + self.model.relations["ingress-per-unit"]
-            + self.model.relations["traefik-route"]
-        ):
-            provider = self._provider_from_relation(relation)
-            provider.wipe_ingress_data(relation)  # type: ignore
+        for relation in self.model.relations["ingress"] + self.model.relations["ingress-per-unit"]:
+            self._wipe_ingress_for_relation(relation)
 
     def _wipe_ingress_for_relation(
         self, relation: Relation, *, wipe_rel_data: bool = True
@@ -1659,13 +1649,15 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         # is the case, nevermind, we will wipe the dangling config files anyhow
         # during _on_traefik_pebble_ready .
         if self.container.can_connect() and relation.app:
-            key = self._relation_config_key(relation)
-            self.traefik.delete_dynamic_config(key)
+            name = self._relation_config_key(relation)
+            self.traefik.delete_dynamic_config(name)
 
         # Wipe URLs sent to the requesting apps and units, as they are based on a gateway
         # address that is no longer valid.
+        # Skip this for traefik-route because it doesn't have a `wipe_ingress_data` method.
         provider = self._provider_from_relation(relation)
-        if wipe_rel_data and self.unit.is_leader():
+        if wipe_rel_data and self.unit.is_leader() and provider != self.traefik_route:
+            # this is an ingress-type relation
             provider.wipe_ingress_data(relation)  # type: ignore
 
     @staticmethod

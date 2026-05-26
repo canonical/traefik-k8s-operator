@@ -11,10 +11,10 @@ import logging
 import os
 import re
 import socket
+import tarfile
 from copy import deepcopy
 from pathlib import Path
 from string import Template
-import tarfile
 from typing import Any, Dict, Iterable, List, Optional, Union, cast
 
 import yaml
@@ -800,11 +800,19 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
 
         # Push the archive as a single blob, then extract in one exec call.
         archive_path = f"{DYNAMIC_CONFIG_DIR}/_ingress_configs.tar.gz"
-        self._container.push(archive_path, archive_data, make_dirs=True)
-        self._container.exec(
-            ["tar", "-xzf", archive_path, "-C", DYNAMIC_CONFIG_DIR]
-        ).wait()
-        self._container.remove_path(archive_path)
+        try:
+            self._container.push(archive_path, archive_data, make_dirs=True)
+            self._container.exec(
+                ["tar", "-xzf", archive_path, "-C", DYNAMIC_CONFIG_DIR]
+            ).wait()
+        except (ExecError, PathError) as e:
+            logger.error("Failed to push and extract dynamic config archive: %s", e)
+            return
+        finally:
+            try:
+                self._container.remove_path(archive_path)
+            except PathError:
+                logger.debug("Archive file %s already removed or not found.", archive_path)
 
         logger.debug(
             "Pushed %d per-relation ingress config files.",

@@ -6,7 +6,6 @@ from unittest.mock import PropertyMock, patch
 from ops import ActiveStatus, BlockedStatus, WaitingStatus
 from scenario import Container, ExecOutput, State
 
-
 FIND_EXEC = ("find", "/opt/traefik/juju", "-name", "juju_ingress_*.yaml", "-delete")
 
 
