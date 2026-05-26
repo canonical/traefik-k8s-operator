@@ -25,7 +25,7 @@ TRAEFIK_RESOURCES = {
 
 TRAEFIK_APP_NAME = "traefik"
 ALERTMANAGER_APP_NAME = "alertmanager"
-GRAFANA_APP_NAME = "grafana"
+CATALOGUE_APP_NAME = "catalogue"
 DYNAMIC_CONFIG_DIR = "/opt/traefik/juju"
 
 
@@ -80,18 +80,18 @@ def deploy_alertmanager(juju, deploy_traefik):
 
 
 @pytest.fixture(scope="module")
-def deploy_grafana(juju, deploy_traefik):
-    """Deploy grafana and integrate with traefik."""
+def deploy_catalogue(juju, deploy_traefik):
+    """Deploy catalogue and integrate with traefik."""
     juju.deploy(
-        "ch:grafana-k8s",
-        GRAFANA_APP_NAME,
+        "ch:catalogue-k8s",
+        CATALOGUE_APP_NAME,
         channel="1/edge",
         trust=True,
     )
     juju.wait(jubilant.all_active, timeout=600)
-    juju.integrate(f"{GRAFANA_APP_NAME}:ingress", TRAEFIK_APP_NAME)
+    juju.integrate(f"{CATALOGUE_APP_NAME}:ingress", TRAEFIK_APP_NAME)
     juju.wait(jubilant.all_active, timeout=600)
-    return GRAFANA_APP_NAME
+    return CATALOGUE_APP_NAME
 
 
 def _list_dynamic_configs(juju):
@@ -104,36 +104,36 @@ def _list_dynamic_configs(juju):
     return [f for f in output.strip().split("\n") if f.endswith(".yaml")]
 
 
-def test_dynamic_configs_present(juju, deploy_traefik, deploy_alertmanager, deploy_grafana):
+def test_dynamic_configs_present(juju, deploy_traefik, deploy_alertmanager, deploy_catalogue):
     """After integrating 2 apps, verify dynamic config files exist in the container."""
     files = _list_dynamic_configs(juju)
     logger.info("Dynamic config files in container: %s", files)
 
     # Each integrated app should have a config file matching juju_ingress_ingress_*_{app}.yaml
     alertmanager_configs = [f for f in files if ALERTMANAGER_APP_NAME in f]
-    grafana_configs = [f for f in files if GRAFANA_APP_NAME in f]
+    catalogue_configs = [f for f in files if CATALOGUE_APP_NAME in f]
 
     assert len(alertmanager_configs) == 1, (
         f"Expected exactly 1 config for {ALERTMANAGER_APP_NAME}, "
         f"found {alertmanager_configs} in {files}"
     )
-    assert len(grafana_configs) == 1, (
-        f"Expected exactly 1 config for {GRAFANA_APP_NAME}, "
-        f"found {grafana_configs} in {files}"
+    assert len(catalogue_configs) == 1, (
+        f"Expected exactly 1 config for {CATALOGUE_APP_NAME}, "
+        f"found {catalogue_configs} in {files}"
     )
 
     # Verify naming convention: juju_ingress_{relation_name}_{relation_id}_{app_name}.yaml
-    for f in alertmanager_configs + grafana_configs:
+    for f in alertmanager_configs + catalogue_configs:
         assert f.startswith("juju_ingress_ingress_"), (
             f"Config file {f} doesn't follow expected naming convention"
         )
 
 
-def test_dynamic_config_content_valid(juju, deploy_traefik, deploy_alertmanager, deploy_grafana):
+def test_dynamic_config_content_valid(juju, deploy_traefik, deploy_alertmanager, deploy_catalogue):
     """Verify that the dynamic config files contain valid traefik routing config."""
     files = _list_dynamic_configs(juju)
 
-    for app_name in (ALERTMANAGER_APP_NAME, GRAFANA_APP_NAME):
+    for app_name in (ALERTMANAGER_APP_NAME, CATALOGUE_APP_NAME):
         config_file = next(f for f in files if app_name in f)
         output = juju.ssh(
             f"{TRAEFIK_APP_NAME}/0",
@@ -155,7 +155,7 @@ def test_dynamic_config_content_valid(juju, deploy_traefik, deploy_alertmanager,
 
 
 def test_dynamic_config_removed_after_relation_removed(
-    juju, deploy_traefik, deploy_alertmanager, deploy_grafana
+    juju, deploy_traefik, deploy_alertmanager, deploy_catalogue
 ):
     """After removing a relation, the corresponding config file should be cleaned up."""
     # Verify file exists before removal
@@ -175,8 +175,8 @@ def test_dynamic_config_removed_after_relation_removed(
         f"but found: {alertmanager_configs_after}"
     )
 
-    # Grafana config should still be present
-    grafana_configs_after = [f for f in files_after if GRAFANA_APP_NAME in f]
-    assert len(grafana_configs_after) == 1, (
-        f"Grafana config should still exist, but found: {grafana_configs_after}"
+    # Catalogue config should still be present
+    catalogue_configs_after = [f for f in files_after if CATALOGUE_APP_NAME in f]
+    assert len(catalogue_configs_after) == 1, (
+        f"Catalogue config should still exist, but found: {catalogue_configs_after}"
     )
