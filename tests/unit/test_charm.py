@@ -155,7 +155,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
         self.addCleanup(self.harness.cleanup)
         self.harness.handle_exec("traefik", ["update-ca-certificates", "--fresh"], result=0)
         self.harness.handle_exec(
-            "traefik", ["find", "/opt/traefik/juju", "-name", "juju_ingress_*.yaml", "-delete"], result=0
+            "traefik", ["find", "/opt/traefik/juju", "-name", "*.yaml", "-delete"], result=0
         )
 
         patcher = patch.object(TraefikIngressCharm, "version", property(lambda *_: "0.0.0"))
@@ -631,7 +631,7 @@ class TestConfigOptionsValidation(unittest.TestCase):
         self.addCleanup(self.harness.cleanup)
         self.harness.handle_exec("traefik", ["update-ca-certificates", "--fresh"], result=0)
         self.harness.handle_exec(
-            "traefik", ["find", "/opt/traefik/juju", "-name", "juju_ingress_*.yaml", "-delete"], result=0
+            "traefik", ["find", "/opt/traefik/juju", "-name", "*.yaml", "-delete"], result=0
         )
 
         patcher = patch.object(TraefikIngressCharm, "version", property(lambda *_: "0.0.0"))

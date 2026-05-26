@@ -4,9 +4,7 @@
 from unittest.mock import PropertyMock, patch
 
 from ops import ActiveStatus, BlockedStatus, WaitingStatus
-from scenario import Container, ExecOutput, State
-
-FIND_EXEC = ("find", "/opt/traefik/juju", "-name", "juju_ingress_*.yaml", "-delete")
+from scenario import Container, State
 
 
 @patch("charm.TraefikIngressCharm._ingressed_address", PropertyMock(return_value="foo.bar"))
@@ -29,10 +27,7 @@ def test_start_traefik_no_hostname(traefik_ctx, *_):
     # WHEN a `start` hook fires
     state = State(
         config={"routing_mode": "path"},
-        containers=[Container(
-            name="traefik", can_connect=True,
-            exec_mock={FIND_EXEC: ExecOutput()},
-        )],
+        containers=[Container(name="traefik", can_connect=True)],
     )
     out = traefik_ctx.run("start", state)
 
@@ -48,10 +43,7 @@ def test_start_traefik_subdomain_without_hostname(traefik_ctx, *_):
     # WHEN a `start` hook fires
     state = State(
         config={"routing_mode": "subdomain"},
-        containers=[Container(
-            name="traefik", can_connect=True,
-            exec_mock={FIND_EXEC: ExecOutput()},
-        )],
+        containers=[Container(name="traefik", can_connect=True)],
     )
     out = traefik_ctx.run("start", state)
 

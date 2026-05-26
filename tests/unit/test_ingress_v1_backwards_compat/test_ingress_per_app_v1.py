@@ -8,7 +8,7 @@ from unittest.mock import PropertyMock, patch
 import pytest
 import yaml
 from ops import pebble
-from scenario import Container, ExecOutput, Model, Mount, Relation, State
+from scenario import Container, Model, Mount, Relation, State
 
 
 @pytest.fixture
@@ -39,9 +39,6 @@ def traefik_container(tmp_path):
         name="traefik",
         can_connect=True,
         layers={"traefik": layer},
-        exec_mock={
-            ("find", "/opt/traefik/juju", "-name", "juju_ingress_*.yaml", "-delete"): ExecOutput(),
-        },
         service_status={"traefik": pebble.ServiceStatus.ACTIVE},
         mounts={"opt": opt},
     )
