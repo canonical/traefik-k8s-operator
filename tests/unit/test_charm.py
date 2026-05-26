@@ -583,8 +583,8 @@ class TestTraefikCertTransferInterface(unittest.TestCase):
         return_value="10.0.0.1",
     )
     def test_transferred_ca_certs_are_updated(self, mock_get_loadbalancer_status, patch_exec):
-        # Given container is ready, when receive-ca-cert relation joins,
-        # then ca certs are updated.
+        # Given container is ready, when receive-ca-cert relation joins with cert data,
+        # then the CA cert is pushed and generate_static_config includes rootCAs.
         provider_app = "self-signed-certificates"
         self.harness.set_leader(True)
         self.harness.begin_with_initial_hooks()
@@ -595,8 +595,21 @@ class TestTraefikCertTransferInterface(unittest.TestCase):
         self.harness.add_relation_unit(
             relation_id=certificate_transfer_rel_id, remote_unit_name=f"{provider_app}/0"
         )
-        call_list = patch_exec.call_args_list
-        assert ["update-ca-certificates", "--fresh"] in [call.args[0] for call in call_list]
+        ca_cert = "-----BEGIN CERTIFICATE-----\nMIIFake\n-----END CERTIFICATE-----"
+        self.harness.update_relation_data(
+            certificate_transfer_rel_id,
+            provider_app,
+            {
+                "certificates": json.dumps(sorted([ca_cert])),
+                "version": "1",
+            },
+        )
+        # Verify that generate_static_config includes the CA in rootCAs.
+        static_config = self.harness.charm.traefik.generate_static_config()
+        assert "serversTransport" in static_config
+        root_cas = static_config["serversTransport"]["rootCAs"]
+        expected_path = f"/usr/local/share/ca-certificates/receive-ca-cert-{certificate_transfer_rel_id}-ca.crt"
+        assert expected_path in root_cas
 
     @patch("ops.model.Container.exec")
     @patch(
