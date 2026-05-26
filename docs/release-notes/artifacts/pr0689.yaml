@@ -1,0 +1,17 @@
+# Version of the artifact schema
+version_schema: 2
+# The key holding the change(s)
+changes:
+  - title: Use serversTransport.rootCAs instead of update-ca-certificates
+    author: swetha1654
+    type: enhancement
+    description: |
+      Replaced exec of `update-ca-certificates` with Traefik's native
+      `serversTransport.rootCAs` static config for backend CA trust.
+    urls:
+      pr:
+        - https://github.com/canonical/traefik-k8s-operator/pull/689
+      related_doc:
+      related_issue:
+    visibility: public
+    highlight: false
