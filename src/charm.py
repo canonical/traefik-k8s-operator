@@ -617,6 +617,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         if not self.container.can_connect():
             return
         self._update_received_ca_certs(event)
+        self._reconcile_lb()
         # Regenerate static config so rootCAs picks up the new CA, then restart.
         self.traefik.configure()
         self._restart_traefik()
@@ -648,6 +649,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         # Regenerate static config so rootCAs reflects the removed CA, then restart.
         self.traefik.configure()
         self._restart_traefik()
+        self._reconcile_lb()
 
     def _is_tls_enabled(self) -> bool:
         """Return True if TLS is enabled."""
