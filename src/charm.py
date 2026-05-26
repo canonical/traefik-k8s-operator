@@ -617,8 +617,8 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         if not self.container.can_connect():
             return
         self._update_received_ca_certs(event)
-        self._reconcile_lb()
-        # We need to restart Traefik now
+        # Regenerate static config so rootCAs picks up the new CA, then restart.
+        self.traefik.configure()
         self._restart_traefik()
 
     def _update_received_ca_certs(
@@ -645,9 +645,9 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
     def _on_recv_ca_cert_removed(self, event: CertificateTransferRemovedEvent) -> None:
         # Assuming only one cert per relation (this is in line with the original lib design).
         self.traefik.remove_ca(str(event.relation_id))
-        # Since remove_ca will call update_ca_certs in traefik, a restart is needed.
+        # Regenerate static config so rootCAs reflects the removed CA, then restart.
+        self.traefik.configure()
         self._restart_traefik()
-        self._reconcile_lb()
 
     def _is_tls_enabled(self) -> bool:
         """Return True if TLS is enabled."""
@@ -714,10 +714,6 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         """Update the server cert, ca, and key configuration files."""
         self._sync_certs_to_peer_databag()
         self.traefik.update_cert_configuration(self._get_certs())
-
-        # update_cert_configuration relies on traefik.update_ca_certs.
-        # Thus, we should restart traefik with the new CA certs.
-        self._restart_traefik()
 
     def _sync_certs_to_peer_databag(self) -> None:
         """Sync certificates to the peer databag (leader only).
@@ -1057,9 +1053,6 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         """Return UDP entryPoints sent via traefik_route."""
         return self._traefik_route_entrypoints(protocol="udp")
 
-    def _configure_traefik(self) -> None:
-        self.traefik.configure()
-
     def _on_traefik_pebble_ready(self, _: PebbleReadyEvent) -> None:
         # If the Traefik container comes up, e.g., after a pod churn, we
         # ignore the unit status and start fresh.
@@ -1070,8 +1063,8 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             return
         self._clear_all_configs_and_restart_traefik()
         # push the (fresh new) configs.
-        self._configure()
         self._update_received_ca_certs()
+        self._configure()
         self._set_workload_version()
 
     def _clear_all_configs_and_restart_traefik(self) -> None:
@@ -1084,7 +1077,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
 
         # we push the config
         self._update_cert_configs()
-        self._configure_traefik()
+        self.traefik.configure()
         # now we restart traefik
         self._restart_traefik()
 
@@ -1137,7 +1130,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             return
 
         self._update_cert_configs()
-        self._configure_traefik()
+        self.traefik.configure()
         self._restart_traefik()
         self._process_status_and_configurations()
 
@@ -1155,7 +1148,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
                 # we keep this nested under the hash-check because, unless the tls config has
                 # changed, we don't need to redo this.
                 self._update_cert_configs()
-                self._configure_traefik()
+                self.traefik.configure()
 
                 self._restart_traefik()
 

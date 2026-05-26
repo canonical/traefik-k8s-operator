@@ -232,8 +232,6 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
                 CA_CERTS_DIR / f"{hostname}.traefik-charm.crt", cert["ca"], make_dirs=True
             )
 
-        self.update_ca_certs()
-
     def _clean_up_certificates_in_traefik_container(self, excluded_certs: dict) -> None:
         """Clean up certificates in the remote traefik container.
 
@@ -264,20 +262,12 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
                     continue
 
     def add_cas(self, cas: Iterable[CA]) -> None:
-        """Add any number of CAs to Traefik.
-
-        Calls update-ca-certificates once done.
-        """
+        """Add any number of CAs to Traefik."""
         for ca in cas:
             self._add_ca(ca)
-        self.update_ca_certs()
 
     def _add_ca(self, ca: CA) -> None:
-        """Add a ca.
-
-        After doing this (any number of times),
-        the caller is responsible for invoking update-ca-certs.
-        """
+        """Add a ca."""
         self._container.push(ca.path, ca.ca, make_dirs=True)
 
     def remove_ca(self, uid: str) -> None:
@@ -287,19 +277,28 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         Traefik watches the dynamic config dir and reloads automatically on change.
         So make sure any traefik config depending on the certificates being there is updated
         **before** the certs are removed, otherwise you might have some downtime.
-
-        Calls update-ca-certificates once done.
         """
         ca_path = RECV_CA_TEMPLATE.substitute(rel_id=uid)
         try:
             self._container.remove_path(ca_path)
         except PathError:
             logger.exception("Error removing cert file %s.", ca_path)
-        self.update_ca_certs()
 
-    def update_ca_certs(self) -> None:
-        """Update ca certificates. Traefik will restart from inside charm.py."""
-        self._container.exec(["update-ca-certificates", "--fresh"]).wait()
+    def _collect_root_ca_paths(self) -> List[str]:
+        """Collect all CA certificate file paths from the CA certs directory.
+
+        This includes both pre-bundled CAs from the container image and
+        charm-managed CAs (from TLS and receive-ca-cert relations).
+        """
+        ca_paths: List[str] = []
+        try:
+            if self._container.can_connect() and self._container.isdir(str(CA_CERTS_DIR)):
+                for f in self._container.list_files(str(CA_CERTS_DIR)):
+                    if f.name.endswith(".crt"):
+                        ca_paths.append(f.path)
+        except (PathError, FileNotFoundError):
+            logger.debug("Could not list CA certs directory.")
+        return sorted(ca_paths)
 
     def generate_static_config(self, _raise: bool = False) -> Dict[str, Any]:
         """Generate Traefik's static config yaml."""
@@ -367,6 +366,17 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
                         "endpoint": f"{self._tracing_endpoint}/api/traces?format=jaeger.thrift"
                     },
                 }
+            }
+
+        # Configure rootCAs for outbound backend certificate verification.
+        # This collects all CA certs from /usr/local/share/ca-certificates/
+        # (pre-bundled in the container image + charm-managed CAs) and sets them
+        # in the static serversTransport so Traefik can verify backend server
+        # certificates when proxying to HTTPS services.
+        root_ca_paths = self._collect_root_ca_paths()
+        if root_ca_paths:
+            static_config["serversTransport"] = {
+                "rootCAs": root_ca_paths,
             }
 
         # we attempt to put together the base config with whatever the user
@@ -556,8 +566,8 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
 
         elif is_end_to_end:
             # We cannot assume traefik's CA is the same CA that signed the proxied apps.
-            # Since we use the update_ca_certificates machinery, we don't need to specify the
-            # "rootCAs" entry.
+            # The static serversTransport.rootCAs includes all known CAs, so we don't
+            # need to specify "rootCAs" per-transport here.
             # Keeping the serverTransports section anyway because it is informative ("endToEndTLS"
             # vs "reverseTerminationTransport") when inspecting the config file in production.
             transport_name = "endToEndTLS"
