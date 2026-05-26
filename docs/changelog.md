@@ -15,6 +15,10 @@ Each revision is versioned by the date of the revision.
 
 - Fixed `delete_dynamic_configs` and `delete_dynamic_config` to guard against missing directory/file, preventing `ExecError` crash on first container start or after pod churn.
 
+## 2026-05-19
+
+- Added the `resources` variable to the Terraform charm module so users can pin images for Traefik.
+
 ## 2026-05-07
 
 - Fixed `_on_remove` to only delete the LoadBalancer resource when the application is fully removed (0 planned units), preventing accidental LB deletion during scale-down.

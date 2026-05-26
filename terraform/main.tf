@@ -3,6 +3,7 @@ resource "juju_application" "traefik" {
   config             = var.config
   constraints        = var.constraints
   model_uuid         = var.model_uuid
+  resources          = var.resources
   storage_directives = var.storage_directives
   trust              = true
   units              = var.units
