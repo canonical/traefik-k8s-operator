@@ -32,11 +32,6 @@ def _render_config(
     service_spec = {
         "loadBalancer": {"servers": [{"url": f"{scheme}://{host}:{port}"}]},
     }
-    transports = {}
-    if scheme == "https":
-        # service_spec["rootCAs"] = ["/opt/traefik/juju/certificate.cert"]
-        service_spec["loadBalancer"]["serversTransport"] = "reverseTerminationTransport"
-        transports = {"reverseTerminationTransport": {"insecureSkipVerify": False}}
 
     expected = {
         "http": {
@@ -65,9 +60,6 @@ def _render_config(
                 ],
             },
         }
-
-    if transports:
-        expected["http"]["serversTransports"] = transports
 
     if middlewares := _render_middlewares(
         strip_prefix=strip_prefix and routing_mode == "path",

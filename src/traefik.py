@@ -426,7 +426,6 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         return self._generate_config_block(
             prefix=prefix,
             lb_servers=lb_servers,
-            scheme=scheme,
             strip_prefix=strip_prefix,
             external_host=external_host,
             forward_auth_app=forward_auth_app,
@@ -453,7 +452,6 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         return self._generate_config_block(
             prefix=prefix,
             lb_servers=lb_servers,
-            scheme=scheme,
             strip_prefix=strip_prefix,
             external_host=external_host,
             forward_auth_app=forward_auth_app,
@@ -465,7 +463,6 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         self,
         *,
         prefix: str,
-        scheme: str,
         host: str,
         port: int,
         strip_prefix: bool,
@@ -478,7 +475,6 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         return self._generate_config_block(
             prefix=prefix,
             lb_servers=lb_servers,
-            scheme=scheme,
             strip_prefix=strip_prefix,
             external_host=external_host,
             forward_auth_app=forward_auth_app,
@@ -489,7 +485,6 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         self,
         prefix: str,
         lb_servers: List[Dict[str, str]],
-        scheme: Optional[str],
         strip_prefix: Optional[bool],
         external_host: str,
         forward_auth_app: bool,
@@ -503,7 +498,6 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         unit and IPA may be more than one).
         """
         # purge any optionals:
-        scheme_: str = scheme if scheme is not None else "http"
         strip_prefix_: bool = strip_prefix if strip_prefix is not None else False
 
         host = external_host
@@ -532,21 +526,6 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
                 )
             )
 
-        # Add the "rootsCAs" section only if TLS is enabled. If the rootCA section
-        # is empty or the file does not exist, HTTP requests will fail with
-        # "404 page not found".
-        # Note: we're assuming here that the CA that signed traefik's own CSR is
-        # the same CA that signed the service's servers CSRs.
-        external_tls = self._tls_enabled
-
-        # REVERSE TERMINATION: we are providing ingress for a unit who is itself behind https,
-        # but traefik is not.
-        internal_tls = scheme_ == "https"
-
-        is_reverse_termination = not external_tls and internal_tls
-        is_termination = external_tls and not internal_tls
-        is_end_to_end = external_tls and internal_tls
-
         lb_def: Dict[str, Any] = {"servers": lb_servers}
         service_def = {
             "loadBalancer": lb_def,
@@ -554,28 +533,11 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         if healthcheck_params:
             service_def["loadBalancer"]["healthCheck"] = healthcheck_params
 
-        if is_reverse_termination:
-            # i.e. traefik itself is not related to tls certificates, but the ingress requirer is
-            transport_name = "reverseTerminationTransport"
-            lb_def["serversTransport"] = transport_name
-            transports = {transport_name: {"insecureSkipVerify": False}}
-
-        elif is_termination:
-            # i.e. traefik itself is related to tls certificates, but the ingress requirer is not
-            transports = {}
-
-        elif is_end_to_end:
-            # We cannot assume traefik's CA is the same CA that signed the proxied apps.
-            # The static serversTransport.rootCAs includes all known CAs, so we don't
-            # need to specify "rootCAs" per-transport here.
-            # Keeping the serverTransports section anyway because it is informative ("endToEndTLS"
-            # vs "reverseTerminationTransport") when inspecting the config file in production.
-            transport_name = "endToEndTLS"
-            lb_def["serversTransport"] = transport_name
-            transports = {transport_name: {"insecureSkipVerify": False}}
-
-        else:
-            transports = {}
+        # For backend TLS verification we rely on the static serversTransport.rootCAs
+        # (set in generate_static_config) which applies to all services that don't reference
+        # a named transport. Named transports do NOT inherit rootCAs from the static config,
+        # so we intentionally avoid assigning one here.
+        # insecureSkipVerify defaults to false, so certificate verification is always on.
 
         config = {
             "http": {
@@ -583,9 +545,6 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
                 "services": {traefik_service_name: service_def},
             },
         }
-        # Traefik does not accept an empty serversTransports. Add it only if it's non-empty.
-        if transports:
-            config["http"].update({"serversTransports": transports})
 
         middlewares = self._generate_middleware_config(
             strip_prefix=strip_prefix_,

@@ -1522,7 +1522,6 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         prefix = self._get_prefix(data)  # type: ignore
         config = self.traefik.get_per_leader_http_config(
             prefix=prefix,
-            scheme="http",  # IPL (aka ingress v1) has no https option
             port=data["port"],
             host=data["host"],
             strip_prefix=data.get("strip-prefix", False),
