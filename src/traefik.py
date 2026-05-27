@@ -533,12 +533,6 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         if healthcheck_params:
             service_def["loadBalancer"]["healthCheck"] = healthcheck_params
 
-        # For backend TLS verification we rely on the static serversTransport.rootCAs
-        # (set in generate_static_config) which applies to all services that don't reference
-        # a named transport. Named transports do NOT inherit rootCAs from the static config,
-        # so we intentionally avoid assigning one here.
-        # insecureSkipVerify defaults to false, so certificate verification is always on.
-
         config = {
             "http": {
                 "routers": router_cfg,
