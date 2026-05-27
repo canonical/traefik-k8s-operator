@@ -113,6 +113,18 @@ def receive_ca_cert_fixture(juju, traefik_app, ssc_app):
     return True
 
 
+@pytest.fixture(scope="module", name="alertmanager_tls")
+def alertmanager_tls_fixture(juju, alertmanager_app, ssc_app, receive_ca_cert_relation):
+    """Integrate alertmanager with SSC for backend TLS (end-to-end scenario).
+
+    After this, alertmanager serves HTTPS and advertises scheme=https to traefik.
+    This triggers the end-to-end TLS path where traefik must verify the backend cert.
+    """
+    juju.integrate(f"{ALERTMANAGER_APP_NAME}:certificates", f"{SSC_APP_NAME}:certificates")
+    juju.wait(jubilant.all_active, timeout=600)
+    return True
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -238,4 +250,50 @@ def test_https_ingress_accessible_with_root_cas(
 
     response = session.get(alertmanager_url, timeout=30)
     logger.info("Response: status=%s body=%s", response.status_code, response.text[:200])
+    response.raise_for_status()
+
+
+def test_end_to_end_tls(
+    juju: jubilant.Juju,
+    traefik_app,
+    alertmanager_tls,
+    tmp_path: Path,
+):
+    """End-to-end TLS: client -> HTTPS -> traefik -> HTTPS -> alertmanager.
+
+    This exercises the code path where traefik must verify the backend's TLS cert.
+    Without rootCAs in the static serversTransport (or with a named transport that
+    doesn't inherit rootCAs), this would return HTTP 502.
+    """
+    ca_cert_path = _pull_ca_cert(juju, tmp_path)
+    alertmanager_url = _get_alertmanager_url(juju)
+
+    # Verify the URL is HTTPS (alertmanager advertised scheme=https).
+    assert alertmanager_url.startswith("https://"), (
+        f"Expected HTTPS URL after alertmanager TLS integration, got: {alertmanager_url}"
+    )
+
+    # Get traefik unit IP.
+    status = juju.status()
+    unit_ip = status.apps[TRAEFIK_APP_NAME].units[f"{TRAEFIK_APP_NAME}/0"].address
+
+    logger.info(
+        "Testing end-to-end TLS: client -> %s (via %s) -> alertmanager HTTPS backend",
+        alertmanager_url,
+        unit_ip,
+    )
+
+    # Hit the HTTPS endpoint, resolving MOCK_HOSTNAME to traefik's IP.
+    session = requests.Session()
+    session.mount("https://", DNSResolverHTTPSAdapter(MOCK_HOSTNAME, unit_ip))
+    session.verify = str(ca_cert_path)
+
+    response = session.get(alertmanager_url, timeout=30)
+    logger.info(
+        "End-to-end TLS result: status=%s body=%s",
+        response.status_code,
+        response.text[:200],
+    )
+    # Without the rootCAs fix, this would be a 502 because traefik can't verify
+    # alertmanager's backend certificate.
     response.raise_for_status()
