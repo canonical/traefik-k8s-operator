@@ -287,12 +287,19 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
     def _collect_root_ca_paths(self) -> List[str]:
         """Collect all CA certificate file paths from the CA certs directory.
 
-        This includes both pre-bundled CAs from the container image and
-        charm-managed CAs (from TLS and receive-ca-cert relations).
+        This includes the system CA bundle (so public CAs remain trusted)
+        plus charm-managed CAs (from TLS and receive-ca-cert relations).
         """
         ca_paths: List[str] = []
         try:
-            if self._container.can_connect() and self._container.isdir(str(CA_CERTS_DIR)):
+            if not self._container.can_connect():
+                return []
+            # Include the system CA bundle so that backends with publicly-signed
+            # certificates remain trusted when rootCAs is set.
+            system_bundle = "/etc/ssl/certs/ca-certificates.crt"
+            if self._container.exists(system_bundle):
+                ca_paths.append(system_bundle)
+            if self._container.isdir(str(CA_CERTS_DIR)):
                 for f in self._container.list_files(str(CA_CERTS_DIR)):
                     if f.name.endswith(".crt"):
                         ca_paths.append(f.path)
