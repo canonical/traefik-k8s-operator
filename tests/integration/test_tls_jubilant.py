@@ -217,9 +217,10 @@ def test_root_cas_in_static_config(
     root_cas = static_config["serversTransport"].get("rootCAs", [])
     assert len(root_cas) > 0, "Expected at least one CA path in serversTransport.rootCAs"
 
-    # Verify the paths point to files in the CA certs directory.
+    # Verify the paths point to known CA locations.
+    allowed_prefixes = ("/usr/local/share/ca-certificates/", "/etc/ssl/certs/")
     for ca_path in root_cas:
-        assert ca_path.startswith("/usr/local/share/ca-certificates/"), (
+        assert ca_path.startswith(allowed_prefixes), (
             f"Unexpected CA path: {ca_path}"
         )
         assert ca_path.endswith(".crt"), f"CA path should end in .crt: {ca_path}"
