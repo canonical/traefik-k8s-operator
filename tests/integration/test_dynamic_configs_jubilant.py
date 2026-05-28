@@ -31,9 +31,10 @@ DYNAMIC_CONFIG_DIR = "/opt/traefik/juju"
 
 @pytest.fixture(scope="module")
 def juju():
-    with jubilant.temp_model() as juju:
-        juju.wait_timeout = 10 * 60
-        yield juju
+    juju = jubilant.Juju()
+    juju.add_model("test-dynamic-configs")
+    juju.wait_timeout = 10 * 60
+    yield juju
 
 
 @pytest.fixture(scope="module")
