@@ -1,0 +1,20 @@
+# Version of the artifact schema
+version_schema: 2
+# The key holding the change(s)
+changes:
+  - title: Reduced redundant LoadBalancer reconciliation and status churn
+    author: swetha1654
+    type: bugfix
+    description: |
+      Removed redundant `_reconcile_lb()` calls from certificate and configuration
+      handling paths, and removed per-relation maintenance status updates during
+      ingress processing. This reduces unnecessary Kubernetes API operations and
+      avoids excessive status churn on busy relation updates.
+    urls:
+      pr:
+        - https://github.com/canonical/traefik-k8s-operator/pull/691
+      related_doc:
+      related_issue:
+        - https://github.com/canonical/traefik-k8s-operator/pull/612
+    visibility: public
+    highlight: false
