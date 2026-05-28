@@ -769,23 +769,23 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         self._dynamic_configs[key] = config
 
     def flush_dynamic_configs(self) -> None:
-        """Write per-relation config files locally, archive them, and push to the container.
+        """Write per-relation config files to the container atomically.
 
-        Stale config files (from relations that no longer have configs) are
-        removed before extracting the new archive.
+        New config files are extracted first, then
+        stale files are replaced with the new dynamic config files.
         """
-        # Remove all existing per-relation config files first; the archive
-        # extraction below will recreate the wanted ones.
-        try:
-            self._container.exec(
-                ["find", DYNAMIC_CONFIG_DIR, "-name", f"{INGRESS_CONFIG_PREFIX}*.yaml", "-delete"]
-            ).wait()
-        except ExecError as e:
-            logger.error(f"Error deleting existing per-relation config files: {e}")
-        logger.debug("Deleted all dynamic configuration files.")
-
         if not self._dynamic_configs:
-            logger.debug("No dynamic configs to push.")
+            # No configs needed — remove all ingress config files.
+            try:
+                self._container.exec(
+                    [
+                        "find", DYNAMIC_CONFIG_DIR,
+                        "-name", f"{INGRESS_CONFIG_PREFIX}*.yaml", "-delete",
+                    ]
+                ).wait()
+            except ExecError as e:
+                logger.error(f"Error deleting per-relation config files: {e}")
+            logger.debug("No dynamic configs to push; cleared all ingress config files.")
             return
 
         # Build a tar.gz archive in memory containing one YAML file per relation.
@@ -798,24 +798,42 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
                 tar.addfile(info, io.BytesIO(yaml_bytes))
         archive_data = buf.getvalue()
 
-        # Push the archive as a single blob, then extract in one exec call.
+        # Push the archive and extract to a staging dir.
         archive_path = f"{DYNAMIC_CONFIG_DIR}/_ingress_configs.tar.gz"
+        staging_dir = "/tmp/_juju_ingress_staging"
+
         try:
             self._container.push(archive_path, archive_data, make_dirs=True)
             self._container.exec(
-                ["tar", "-xzf", archive_path, "-C", DYNAMIC_CONFIG_DIR]
+                ["sh", "-c", f"mkdir -p {staging_dir} && tar -xzf {archive_path} -C {staging_dir}"]
             ).wait()
         except (ExecError, PathError) as e:
-            logger.error("Failed to push and extract dynamic config archive: %s", e)
-            return
-        finally:
+            logger.error("Failed to push/extract dynamic config archive: %s", e)
             try:
                 self._container.remove_path(archive_path)
             except PathError:
-                logger.debug("Archive file %s already removed or not found.", archive_path)
+                pass
+            return
+
+        # Remove stale ingress configs, move new ones in, and clean up.
+        try:
+            self._container.exec(
+                ["sh", "-c",
+                 f"find {DYNAMIC_CONFIG_DIR}"
+                 f" -name '{INGRESS_CONFIG_PREFIX}*.yaml' -delete"
+                 f" && mv {staging_dir}/*.yaml {DYNAMIC_CONFIG_DIR}/"]
+            ).wait()
+        except ExecError as e:
+            logger.error("Failed to swap dynamic config files: %s", e)
+            return
+        finally:
+            try:
+                self._container.exec(["rm", "-rf", staging_dir, archive_path]).wait()
+            except ExecError:
+                pass
 
         logger.debug(
-            "Pushed %d per-relation ingress config files.",
+            "Flushed %d per-relation ingress config files.",
             len(self._dynamic_configs),
         )
 

@@ -154,6 +154,27 @@ def test_dynamic_config_content_valid(juju, deploy_traefik, deploy_alertmanager,
         assert len(http["services"]) >= 1, f"No services defined for {app_name}"
 
 
+def test_staging_artifacts_cleaned_up(juju, deploy_traefik, deploy_alertmanager, deploy_catalogue):
+    """Verify that the tar archive and staging directory are removed after flush."""
+    # The tar archive should not exist in the dynamic config dir
+    output = juju.ssh(
+        f"{TRAEFIK_APP_NAME}/0",
+        f"ls {DYNAMIC_CONFIG_DIR}/ | grep '_ingress_configs.tar.gz' || true",
+        container="traefik",
+    )
+    assert "_ingress_configs.tar.gz" not in output, (
+        f"Tar archive was not cleaned up: {output.strip()}"
+    )
+
+    # The staging directory should not exist
+    output = juju.ssh(
+        f"{TRAEFIK_APP_NAME}/0",
+        "test -d /tmp/_juju_ingress_staging && echo EXISTS || echo GONE",
+        container="traefik",
+    )
+    assert "GONE" in output, "Staging directory /tmp/_juju_ingress_staging was not cleaned up"
+
+
 def test_dynamic_config_removed_after_relation_removed(
     juju, deploy_traefik, deploy_alertmanager, deploy_catalogue
 ):
