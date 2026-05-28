@@ -17,7 +17,7 @@ jobs:
       contents: write
     with:
       channel: latest/edge
-      integration-workflow-name: integration-test-charm-ci.yaml
+      integration-workflow-name: integration-test.yaml
     secrets:
       CHARMHUB_TOKEN: ${{ secrets.CHARMHUB_TOKEN }}
 
