@@ -8,6 +8,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 Each revision is versioned by the date of the revision.
 
+## 2026-05-28
+
+- Push all dynamic configurations together in the end rather than individual pushes.
+- Reduced unnecessary LoadBalancer reconciliations by removing redundant `_reconcile_lb()` calls from CA certificate and configuration paths, and removed per-relation maintenance status churn during ingress processing.
+
 ## 2026-05-22
 
 - Fixed `delete_dynamic_configs` and `delete_dynamic_config` to guard against missing directory/file, preventing `ExecError` crash on first container start or after pod churn.

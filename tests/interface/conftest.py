@@ -41,7 +41,7 @@ def interface_tester(interface_tester: InterfaceTester):
                                 "find",
                                 "/opt/traefik/juju",
                                 "-name",
-                                "*.yaml",
+                                "juju_ingress_*.yaml",
                                 "-delete",
                             ): ExecOutput()
                         },
