@@ -617,7 +617,6 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         if not self.container.can_connect():
             return
         self._update_received_ca_certs(event)
-        self._reconcile_lb()
         # We need to restart Traefik now
         self._restart_traefik()
 
@@ -647,7 +646,6 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         self.traefik.remove_ca(str(event.relation_id))
         # Since remove_ca will call update_ca_certs in traefik, a restart is needed.
         self._restart_traefik()
-        self._reconcile_lb()
 
     def _is_tls_enabled(self) -> bool:
         """Return True if TLS is enabled."""
@@ -1132,7 +1130,6 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
 
     def _configure(self) -> None:
         """Configure the traefik charm."""
-        self._reconcile_lb()
         if not self.container.can_connect():
             return
 
@@ -1146,7 +1143,6 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         # has changed. If the config hash has changed since we last calculated it, we need to
         # recompute our state from scratch, based on all data sent over the relations and all
         # configs.
-        self._reconcile_lb()
         new_config_hash = self._config_hash
         if self._stored.config_hash != new_config_hash:
             self._stored.config_hash = new_config_hash
@@ -1396,7 +1392,6 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
 
         rel = f"{relation.name}:{relation.id}"
 
-        self.unit.status = MaintenanceStatus(f"updating ingress configuration for '{rel}'")
         logger.debug("Updating ingress for relation '%s'", rel)
 
         if provider is self.traefik_route:
