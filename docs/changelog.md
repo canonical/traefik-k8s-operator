@@ -10,6 +10,7 @@ Each revision is versioned by the date of the revision.
 
 ## 2026-05-28
 
+- Push all dynamic configurations together in the end rather than individual pushes.
 - Reduced unnecessary LoadBalancer reconciliations by removing redundant `_reconcile_lb()` calls from CA certificate and configuration paths, and removed per-relation maintenance status churn during ingress processing.
 
 ## 2026-05-22
