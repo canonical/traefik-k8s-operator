@@ -1,0 +1,18 @@
+# Version of the artifact schema
+version_schema: 2
+# The key holding the change(s)
+changes:
+  - title: Rewrote the logic to push dynamic configuration files
+    author: swetha1654
+    type: bugfix
+    description: |-
+      Optimized how dynamic configuration files are pushed to Traefik by avoiding
+      pushing per file and instead pushing them all together in the end.
+    urls:
+      pr:
+        - https://github.com/canonical/traefik-k8s-operator/pull/675
+      related_doc:
+      related_issue:
+        - https://github.com/canonical/traefik-k8s-operator/issues/612
+    visibility: public
+    highlight: false

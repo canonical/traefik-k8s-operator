@@ -2,11 +2,13 @@ import pathlib
 from unittest.mock import PropertyMock, patch
 
 import pytest
+import yaml
 from charms.tempo_coordinator_k8s.v0.charm_tracing import charm_tracing_disabled
 from ops import pebble
 from scenario import Container, Context, ExecOutput, Model, Mount
 
 from charm import TraefikIngressCharm
+from traefik import DYNAMIC_CONFIG_DIR, Traefik
 
 MOCK_LB_ADDRESS = "1.2.3.4"
 
@@ -78,3 +80,23 @@ def traefik_container(tmp_path):
         service_status={"traefik": pebble.ServiceStatus.ACTIVE},
         mounts={"opt": opt, "/etc/traefik": etc_traefik, "/etc/ssl/certs": etc_ssl_certs},
     )
+
+
+@pytest.fixture(autouse=True)
+def _mock_flush_dynamic_configs(monkeypatch):
+    """Mock flush_dynamic_configs to push files individually.
+
+    In production, flush_dynamic_configs uses a tar archive for efficiency.
+    In tests, we simply push each file via container.push() so the test
+    filesystem reflects the written configs.
+    """
+
+    def mock_flush(self):
+        for key, config in self._dynamic_configs.items():
+            self._container.push(
+                f"{DYNAMIC_CONFIG_DIR}/{key}.yaml",
+                yaml.safe_dump(config),
+                make_dirs=True,
+            )
+
+    monkeypatch.setattr(Traefik, "flush_dynamic_configs", mock_flush)
