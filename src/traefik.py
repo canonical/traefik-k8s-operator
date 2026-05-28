@@ -381,6 +381,12 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         # in the static serversTransport so Traefik can verify backend server
         # certificates when proxying to HTTPS services.
         root_ca_paths = self._collect_root_ca_paths()
+        if not root_ca_paths and self._container.can_connect():
+            raise RuntimeError(
+                "No root CA certificates found. The system CA bundle "
+                "(/etc/ssl/certs/ca-certificates.crt) is expected to be present in the "
+                "container image."
+            )
         if root_ca_paths:
             static_config["serversTransport"] = {
                 "rootCAs": root_ca_paths,

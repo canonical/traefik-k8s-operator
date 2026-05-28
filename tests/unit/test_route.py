@@ -122,6 +122,11 @@ def harness() -> Harness[TraefikIngressCharm]:
         "traefik", ["find", "/opt/traefik/juju", "-name", "*.yaml", "-delete"], result=0
     )
 
+    # Simulate the system CA bundle present in the container image.
+    ca_certs_dir = harness.get_filesystem_root("traefik") / "etc" / "ssl" / "certs"
+    ca_certs_dir.mkdir(parents=True, exist_ok=True)
+    (ca_certs_dir / "ca-certificates.crt").write_text("# system CA bundle\n")
+
     patcher = patch.object(TraefikIngressCharm, "version", property(lambda *_: "0.0.0"))
     patcher.start()
 

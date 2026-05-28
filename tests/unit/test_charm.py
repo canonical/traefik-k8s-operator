@@ -158,6 +158,11 @@ class TestTraefikIngressCharm(unittest.TestCase):
             "traefik", ["find", "/opt/traefik/juju", "-name", "*.yaml", "-delete"], result=0
         )
 
+        # Simulate the system CA bundle present in the container image.
+        ca_certs_dir = self.harness.get_filesystem_root("traefik") / "etc" / "ssl" / "certs"
+        ca_certs_dir.mkdir(parents=True, exist_ok=True)
+        (ca_certs_dir / "ca-certificates.crt").write_text("# system CA bundle\n")
+
         patcher = patch.object(TraefikIngressCharm, "version", property(lambda *_: "0.0.0"))
         self.mock_version = patcher.start()
         self.addCleanup(patcher.stop)
@@ -571,6 +576,16 @@ class TestTraefikCertTransferInterface(unittest.TestCase):
         self.harness: Harness[TraefikIngressCharm] = Harness(TraefikIngressCharm)
         self.harness.set_model_name("test-model")
         self.addCleanup(self.harness.cleanup)
+        self.harness.handle_exec("traefik", ["update-ca-certificates", "--fresh"], result=0)
+        self.harness.handle_exec(
+            "traefik", ["find", "/opt/traefik/juju", "-name", "*.yaml", "-delete"], result=0
+        )
+
+        # Simulate the system CA bundle present in the container image.
+        ca_certs_dir = self.harness.get_filesystem_root("traefik") / "etc" / "ssl" / "certs"
+        ca_certs_dir.mkdir(parents=True, exist_ok=True)
+        (ca_certs_dir / "ca-certificates.crt").write_text("# system CA bundle\n")
+
         patcher = patch.object(TraefikIngressCharm, "version", property(lambda *_: "0.0.0"))
         self.mock_version = patcher.start()
         self.addCleanup(patcher.stop)
@@ -646,6 +661,11 @@ class TestConfigOptionsValidation(unittest.TestCase):
         self.harness.handle_exec(
             "traefik", ["find", "/opt/traefik/juju", "-name", "*.yaml", "-delete"], result=0
         )
+
+        # Simulate the system CA bundle present in the container image.
+        ca_certs_dir = self.harness.get_filesystem_root("traefik") / "etc" / "ssl" / "certs"
+        ca_certs_dir.mkdir(parents=True, exist_ok=True)
+        (ca_certs_dir / "ca-certificates.crt").write_text("# system CA bundle\n")
 
         patcher = patch.object(TraefikIngressCharm, "version", property(lambda *_: "0.0.0"))
         self.mock_version = patcher.start()

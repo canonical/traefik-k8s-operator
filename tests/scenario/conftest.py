@@ -60,6 +60,12 @@ def traefik_container(tmp_path):
     opt = Mount("/opt/", tmp_path)
     etc_traefik = Mount("/etc/traefik/", tmp_path)
 
+    # Simulate the system CA bundle that's always present in the container image.
+    ssl_certs_dir = tmp_path / "ssl_certs"
+    ssl_certs_dir.mkdir()
+    (ssl_certs_dir / "ca-certificates.crt").write_text("# system CA bundle\n")
+    etc_ssl_certs = Mount("/etc/ssl/certs/", ssl_certs_dir)
+
     return Container(
         name="traefik",
         can_connect=True,
@@ -70,5 +76,5 @@ def traefik_container(tmp_path):
             ("/usr/bin/traefik", "version"): ExecOutput(stdout="42.42"),
         },
         service_status={"traefik": pebble.ServiceStatus.ACTIVE},
-        mounts={"opt": opt, "/etc/traefik": etc_traefik},
+        mounts={"opt": opt, "/etc/traefik": etc_traefik, "/etc/ssl/certs": etc_ssl_certs},
     )

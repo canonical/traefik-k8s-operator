@@ -295,6 +295,6 @@ def test_end_to_end_tls(
         response.status_code,
         response.text[:200],
     )
-    # Without the rootCAs fix, this would be a 502 because traefik can't verify
+    # Without the rootCAs, this would be a 502 because traefik can't verify
     # alertmanager's backend certificate.
     response.raise_for_status()
