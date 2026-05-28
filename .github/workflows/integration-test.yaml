@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   integration-test:
-    uses: canonical/charm-ci/.github/workflows/integration-test.yml@main
+    uses: canonical/charm-ci/.github/workflows/integration-test.yml@v0.0.1-alpha.1
     secrets: inherit
     with:
       working-directory: .
