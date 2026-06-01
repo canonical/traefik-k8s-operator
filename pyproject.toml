@@ -33,7 +33,8 @@ dev = [
     "pytest==8.3.5",
     "pytest-asyncio==0.21.2",
     "pytest-operator",
-    "jubilant",
+    "jubilant~=1.8",
+    "pytest-jubilant>=2,<3",
     "juju",
     "tenacity==8.5.0",
     "sh",
@@ -70,6 +71,8 @@ asyncio_mode = "auto"
 markers = [
     "setup: tests that mutate the model topology by adding stuff (deselect with '-m \"not setup\"')",
     "teardown: tests that mutate the model topology by removing stuff (deselect with '-m \"not teardown\"')",
+    "juju_setup: tests that set up the model (deploy, integrate).",
+    "juju_teardown: tests that tear down the model (remove apps, relations).",
 ]
 
 # Formatting tools configuration

@@ -6,14 +6,14 @@
 
 import json
 import logging
-import os
 from pathlib import Path
 
 import jubilant
 import pytest
 import requests
 import yaml
-from dns_adapter import DNSResolverHTTPSAdapter
+
+from tests.integration.dns_adapter import DNSResolverHTTPSAdapter
 
 logger = logging.getLogger(__name__)
 
@@ -30,45 +30,23 @@ NUM_TRAEFIK_UNITS = 2
 
 
 # ---------------------------------------------------------------------------
-# Fixtures (inline — shadows the parent conftest fixtures for this file)
+# Deploy helpers (called from juju_setup tests, NOT fixtures)
 # ---------------------------------------------------------------------------
-@pytest.fixture(scope="module")
-def juju():
-    with jubilant.temp_model() as juju:
-        juju.wait_timeout = 10 * 60
-        yield juju
 
 
-@pytest.fixture(scope="module")
-def traefik_charm():
-    charm_path = os.environ.get("CHARM_PATH")
-    if charm_path:
-        return Path(charm_path)
-    charms = sorted(Path(".").glob("traefik*.charm"))
-    if charms:
-        return charms[0]
-    raise FileNotFoundError(
-        "Set CHARM_PATH to the built traefik charm, "
-        "or place a traefik*.charm file in the repo root."
-    )
-
-
-@pytest.fixture(scope="module", name="traefik_app")
-def traefik_fixture(juju, traefik_charm):
+def deploy_traefik(juju: jubilant.Juju, charm: Path) -> None:
     """Deploy traefik."""
     juju.deploy(
-        traefik_charm,
+        charm,
         TRAEFIK_APP_NAME,
         resources=TRAEFIK_RESOURCES,
         trust=True,
     )
     juju.config(TRAEFIK_APP_NAME, {"external_hostname": MOCK_HOSTNAME})
-    juju.wait(jubilant.all_active, timeout=600)
-    return TRAEFIK_APP_NAME
+    juju.wait(jubilant.all_active)
 
 
-@pytest.fixture(scope="module", name="alertmanager_app")
-def alertmanager_fixture(juju, traefik_app):
+def deploy_alertmanager(juju: jubilant.Juju) -> None:
     """Deploy alertmanager and integrate with traefik."""
     juju.deploy(
         "ch:alertmanager-k8s",
@@ -76,14 +54,12 @@ def alertmanager_fixture(juju, traefik_app):
         channel="2/edge",
         trust=True,
     )
-    juju.wait(jubilant.all_active, timeout=600)
+    juju.wait(jubilant.all_active)
     juju.integrate(f"{ALERTMANAGER_APP_NAME}:ingress", TRAEFIK_APP_NAME)
-    juju.wait(jubilant.all_active, timeout=600)
-    return ALERTMANAGER_APP_NAME
+    juju.wait(jubilant.all_active)
 
 
-@pytest.fixture(scope="module", name="ssc_app")
-def ssc_fixture(juju, traefik_app):
+def deploy_ssc(juju: jubilant.Juju) -> None:
     """Deploy self-signed-certificates and integrate with traefik."""
     juju.deploy(
         "ch:self-signed-certificates",
@@ -91,20 +67,14 @@ def ssc_fixture(juju, traefik_app):
         channel="1/stable",
         trust=True,
     )
-    juju.wait(jubilant.all_active, timeout=600)
+    juju.wait(jubilant.all_active)
     juju.integrate(f"{SSC_APP_NAME}:certificates", TRAEFIK_APP_NAME)
-    juju.wait(jubilant.all_active, timeout=600)
-    return SSC_APP_NAME
+    juju.wait(jubilant.all_active)
 
 
-# ---------------------------------------------------------------------------
-# Test
-# ---------------------------------------------------------------------------
-def test_tls_on_all_units(
-    juju: jubilant.Juju, traefik_app, ssc_app, alertmanager_app, tmp_path: Path
-):
-    """HTTPS endpoints are accessible through every traefik unit IP."""
-    juju.add_unit(traefik_app, num_units=NUM_TRAEFIK_UNITS - 1)
+def scale_traefik(juju: jubilant.Juju) -> None:
+    """Scale traefik to multiple units."""
+    juju.add_unit(TRAEFIK_APP_NAME, num_units=NUM_TRAEFIK_UNITS - 1)
 
     def all_active_and_idle_with_expected_units(status):
         app = status.apps.get(TRAEFIK_APP_NAME)
@@ -117,23 +87,45 @@ def test_tls_on_all_units(
                 return False
         return True
 
-    juju.wait(all_active_and_idle_with_expected_units, timeout=600)
+    juju.wait(all_active_and_idle_with_expected_units)
 
+
+# ---------------------------------------------------------------------------
+# Setup
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.juju_setup
+def test_deploy(juju: jubilant.Juju, charm: Path):
+    """Deploy traefik, alertmanager, and self-signed-certificates."""
+    deploy_traefik(juju, charm)
+    deploy_alertmanager(juju)
+    deploy_ssc(juju)
+    scale_traefik(juju)
+
+
+# ---------------------------------------------------------------------------
+# Tests
+# ---------------------------------------------------------------------------
+
+
+def test_tls_on_all_units(juju: jubilant.Juju, tmp_path: Path):
+    """HTTPS endpoints are accessible through every traefik unit IP."""
     # Pull the CA certificate from the SSC charm.
     ca_cert_path = tmp_path / "ca.cert"
-    result = juju.run(f"{ssc_app}/0", "get-ca-certificate")
+    result = juju.run(f"{SSC_APP_NAME}/0", "get-ca-certificate")
     ca_cert = result.results["ca-certificate"]
     ca_cert_path.write_text(ca_cert)
     logger.info("Pulled CA cert (%d bytes) to %s", len(ca_cert), ca_cert_path)
 
     # Get the alertmanager endpoint from traefik's proxied endpoints action.
-    result = juju.run(f"{traefik_app}/0", "show-proxied-endpoints")
+    result = juju.run(f"{TRAEFIK_APP_NAME}/0", "show-proxied-endpoints")
     endpoints = json.loads(result.results["proxied-endpoints"])
-    alertmanager_url = endpoints[alertmanager_app]["url"]
+    alertmanager_url = endpoints[ALERTMANAGER_APP_NAME]["url"]
 
     # Get unit IPs from status
     status = juju.status()
-    units = status.apps[traefik_app].units
+    units = status.apps[TRAEFIK_APP_NAME].units
 
     assert len(units) == NUM_TRAEFIK_UNITS, (
         f"Expected {NUM_TRAEFIK_UNITS} traefik units, got {len(units)}"
@@ -151,6 +143,8 @@ def test_tls_on_all_units(
         response = session.get(alertmanager_url, timeout=30)
         logger.info(
             "%s result: status=%s body=%s",
-            unit_name, response.status_code, response.text[:200],
+            unit_name,
+            response.status_code,
+            response.text[:200],
         )
         response.raise_for_status()

@@ -1,5 +1,8 @@
-# Copyright 2022 Canonical Ltd.
+# Copyright 2026 Canonical Ltd.
 # See LICENSE file for licensing details.
+
+"""Fixtures for charm integration tests."""
+
 import functools
 import logging
 import os
@@ -12,6 +15,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict
 
+import jubilant
 import juju
 import pytest
 import yaml
@@ -439,3 +443,30 @@ async def setup_env(ops_test: OpsTest):
     await ops_test.model.set_config(
         {"update-status-hook-interval": "60m", "logging-config": "<root>=WARNING; unit=DEBUG"}
     )
+
+
+# ---------------------------------------------------------------------------
+# Jubilant / pytest-jubilant fixtures (for new-style integration tests)
+# ---------------------------------------------------------------------------
+
+METADATA = yaml.safe_load((trfk_root / "metadata.yaml").read_text())
+TRAEFIK_RESOURCES = {
+    name: val["upstream-source"] for name, val in METADATA["resources"].items()
+}
+
+TRAEFIK_APP_NAME = "traefik-k8s"
+
+
+@pytest.fixture(scope="module")
+def juju(juju: jubilant.Juju) -> jubilant.Juju:  # noqa: F811
+    """Override the pytest-jubilant juju fixture to set wait_timeout."""
+    juju.wait_timeout = 10 * 60
+    return juju
+
+
+@pytest.fixture(scope="module", name="charm")
+def charm_fixture(pytestconfig: pytest.Config) -> Path:
+    """Get value from parameter charm-file."""
+    charm = pytestconfig.getoption("--charm-file")
+    assert charm, "--charm-file must be set"
+    return Path(charm)
