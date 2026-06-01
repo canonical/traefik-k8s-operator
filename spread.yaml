@@ -24,7 +24,7 @@ integration-suites:
     - integration-test
     auto-discover: true
     environment:
-      MODULE/test_dynamic_configs_jubilant-juju4: test_dynamic_configs_jubilant
-      MODULE/test_tls_multi_unit_jubilant-juju4: test_tls_multi_unit_jubilant
-      CONCIERGE/test_dynamic_configs_jubilant-juju4: concierge-juju4.yaml
-      CONCIERGE/test_tls_multi_unit_jubilant-juju4: concierge-juju4.yaml
+      MODULE/test_dynamic_configs_jubilant_juju4: test_dynamic_configs_jubilant
+      MODULE/test_tls_multi_unit_jubilant_juju4: test_tls_multi_unit_jubilant
+      CONCIERGE/test_dynamic_configs_jubilant_juju4: concierge-juju4.yaml
+      CONCIERGE/test_tls_multi_unit_jubilant_juju4: concierge-juju4.yaml
