@@ -28,6 +28,25 @@ _JUJU_KEYS = ("egress-subnets", "ingress-address", "private-address")
 logger = logging.getLogger(__name__)
 
 
+@pytest.fixture(scope="module")
+async def ops_test(request, tmp_path_factory):
+    """Override ops_test to yield None for jubilant modules (juju4 compatibility).
+
+    Jubilant-based tests manage their own juju model via jubilant and don't use
+    python-libjuju (which only supports juju 3.x). Yielding None prevents the
+    juju connection attempt for those modules.
+    """
+    if "jubilant" in request.module.__name__:
+        yield None
+        return
+    ops_test_instance = OpsTest(request, tmp_path_factory)
+    await ops_test_instance._setup_model()
+    OpsTest._instance = ops_test_instance
+    yield ops_test_instance
+    OpsTest._instance = None
+    await ops_test_instance._cleanup_models()
+
+
 class Store(defaultdict):
     def __init__(self):
         """Initialize the store."""
@@ -434,11 +453,10 @@ async def safe_relate(ops_test: OpsTest, ep1, ep2):
 
 
 @pytest.fixture(autouse=True, scope="module")
-async def setup_env(request):
-    # Jubilant-based tests manage their own model and don't use OpsTest.
-    if "jubilant" in request.module.__name__:
+async def setup_env(ops_test):
+    # ops_test is None for jubilant modules (see ops_test fixture override above).
+    if ops_test is None:
         return
-    ops_test = request.getfixturevalue("ops_test")
     # Prevent "update-status" from interfering with the test:
     # - if fired "too quickly", traefik will flip between active/idle and maintenance;
     # - make sure charm code does not rely on update-status for correct operation.
