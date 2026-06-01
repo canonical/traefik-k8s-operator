@@ -36,7 +36,7 @@ NUM_TRAEFIK_UNITS = 2
 def traefik_charm():
     charm_path = os.environ.get("CHARM_PATH")
     if charm_path:
-        return Path(charm_path)
+        return Path(charm_path).resolve()
     charms = sorted(Path(".").glob("traefik*.charm"))
     if charms:
         return charms[0]
