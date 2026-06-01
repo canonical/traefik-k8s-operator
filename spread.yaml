@@ -33,7 +33,7 @@ integration-suites:
     backends:
     - integration-test
     auto-discover: true
-    pytest-arguments-template: "tests/integration/jubilant/"
+    pytest-arguments-template: ""
     pytest-environment-template: |
       {% for build in artifacts.charms[0].builds if build.arch == arch %}
       CHARM_PATH={{ build.path }}
