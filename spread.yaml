@@ -27,19 +27,8 @@ integration-suites:
       {% for build in artifacts.charms[0].builds if build.arch == arch %}
       CHARM_PATH={{ build.path }}
       {% endfor %}
-  tests/integration/jubilant/:
-    cwd: ./
-    summary: jubilant integration tests
-    backends:
-    - integration-test
-    auto-discover: true
-    pytest-arguments-template: ""
-    pytest-environment-template: |
-      {% for build in artifacts.charms[0].builds if build.arch == arch %}
-      CHARM_PATH={{ build.path }}
-      {% endfor %}
     environment:
-      MODULE/test_dynamic_configs_juju4: test_dynamic_configs
-      MODULE/test_https_multi_unit_juju4: test_https_multi_unit
-      CONCIERGE/test_dynamic_configs_juju4: concierge-juju4.yaml
-      CONCIERGE/test_https_multi_unit_juju4: concierge-juju4.yaml
+      MODULE/jubilant_test_dynamic_configs_juju4: tests/integration/jubilant/test_dynamic_configs.py
+      MODULE/jubilant_test_https_multi_unit_juju4: tests/integration/jubilant/test_https_multi_unit.py
+      CONCIERGE/jubilant_test_dynamic_configs_juju4: concierge-juju4.yaml
+      CONCIERGE/jubilant_test_https_multi_unit_juju4: concierge-juju4.yaml
