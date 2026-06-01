@@ -10,7 +10,7 @@ Rather, Traefik is instructed to expose Juju applications by means of relations 
 
 ## Setup
 
-These instructions assume you will run the charm on [`microk8s`](https://microk8s.io), and rely on a few plugins, specifically:
+These instructions assume you will run the charm on [`microk8s`](https://canonical.com/microk8s), and rely on a few plugins, specifically:
 
 ```sh
 sudo snap install microk8s
