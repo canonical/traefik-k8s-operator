@@ -153,7 +153,7 @@ The code for this charm can be downloaded as follows:
 git clone https://github.com/canonical/traefik-k8s-operator
 ```
 
-These instructions assume you will run the charm on [`microk8s`](https://microk8s.io), and relies on the `dns`, `storage`, `registry` and `metallb` plugins:
+These instructions assume you will run the charm on [`microk8s`](https://canonical.com/microk8s), and relies on the `dns`, `storage`, `registry` and `metallb` plugins:
 
 ```sh
 sudo snap install microk8s --classic
