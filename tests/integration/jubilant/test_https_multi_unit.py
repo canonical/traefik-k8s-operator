@@ -78,7 +78,7 @@ def ssc_fixture(juju, traefik_app):
 # ---------------------------------------------------------------------------
 # Test
 # ---------------------------------------------------------------------------
-def test_tls_on_all_units(
+def test_https_on_all_units(
     juju: jubilant.Juju, traefik_app, ssc_app, alertmanager_app, tmp_path: Path
 ):
     """HTTPS endpoints are accessible through every traefik unit IP."""
