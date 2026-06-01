@@ -116,7 +116,7 @@ def copy_traefik_library_into_tester_charms(request):
 async def traefik_charm(ops_test):
     charm_path = os.environ.get("CHARM_PATH")
     if charm_path:
-        return Path(charm_path)
+        return Path(charm_path).resolve()
     count = 0
     while True:
         try:
