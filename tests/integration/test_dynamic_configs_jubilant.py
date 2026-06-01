@@ -30,14 +30,6 @@ DYNAMIC_CONFIG_DIR = "/opt/traefik/juju"
 
 
 @pytest.fixture(scope="module")
-def juju():
-    juju = jubilant.Juju()
-    juju.add_model("test-dynamic-configs")
-    juju.wait_timeout = 10 * 60
-    yield juju
-
-
-@pytest.fixture(scope="module")
 def traefik_charm():
     charm_path = os.environ.get("CHARM_PATH")
     if charm_path:
@@ -51,6 +43,11 @@ def traefik_charm():
     )
 
 
+def _all_settled(status: jubilant.Status) -> bool:
+    """Return True when all apps are active and all agents are idle."""
+    return jubilant.all_active(status) and jubilant.all_agents_idle(status)
+
+
 @pytest.fixture(scope="module")
 def deploy_traefik(juju, traefik_charm):
     """Deploy traefik."""
@@ -61,7 +58,7 @@ def deploy_traefik(juju, traefik_charm):
         trust=True,
     )
     juju.config(TRAEFIK_APP_NAME, {"external_hostname": "traefik.test"})
-    juju.wait(jubilant.all_active, timeout=600)
+    juju.wait(_all_settled, timeout=600)
     return TRAEFIK_APP_NAME
 
 
@@ -74,9 +71,9 @@ def deploy_alertmanager(juju, deploy_traefik):
         channel="2/edge",
         trust=True,
     )
-    juju.wait(jubilant.all_active, timeout=600)
+    juju.wait(_all_settled, timeout=600)
     juju.integrate(f"{ALERTMANAGER_APP_NAME}:ingress", TRAEFIK_APP_NAME)
-    juju.wait(jubilant.all_active, timeout=600)
+    juju.wait(_all_settled, timeout=600)
     return ALERTMANAGER_APP_NAME
 
 
@@ -89,9 +86,9 @@ def deploy_catalogue(juju, deploy_traefik):
         channel="1/edge",
         trust=True,
     )
-    juju.wait(jubilant.all_active, timeout=600)
+    juju.wait(_all_settled, timeout=600)
     juju.integrate(f"{CATALOGUE_APP_NAME}:ingress", TRAEFIK_APP_NAME)
-    juju.wait(jubilant.all_active, timeout=600)
+    juju.wait(_all_settled, timeout=600)
     return CATALOGUE_APP_NAME
 
 
@@ -187,7 +184,26 @@ def test_dynamic_config_removed_after_relation_removed(
 
     # Remove the alertmanager relation
     juju.remove_relation(f"{ALERTMANAGER_APP_NAME}:ingress", TRAEFIK_APP_NAME)
-    juju.wait(jubilant.all_active, timeout=300)
+    # Wait until:
+    # 1. traefik and catalogue are active
+    # 2. all agents are idle (hooks have finished)
+    # 3. the alertmanager↔traefik ingress relation is gone from juju status
+    #
+    # Condition (3) is key: immediately after remove_relation, all agents can
+    # appear idle before Juju dispatches the relation-broken hooks. Waiting for
+    # the relation to actually disappear from the status ensures traefik has run
+    # its ingress-relation-broken hook and deleted the config file.
+    juju.wait(
+        lambda status: (
+            jubilant.all_active(status, TRAEFIK_APP_NAME, CATALOGUE_APP_NAME)
+            and jubilant.all_agents_idle(status)
+            and not any(
+                r.related_app == TRAEFIK_APP_NAME
+                for r in status.apps[ALERTMANAGER_APP_NAME].relations.get("ingress", [])
+            )
+        ),
+        timeout=300,
+    )
 
     # Verify the alertmanager config file is gone
     files_after = _list_dynamic_configs(juju)

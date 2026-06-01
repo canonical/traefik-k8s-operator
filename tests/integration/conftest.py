@@ -10,9 +10,10 @@ from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Dict
+from typing import Dict, cast
 
 import juju
+import jubilant
 import pytest
 import yaml
 from juju.errors import JujuError
@@ -450,6 +451,26 @@ async def safe_relate(ops_test: OpsTest, ep1, ep2):
         # relation already exists? skip
         logging.error(e)
         pass
+
+
+@pytest.fixture(scope="module", name="juju")
+def juju_fixture(request):
+    """Jubilant Juju fixture for jubilant-based test modules.
+
+    Honours ``--model`` (use a pre-existing model, e.g. the one bootstrapped by
+    concierge in CI) and ``--keep-models`` (preserve the temp model on failure).
+    """
+    model = request.config.getoption("--model")
+    if model:
+        _juju = jubilant.Juju(model=model)
+        _juju.wait_timeout = 10 * 60
+        yield _juju
+        return
+
+    keep_models = cast(bool, request.config.getoption("--keep-models"))
+    with jubilant.temp_model(keep=keep_models) as _juju:
+        _juju.wait_timeout = 10 * 60
+        yield _juju
 
 
 @pytest.fixture(autouse=True, scope="module")

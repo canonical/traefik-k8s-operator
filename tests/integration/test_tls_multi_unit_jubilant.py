@@ -30,15 +30,8 @@ NUM_TRAEFIK_UNITS = 2
 
 
 # ---------------------------------------------------------------------------
-# Fixtures (inline — shadows the parent conftest fixtures for this file)
+# Fixtures
 # ---------------------------------------------------------------------------
-@pytest.fixture(scope="module")
-def juju():
-    with jubilant.temp_model() as juju:
-        juju.wait_timeout = 10 * 60
-        yield juju
-
-
 @pytest.fixture(scope="module")
 def traefik_charm():
     charm_path = os.environ.get("CHARM_PATH")
