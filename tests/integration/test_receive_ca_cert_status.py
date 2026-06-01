@@ -4,13 +4,13 @@
 
 """Regression test for receive-ca-cert status after relation removal (#670)."""
 
-import asyncio
-import json
+import os
+import time
 from pathlib import Path
 
+import jubilant
 import pytest
 import yaml
-from pytest_operator.plugin import OpsTest
 
 APP_NAME = "traefik-rca"
 SSC_NAME = "ssc-rca"
@@ -19,72 +19,63 @@ METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 RESOURCES = {"traefik-image": METADATA["resources"]["traefik-image"]["upstream-source"]}
 
 
-async def _workload_status(ops_test: OpsTest, unit_name: str) -> tuple[str, str]:
-    rc, stdout, _ = await ops_test.juju("status", "--format", "json")
-    assert rc == 0
-    status = json.loads(stdout)
-    app_name = unit_name.split("/")[0]
-    unit = status["applications"][app_name]["units"][unit_name]
-    workload_status = unit["workload-status"]
-    return workload_status.get("current", ""), workload_status.get("message", "")
+@pytest.fixture(scope="module")
+def juju():
+    with jubilant.temp_model() as juju:
+        juju.wait_timeout = 10 * 60
+        yield juju
 
 
-@pytest.mark.abort_on_fail
-async def test_build_and_deploy(ops_test: OpsTest, traefik_charm):
-    await asyncio.gather(
-        ops_test.model.deploy(
-            traefik_charm,
-            resources=RESOURCES,
-            application_name=APP_NAME,
-            trust=True,
-        ),
-        ops_test.model.deploy(
-            "ch:self-signed-certificates",
-            application_name=SSC_NAME,
-            channel="1/stable",
-            trust=True,
-        ),
-    )
-
-    await ops_test.model.wait_for_idle(
-        apps=[APP_NAME, SSC_NAME],
-        status="active",
-        timeout=900,
-        idle_period=20,
+@pytest.fixture(scope="module")
+def traefik_charm():
+    charm_path = os.environ.get("CHARM_PATH")
+    if charm_path:
+        return Path(charm_path)
+    charms = sorted(Path(".").glob("traefik*.charm"))
+    if charms:
+        return charms[0]
+    raise FileNotFoundError(
+        "Set CHARM_PATH to the built traefik charm, "
+        "or place a traefik*.charm file in the repo root."
     )
 
 
-@pytest.mark.abort_on_fail
-async def test_status_is_not_stuck_restarting_after_receive_ca_cert_removal(ops_test: OpsTest):
-    await ops_test.model.add_relation(f"{SSC_NAME}:send-ca-cert", f"{APP_NAME}:receive-ca-cert")
-    await ops_test.model.wait_for_idle(
-        apps=[APP_NAME, SSC_NAME],
-        status="active",
-        timeout=600,
-        idle_period=20,
+def test_build_and_deploy(juju: jubilant.Juju, traefik_charm):
+    juju.deploy(
+        traefik_charm,
+        APP_NAME,
+        resources=RESOURCES,
+        trust=True,
+    )
+    juju.deploy(
+        "ch:self-signed-certificates",
+        SSC_NAME,
+        channel="1/stable",
+        trust=True,
     )
 
-    await ops_test.juju(
-        "remove-relation",
-        f"{SSC_NAME}:send-ca-cert",
-        f"{APP_NAME}:receive-ca-cert",
-    )
+    juju.wait(jubilant.all_active, timeout=900)
 
-    deadline = asyncio.get_running_loop().time() + 180
+
+def test_status_is_not_stuck_restarting_after_receive_ca_cert_removal(juju: jubilant.Juju):
+    juju.integrate(f"{SSC_NAME}:send-ca-cert", f"{APP_NAME}:receive-ca-cert")
+    juju.wait(jubilant.all_active, timeout=600)
+
+    juju.remove_relation(f"{SSC_NAME}:send-ca-cert", f"{APP_NAME}:receive-ca-cert")
+
+    deadline = time.monotonic() + 180
     current, message = "", ""
-    while asyncio.get_running_loop().time() < deadline:
-        current, message = await _workload_status(ops_test, f"{APP_NAME}/0")
+    while time.monotonic() < deadline:
+        status = juju.status()
+        unit = status.apps[APP_NAME].units[f"{APP_NAME}/0"]
+        current = unit.workload_status.current
+        message = unit.workload_status.message
         if not (current == "maintenance" and message == "restarting traefik..."):
             break
-        await asyncio.sleep(5)
+        time.sleep(5)
 
     assert not (
         current == "maintenance" and message == "restarting traefik..."
     ), "Traefik unit remained in maintenance/restarting after receive-ca-cert removal"
 
-    await ops_test.model.wait_for_idle(
-        apps=[APP_NAME, SSC_NAME],
-        status="active",
-        timeout=600,
-        idle_period=20,
-    )
+    juju.wait(jubilant.all_active, timeout=600)
