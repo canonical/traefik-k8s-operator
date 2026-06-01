@@ -67,8 +67,10 @@ def timed_memoizer(func):
 
 
 @pytest.fixture(scope="module", autouse=True)
-def copy_traefik_library_into_tester_charms(ops_test):
+def copy_traefik_library_into_tester_charms(request):
     """Ensure the tester charms have the requisite libraries."""
+    if "jubilant" in request.module.__name__:
+        return
     libraries = [
         "traefik_k8s/v2/ingress.py",
         "traefik_k8s/v1/ingress_per_unit.py",
