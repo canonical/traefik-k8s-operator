@@ -188,9 +188,15 @@ def test_dynamic_config_removed_after_relation_removed(juju: jubilant.Juju):
     alertmanager_configs = [f for f in files_before if ALERTMANAGER_APP_NAME in f]
     assert len(alertmanager_configs) == 1
 
-    # Remove the alertmanager relation
+    # Remove the alertmanager relation and wait for all hooks to complete.
+    # Using all_agents_idle in addition to all_active ensures the relation_broken
+    # hook (which deletes the dynamic config file) has finished executing before
+    # we inspect the filesystem.
     juju.remove_relation(f"{ALERTMANAGER_APP_NAME}:ingress", TRAEFIK_APP_NAME)
-    juju.wait(jubilant.all_active, timeout=300)
+    juju.wait(
+        lambda s: jubilant.all_active(s) and jubilant.all_agents_idle(s),
+        timeout=300,
+    )
 
     # Verify the alertmanager config file is gone
     files_after = _list_dynamic_configs(juju)
