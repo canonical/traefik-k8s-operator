@@ -1,0 +1,16 @@
+# Version of the artifact schema
+version_schema: 2
+# The key holding the change(s)
+changes:
+  - title: Update the charm to use 2.11-26.04_edge tag of traefik image
+    author: swetha1654
+    type: minor
+    description: |
+      The charm now uses Traefik rock built with Ubuntu 26.04 base and Traefik v2.11.46.
+    urls:
+      pr:
+        - https://github.com/canonical/traefik-k8s-operator/pull/686
+      related_doc:
+      related_issue:
+    visibility: hidden
+    highlight: false
