@@ -432,7 +432,11 @@ async def safe_relate(ops_test: OpsTest, ep1, ep2):
 
 
 @pytest.fixture(autouse=True, scope="module")
-async def setup_env(ops_test: OpsTest):
+async def setup_env(request):
+    # Jubilant-based tests manage their own model and don't use OpsTest.
+    if "jubilant" in request.module.__name__:
+        return
+    ops_test = request.getfixturevalue("ops_test")
     # Prevent "update-status" from interfering with the test:
     # - if fired "too quickly", traefik will flip between active/idle and maintenance;
     # - make sure charm code does not rely on update-status for correct operation.
