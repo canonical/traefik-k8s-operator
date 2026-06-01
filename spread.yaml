@@ -27,6 +27,17 @@ integration-suites:
       {% for build in artifacts.charms[0].builds if build.arch == arch %}
       CHARM_PATH={{ build.path }}
       {% endfor %}
+  tests/integration/jubilant/:
+    cwd: ./
+    summary: jubilant integration tests
+    backends:
+    - integration-test
+    auto-discover: true
+    pytest-arguments-template: ""
+    pytest-environment-template: |
+      {% for build in artifacts.charms[0].builds if build.arch == arch %}
+      CHARM_PATH={{ build.path }}
+      {% endfor %}
     environment:
       MODULE/test_dynamic_configs_jubilant_juju4: test_dynamic_configs_jubilant
       MODULE/test_tls_multi_unit_jubilant_juju4: test_tls_multi_unit_jubilant

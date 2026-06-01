@@ -10,9 +10,8 @@ from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, cast
+from typing import Dict
 
-import jubilant
 import juju
 import pytest
 import yaml
@@ -27,25 +26,6 @@ _JUJU_DATA_CACHE = {}
 _JUJU_KEYS = ("egress-subnets", "ingress-address", "private-address")
 
 logger = logging.getLogger(__name__)
-
-
-@pytest.fixture(scope="module")
-async def ops_test(request, tmp_path_factory):
-    """Override ops_test to yield None for jubilant modules (juju4 compatibility).
-
-    Jubilant-based tests manage their own juju model via jubilant and don't use
-    python-libjuju (which only supports juju 3.x). Yielding None prevents the
-    juju connection attempt for those modules.
-    """
-    if "jubilant" in request.module.__name__:
-        yield None
-        return
-    ops_test_instance = OpsTest(request, tmp_path_factory)
-    await ops_test_instance._setup_model()
-    OpsTest._instance = ops_test_instance
-    yield ops_test_instance
-    OpsTest._instance = None
-    await ops_test_instance._cleanup_models()
 
 
 class Store(defaultdict):
@@ -89,8 +69,6 @@ def timed_memoizer(func):
 @pytest.fixture(scope="module", autouse=True)
 def copy_traefik_library_into_tester_charms(request):
     """Ensure the tester charms have the requisite libraries."""
-    if "jubilant" in request.module.__name__:
-        return
     libraries = [
         "traefik_k8s/v2/ingress.py",
         "traefik_k8s/v1/ingress_per_unit.py",
@@ -453,31 +431,8 @@ async def safe_relate(ops_test: OpsTest, ep1, ep2):
         pass
 
 
-@pytest.fixture(scope="module", name="juju")
-def juju_fixture(request):
-    """Jubilant Juju fixture for jubilant-based test modules.
-
-    Honours ``--model`` (use a pre-existing model, e.g. the one bootstrapped by
-    concierge in CI) and ``--keep-models`` (preserve the temp model on failure).
-    """
-    model = request.config.getoption("--model")
-    if model:
-        _juju = jubilant.Juju(model=model)
-        _juju.wait_timeout = 10 * 60
-        yield _juju
-        return
-
-    keep_models = cast(bool, request.config.getoption("--keep-models"))
-    with jubilant.temp_model(keep=keep_models) as _juju:
-        _juju.wait_timeout = 10 * 60
-        yield _juju
-
-
 @pytest.fixture(autouse=True, scope="module")
 async def setup_env(ops_test):
-    # ops_test is None for jubilant modules (see ops_test fixture override above).
-    if ops_test is None:
-        return
     # Prevent "update-status" from interfering with the test:
     # - if fired "too quickly", traefik will flip between active/idle and maintenance;
     # - make sure charm code does not rely on update-status for correct operation.

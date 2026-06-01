@@ -9,7 +9,6 @@ dynamic config YAML files exist in /opt/traefik/juju/ inside the traefik contain
 """
 
 import logging
-import os
 from pathlib import Path
 
 import jubilant
@@ -27,20 +26,6 @@ TRAEFIK_APP_NAME = "traefik"
 ALERTMANAGER_APP_NAME = "alertmanager"
 CATALOGUE_APP_NAME = "catalogue"
 DYNAMIC_CONFIG_DIR = "/opt/traefik/juju"
-
-
-@pytest.fixture(scope="module")
-def traefik_charm():
-    charm_path = os.environ.get("CHARM_PATH")
-    if charm_path:
-        return Path(charm_path).resolve()
-    charms = sorted(Path(".").glob("traefik*.charm"))
-    if charms:
-        return charms[0]
-    raise FileNotFoundError(
-        "Set CHARM_PATH to the built traefik charm, "
-        "or place a traefik*.charm file in the repo root."
-    )
 
 
 def _all_settled(status: jubilant.Status) -> bool:
