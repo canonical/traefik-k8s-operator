@@ -1,0 +1,17 @@
+# Version of the artifact schema
+version_schema: 2
+# The key holding the change(s)
+changes:
+  - title: Added the `resources` variable to the Terraform charm module so users can pin images for Traefik
+    author: MichaelThamm
+    type: minor
+    description: |
+      Added the `resources` variable to the Terraform charm module so 
+      users can pin images for Traefik
+    urls:
+      pr:
+        - https://github.com/canonical/traefik-k8s-operator/pull/682
+      related_doc:
+      related_issue:
+    visibility: hidden
+    highlight: false

@@ -7,7 +7,7 @@
 - [ ] I followed the [contributing guide](https://github.com/canonical/is-charms-contributing-guide)
 - [ ] I added or updated the documentation (if applicable)
 - [ ] I updated `docs/changelog.md` with user-relevant changes
-- [ ] I added a [change artifact](../docs/release-notes/template/docs/release-notes/template/_change-artifact-template.yaml) for user-relevant changes in `docs/release-notes/artifacts`. If no change artifact is necessary, I tagged the PR with the label `no-release-note`.
+- [ ] I added a [change artifact](https://github.com/canonical/traefik-k8s-operator/blob/main/docs/release-notes/template/_change-artifact-template.yaml) for user-relevant changes in `docs/release-notes/artifacts` according to the [contributing guidelines](https://github.com/canonical/traefik-k8s-operator/blob/main/CONTRIBUTING.md#release-notes). If no change artifact is necessary, I tagged the PR with the label `no-release-note`.
 - [ ] I used AI to assist with preparing this PR
 - [ ] I added or updated tests as needed (unit and integration)
 - [ ] **If this PR involves a Grafana dashboard:** I added a screenshot of the dashboard
