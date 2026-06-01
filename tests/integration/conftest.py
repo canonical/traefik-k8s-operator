@@ -12,8 +12,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, cast
 
-import juju
 import jubilant
+import juju
 import pytest
 import yaml
 from juju.errors import JujuError
