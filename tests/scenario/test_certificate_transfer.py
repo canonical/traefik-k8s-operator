@@ -1,5 +1,6 @@
 import json
 
+from ops import MaintenanceStatus
 from scenario import Relation, State
 
 
@@ -82,3 +83,39 @@ def test_ca_cert_written_from_app_databag_on_pebble_ready(traefik_ctx, traefik_c
     assert not written_content.startswith('"')
     assert not written_content.endswith('"')
     assert written_content == ca_cert
+
+
+def test_relation_add_does_not_leave_status_in_restart(traefik_ctx, traefik_container):
+    """After receive-ca-cert relation changes, unit status must not be stuck in maintenance."""
+    # GIVEN a receive-ca-cert relation (no cert data needed — the charm only restarts on the event)
+    receive_ca_cert_relation = Relation("receive-ca-cert")
+
+    state = State(
+        leader=True,
+        containers=[traefik_container],
+        relations=[receive_ca_cert_relation],
+    )
+
+    # WHEN a certificate_set_updated event fires (triggered by relation-changed)
+    state_out = traefik_ctx.run(receive_ca_cert_relation.changed_event, state)
+
+    # THEN the unit is not stuck with "restarting traefik..." maintenance status
+    assert state_out.unit_status != MaintenanceStatus("restarting traefik...")
+
+
+def test_relation_remove_does_not_leave_status_in_restart(traefik_ctx, traefik_container):
+    """After receive-ca-cert relation is removed, unit status must not be stuck in maintenance."""
+    # GIVEN a receive-ca-cert relation already in the state
+    receive_ca_cert_relation = Relation("receive-ca-cert")
+
+    state = State(
+        leader=True,
+        containers=[traefik_container],
+        relations=[receive_ca_cert_relation],
+    )
+
+    # WHEN a certificates_removed event fires (triggered by relation-broken)
+    state_out = traefik_ctx.run(receive_ca_cert_relation.broken_event, state)
+
+    # THEN the unit is not stuck with "restarting traefik..." maintenance status
+    assert state_out.unit_status != MaintenanceStatus("restarting traefik...")
