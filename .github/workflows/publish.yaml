@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   publish:
-    uses: canonical/charm-ci/.github/workflows/publish-artifacts.yml@v0.0.1-alpha.1
+    uses: canonical/charm-ci/.github/workflows/publish-artifacts.yml@main
     permissions:
       actions: read
       contents: write
