@@ -24,7 +24,7 @@ tailor the exact steps and commands to your setup.
 ## Requirements
 
 - You have ran `juju trust <traefik> --scope=cluster`
-- The [metallb MicroK8s addon](https://microk8s.io/docs/addon-metallb) is enabled.
+- The [metallb MicroK8s addon](https://canonical.com/microk8s/docs/addon-metallb) is enabled.
 - Traefik's service type is `LoadBalancer`.
 - An external IP address is assigned to Traefik.
 
@@ -59,7 +59,7 @@ kubectl get svc -A -o wide | grep -E "^NAMESPACE|$JUJU_APP_NAME"
 This frequently happens when: 
 
 - Metallb has only one IP in its range but you deployed two instances of Traefik, or Traefik is forcefully removed (`--force --no-wait`) and then a new Traefik app is deployed immediately after.
-- The [`ingress`](https://microk8s.io/docs/ingress) addon is enabled. It's possible that NGINX from the ingress addon has claimed the ExternalIP. Disable NGINX and re-enable metallb.
+- The [`ingress`](https://canonical.com/microk8s/docs/addon-ingress) addon is enabled. It's possible that NGINX from the ingress addon has claimed the ExternalIP. Disable NGINX and re-enable metallb.
 
 Check with:
 
