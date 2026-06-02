@@ -647,6 +647,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         self.traefik.remove_ca(str(event.relation_id))
         # Since remove_ca will call update_ca_certs in traefik, a restart is needed.
         self._restart_traefik()
+        self._process_status_and_configurations()
 
     def _is_tls_enabled(self) -> bool:
         """Return True if TLS is enabled."""
