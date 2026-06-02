@@ -10,10 +10,6 @@ Each revision is versioned by the date of the revision.
 
 ## 2026-06-01
 
-- Update the charm to use 2.11-26.04_edge tag of traefik image.
-
-## 2026-06-01
-
 - Updated ingress lib to publish new attribute `is_port_opened` on the requirer's side
   that represents whether the port requested is open or not.
 
