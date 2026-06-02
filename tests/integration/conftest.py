@@ -1,4 +1,4 @@
-# Copyright 2026 Canonical Ltd.
+# Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 
 """Fixtures for charm integration tests."""
@@ -457,16 +457,21 @@ TRAEFIK_RESOURCES = {
 TRAEFIK_APP_NAME = "traefik-k8s"
 
 
-@pytest.fixture(scope="module")
-def juju(juju: jubilant.Juju) -> jubilant.Juju:  # noqa: F811
-    """Override the pytest-jubilant juju fixture to set wait_timeout."""
+@pytest.fixture(scope="module", autouse=True)
+def _set_juju_wait_timeout(juju: jubilant.Juju) -> None:
+    """Set pytest-jubilant Juju wait_timeout for integration tests."""
     juju.wait_timeout = 10 * 60
-    return juju
 
 
 @pytest.fixture(scope="module", name="charm")
 def charm_fixture(pytestconfig: pytest.Config) -> Path:
-    """Get value from parameter charm-file."""
-    charm = pytestconfig.getoption("--charm-file")
-    assert charm, "--charm-file must be set"
-    return Path(charm)
+    """Get charm file path from --charm-file/CHARM_PATH or a local traefik*.charm."""
+    charm = pytestconfig.getoption("--charm-file") or os.environ.get("CHARM_PATH")
+    if charm:
+        return Path(charm)
+    charms = sorted(Path(".").glob("traefik*.charm"))
+    assert charms, (
+        "Set --charm-file/CHARM_PATH to the built traefik charm, "
+        "or place a traefik*.charm file in the repo root."
+    )
+    return charms[0]
