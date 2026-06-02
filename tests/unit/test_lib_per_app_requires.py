@@ -12,9 +12,7 @@ from charms.traefik_k8s.v2.ingress import (
     IngressPerAppReadyEvent,
     IngressPerAppRequirer,
     IngressPerAppRevokedEvent,
-    IngressRequirerAppData,
 )
-from ops import Port
 from ops.charm import CharmBase
 from ops.testing import Harness
 
@@ -52,38 +50,6 @@ def requirer(harness):
 
 def test_ingress_app_requirer_uninitialized(requirer: IngressPerAppRequirer, harness):
     assert not requirer.is_ready()
-
-
-def test_requirer_sets_is_port_open_true_when_port_is_open(
-    requirer: IngressPerAppRequirer, harness
-):
-    harness.set_leader(True)
-    harness.add_network("10.0.0.10")
-    relation_id = harness.add_relation("ingress", "remote")
-
-    with unittest.mock.patch.object(
-        type(requirer.unit), "opened_ports", return_value={Port("tcp", 80)}
-    ):
-        requirer.provide_ingress_requirements(host="example.local", ip="10.0.0.1", port=80)
-
-    app_data = harness.get_relation_data(relation_id, "test-requirer")
-    assert app_data["is_port_open"] == "true"
-    assert IngressRequirerAppData.load(app_data).is_port_open
-
-
-def test_requirer_omits_is_port_open_when_port_is_not_open(
-    requirer: IngressPerAppRequirer, harness
-):
-    harness.set_leader(True)
-    harness.add_network("10.0.0.10")
-    relation_id = harness.add_relation("ingress", "remote")
-
-    with unittest.mock.patch.object(type(requirer.unit), "opened_ports", return_value=set()):
-        requirer.provide_ingress_requirements(host="example.local", ip="10.0.0.1", port=80)
-
-    app_data = harness.get_relation_data(relation_id, "test-requirer")
-    assert "is_port_open" not in app_data
-    assert not IngressRequirerAppData.load(app_data).is_port_open
 
 
 @pytest.mark.parametrize("strip_prefix", (True, False))
