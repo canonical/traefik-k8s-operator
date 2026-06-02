@@ -5,13 +5,12 @@ on:
     branches:
       - main
 
-permissions:
-  actions: read
-  contents: read
-  packages: write
-
 jobs:
   integration-test:
+    permissions:
+      actions: read
+      contents: read
+      packages: write
     uses: canonical/charm-ci/.github/workflows/integration-test.yml@main
     secrets: inherit
     with:
