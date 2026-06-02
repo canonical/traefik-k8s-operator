@@ -17,7 +17,7 @@ exclude:
 - .*_cache
 integration-suites:
   tests/integration/:
-    cwd: ./
+    working-dir: ./
     summary: integration tests
     backends:
     - integration-test
