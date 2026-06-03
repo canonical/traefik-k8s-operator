@@ -13,7 +13,7 @@ provides both Layer 4 and Layer 7 traffic management, allowing applications to e
 
 ## Charm architecture diagram
 
-```mermaid
+```{mermaid}
 C4Container
 
 System_Boundary(traefikcharm, "Traefik Charm") {
