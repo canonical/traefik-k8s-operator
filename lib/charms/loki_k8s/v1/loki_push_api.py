@@ -79,7 +79,6 @@ and three optional arguments.
               external_url = urlparse(self._external_url)
               self.loki_provider = LokiPushApiProvider(
                   self,
-                  address=external_url.hostname or self.hostname,
                   port=external_url.port or 80,
                   scheme=external_url.scheme,
                   path=f"{external_url.path}/loki/api/v1/push",
@@ -96,6 +95,7 @@ The `LokiPushApiProvider` object has several responsibilities:
 
 1. Set the URL of the Loki Push API in the relation application data bag; the URL
    must be unique to all instances (e.g. using a load balancer).
+   The default URL is the FQDN, but this can be overridden by calling `update_endpoint()`.
 
 2. Set the Promtail binary URL (`promtail_binary_zip_url`) so clients that use
    `LogProxyConsumer` object could download and configure it.
@@ -406,7 +406,7 @@ named `loki_alert_rules`.
 
 This directory must reside at the top level in the `src` folder of the
 consumer charm. Each file in this directory is assumed to be a single alert rule
-in YAML format. The file name must have the `.rule` extension.
+in YAML format. The file name must have one of the following extensions: `.yaml`, `.yml`, `.rule`, or `.rules`.
 The format of this alert rule conforms to the
 [Loki docs](https://grafana.com/docs/loki/latest/rules/#alerting-rules).
 
@@ -505,20 +505,20 @@ import os
 import platform
 import re
 import socket
-import subprocess
-import tempfile
-import typing
+import warnings
 from copy import deepcopy
 from gzip import GzipFile
 from hashlib import sha256
 from io import BytesIO
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union, cast
 from urllib import request
 from urllib.error import URLError
 
 import yaml
-from cosl import JujuTopology
+from cosl import CosTool, JujuTopology
+from cosl.rules import AlertRules
+from cosl.types import OfficialRuleFileFormat
 from ops.charm import (
     CharmBase,
     HookEvent,
@@ -544,7 +544,7 @@ LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 21
+LIBPATCH = 25
 
 PYDEPS = ["cosl"]
 
@@ -718,273 +718,6 @@ class InvalidAlertRulePathError(Exception):
         super().__init__(self.message)
 
 
-def _is_official_alert_rule_format(rules_dict: dict) -> bool:
-    """Are alert rules in the upstream format as supported by Loki.
-
-    Alert rules in dictionary format are in "official" form if they
-    contain a "groups" key, since this implies they contain a list of
-    alert rule groups.
-
-    Args:
-        rules_dict: a set of alert rules in Python dictionary format
-
-    Returns:
-        True if alert rules are in official Loki file format.
-    """
-    return "groups" in rules_dict
-
-
-def _is_single_alert_rule_format(rules_dict: dict) -> bool:
-    """Are alert rules in single rule format.
-
-    The Loki charm library supports reading of alert rules in a
-    custom format that consists of a single alert rule per file. This
-    does not conform to the official Loki alert rule file format
-    which requires that each alert rules file consists of a list of
-    alert rule groups and each group consists of a list of alert
-    rules.
-
-    Alert rules in dictionary form are considered to be in single rule
-    format if in the least it contains two keys corresponding to the
-    alert rule name and alert expression.
-
-    Returns:
-        True if alert rule is in single rule file format.
-    """
-    # one alert rule per file
-    return set(rules_dict) >= {"alert", "expr"}
-
-
-class AlertRules:
-    """Utility class for amalgamating Loki alert rule files and injecting juju topology.
-
-    An `AlertRules` object supports aggregating alert rules from files and directories in both
-    official and single rule file formats using the `add_path()` method. All the alert rules
-    read are annotated with Juju topology labels and amalgamated into a single data structure
-    in the form of a Python dictionary using the `as_dict()` method. Such a dictionary can be
-    easily dumped into JSON format and exchanged over relation data. The dictionary can also
-    be dumped into YAML format and written directly into an alert rules file that is read by
-    Loki. Note that multiple `AlertRules` objects must not be written into the same file,
-    since Loki allows only a single list of alert rule groups per alert rules file.
-
-    The official Loki format is a YAML file conforming to the Loki documentation
-    (https://grafana.com/docs/loki/latest/api/#list-rule-groups).
-    The custom single rule format is a subsection of the official YAML, having a single alert
-    rule, effectively "one alert per file".
-    """
-
-    # This class uses the following terminology for the various parts of a rule file:
-    # - alert rules file: the entire groups[] yaml, including the "groups:" key.
-    # - alert groups (plural): the list of groups[] (a list, i.e. no "groups:" key) - it is a list
-    #   of dictionaries that have the "name" and "rules" keys.
-    # - alert group (singular): a single dictionary that has the "name" and "rules" keys.
-    # - alert rules (plural): all the alerts in a given alert group - a list of dictionaries with
-    #   the "alert" and "expr" keys.
-    # - alert rule (singular): a single dictionary that has the "alert" and "expr" keys.
-
-    def __init__(self, topology: Optional[JujuTopology] = None):
-        """Build and alert rule object.
-
-        Args:
-            topology: a `JujuTopology` instance that is used to annotate all alert rules.
-        """
-        self.topology = topology
-        self.tool = CosTool(None)
-        self.alert_groups = []  # type: List[dict]
-
-    def _from_file(self, root_path: Path, file_path: Path) -> List[dict]:
-        """Read a rules file from path, injecting juju topology.
-
-        Args:
-            root_path: full path to the root rules folder (used only for generating group name)
-            file_path: full path to a *.rule file.
-
-        Returns:
-            A list of dictionaries representing the rules file, if file is valid (the structure is
-            formed by `yaml.safe_load` of the file); an empty list otherwise.
-        """
-        with file_path.open() as rf:
-            # Load a list of rules from file then add labels and filters
-            try:
-                rule_file = yaml.safe_load(rf) or {}
-
-            except Exception as e:
-                logger.error("Failed to read alert rules from %s: %s", file_path.name, e)
-                return []
-
-            if _is_official_alert_rule_format(rule_file):
-                alert_groups = rule_file["groups"]
-            elif _is_single_alert_rule_format(rule_file):
-                # convert to list of alert groups
-                # group name is made up from the file name
-                alert_groups = [{"name": file_path.stem, "rules": [rule_file]}]
-            else:
-                # invalid/unsupported
-                reason = "file is empty" if not rule_file else "unexpected file structure"
-                logger.error("Invalid rules file (%s): %s", reason, file_path.name)
-                return []
-
-            # update rules with additional metadata
-            for alert_group in alert_groups:
-                # update group name with topology and sub-path
-                alert_group["name"] = self._group_name(
-                    str(root_path),
-                    str(file_path),
-                    alert_group["name"],
-                )
-
-                # add "juju_" topology labels
-                for alert_rule in alert_group["rules"]:
-                    if "labels" not in alert_rule:
-                        alert_rule["labels"] = {}
-
-                    if self.topology:
-                        # only insert labels that do not already exist
-                        for label, val in self.topology.label_matcher_dict.items():
-                            if label not in alert_rule["labels"]:
-                                alert_rule["labels"][label] = val
-
-                        # insert juju topology filters into a prometheus alert rule
-                        # logql doesn't like empty matchers, so add a job matcher which hits
-                        # any string as a "wildcard" which the topology labels will
-                        # filter down
-                        alert_rule["expr"] = self.tool.inject_label_matchers(
-                            re.sub(r"%%juju_topology%%", r'job=~".+"', alert_rule["expr"]),
-                            self.topology.label_matcher_dict,
-                        )
-
-            return alert_groups
-
-    def _group_name(
-        self,
-        root_path: typing.Union[Path, str],
-        file_path: typing.Union[Path, str],
-        group_name: str,
-    ) -> str:
-        """Generate group name from path and topology.
-
-        The group name is made up of the relative path between the root dir_path, the file path,
-        and topology identifier.
-
-        Args:
-            root_path: path to the root rules dir.
-            file_path: path to rule file.
-            group_name: original group name to keep as part of the new augmented group name
-
-        Returns:
-            New group name, augmented by juju topology and relative path.
-        """
-        file_path = Path(file_path) if not isinstance(file_path, Path) else file_path
-        root_path = Path(root_path) if not isinstance(root_path, Path) else root_path
-        rel_path = file_path.parent.relative_to(root_path.as_posix())
-
-        # We should account for both absolute paths and Windows paths. Convert it to a POSIX
-        # string, strip off any leading /, then join it
-
-        path_str = ""
-        if not rel_path == Path("."):
-            # Get rid of leading / and optionally drive letters so they don't muck up
-            # the template later, since Path.parts returns them. The 'if relpath.is_absolute ...'
-            # isn't even needed since re.sub doesn't throw exceptions if it doesn't match, so it's
-            # optional, but it makes it clear what we're doing.
-
-            # Note that Path doesn't actually care whether the path is valid just to instantiate
-            # the object, so we can happily strip that stuff out to make templating nicer
-            rel_path = Path(
-                re.sub(r"^([A-Za-z]+:)?/", "", rel_path.as_posix())
-                if rel_path.is_absolute()
-                else str(rel_path)
-            )
-
-            # Get rid of relative path characters in the middle which both os.path and pathlib
-            # leave hanging around. We could use path.resolve(), but that would lead to very
-            # long template strings when rules come from pods and/or other deeply nested charm
-            # paths
-            path_str = "_".join(filter(lambda x: x not in ["..", "/"], rel_path.parts))
-
-        # Generate group name:
-        #  - name, from juju topology
-        #  - suffix, from the relative path of the rule file;
-        group_name_parts = [self.topology.identifier] if self.topology else []
-        group_name_parts.extend([path_str, group_name, "alerts"])
-        # filter to remove empty strings
-        return "_".join(filter(lambda x: x, group_name_parts))
-
-    @classmethod
-    def _multi_suffix_glob(
-        cls, dir_path: Path, suffixes: List[str], recursive: bool = True
-    ) -> list:
-        """Helper function for getting all files in a directory that have a matching suffix.
-
-        Args:
-            dir_path: path to the directory to glob from.
-            suffixes: list of suffixes to include in the glob (items should begin with a period).
-            recursive: a flag indicating whether a glob is recursive (nested) or not.
-
-        Returns:
-            List of files in `dir_path` that have one of the suffixes specified in `suffixes`.
-        """
-        all_files_in_dir = dir_path.glob("**/*" if recursive else "*")
-        return list(filter(lambda f: f.is_file() and f.suffix in suffixes, all_files_in_dir))
-
-    def _from_dir(self, dir_path: Path, recursive: bool) -> List[dict]:
-        """Read all rule files in a directory.
-
-        All rules from files for the same directory are loaded into a single
-        group. The generated name of this group includes juju topology.
-        By default, only the top directory is scanned; for nested scanning, pass `recursive=True`.
-
-        Args:
-            dir_path: directory containing *.rule files (alert rules without groups).
-            recursive: flag indicating whether to scan for rule files recursively.
-
-        Returns:
-            a list of dictionaries representing prometheus alert rule groups, each dictionary
-            representing an alert group (structure determined by `yaml.safe_load`).
-        """
-        alert_groups = []  # type: List[dict]
-
-        # Gather all alerts into a list of groups
-        for file_path in self._multi_suffix_glob(dir_path, [".rule", ".rules"], recursive):
-            alert_groups_from_file = self._from_file(dir_path, file_path)
-            if alert_groups_from_file:
-                logger.debug("Reading alert rule from %s", file_path)
-                alert_groups.extend(alert_groups_from_file)
-
-        return alert_groups
-
-    def add_path(self, path_str: str, *, recursive: bool = False):
-        """Add rules from a dir path.
-
-        All rules from files are aggregated into a data structure representing a single rule file.
-        All group names are augmented with juju topology.
-
-        Args:
-            path_str: either a rules file or a dir of rules files.
-            recursive: whether to read files recursively or not (no impact if `path` is a file).
-
-        Raises:
-            InvalidAlertRulePathError: if the provided path is invalid.
-        """
-        path = Path(path_str)  # type: Path
-        if path.is_dir():
-            self.alert_groups.extend(self._from_dir(path, recursive))
-        elif path.is_file():
-            self.alert_groups.extend(self._from_file(path.parent, path))
-        else:
-            logger.debug("The alerts file does not exist: %s", path)
-
-    def as_dict(self) -> dict:
-        """Return standard alert rules file in dict representation.
-
-        Returns:
-            a dictionary containing a single list of alert rule groups.
-            The list of alert rule groups is provided as value of the
-            "groups" dictionary key.
-        """
-        return {"groups": self.alert_groups} if self.alert_groups else {}
-
-
 def _resolve_dir_against_charm_path(charm: CharmBase, *path_elements: str) -> str:
     """Resolve the provided path items against the directory of the main file.
 
@@ -1150,7 +883,7 @@ class LokiPushApiProvider(Object):
         *,
         port: Union[str, int] = 3100,
         scheme: str = "http",
-        address: str = "localhost",
+        address: str = "",
         path: str = "loki/api/v1/push",
     ):
         """A Loki service provider.
@@ -1165,7 +898,9 @@ class LokiPushApiProvider(Object):
                 other charms that consume metrics endpoints.
             port: an optional port of the Loki service (default is "3100").
             scheme: an optional scheme of the Loki API URL (default is "http").
-            address: an optional address of the Loki service (default is "localhost").
+            address: DEPRECATED. This argument is ignored and will be removed in v2.
+                It is kept for backward compatibility.
+                Use `update_endpoint()` instead.
             path: an optional path of the Loki API URL (default is "loki/api/v1/push")
 
         Raises:
@@ -1181,14 +916,23 @@ class LokiPushApiProvider(Object):
         _validate_relation_by_interface_and_direction(
             charm, relation_name, RELATION_INTERFACE_NAME, RelationRole.provides
         )
+
+        if address != "":
+            warnings.warn(
+                "The 'address' parameter is deprecated and will be removed in v2. "
+                "Use 'update_endpoint()' instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
         super().__init__(charm, relation_name)
         self._charm = charm
         self._relation_name = relation_name
-        self._tool = CosTool(self)
+        self._tool = CosTool("logql")
         self.port = int(port)
         self.scheme = scheme
-        self.address = address
         self.path = path
+        self._custom_url = None
 
         events = self._charm.on[relation_name]
         self.framework.observe(self._charm.on.upgrade_charm, self._on_lifecycle_event)
@@ -1302,6 +1046,14 @@ class LokiPushApiProvider(Object):
         """
         relation.data[self._charm.unit]["public_address"] = socket.getfqdn() or ""
         self.update_endpoint(relation=relation)
+
+        # Ensure promtail binary URL is set in app data. This is normally done on
+        # relation_joined, but charms using the reconcile pattern may miss that event
+        # if the workload container is not yet ready when the relation is first established.
+        if self._charm.unit.is_leader():
+            if not relation.data[self._charm.app].get("promtail_binary_zip_url"):
+                relation.data[self._charm.app].update(self._promtail_binary_url)
+
         return self._should_update_alert_rules(relation)
 
     @property
@@ -1326,6 +1078,11 @@ class LokiPushApiProvider(Object):
         host address change because the charmed operator becomes connected to an
         Ingress after the `logging` relation is established.
 
+        To make this library reconciler-friendly, the endpoint URL was made sticky i.e., once the
+        endpoint is updated with a custom URL, using the public method, it cannot be unset. Users
+        of this method should set the "url" arg to an internal URL if the charms ingress is no
+        longer available.
+
         Args:
             url: An optional url value to update relation data.
             relation: An optional instance of `class:ops.model.Relation` to update.
@@ -1339,7 +1096,10 @@ class LokiPushApiProvider(Object):
         else:
             relations_list = [relation]
 
-        endpoint = self._endpoint(url or self._url)
+        if url:
+            self._custom_url = url
+
+        endpoint = self._endpoint(self._custom_url or self._url)
 
         for relation in relations_list:
             relation.data[self._charm.unit].update({"endpoint": json.dumps(endpoint)})
@@ -1429,9 +1189,10 @@ class LokiPushApiProvider(Object):
                 )
                 continue
 
-            _, errmsg = self._tool.validate_alert_rules(alert_rules)
+            _, errmsg = self._tool.validate_alert_rules(cast(OfficialRuleFileFormat, alert_rules))
             if errmsg:
-                relation.data[self._charm.app]["event"] = json.dumps({"errors": errmsg})
+                if self._charm.unit.is_leader():
+                    relation.data[self._charm.app]["event"] = json.dumps({"errors": errmsg})
                 continue
 
             alerts[identifier] = alert_rules
@@ -1579,7 +1340,9 @@ class ConsumerBase(Object):
             return
 
         alert_rules = (
-            AlertRules(None) if self._skip_alert_topology_labeling else AlertRules(self.topology)
+            AlertRules(query_type="logql")
+            if self._skip_alert_topology_labeling
+            else AlertRules(query_type="logql", topology=self.topology)
         )
         if self._forward_alert_rules:
             alert_rules.add_path(self._alert_rules_path, recursive=self._recursive)
@@ -2731,123 +2494,6 @@ class LogForwarder(ConsumerBase):
         endpoints = self._extract_urls(relation)
 
         return endpoints
-
-
-class CosTool:
-    """Uses cos-tool to inject label matchers into alert rule expressions and validate rules."""
-
-    _path = None
-    _disabled = False
-
-    def __init__(self, charm):
-        self._charm = charm
-
-    @property
-    def path(self):
-        """Lazy lookup of the path of cos-tool."""
-        if self._disabled:
-            return None
-        if not self._path:
-            self._path = self._get_tool_path()
-            if not self._path:
-                logger.debug("Skipping injection of juju topology as label matchers")
-                self._disabled = True
-        return self._path
-
-    def apply_label_matchers(self, rules) -> dict:
-        """Will apply label matchers to the expression of all alerts in all supplied groups."""
-        if not self.path:
-            return rules
-        for group in rules["groups"]:
-            rules_in_group = group.get("rules", [])
-            for rule in rules_in_group:
-                topology = {}
-                # if the user for some reason has provided juju_unit, we'll need to honor it
-                # in most cases, however, this will be empty
-                for label in [
-                    "juju_model",
-                    "juju_model_uuid",
-                    "juju_application",
-                    "juju_charm",
-                    "juju_unit",
-                ]:
-                    if label in rule["labels"]:
-                        topology[label] = rule["labels"][label]
-
-                rule["expr"] = self.inject_label_matchers(rule["expr"], topology)
-        return rules
-
-    def validate_alert_rules(self, rules: dict) -> Tuple[bool, str]:
-        """Will validate correctness of alert rules, returning a boolean and any errors."""
-        if not self.path:
-            logger.debug("`cos-tool` unavailable. Not validating alert correctness.")
-            return True, ""
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            rule_path = Path(tmpdir + "/validate_rule.yaml")
-
-            # Smash "our" rules format into what upstream actually uses, which is more like:
-            #
-            # groups:
-            #   - name: foo
-            #     rules:
-            #       - alert: SomeAlert
-            #         expr: up
-            #       - alert: OtherAlert
-            #         expr: up
-            transformed_rules = {"groups": []}  # type: ignore
-            for rule in rules["groups"]:
-                transformed_rules["groups"].append(rule)
-
-            rule_path.write_text(yaml.dump(transformed_rules))
-            args = [str(self.path), "--format", "logql", "validate", str(rule_path)]
-            # noinspection PyBroadException
-            try:
-                self._exec(args)
-                return True, ""
-            except subprocess.CalledProcessError as e:
-                logger.debug("Validating the rules failed: %s", e.output)
-                return False, ", ".join([line for line in e.output if "error validating" in line])
-
-    def inject_label_matchers(self, expression, topology) -> str:
-        """Add label matchers to an expression."""
-        if not topology:
-            return expression
-        if not self.path:
-            logger.debug("`cos-tool` unavailable. Leaving expression unchanged: %s", expression)
-            return expression
-        args = [str(self.path), "--format", "logql", "transform"]
-        args.extend(
-            ["--label-matcher={}={}".format(key, value) for key, value in topology.items()]
-        )
-
-        args.extend(["{}".format(expression)])
-        # noinspection PyBroadException
-        try:
-            return self._exec(args)
-        except subprocess.CalledProcessError as e:
-            logger.debug('Applying the expression failed: "%s", falling back to the original', e)
-            print('Applying the expression failed: "{}", falling back to the original'.format(e))
-            return expression
-
-    def _get_tool_path(self) -> Optional[Path]:
-        arch = platform.processor()
-        arch = "amd64" if arch == "x86_64" else arch
-        res = "cos-tool-{}".format(arch)
-        try:
-            path = Path(res).resolve()
-            path.chmod(0o777)
-            return path
-        except NotImplementedError:
-            logger.debug("System lacks support for chmod")
-        except FileNotFoundError:
-            logger.debug('Could not locate cos-tool at: "{}"'.format(res))
-        return None
-
-    def _exec(self, cmd) -> str:
-        result = subprocess.run(cmd, check=True, stdout=subprocess.PIPE)
-        output = result.stdout.decode("utf-8").strip()
-        return output
 
 
 def charm_logging_config(
