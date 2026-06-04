@@ -9,7 +9,7 @@ myst:
 # Charm architecture
 
 At its core, [Traefik](https://traefik.io/traefik) is a [Go](https://go.dev/) application that 
-provides both Layer 4 and Layer 7 traffic management, allowing applications to expose themselves outside their network boundary. The traefik-k8s charm deploys and manages Traefik as a Kubernetes ingress controller, routing requests from outside the cluster to Juju units and applications with support for TLS termination, path-based and subdomain-based routing, and much more.
+provides both Layer 4 and Layer 7 traffic management, allowing applications to expose themselves outside their network boundary. The traefik-k8s charm deploys and manages Traefik as a reverse proxy on Kubernetes, routing requests from outside the cluster to Juju units and applications with support for TLS termination, path-based and subdomain-based routing, and much more.
 
 ## Charm architecture diagram
 
