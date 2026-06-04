@@ -33,6 +33,16 @@ def juju_fixture(request):
     if model:
         _juju = jubilant.Juju(model=model)
         _juju.wait_timeout = 10 * 60
+        # On Juju 4 + canonical k8s, the default secret backend is "kubernetes",
+        # which creates juju-secret-consumer-* service accounts whose RBAC
+        # permissions are sometimes not ready before hooks fire, causing transient
+        # "forbidden: cannot patch secrets" failures. Switching to "internal"
+        # stores secrets in the controller database instead, avoiding K8s RBAC
+        # entirely.
+        try:
+            _juju.cli("model-secret-backend", "internal", include_model=False)
+        except jubilant.CLIError:
+            pass  # Juju 3 doesn't have this command; safe to ignore
         yield _juju
         return
 
