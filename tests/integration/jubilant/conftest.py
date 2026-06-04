@@ -40,7 +40,7 @@ def juju_fixture(request):
         # stores secrets in the controller database instead, avoiding K8s RBAC
         # entirely.
         try:
-            _juju.cli("model-secret-backend", "internal", include_model=False)
+            _juju.cli("model-secret-backend", "internal")
         except jubilant.CLIError:
             pass  # Juju 3 doesn't have this command; safe to ignore
         yield _juju
