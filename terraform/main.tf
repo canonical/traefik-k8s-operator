@@ -13,4 +13,13 @@ resource "juju_application" "traefik" {
     channel  = var.channel
     revision = var.revision
   }
+
+  dynamic "expose" {
+    for_each = var.expose != null ? [var.expose] : []
+    content {
+      cidrs     = expose.value.cidrs
+      endpoints = expose.value.endpoints
+      spaces    = expose.value.spaces
+    }
+  }
 }

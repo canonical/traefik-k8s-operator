@@ -25,6 +25,16 @@ variable "constraints" {
   default = "arch=amd64"
 }
 
+variable "expose" {
+  description = "Make the application publicly available over the network"
+  type = object({
+    cidrs     = optional(string)
+    endpoints = optional(string)
+    spaces    = optional(string)
+  })
+  default = null
+}
+
 variable "model_uuid" {
   description = "ID of the model to deploy to"
   type        = string
