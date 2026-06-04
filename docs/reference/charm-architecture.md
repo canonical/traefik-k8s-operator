@@ -4,7 +4,7 @@ myst:
     "description lang=en": "Learn more about the architecture of the Traefik charm."
 ---
 
-(explanation_charm_architecture)=
+(reference_charm_architecture)=
 
 # Charm architecture
 

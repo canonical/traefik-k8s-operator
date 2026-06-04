@@ -13,5 +13,4 @@ The pages in this section provide additional context and deeper understanding of
 ```{toctree}
 :maxdepth: 1
 security.md
-charm-architecture.md
 ```
