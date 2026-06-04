@@ -43,7 +43,7 @@ def deploy_traefik(juju, traefik_charm):
         trust=True,
     )
     juju.config(TRAEFIK_APP_NAME, {"external_hostname": "traefik.test"})
-    juju.wait(_all_settled, timeout=600)
+    juju.wait(_all_settled, delay=5, timeout=600)
     return TRAEFIK_APP_NAME
 
 
