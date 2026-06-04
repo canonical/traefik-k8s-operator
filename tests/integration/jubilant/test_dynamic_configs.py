@@ -56,9 +56,8 @@ def deploy_alertmanager(juju, deploy_traefik):
         channel="2/edge",
         trust=True,
     )
-    juju.wait(_all_settled, timeout=600)
     juju.integrate(f"{ALERTMANAGER_APP_NAME}:ingress", TRAEFIK_APP_NAME)
-    juju.wait(_all_settled, timeout=600)
+    juju.wait(_all_settled, delay=5, timeout=600)
     return ALERTMANAGER_APP_NAME
 
 
@@ -71,9 +70,8 @@ def deploy_catalogue(juju, deploy_traefik):
         channel="1/edge",
         trust=True,
     )
-    juju.wait(_all_settled, timeout=600)
     juju.integrate(f"{CATALOGUE_APP_NAME}:ingress", TRAEFIK_APP_NAME)
-    juju.wait(_all_settled, timeout=600)
+    juju.wait(_all_settled, delay=5, timeout=600)
     return CATALOGUE_APP_NAME
 
 
