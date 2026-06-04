@@ -30,10 +30,10 @@ def juju():
 def traefik_charm():
     charm_path = os.environ.get("CHARM_PATH")
     if charm_path:
-        return Path(charm_path)
+        return Path(charm_path).resolve()
     charms = sorted(Path(".").glob("traefik*.charm"))
     if charms:
-        return charms[0]
+        return charms[0].resolve()
     raise FileNotFoundError(
         "Set CHARM_PATH to the built traefik charm, "
         "or place a traefik*.charm file in the repo root."
