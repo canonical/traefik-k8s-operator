@@ -1,7 +1,7 @@
 ---
 myst:
   html_meta:
-    "description lang=en": "Learn more about the charm architecture of the Traefik charm."
+    "description lang=en": "Learn more about the architecture of the Traefik charm."
 ---
 
 (explanation_charm_architecture)=
@@ -32,7 +32,7 @@ Rel(charm_logic, traefik_core, "Supervises<br>process")
 UpdateRelStyle(charm_logic, traefik_core, $offsetX="-30")
 ```
 
-The charm design leverages the [sidecar](https://kubernetes.io/blog/2015/06/the-distributed-system-toolkit-patterns/#example-1-sidecar-containers) pattern to allow multiple containers in each pod with [Pebble](https://documentation.ubuntu.com/juju/3.6/reference/pebble/) running as the workload container's entrypoint.
+The charm design leverages the [sidecar](https://kubernetes.io/blog/2015/06/the-distributed-system-toolkit-patterns/#example-1-sidecar-containers) pattern to allow multiple containers in each pod with {ref}`Pebble <juju:pebble>` running as the workload container's entrypoint.
 
 Pebble is a lightweight, API-driven process supervisor that is responsible for configuring processes to run in a container and controlling those processes throughout the workload lifecycle.
 
@@ -79,21 +79,21 @@ The charm exposes Prometheus metrics at the `/metrics` endpoint at the diagnosti
 
 For this charm, the following Juju events are observed:
 
-1. [`traefik_pebble_ready`](https://documentation.ubuntu.com/juju/3.6/reference/hook/index.html#container-pebble-ready): fired on Kubernetes charms when the requested container is ready. **Action**: configure and start the Traefik workload, write static/dynamic configuration, and replan the Pebble service.
+1. {ref}`traefik-pebble-ready <juju:hook-container-pebble-ready>`: fired on Kubernetes charms when the requested container is ready. **Action**: configure and start the Traefik workload, write static/dynamic configuration, and replan the Pebble service.
 
-2. [`config_changed`](https://documentation.ubuntu.com/juju/latest/reference/hook/index.html#config-changed): usually fired in response to a configuration change using the CLI. **Action**: regenerate Traefik static and dynamic configuration, update the Kubernetes LoadBalancer service, and restart the workload.
+2. {ref}`config-changed <juju:hook-config-changed>`: usually fired in response to a configuration change using the CLI. **Action**: regenerate Traefik static and dynamic configuration, update the Kubernetes LoadBalancer service, and restart the workload.
 
-3. [`start`](https://documentation.ubuntu.com/juju/latest/reference/hook/index.html#start): fired once when the unit is first started. **Action**: perform initial setup tasks for the charm.
+3. {ref}`start <juju:hook-start>`: fired once when the unit is first started. **Action**: perform initial setup tasks for the charm.
 
-4. [`stop`](https://documentation.ubuntu.com/juju/latest/reference/hook/index.html#stop): fired when the unit is being stopped. **Action**: clean up resources.
+4. {ref}`stop <juju:hook-stop>`: fired when the unit is being stopped. **Action**: clean up resources.
 
-5. [`remove`](https://documentation.ubuntu.com/juju/latest/reference/hook/index.html#remove): fired when the unit is being removed. **Action**: clean up Kubernetes resources such as the LoadBalancer service.
+5. {ref}`remove <juju:hook-remove>`: fired when the unit is being removed. **Action**: clean up Kubernetes resources such as the LoadBalancer service.
 
-6. [`update_status`](https://documentation.ubuntu.com/juju/latest/reference/hook/index.html#update-status): fired at regular intervals. **Action**: validate the current state of the workload and update the charm status accordingly.
+6. {ref}`update-status <juju:hook-update-status>`: fired at regular intervals. **Action**: validate the current state of the workload and update the charm status accordingly.
 
 7. [`certificate_available`](https://github.com/canonical/tls-certificates-interface): fired when a TLS certificate becomes available from the certificates provider. **Action**: store the certificate and reconfigure Traefik with TLS settings.
 
-8. [`certificates_relation_broken`](https://documentation.ubuntu.com/juju/latest/reference/hook/index.html#endpoint-relation-departed): fired when the TLS certificates relation is removed. **Action**: clean up TLS configuration and restart Traefik without TLS.
+8. {ref}`certificates_relation_broken <juju:hook-relation-broken>`: fired when the TLS certificates relation is removed. **Action**: clean up TLS configuration and restart Traefik without TLS.
 
 9. [`certificate_set_updated`](https://github.com/canonical/certificate-transfer-interface): fired when a CA certificate is received via the `receive-ca-cert` relation. **Action**: update the trusted CA certificates in the container and run `update-ca-certificates`.
 
@@ -107,15 +107,15 @@ For this charm, the following Juju events are observed:
 
 14. [`traefik_route ready`](https://github.com/canonical/traefik-k8s-operator): fired when a traefik-route charm provides raw Traefik configuration. **Action**: write the provided configuration to the dynamic config directory.
 
-15. [`show_proxied_endpoints`](https://documentation.ubuntu.com/juju/latest/user/reference/action/): fired when the `show-proxied-endpoints` action is run. **Action**: display all currently configured ingress routes.
+15. {ref}`show-proxied-endpoints <juju:action>`: fired when the `show-proxied-endpoints` action is run. **Action**: display all currently configured ingress routes.
 
-> See more in the Juju docs: [Hook](https://documentation.ubuntu.com/juju/latest/reference/hook/)
+> See more in the Juju docs: {ref}`juju:hook`
 
 ## Charm code overview
 
 The `src/charm.py` is the default entry point for a charm and has the `TraefikIngressCharm` Python class which inherits from `CharmBase`. `CharmBase` is the base class from which all charms are formed, defined by [Ops](https://ops.readthedocs.io/en/latest/index.html) (Python framework for developing charms).
 
-> See more in the Juju docs: [Charm](https://documentation.ubuntu.com/juju/latest/user/reference/charm/)
+> See more in the Juju docs: {ref}`juju:charm`
 
 The `__init__` method guarantees that the charm observes all events relevant to its operation and handles them.
 
