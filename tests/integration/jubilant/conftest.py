@@ -1,11 +1,14 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
+import logging
 import os
 from pathlib import Path
 from typing import cast
 
 import jubilant
 import pytest
+
+logger = logging.getLogger(__name__)
 
 
 @pytest.fixture(scope="module")
@@ -41,8 +44,10 @@ def juju_fixture(request):
         # entirely.
         try:
             _juju.cli("model-secret-backend", "internal")
-        except jubilant.CLIError:
-            pass  # Juju 3 doesn't have this command; safe to ignore
+        except jubilant.CLIError as e:
+            # Juju 3 doesn't have this command; safe to ignore.
+            # On Juju 4 failures will show up here as a warning so they're visible.
+            logger.warning("model-secret-backend internal failed (Juju 3?): %s", e)
         yield _juju
         return
 
