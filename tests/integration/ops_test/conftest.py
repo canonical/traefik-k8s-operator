@@ -18,7 +18,7 @@ import yaml
 from juju.errors import JujuError
 from pytest_operator.plugin import OpsTest
 
-trfk_root = Path(__file__).parent.parent.parent
+trfk_root = Path(__file__).parent.parent.parent.parent
 trfk_meta = yaml.safe_load((trfk_root / "metadata.yaml").read_text())
 trfk_resources = {name: val["upstream-source"] for name, val in trfk_meta["resources"].items()}
 
@@ -110,7 +110,7 @@ async def traefik_charm(ops_test):
 @pytest.fixture(scope="module")
 @timed_memoizer
 async def forward_auth_tester_charm(ops_test):
-    charm_path = (Path(__file__).parent / "testers" / "forward-auth").absolute()
+    charm_path = (Path(__file__).parent.parent / "testers" / "forward-auth").absolute()
     count = 0
     while True:
         try:
@@ -126,7 +126,7 @@ async def forward_auth_tester_charm(ops_test):
 @pytest.fixture(scope="module")
 @timed_memoizer
 async def ipa_tester_charm(ops_test):
-    charm_path = (Path(__file__).parent / "testers" / "ipa").absolute()
+    charm_path = (Path(__file__).parent.parent / "testers" / "ipa").absolute()
     count = 0
     while True:
         try:
@@ -142,7 +142,7 @@ async def ipa_tester_charm(ops_test):
 @pytest.fixture(scope="module")
 @timed_memoizer
 async def ingress_requirer_mock(ops_test):
-    charm_path = (Path(__file__).parent / "testers" / "ingress-requirer-mock").absolute()
+    charm_path = (Path(__file__).parent.parent / "testers" / "ingress-requirer-mock").absolute()
     count = 0
     while True:
         try:
@@ -159,7 +159,7 @@ async def ingress_requirer_mock(ops_test):
 @pytest.fixture(scope="module")
 @timed_memoizer
 async def ipu_tester_charm(ops_test):
-    charm_path = (Path(__file__).parent / "testers" / "ipu").absolute()
+    charm_path = (Path(__file__).parent.parent / "testers" / "ipu").absolute()
     count = 0
     while True:
         try:
@@ -175,7 +175,7 @@ async def ipu_tester_charm(ops_test):
 @pytest.fixture(scope="module")
 @timed_memoizer
 async def tcp_tester_charm(ops_test):
-    charm_path = (Path(__file__).parent / "testers" / "tcp").absolute()
+    charm_path = (Path(__file__).parent.parent / "testers" / "tcp").absolute()
     count = 0
     while True:
         try:
@@ -191,7 +191,7 @@ async def tcp_tester_charm(ops_test):
 @pytest.fixture(scope="module")
 @timed_memoizer
 async def route_tester_charm(ops_test):
-    charm_path = (Path(__file__).parent / "testers" / "route").absolute()
+    charm_path = (Path(__file__).parent.parent / "testers" / "route").absolute()
     count = 0
     while True:
         try:
@@ -207,7 +207,7 @@ async def route_tester_charm(ops_test):
 @pytest.fixture(scope="module")
 @timed_memoizer
 async def health_tester_charm(ops_test: OpsTest):
-    charm_path = (Path(__file__).parent / "testers" / "health").absolute()
+    charm_path = (Path(__file__).parent.parent / "testers" / "health").absolute()
     count = 0
     while True:
         try:
