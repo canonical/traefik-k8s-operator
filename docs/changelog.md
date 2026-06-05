@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 Each revision is versioned by the date of the revision.
 
+## 2026-06-03
+
+- Added the charm architecture documentation page.
+
 ## 2026-06-01
 
 - Updated ingress lib to publish new attribute `is_port_opened` on the requirer's side

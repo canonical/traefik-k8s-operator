@@ -76,7 +76,7 @@ LIBAPI = 4
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 28
+LIBPATCH = 29
 
 PYDEPS = [
     "cryptography>=43.0.0",
@@ -1733,6 +1733,7 @@ class TLSCertificatesRequiresV4(Object):
                 "Invalid renewal relative time. Must be between 0.5 and 1.0"
             )
         self._private_key = private_key
+        self._cached_private_key: Optional[PrivateKey] = None
         self.renewal_relative_time = renewal_relative_time
         self.framework.observe(charm.on[relationship_name].relation_created, self._configure)
         self.framework.observe(charm.on[relationship_name].relation_changed, self._configure)
@@ -1865,11 +1866,15 @@ class TLSCertificatesRequiresV4(Object):
         """Return the private key."""
         if self._private_key:
             return self._private_key
-        if not self._private_key_generated():
+        if self._cached_private_key:
+            return self._cached_private_key
+        try:
+            secret = self.charm.model.get_secret(label=self._get_private_key_secret_label())
+            private_key = secret.get_content(refresh=True)["private-key"]
+        except SecretNotFoundError:
             return None
-        secret = self.charm.model.get_secret(label=self._get_private_key_secret_label())
-        private_key = secret.get_content(refresh=True)["private-key"]
-        return PrivateKey.from_string(private_key)
+        self._cached_private_key = PrivateKey.from_string(private_key)
+        return self._cached_private_key
 
     def _ensure_private_key(self) -> None:
         """Make sure there is a private key to be used.
@@ -1932,6 +1937,7 @@ class TLSCertificatesRequiresV4(Object):
             return False
 
     def _store_private_key_in_secret(self, private_key: PrivateKey) -> None:
+        self._cached_private_key = None
         try:
             secret = self.charm.model.get_secret(label=self._get_private_key_secret_label())
             secret.set_content({"private-key": str(private_key)})
@@ -1944,6 +1950,7 @@ class TLSCertificatesRequiresV4(Object):
 
     def _remove_private_key_secret(self) -> None:
         """Remove the private key secret."""
+        self._cached_private_key = None
         try:
             secret = self.charm.model.get_secret(label=self._get_private_key_secret_label())
             secret.remove_all_revisions()
