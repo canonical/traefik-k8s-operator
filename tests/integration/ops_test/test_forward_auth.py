@@ -7,13 +7,13 @@ from os.path import join
 import pytest
 import requests
 import yaml
-from helpers import get_k8s_service_address, remove_application
 from lightkube import Client
 from lightkube.resources.core_v1 import ConfigMap
 from pytest_operator.plugin import OpsTest
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from tests.integration.ops_test.conftest import deploy_traefik_if_not_deployed
+from tests.integration.ops_test.helpers import get_k8s_service_address, remove_application
 
 logger = logging.getLogger(__name__)
 

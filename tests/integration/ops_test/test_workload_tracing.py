@@ -7,7 +7,12 @@ from pathlib import Path
 
 import pytest
 import yaml
-from helpers import deploy_tempo_cluster, get_application_ip, get_traces_patiently
+
+from tests.integration.ops_test.helpers import (
+    deploy_tempo_cluster,
+    get_application_ip,
+    get_traces_patiently,
+)
 
 logger = logging.getLogger(__name__)
 
