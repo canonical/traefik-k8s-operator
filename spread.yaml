@@ -28,7 +28,7 @@ integration-suites:
       CHARM_PATH={{ build.path }}
       {% endfor %}
     environment:
-      MODULE/jubilant_test_dynamic_configs_juju4: tests/integration/jubilant/test_dynamic_configs.py
-      MODULE/jubilant_test_https_multi_unit_juju4: tests/integration/jubilant/test_https_multi_unit.py
+      MODULE/jubilant_test_dynamic_configs_juju4: tests/integration/test_dynamic_configs.py
+      MODULE/jubilant_test_https_multi_unit_juju4: tests/integration/test_https_multi_unit.py
       CONCIERGE/jubilant_test_dynamic_configs_juju4: concierge-juju4.yaml
       CONCIERGE/jubilant_test_https_multi_unit_juju4: concierge-juju4.yaml
