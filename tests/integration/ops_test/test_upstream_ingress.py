@@ -9,7 +9,7 @@ import yaml
 from pytest_operator.plugin import OpsTest
 from tenacity import retry, stop_after_delay, wait_fixed
 
-from tests.integration.conftest import trfk_resources
+from tests.integration.ops_test.conftest import trfk_resources
 
 TRAEFIK = "traefik-k8s"
 UPSTREAM_INGRESS = f"{TRAEFIK}-upstream"

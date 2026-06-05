@@ -13,7 +13,7 @@ from lightkube.resources.core_v1 import ConfigMap
 from pytest_operator.plugin import OpsTest
 from tenacity import retry, stop_after_attempt, wait_exponential
 
-from tests.integration.conftest import deploy_traefik_if_not_deployed
+from tests.integration.ops_test.conftest import deploy_traefik_if_not_deployed
 
 logger = logging.getLogger(__name__)
 

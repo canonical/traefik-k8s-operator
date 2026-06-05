@@ -8,7 +8,7 @@ import pytest
 import yaml
 from pytest_operator.plugin import OpsTest
 
-from tests.integration.conftest import deploy_traefik_if_not_deployed, get_relation_data
+from tests.integration.ops_test.conftest import deploy_traefik_if_not_deployed, get_relation_data
 from tests.integration.helpers import get_k8s_service_address, remove_application
 
 logger = logging.getLogger(__name__)

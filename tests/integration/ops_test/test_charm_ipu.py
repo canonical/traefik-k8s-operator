@@ -7,7 +7,7 @@ import pytest
 import yaml
 from pytest_operator.plugin import OpsTest
 
-from tests.integration.conftest import (
+from tests.integration.ops_test.conftest import (
     assert_can_connect,
     deploy_traefik_if_not_deployed,
     get_relation_data,

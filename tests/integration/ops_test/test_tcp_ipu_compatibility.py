@@ -5,7 +5,7 @@ import asyncio
 import pytest_asyncio
 from pytest_operator.plugin import OpsTest
 
-from tests.integration.conftest import (
+from tests.integration.ops_test.conftest import (
     deploy_charm_if_not_deployed,
     deploy_traefik_if_not_deployed,
     safe_relate,
