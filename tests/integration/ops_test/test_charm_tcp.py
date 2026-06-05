@@ -14,7 +14,7 @@ from tests.integration.ops_test.helpers import get_k8s_service_address, remove_a
 logger = logging.getLogger(__name__)
 
 
-tcp_charm_root = (Path(__file__).parent / "testers" / "tcp").absolute()
+tcp_charm_root = (Path(__file__).parent.parent / "testers" / "tcp").absolute()
 tcp_charm_meta = yaml.safe_load((tcp_charm_root / "metadata.yaml").read_text())
 tcp_charm_resources = {
     name: val["upstream-source"] for name, val in tcp_charm_meta["resources"].items()
