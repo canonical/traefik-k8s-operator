@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 Each revision is versioned by the date of the revision.
 
+## 2026-06-05
+
+- Added an `expose` input to the Terraform module to make Traefik publicly available over the network.
+
 ## 2026-06-03
 
 - Added the charm architecture documentation page.
