@@ -1,0 +1,16 @@
+# Version of the artifact schema
+version_schema: 2
+# The key holding the change(s)
+changes:
+  - title: Added support for `ubuntu@26.04` on the charm
+    author: swetha1654
+    type: minor
+    description: |
+      Added `ubuntu@26.04:amd64` to the `charmcraft.yaml`.
+    urls:
+      pr:
+        - https://github.com/canonical/traefik-k8s-operator/pull/702
+      related_doc:
+      related_issue:
+    visibility: public
+    highlight: false
