@@ -8,13 +8,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 Each revision is versioned by the date of the revision.
 
-## 2026-06-05
+## 2026-06-08
 
 - Added an `expose` input to the Terraform module to make Traefik publicly available over the network.
+
+## 2026-06-05
+
+- Added support for `ubuntu@26.04` on the charm.
+
+## 2026-06-04
+
+- Updated Terraform module Juju provider version constraint to support Juju 4.
 
 ## 2026-06-03
 
 - Added the charm architecture documentation page.
+
+## 2026-06-01
+
+- Updated ingress lib to publish new attribute `is_port_opened` on the requirer's side
+  that represents whether the port requested is open or not.
 
 ## 2026-06-01
 

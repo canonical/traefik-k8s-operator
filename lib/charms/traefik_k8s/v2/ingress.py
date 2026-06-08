@@ -86,7 +86,7 @@ LIBAPI = 2
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 20
+LIBPATCH = 21
 
 PYDEPS = ["pydantic"]
 
@@ -279,6 +279,7 @@ class IngressRequirerAppData(DatabagModel):
     model: str = Field(description="The model the application is in.")
     name: str = Field(description="the name of the app requesting ingress.")
     port: int = Field(description="The port the app wishes to be exposed.")
+    is_port_open: bool = Field(default=False, description="Whether the port is open.")
     healthcheck_params: Optional[IngressHealthCheck] = Field(
         default=None, description="Optional health check configuration for ingress."
     )
@@ -645,10 +646,8 @@ class IngressPerAppProvider(_IngressPerAppBase):
         for ingress_relation in self.relations:
             if not ingress_relation.app:
                 log.warning(
-                    (
-                        f"no app in relation {ingress_relation} when fetching proxied endpoints:"
-                        "skipping"
-                    )
+                    f"no app in relation {ingress_relation} when fetching proxied endpoints:"
+                    "skipping"
                 )
                 continue
             try:
@@ -890,6 +889,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
                 name=self.app.name,
                 scheme=scheme,
                 port=port,
+                is_port_open=port in {open_port.port for open_port in self.unit.opened_ports()},
                 strip_prefix=self._strip_prefix,  # type: ignore
                 redirect_https=self._redirect_https,  # type: ignore
                 healthcheck_params=(

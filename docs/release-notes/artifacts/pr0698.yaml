@@ -1,0 +1,17 @@
+# Version of the artifact schema
+version_schema: 2
+# The key holding the change(s)
+changes:
+  - title: Update Terraform module to support Juju 4
+    author: swetha1654
+    type: minor
+    description: |
+      The Terraform module has been updated to allow version 2 of the Juju provider, 
+      which supports Juju 4.
+    urls:
+      pr:
+        - https://github.com/canonical/traefik-k8s-operator/pull/698
+      related_doc:
+      related_issue: https://github.com/canonical/traefik-k8s-operator/issues/690
+    visibility: hidden
+    highlight: false

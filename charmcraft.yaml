@@ -4,14 +4,19 @@
 type: charm
 
 platforms:
-  ubuntu@20.04:amd64:
+  ubuntu@26.04:amd64:
 
 parts:
   charm:
     source: .
     plugin: uv
-    build-packages: [git]
+    build-packages: [git, libffi-dev]
     build-snaps: [astral-uv]
+    build-environment:
+      # Several locked deps (cffi, rpds-py, pydantic-core) have no Python 3.14
+      # wheels and build from source on the ubuntu@26.04 base. Their PyO3-based
+      # builds reject Python 3.14 unless ABI3 forward-compatibility is enabled.
+      - PYO3_USE_ABI3_FORWARD_COMPATIBILITY: "1"
     override-build: |
       craftctl default
       git describe --always > $CRAFT_PART_INSTALL/version
