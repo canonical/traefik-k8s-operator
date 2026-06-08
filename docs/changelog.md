@@ -12,6 +12,10 @@ Each revision is versioned by the date of the revision.
 
 - Added support for `ubuntu@26.04` on the charm.
 
+## 2026-06-04
+
+- Updated Terraform module Juju provider version constraint to support Juju 4.
+
 ## 2026-06-03
 
 - Added the charm architecture documentation page.
