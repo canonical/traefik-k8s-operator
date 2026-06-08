@@ -16,7 +16,7 @@ run "basic_deploy" {
   }
 
   assert {
-    condition     = output.app_name == "traefik"
+    condition     = output.application.name == "traefik"
     error_message = "traefik app_name did not match expected"
   }
 }

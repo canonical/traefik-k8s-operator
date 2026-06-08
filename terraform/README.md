@@ -2,9 +2,10 @@
 
 This is a Terraform module facilitating the deployment of traefik-k8s charm, using the [Terraform juju provider](https://github.com/juju/terraform-provider-juju/). For more information, refer to the provider [documentation](https://registry.terraform.io/providers/juju/juju/latest/docs). 
 
-## Requirements
-
 This module requires a `juju` model to be available. Refer to the [usage section](#usage) below for more details.
+
+<!-- BEGIN_TF_DOCS -->
+## Requirements
 
 | Name | Version |
 |------|---------|
@@ -45,5 +46,7 @@ No modules.
 
 | Name | Description |
 |------|-------------|
-| <a name="output_app_name"></a> [app\_name](#output\_app\_name) | n/a |
-| <a name="output_endpoints"></a> [endpoints](#output\_endpoints) | n/a |
+| <a name="output_application"></a> [application](#output\_application) | The deployed traefik-k8s application. |
+| <a name="output_provides"></a> [provides](#output\_provides) | Map of the provides endpoints exposed by the charm. |
+| <a name="output_requires"></a> [requires](#output\_requires) | Map of the requires endpoints consumed by the charm. |
+<!-- END_TF_DOCS -->
