@@ -36,6 +36,7 @@ No modules.
 | <a name="input_channel"></a> [channel](#input\_channel) | Channel that the charm is deployed from | `string` | n/a | yes |
 | <a name="input_config"></a> [config](#input\_config) | Map of the charm configuration options | `map(string)` | `{}` | no |
 | <a name="input_constraints"></a> [constraints](#input\_constraints) | String listing constraints for this application | `string` | `"arch=amd64"` | no |
+| <a name="input_expose"></a> [expose](#input\_expose) | Make the application publicly available over the network | <pre>object({<br>    cidrs     = optional(string)<br>    endpoints = optional(string)<br>    spaces    = optional(string)<br>  })</pre> | `null` | no |
 | <a name="input_model_uuid"></a> [model\_uuid](#input\_model\_uuid) | ID of the model to deploy to | `string` | n/a | yes |
 | <a name="input_resources"></a> [resources](#input\_resources) | The charm's resources i.e., a resource revision number from CharmHub or a custom OCI image resource | `map(string)` | `{}` | no |
 | <a name="input_revision"></a> [revision](#input\_revision) | Revision number of the charm | `number` | `null` | no |
@@ -66,3 +67,5 @@ Setting the `expose` input makes the application publicly reachable. Two things 
   ```
 
   Setting the hostname and `expose` in the same `terraform apply` works — the provider applies the config before exposing.
+
+- **Endpoint-specific exposures cannot be removed cleanly yet.** When `expose` is restricted to specific `endpoints`, removing the `expose` block later fails with `endpoint "" is not exposed` — a [terraform-provider-juju](https://github.com/juju/terraform-provider-juju) limitation (observed with v1.5.3). Exposing the whole application (with or without `cidrs`) toggles off without issue. `spaces` does not apply to Kubernetes models.
