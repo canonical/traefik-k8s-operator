@@ -4,7 +4,6 @@
 
 """Regression test for receive-ca-cert status after relation removal (#670)."""
 
-import os
 import time
 from pathlib import Path
 

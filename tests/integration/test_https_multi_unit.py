@@ -11,17 +11,12 @@ from pathlib import Path
 import jubilant
 import pytest
 import requests
-import yaml
 from dns_adapter import DNSResolverHTTPSAdapter
+
+from tests.integration.conftest import TRAEFIK_APP_NAME
 
 logger = logging.getLogger(__name__)
 
-METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
-TRAEFIK_RESOURCES = {
-    name: val["upstream-source"] for name, val in METADATA["resources"].items()
-}
-
-TRAEFIK_APP_NAME = "traefik"
 SSC_APP_NAME = "ssc"
 ALERTMANAGER_APP_NAME = "alertmanager"
 MOCK_HOSTNAME = "traefik-demo.local"
@@ -31,19 +26,6 @@ NUM_TRAEFIK_UNITS = 2
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
-@pytest.fixture(scope="module", name="traefik_app")
-def traefik_fixture(juju, traefik_charm):
-    """Deploy traefik."""
-    juju.deploy(
-        traefik_charm,
-        TRAEFIK_APP_NAME,
-        resources=TRAEFIK_RESOURCES,
-        trust=True,
-    )
-    juju.config(TRAEFIK_APP_NAME, {"external_hostname": MOCK_HOSTNAME})
-    juju.wait(jubilant.all_active, timeout=600)
-    return TRAEFIK_APP_NAME
-
 
 @pytest.fixture(scope="module", name="alertmanager_app")
 def alertmanager_fixture(juju, traefik_app):

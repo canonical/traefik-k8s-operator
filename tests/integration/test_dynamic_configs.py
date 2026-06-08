@@ -9,42 +9,18 @@ dynamic config YAML files exist in /opt/traefik/juju/ inside the traefik contain
 """
 
 import logging
-from pathlib import Path
 
 import jubilant
 import pytest
 import yaml
 
+from tests.integration.conftest import TRAEFIK_APP_NAME, all_settled
+
 logger = logging.getLogger(__name__)
 
-METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
-TRAEFIK_RESOURCES = {
-    name: val["upstream-source"] for name, val in METADATA["resources"].items()
-}
-
-TRAEFIK_APP_NAME = "traefik"
 ALERTMANAGER_APP_NAME = "alertmanager"
 CATALOGUE_APP_NAME = "catalogue"
 DYNAMIC_CONFIG_DIR = "/opt/traefik/juju"
-
-
-def _all_settled(status: jubilant.Status) -> bool:
-    """Return True when all apps are active and all agents are idle."""
-    return jubilant.all_active(status) and jubilant.all_agents_idle(status)
-
-
-@pytest.fixture(scope="module")
-def deploy_traefik(juju, traefik_charm):
-    """Deploy traefik."""
-    juju.deploy(
-        traefik_charm,
-        TRAEFIK_APP_NAME,
-        resources=TRAEFIK_RESOURCES,
-        trust=True,
-    )
-    juju.config(TRAEFIK_APP_NAME, {"external_hostname": "traefik.test"})
-    juju.wait(_all_settled, delay=5, timeout=600)
-    return TRAEFIK_APP_NAME
 
 
 @pytest.fixture(scope="module")
@@ -57,7 +33,7 @@ def deploy_alertmanager(juju, deploy_traefik):
         trust=True,
     )
     juju.integrate(f"{ALERTMANAGER_APP_NAME}:ingress", TRAEFIK_APP_NAME)
-    juju.wait(_all_settled, delay=5, timeout=600)
+    juju.wait(all_settled, delay=5, timeout=600)
     return ALERTMANAGER_APP_NAME
 
 
@@ -71,7 +47,7 @@ def deploy_catalogue(juju, deploy_traefik):
         trust=True,
     )
     juju.integrate(f"{CATALOGUE_APP_NAME}:ingress", TRAEFIK_APP_NAME)
-    juju.wait(_all_settled, delay=5, timeout=600)
+    juju.wait(all_settled, delay=5, timeout=600)
     return CATALOGUE_APP_NAME
 
 

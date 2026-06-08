@@ -8,9 +8,16 @@ from typing import cast
 
 import jubilant
 import pytest
+import yaml
 
 logger = logging.getLogger(__name__)
 
+METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
+TRAEFIK_RESOURCES = {
+    name: val["upstream-source"] for name, val in METADATA["resources"].items()
+}
+
+TRAEFIK_APP_NAME = "traefik"
 
 @pytest.fixture(scope="module")
 def traefik_charm():
@@ -24,6 +31,25 @@ def traefik_charm():
         "Set CHARM_PATH to the built traefik charm, "
         "or place a traefik*.charm file in the repo root."
     )
+
+
+@pytest.fixture(scope="module")
+def deploy_traefik(juju, traefik_charm):
+    """Deploy traefik."""
+    juju.deploy(
+        traefik_charm,
+        TRAEFIK_APP_NAME,
+        resources=TRAEFIK_RESOURCES,
+        trust=True,
+    )
+    juju.config(TRAEFIK_APP_NAME, {"external_hostname": "traefik.test"})
+    juju.wait(all_settled, delay=5, timeout=600)
+    return TRAEFIK_APP_NAME
+
+
+def all_settled(status: jubilant.Status) -> bool:
+    """Return True when all apps are active and all agents are idle."""
+    return jubilant.all_active(status) and jubilant.all_agents_idle(status)
 
 
 @pytest.fixture(scope="module", name="juju")
