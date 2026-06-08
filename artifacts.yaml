@@ -9,4 +9,5 @@ charms:
   platforms:
   - arch: amd64
   - arch: s390x
+    runner: [self-hosted-linux-s390x-noble-medium]
 snaps: []
