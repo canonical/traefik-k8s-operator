@@ -16,7 +16,6 @@ from dns_adapter import DNSResolverHTTPSAdapter
 logger = logging.getLogger(__name__)
 
 SSC_APP_NAME = "ssc"
-ALERTMANAGER_APP_NAME = "alertmanager"
 MOCK_HOSTNAME = "traefik-demo.local"
 NUM_TRAEFIK_UNITS = 2
 
@@ -24,21 +23,6 @@ NUM_TRAEFIK_UNITS = 2
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
-
-@pytest.fixture(scope="module", name="alertmanager_app")
-def alertmanager_fixture(juju, traefik_app):
-    """Deploy alertmanager and integrate with traefik."""
-    juju.deploy(
-        "ch:alertmanager-k8s",
-        ALERTMANAGER_APP_NAME,
-        channel="2/edge",
-        trust=True,
-    )
-    juju.wait(jubilant.all_active, timeout=600)
-    juju.integrate(f"{ALERTMANAGER_APP_NAME}:ingress", traefik_app)
-    juju.wait(jubilant.all_active, timeout=600)
-    return ALERTMANAGER_APP_NAME
-
 
 @pytest.fixture(scope="module", name="ssc_app")
 def ssc_fixture(juju, traefik_app):

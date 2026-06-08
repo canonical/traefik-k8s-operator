@@ -19,6 +19,7 @@ TRAEFIK_RESOURCES = {
     name: val["upstream-source"] for name, val in METADATA["resources"].items()
 }
 
+ALERTMANAGER_APP_NAME = "alertmanager"
 TRAEFIK_APP_NAME = "traefik"
 
 @pytest.fixture(scope="module")
@@ -47,6 +48,21 @@ def deploy_traefik(juju, traefik_charm):
     juju.config(TRAEFIK_APP_NAME, {"external_hostname": "traefik.test"})
     juju.wait(all_settled, delay=5, timeout=600)
     return TRAEFIK_APP_NAME
+
+
+@pytest.fixture(scope="module", name="alertmanager_app")
+def alertmanager_fixture(juju, traefik_app):
+    """Deploy alertmanager and integrate with traefik."""
+    juju.deploy(
+        "ch:alertmanager-k8s",
+        ALERTMANAGER_APP_NAME,
+        channel="2/edge",
+        trust=True,
+    )
+    juju.wait(jubilant.all_active, timeout=600)
+    juju.integrate(f"{ALERTMANAGER_APP_NAME}:ingress", traefik_app)
+    juju.wait(jubilant.all_active, timeout=600)
+    return ALERTMANAGER_APP_NAME
 
 
 @pytest.fixture(scope="module", name="juju")
