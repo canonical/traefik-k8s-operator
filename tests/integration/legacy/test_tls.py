@@ -23,7 +23,7 @@ import pytest
 import yaml
 from pytest_operator.plugin import OpsTest
 
-from tests.integration.ops_test.helpers import (
+from tests.integration.legacy.helpers import (
     delete_k8s_service,
     get_k8s_service_address,
     remove_application,

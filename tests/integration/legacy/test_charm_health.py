@@ -9,8 +9,8 @@ from urllib.parse import urlparse
 import pytest
 from pytest_operator.plugin import OpsTest
 
-from tests.integration.ops_test.conftest import trfk_resources
-from tests.integration.ops_test.helpers import get_k8s_service_address, remove_application
+from tests.integration.legacy.conftest import trfk_resources
+from tests.integration.legacy.helpers import get_k8s_service_address, remove_application
 
 health_tester_resources = {
     "python-image": "ubuntu/python:3.10-22.04_stable",

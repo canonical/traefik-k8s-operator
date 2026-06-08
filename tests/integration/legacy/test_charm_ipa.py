@@ -8,12 +8,12 @@ import pytest
 import yaml
 from pytest_operator.plugin import OpsTest
 
-from tests.integration.ops_test.conftest import (
+from tests.integration.legacy.conftest import (
     assert_can_connect,
     get_relation_data,
     trfk_resources,
 )
-from tests.integration.ops_test.helpers import dequote, get_k8s_service_address, remove_application
+from tests.integration.legacy.helpers import dequote, get_k8s_service_address, remove_application
 
 # FIXME Replace parts of this itest with a utest
 

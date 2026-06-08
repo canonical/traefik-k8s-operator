@@ -14,7 +14,7 @@ import pytest
 import yaml
 from pytest_operator.plugin import OpsTest
 
-from tests.integration.ops_test.helpers import fetch_with_retry
+from tests.integration.legacy.helpers import fetch_with_retry
 
 logger = logging.getLogger(__name__)
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())

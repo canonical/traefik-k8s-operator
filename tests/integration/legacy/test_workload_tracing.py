@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from tests.integration.ops_test.helpers import (
+from tests.integration.legacy.helpers import (
     deploy_tempo_cluster,
     get_application_ip,
     get_traces_patiently,

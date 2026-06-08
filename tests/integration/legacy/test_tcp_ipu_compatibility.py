@@ -5,15 +5,15 @@ import asyncio
 import pytest_asyncio
 from pytest_operator.plugin import OpsTest
 
-from tests.integration.ops_test.conftest import (
+from tests.integration.legacy.conftest import (
     deploy_charm_if_not_deployed,
     deploy_traefik_if_not_deployed,
     safe_relate,
 )
-from tests.integration.ops_test.helpers import remove_application
-from tests.integration.ops_test.test_charm_ipa import assert_ipa_charm_has_ingress  # noqa
-from tests.integration.ops_test.test_charm_ipu import assert_ipu_charm_has_ingress  # noqa
-from tests.integration.ops_test.test_charm_tcp import (  # noqa
+from tests.integration.legacy.helpers import remove_application
+from tests.integration.legacy.test_charm_ipa import assert_ipa_charm_has_ingress  # noqa
+from tests.integration.legacy.test_charm_ipu import assert_ipu_charm_has_ingress  # noqa
+from tests.integration.legacy.test_charm_tcp import (  # noqa
     assert_tcp_charm_has_ingress,
     tcp_charm_resources,
 )
