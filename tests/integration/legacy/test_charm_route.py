@@ -12,13 +12,13 @@ import pytest
 import yaml
 from pytest_operator.plugin import OpsTest
 
-from tests.integration.conftest import trfk_resources
-from tests.integration.helpers import get_k8s_service_address, remove_application
+from tests.integration.legacy.conftest import trfk_resources
+from tests.integration.legacy.helpers import get_k8s_service_address, remove_application
 
 APP_NAME = "traefik"
 TESTER_APP_NAME = "route"
 
-route_charm_root = (Path(__file__).parent / "testers" / "route").absolute()
+route_charm_root = (Path(__file__).parent.parent / "testers" / "route").absolute()
 route_charm_meta = yaml.safe_load((route_charm_root / "metadata.yaml").read_text())
 route_charm_resources = {
     name: val["upstream-source"] for name, val in route_charm_meta["resources"].items()
