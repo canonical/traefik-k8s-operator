@@ -17,7 +17,6 @@ jobs:
     secrets: inherit
     with:
       juju-channel: "3.6/stable"
-      charmcraft-channel: "latest/edge"
 
   required_status_checks:
     name: Required Status Checks
