@@ -1,0 +1,18 @@
+# Version of the artifact schema
+version_schema: 2
+
+# The key holding the change(s)
+changes:
+- title: Added `is_port_open` to ingress requirer relation data
+  author: f-atwi
+  type: minor
+  description: |
+    The ingress library now publishes an `is_port_open` field in requirer relation data
+    so integrators can detect whether the requested port is currently open on the unit.
+  urls:
+    pr: 
+      - "https://github.com/canonical/traefik-k8s-operator/pull/694"
+    related_doc: # only applicable if there are documentation changes
+    related_issue: # only applicable if there's a corresponding GitHub issue
+  visibility: hidden
+  highlight: false
