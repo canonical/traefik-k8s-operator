@@ -10,6 +10,8 @@ import jubilant
 import pytest
 import yaml
 
+from tests.integration.helpers import all_settled
+
 logger = logging.getLogger(__name__)
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
@@ -33,7 +35,7 @@ def traefik_charm():
     )
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="module", name="traefik_app")
 def deploy_traefik(juju, traefik_charm):
     """Deploy traefik."""
     juju.deploy(
@@ -45,11 +47,6 @@ def deploy_traefik(juju, traefik_charm):
     juju.config(TRAEFIK_APP_NAME, {"external_hostname": "traefik.test"})
     juju.wait(all_settled, delay=5, timeout=600)
     return TRAEFIK_APP_NAME
-
-
-def all_settled(status: jubilant.Status) -> bool:
-    """Return True when all apps are active and all agents are idle."""
-    return jubilant.all_active(status) and jubilant.all_agents_idle(status)
 
 
 @pytest.fixture(scope="module", name="juju")

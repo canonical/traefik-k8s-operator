@@ -14,7 +14,7 @@ import jubilant
 import pytest
 import yaml
 
-from tests.integration.conftest import TRAEFIK_APP_NAME, all_settled
+from tests.integration.helpers import all_settled
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +24,7 @@ DYNAMIC_CONFIG_DIR = "/opt/traefik/juju"
 
 
 @pytest.fixture(scope="module")
-def deploy_alertmanager(juju, deploy_traefik):
+def deploy_alertmanager(juju, traefik_app):
     """Deploy alertmanager and integrate with traefik."""
     juju.deploy(
         "ch:alertmanager-k8s",
@@ -32,13 +32,13 @@ def deploy_alertmanager(juju, deploy_traefik):
         channel="2/edge",
         trust=True,
     )
-    juju.integrate(f"{ALERTMANAGER_APP_NAME}:ingress", TRAEFIK_APP_NAME)
+    juju.integrate(f"{ALERTMANAGER_APP_NAME}:ingress", traefik_app)
     juju.wait(all_settled, delay=5, timeout=600)
     return ALERTMANAGER_APP_NAME
 
 
 @pytest.fixture(scope="module")
-def deploy_catalogue(juju, deploy_traefik):
+def deploy_catalogue(juju, traefik_app):
     """Deploy catalogue and integrate with traefik."""
     juju.deploy(
         "ch:catalogue-k8s",
@@ -46,24 +46,24 @@ def deploy_catalogue(juju, deploy_traefik):
         channel="1/edge",
         trust=True,
     )
-    juju.integrate(f"{CATALOGUE_APP_NAME}:ingress", TRAEFIK_APP_NAME)
+    juju.integrate(f"{CATALOGUE_APP_NAME}:ingress", traefik_app)
     juju.wait(all_settled, delay=5, timeout=600)
     return CATALOGUE_APP_NAME
 
 
-def _list_dynamic_configs(juju):
+def _list_dynamic_configs(juju, traefik_app):
     """List YAML files in the dynamic config directory."""
     output = juju.ssh(
-        f"{TRAEFIK_APP_NAME}/0",
+        f"{traefik_app}/0",
         f"ls {DYNAMIC_CONFIG_DIR}/",
         container="traefik",
     )
     return [f for f in output.strip().split("\n") if f.endswith(".yaml")]
 
 
-def test_dynamic_configs_present(juju, deploy_traefik, deploy_alertmanager, deploy_catalogue):
+def test_dynamic_configs_present(juju, traefik_app, deploy_alertmanager, deploy_catalogue):
     """After integrating 2 apps, verify dynamic config files exist in the container."""
-    files = _list_dynamic_configs(juju)
+    files = _list_dynamic_configs(juju, traefik_app)
     logger.info("Dynamic config files in container: %s", files)
 
     # Each integrated app should have a config file matching juju_ingress_ingress_*_{app}.yaml
@@ -86,14 +86,14 @@ def test_dynamic_configs_present(juju, deploy_traefik, deploy_alertmanager, depl
         )
 
 
-def test_dynamic_config_content_valid(juju, deploy_traefik, deploy_alertmanager, deploy_catalogue):
+def test_dynamic_config_content_valid(juju, traefik_app, deploy_alertmanager, deploy_catalogue):
     """Verify that the dynamic config files contain valid traefik routing config."""
-    files = _list_dynamic_configs(juju)
+    files = _list_dynamic_configs(juju, traefik_app)
 
     for app_name in (ALERTMANAGER_APP_NAME, CATALOGUE_APP_NAME):
         config_file = next(f for f in files if app_name in f)
         output = juju.ssh(
-            f"{TRAEFIK_APP_NAME}/0",
+            f"{traefik_app}/0",
             f"cat {DYNAMIC_CONFIG_DIR}/{config_file}",
             container="traefik",
         )
@@ -111,11 +111,11 @@ def test_dynamic_config_content_valid(juju, deploy_traefik, deploy_alertmanager,
         assert len(http["services"]) >= 1, f"No services defined for {app_name}"
 
 
-def test_staging_artifacts_cleaned_up(juju, deploy_traefik, deploy_alertmanager, deploy_catalogue):
+def test_staging_artifacts_cleaned_up(juju, traefik_app, deploy_alertmanager, deploy_catalogue):
     """Verify that the tar archive and staging directory are removed after flush."""
     # The tar archive should not exist in the dynamic config dir
     output = juju.ssh(
-        f"{TRAEFIK_APP_NAME}/0",
+        f"{traefik_app}/0",
         f"ls {DYNAMIC_CONFIG_DIR}/ | grep '_ingress_configs.tar.gz' || true",
         container="traefik",
     )
@@ -125,7 +125,7 @@ def test_staging_artifacts_cleaned_up(juju, deploy_traefik, deploy_alertmanager,
 
     # The staging directory should not exist
     output = juju.ssh(
-        f"{TRAEFIK_APP_NAME}/0",
+        f"{traefik_app}/0",
         "test -d /tmp/_juju_ingress_staging && echo EXISTS || echo GONE",
         container="traefik",
     )
@@ -133,16 +133,16 @@ def test_staging_artifacts_cleaned_up(juju, deploy_traefik, deploy_alertmanager,
 
 
 def test_dynamic_config_removed_after_relation_removed(
-    juju, deploy_traefik, deploy_alertmanager, deploy_catalogue
+    juju, traefik_app, deploy_alertmanager, deploy_catalogue
 ):
     """After removing a relation, the corresponding config file should be cleaned up."""
     # Verify file exists before removal
-    files_before = _list_dynamic_configs(juju)
+    files_before = _list_dynamic_configs(juju, traefik_app)
     alertmanager_configs = [f for f in files_before if ALERTMANAGER_APP_NAME in f]
     assert len(alertmanager_configs) == 1
 
     # Remove the alertmanager relation
-    juju.remove_relation(f"{ALERTMANAGER_APP_NAME}:ingress", TRAEFIK_APP_NAME)
+    juju.remove_relation(f"{ALERTMANAGER_APP_NAME}:ingress", traefik_app)
     # Wait until:
     # 1. traefik and catalogue are active
     # 2. all agents are idle (hooks have finished)
@@ -154,10 +154,10 @@ def test_dynamic_config_removed_after_relation_removed(
     # its ingress-relation-broken hook and deleted the config file.
     juju.wait(
         lambda status: (
-            jubilant.all_active(status, TRAEFIK_APP_NAME, CATALOGUE_APP_NAME)
+            jubilant.all_active(status, traefik_app, CATALOGUE_APP_NAME)
             and jubilant.all_agents_idle(status)
             and not any(
-                r.related_app == TRAEFIK_APP_NAME
+                r.related_app == traefik_app
                 for r in status.apps[ALERTMANAGER_APP_NAME].relations.get("ingress", [])
             )
         ),
@@ -165,7 +165,7 @@ def test_dynamic_config_removed_after_relation_removed(
     )
 
     # Verify the alertmanager config file is gone
-    files_after = _list_dynamic_configs(juju)
+    files_after = _list_dynamic_configs(juju, traefik_app)
     alertmanager_configs_after = [f for f in files_after if ALERTMANAGER_APP_NAME in f]
     assert len(alertmanager_configs_after) == 0, (
         f"Expected alertmanager config to be removed after relation broken, "

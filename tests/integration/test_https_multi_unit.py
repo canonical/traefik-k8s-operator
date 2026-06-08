@@ -13,8 +13,6 @@ import pytest
 import requests
 from dns_adapter import DNSResolverHTTPSAdapter
 
-from tests.integration.conftest import TRAEFIK_APP_NAME
-
 logger = logging.getLogger(__name__)
 
 SSC_APP_NAME = "ssc"
@@ -37,7 +35,7 @@ def alertmanager_fixture(juju, traefik_app):
         trust=True,
     )
     juju.wait(jubilant.all_active, timeout=600)
-    juju.integrate(f"{ALERTMANAGER_APP_NAME}:ingress", TRAEFIK_APP_NAME)
+    juju.integrate(f"{ALERTMANAGER_APP_NAME}:ingress", traefik_app)
     juju.wait(jubilant.all_active, timeout=600)
     return ALERTMANAGER_APP_NAME
 
@@ -52,7 +50,7 @@ def ssc_fixture(juju, traefik_app):
         trust=True,
     )
     juju.wait(jubilant.all_active, timeout=600)
-    juju.integrate(f"{SSC_APP_NAME}:certificates", TRAEFIK_APP_NAME)
+    juju.integrate(f"{SSC_APP_NAME}:certificates", traefik_app)
     juju.wait(jubilant.all_active, timeout=600)
     return SSC_APP_NAME
 
@@ -67,7 +65,7 @@ def test_https_on_all_units(
     juju.add_unit(traefik_app, num_units=NUM_TRAEFIK_UNITS - 1)
 
     def all_active_and_idle_with_expected_units(status):
-        app = status.apps.get(TRAEFIK_APP_NAME)
+        app = status.apps.get(traefik_app)
         if app is None or len(app.units) < NUM_TRAEFIK_UNITS:
             return False
         if not jubilant.all_active(status):
