@@ -23,6 +23,23 @@ The module offers the following configurable inputs:
 | `storage_directives`| map(string) | Map of storage used by the application, which defaults to 1 GB, allocated by Juju. | {} |
 | `units`| number | Unit count/scale | 1 |
 
+### Exposing the application
+
+Setting the `expose` input makes the application publicly reachable. Two things to be aware of (verified against Juju 3.6 on Kubernetes):
+
+- **A `juju-external-hostname` is required.** Juju refuses to expose a Kubernetes (container) application unless `juju-external-hostname` is set. Provide it via `config`:
+
+  ```hcl
+  module "traefik" {
+    # ...
+    expose = {}
+    config = { "juju-external-hostname" = "<hostname>" }
+  }
+  ```
+
+  Setting the hostname and `expose` in the same `terraform apply` works — the provider applies the config before exposing.
+
+
 ### Outputs
 Upon application, the module exports the following outputs:
 
