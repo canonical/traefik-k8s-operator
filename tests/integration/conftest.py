@@ -98,13 +98,3 @@ subjects:
         logger.warning("Could not pre-grant secret RBAC (kubectl not available?): %s", result.stderr)
     else:
         logger.info("Pre-granted secret RBAC in namespace %r", namespace)
-
-
-@pytest.fixture(autouse=True, scope="module")
-def copy_traefik_library_into_tester_charms():
-    """No-op: jubilant tests deploy from Charmhub, not local tester charms."""
-
-
-@pytest.fixture(autouse=True, scope="module")
-async def setup_env():
-    """No-op: jubilant tests manage their own model via jubilant."""
