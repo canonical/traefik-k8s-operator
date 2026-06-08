@@ -8,4 +8,5 @@ charms:
       type: oci-image
   platforms:
   - arch: amd64
+  - arch: s390x
 snaps: []
