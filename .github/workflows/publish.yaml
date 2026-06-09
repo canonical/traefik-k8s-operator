@@ -19,8 +19,7 @@ jobs:
 
   release-libs:
     name: Release any bumped charm library
-    needs:
-      - release-charm
+    needs: publish
     runs-on: ubuntu-latest
     steps:
       - name: Checkout the source
