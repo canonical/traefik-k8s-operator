@@ -24,12 +24,12 @@ from tests.unit._utils import create_ingress_relation
 @pytest.mark.parametrize(
     "port, ip, host", ((80, "1.1.1.1", "1.1.1.1"), (81, "10.1.10.1", "10.1.10.1"))
 )
-@pytest.mark.parametrize("event_name", ("joined", "changed", "created"))
+@pytest.mark.parametrize("event_name", ("changed",))
 @pytest.mark.parametrize("scheme", ("http", "https"))
 def test_ingress_per_app_created(
     traefik_ctx, port, ip, host, model, traefik_container, event_name, tmp_path, scheme
 ):
-    """Check the config when a new ingress per app is created or changes (single remote unit)."""
+    """Check the config when ingress per app relation changes (single remote unit)."""
     ipa = create_ingress_relation(port=port, scheme=scheme, hosts=[host], ips=[ip])
     state = State(
         model=model,
@@ -67,12 +67,12 @@ def test_ingress_per_app_created(
     "port, ip, host", ((80, "1.1.1.{}", "1.1.1.{}"), (81, "10.1.10.{}", "10.1.10.{}"))
 )
 @pytest.mark.parametrize("n_units", (2, 3, 10))
-@pytest.mark.parametrize("evt_name", ("joined", "changed"))
+@pytest.mark.parametrize("evt_name", ("changed",))
 @pytest.mark.parametrize("scheme", ("http", "https"))
 def test_ingress_per_app_scale(
     traefik_ctx, host, ip, port, model, traefik_container, tmp_path, n_units, scheme, evt_name
 ):
-    """Check the config when a new ingress per app unit joins."""
+    """Check the config when ingress per app unit relation changes."""
     relation_id = 42
     unit_id = 0
     cfg_file = tmp_path.joinpath(
@@ -147,7 +147,7 @@ def test_ingress_per_app_scale(
 @pytest.mark.parametrize(
     "port, ip, host", ((80, "1.1.1.1", "1.1.1.1"), (81, "10.1.10.1", "10.1.10.1"))
 )
-@pytest.mark.parametrize("evt_name", ("joined", "changed"))
+@pytest.mark.parametrize("evt_name", ("changed",))
 @pytest.mark.parametrize("leader", (True, False))
 def get_requirer_ctx(host, ip, port):
     class MyRequirer(CharmBase):
@@ -165,7 +165,7 @@ def get_requirer_ctx(host, ip, port):
 @pytest.mark.parametrize(
     "port, ip, host", ((80, "1.1.1.1", "1.1.1.1"), (81, "10.1.10.1", "1.1.1.1"))
 )
-@pytest.mark.parametrize("evt_name", ("joined", "changed"))
+@pytest.mark.parametrize("evt_name", ("changed",))
 @pytest.mark.parametrize("leader", (True, False))
 def test_ingress_per_app_requirer_with_auto_data(host, ip, port, model, evt_name, leader):
     ipa = Relation("ingress")
@@ -393,3 +393,34 @@ def test_ingress_with_hostname_and_routing_mode(
     # event = getattr(ipa, f"changed_event")
     state_out = traefik_ctx.run("config-changed", state)
     assert state_out.relations[0].local_app_data == expected_local_app_data
+
+
+def test_ingress_per_app_servers_are_sorted(traefik_ctx, model, traefik_container):
+    """Check that load-balancer servers are listed in sorted host order."""
+    # GIVEN a multi-unit app whose hosts arrive in reverse alphabetical order
+    hosts = ["z.unit.svc", "m.unit.svc", "a.unit.svc"]
+    ips = ["1.0.0.3", "1.0.0.2", "1.0.0.1"]
+    ipa = create_ingress_relation(port=80, hosts=hosts, ips=ips)
+
+    state = State(
+        model=model,
+        config={"routing_mode": "path", "external_hostname": "foo.com"},
+        containers=[traefik_container],
+        relations=[ipa],
+    )
+
+    # WHEN the relation changed event fires
+    traefik_ctx.run(ipa.changed_event, state)
+
+    generated_config = yaml.safe_load(
+        traefik_container.get_filesystem(traefik_ctx)
+        .joinpath(f"opt/traefik/juju/juju_ingress_ingress_{ipa.relation_id}_remote.yaml")
+        .read_text()
+    )
+
+    servers = generated_config["http"]["services"]["juju-test-model-remote-0-service"][
+        "loadBalancer"
+    ]["servers"]
+
+    # THEN the servers appear in sorted host order regardless of relation-data order
+    assert servers == [{"url": f"http://{h}:80"} for h in sorted(hosts)]

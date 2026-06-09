@@ -6,7 +6,7 @@ name = "traefik-k8s-operator"
 version = "0.1.0"
 description = "Kubernetes operator for Traefik, managed by Juju."
 authors = ["Canonical Ltd."]
-requires-python = ">=3.8.0"
+requires-python = ">=3.12"
 
 dependencies = [
     "cryptography",
@@ -17,9 +17,9 @@ dependencies = [
     "lightkube-extensions",
     "ops>=2.10.0",
     "importlib-metadata==8.5.0",
-    "opentelemetry-exporter-otlp-proto-http==1.33.1",
-    "opentelemetry-api==1.33.1",
-    "pydantic>=2",
+    "opentelemetry-exporter-otlp-proto-http>=1.34",
+    "opentelemetry-api>=1.34",
+    "pydantic>=2.11",
     "cosl",
 ]
 
@@ -54,7 +54,7 @@ override-dependencies = [
 ]
 
 [tool.uv.sources]
-lightkube-extensions = { git = "https://github.com/canonical/lightkube-extensions.git", rev = "8d37be9ba40b156a6a1648c12e3ed21209cc4360" }
+lightkube-extensions = { git = "https://github.com/canonical/lightkube-extensions.git", rev = "37b32d699dffe9e1f796d5d8e431fd57849c248e" }
 
 # Testing tools configuration
 [tool.coverage.run]
@@ -75,7 +75,7 @@ markers = [
 # Formatting tools configuration
 [tool.black]
 line-length = 99
-target-version = ["py38"]
+target-version = ["py312"]
 
 # Linting tools configuration
 [tool.ruff]
@@ -104,7 +104,7 @@ max-complexity = 10
 [tool.pyright]
 reportTypedDictNotRequiredAccess = false
 extraPaths = ["lib"]
-pythonVersion = "3.8"
+pythonVersion = "3.12"
 pythonPlatform = "All"
 
 [tool.codespell]

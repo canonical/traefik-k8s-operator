@@ -1,0 +1,36 @@
+project: traefik-k8s-operator
+path: /home/ubuntu/proj
+kill-timeout: 60m
+warn-timeout: 1m
+backends:
+  integration-test:
+    type: integration-test
+    systems:
+    - ubuntu-24.04
+environment:
+  CONCIERGE: '$(HOST: echo "${CONCIERGE:-concierge-juju3.yaml}")'
+  OPCLI_GIT_REF: '$(HOST: echo "${OPCLI_GIT_REF:-main}")'
+exclude:
+- .git
+- .tox
+- .venv
+- .*_cache
+integration-suites:
+  tests/integration/:
+    working-dir: ./
+    summary: integration tests
+    backends:
+    - integration-test
+    auto-discover: true
+    pytest-arguments-template: '-x --log-format="%(asctime)s %(levelname)s %(message)s" --keep-models --model testing'
+    pytest-environment-template: |
+      {% for build in artifacts.charms[0].builds if build.arch == arch %}
+      CHARM_PATH={{ build.path }}
+      {% endfor %}
+    environment:
+      MODULE/jubilant_test_dynamic_configs_juju4: tests/integration/test_dynamic_configs.py
+      MODULE/jubilant_test_https_multi_unit_juju4: tests/integration/test_https_multi_unit.py
+      MODULE/jubilant_test_receive_ca_cert_status_juju4: tests/integration/test_receive_ca_cert_status.py
+      CONCIERGE/jubilant_test_dynamic_configs_juju4: concierge-juju4.yaml
+      CONCIERGE/jubilant_test_https_multi_unit_juju4: concierge-juju4.yaml
+      CONCIERGE/jubilant_test_receive_ca_cert_status_juju4: concierge-juju4.yaml

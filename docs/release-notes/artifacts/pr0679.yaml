@@ -1,0 +1,19 @@
+# Version of the artifact schema
+version_schema: 2
+# The key holding the change(s)
+changes:
+  - title: Fixed stale restarting status after receive-ca-cert relation removal
+    author: alithethird
+    type: bugfix
+    description: |
+      Fixed a status refresh gap where Traefik could remain in maintenance with
+      `restarting traefik...` after `receive-ca-cert` integration changes until
+      the next `update-status` hook. Status is now reconciled immediately, and
+      unit/integration regression tests were added for this flow.
+    urls:
+      pr:
+        - https://github.com/canonical/traefik-k8s-operator/pull/679
+      related_doc:
+      related_issue: https://github.com/canonical/traefik-k8s-operator/issues/670
+    visibility: public
+    highlight: false

@@ -53,3 +53,8 @@ terraform.rc
 
 # Tests generate this file
 .charm_tracing_buffer.raw
+
+# opcli/spread generated files
+.spread-reuse.*
+.spread-run-*/
+artifacts.build.yaml
