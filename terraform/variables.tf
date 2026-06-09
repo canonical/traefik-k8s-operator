@@ -26,13 +26,9 @@ variable "constraints" {
 }
 
 variable "expose" {
-  description = "Make the application publicly available over the network"
-  type = object({
-    cidrs     = optional(string)
-    endpoints = optional(string)
-    spaces    = optional(string)
-  })
-  default = null
+  description = "Make the application publicly available over the network. Only takes effect when `external_hostname` is set in `config`."
+  type        = bool
+  default     = false
 }
 
 variable "model_uuid" {

@@ -36,7 +36,7 @@ No modules.
 | <a name="input_channel"></a> [channel](#input\_channel) | Channel that the charm is deployed from | `string` | n/a | yes |
 | <a name="input_config"></a> [config](#input\_config) | Map of the charm configuration options | `map(string)` | `{}` | no |
 | <a name="input_constraints"></a> [constraints](#input\_constraints) | String listing constraints for this application | `string` | `"arch=amd64"` | no |
-| <a name="input_expose"></a> [expose](#input\_expose) | Make the application publicly available over the network | <pre>object({<br>    cidrs     = optional(string)<br>    endpoints = optional(string)<br>    spaces    = optional(string)<br>  })</pre> | `null` | no |
+| <a name="input_expose"></a> [expose](#input\_expose) | Make the application publicly available over the network. Only takes effect when `external_hostname` is set in `config`. | `bool` | `false` | no |
 | <a name="input_model_uuid"></a> [model\_uuid](#input\_model\_uuid) | ID of the model to deploy to | `string` | n/a | yes |
 | <a name="input_resources"></a> [resources](#input\_resources) | The charm's resources i.e., a resource revision number from CharmHub or a custom OCI image resource | `map(string)` | `{}` | no |
 | <a name="input_revision"></a> [revision](#input\_revision) | Revision number of the charm | `number` | `null` | no |
@@ -54,18 +54,16 @@ No modules.
 
 ### Exposing the application
 
-Setting the `expose` input makes the application publicly reachable. Two things to be aware of (verified against Juju 3.6 on Kubernetes):
+Set `expose = true` together with the charm's `external_hostname` to mark the application as publicly available over the network:
 
-- **A `juju-external-hostname` is required.** Juju refuses to expose a Kubernetes (container) application unless `juju-external-hostname` is set. Provide it via `config`:
+```hcl
+module "traefik" {
+  # ...
+  expose = true
+  config = { external_hostname = "<hostname>" }
+}
+```
 
-  ```hcl
-  module "traefik" {
-    # ...
-    expose = {}
-    config = { "juju-external-hostname" = "<hostname>" }
-  }
-  ```
+Juju refuses to expose a Kubernetes (container) application unless `juju-external-hostname` is set, so the module derives `juju-external-hostname` from `external_hostname` automatically. As a result, `expose` only takes effect when `external_hostname` is present in `config` — otherwise it is silently a no-op (this avoids a hard Juju error). This mirrors the pattern used by the [IS COS Terraform module](https://github.com/canonical/is-terraform-modules/blob/main/juju/applications/cos/traefik.tf).
 
-  Setting the hostname and `expose` in the same `terraform apply` works — the provider applies the config before exposing.
-
-- **Endpoint-specific exposures cannot be removed cleanly yet.** When `expose` is restricted to specific `endpoints`, removing the `expose` block later fails with `endpoint "" is not exposed` — a [terraform-provider-juju](https://github.com/juju/terraform-provider-juju) limitation (observed with v1.5.3). Exposing the whole application (with or without `cidrs`) toggles off without issue. `spaces` does not apply to Kubernetes models.
+Per-CIDR / per-endpoint / per-space restrictions are intentionally not supported: the traefik-k8s charm manages its own Kubernetes `LoadBalancer` Service and does not honour Juju's expose restrictions, so they would have no effect. To restrict who can reach Traefik, use the charm's `loadbalancer_annotations` config instead.
