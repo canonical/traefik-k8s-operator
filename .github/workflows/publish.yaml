@@ -36,9 +36,10 @@ jobs:
           cd "${GITHUB_WORKSPACE}/charm/${CHARM_PATH}"
           # Get the charm name
           if [[ $CHARM_NAME = "" ]]; then echo "Error: empty charm name." && exit 1; fi
+          charmlib_path="${CHARM_NAME//-/_}"
           # For each library belonging to the charm, publish it
-          if [ -d "lib/charms/${CHARM_NAME}" ]; then
-            for lib in $(find "lib/charms/${CHARM_NAME}" -type f | sed 's|lib/||' | sed 's/.py$//' | sed 's|/|.|g'); do
+          if [ -d "lib/charms/${charmlib_path}" ]; then
+            for lib in $(find "lib/charms/${charmlib_path}" -type f | sed 's|lib/||' | sed 's/.py$//' | sed 's|/|.|g'); do
               charmcraft publish-lib "$lib"
             done
           fi
