@@ -18,14 +18,28 @@ jobs:
       CHARMHUB_TOKEN: ${{ secrets.CHARMHUB_TOKEN }}
 
   release-libs:
-    name: Release charm libs
+    name: Release any bumped charm library
     needs: publish
-    permissions:
-      contents: write
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: canonical/charming-actions/release-libraries@2.7.0
+      - name: Checkout the source
+        uses: actions/checkout@v6
         with:
-          credentials: ${{ secrets.CHARMHUB_TOKEN }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: charm
+      - name: Release libraries
+        env:
+          CHARMCRAFT_AUTH: "${{ secrets.CHARMHUB_TOKEN }}"
+          CHARM_PATH: '.'
+          CHARM_NAME: 'traefik-k8s'
+        run: |
+          sudo snap install charmcraft --classic
+          cd "${GITHUB_WORKSPACE}/charm/${CHARM_PATH}"
+          # Get the charm name
+          if [[ $CHARM_NAME = "" ]]; then echo "Error: empty charm name." && exit 1; fi
+          charmlib_path="${CHARM_NAME//-/_}"
+          # For each library belonging to the charm, publish it
+          if [ -d "lib/charms/${charmlib_path}" ]; then
+            for lib in $(find "lib/charms/${charmlib_path}" -type f | sed 's|lib/||' | sed 's/.py$//' | sed 's|/|.|g'); do
+              charmcraft publish-lib "$lib"
+            done
+          fi
