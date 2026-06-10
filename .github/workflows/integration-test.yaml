@@ -13,3 +13,20 @@ jobs:
     secrets: inherit
     with:
       working-directory: .
+  required_status_checks:
+    name: Required Integration Test Status Checks
+    runs-on: ubuntu-latest
+    needs:
+      - integration-test
+    if: always() && !cancelled()
+    timeout-minutes: 5
+    steps:
+      - name: Check integration-test status
+        run: |
+          RESULT="${{ needs.integration-test.result }}"
+          if [ "$RESULT" = "success" ] || [ "$RESULT" = "skipped" ]; then
+            exit 0
+          else
+            echo "integration-test failed with status: $RESULT"
+            exit 1
+          fi      
