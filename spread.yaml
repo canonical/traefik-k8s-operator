@@ -50,5 +50,5 @@ integration-suites:
       {% for build in artifacts.charms[0].builds if build.arch == arch %}
       CHARM_PATH={{ build.path }}
       {% endfor %}
-  environment:
-    CONCIERGE: concierge-s390x.yaml
+    environment:
+      CONCIERGE: concierge-s390x.yaml
