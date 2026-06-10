@@ -6,11 +6,13 @@ changes:
     author: MichaelThamm
     type: minor
     description: |
-      The Traefik Terraform module now accepts an optional `expose` input, allowing
-      users to make the application publicly available over the network directly from
-      the module instead of running `juju expose` manually. The optional `cidrs`,
-      `endpoints`, and `spaces` sub-fields restrict which CIDRs, charm endpoints, or
-      network spaces can access the exposed ports.
+      The Traefik Terraform module now accepts an optional `expose` boolean input,
+      allowing users to make the application publicly available over the network
+      directly from the module instead of running `juju expose` manually. It only
+      takes effect when `external_hostname` is set in `config`, from which the module
+      derives the `juju-external-hostname` that Juju requires before exposing a
+      Kubernetes application. To restrict who can reach Traefik, use the charm's
+      `loadbalancer_annotations` config.
     urls:
       pr:
         - https://github.com/canonical/traefik-k8s-operator/pull/701
