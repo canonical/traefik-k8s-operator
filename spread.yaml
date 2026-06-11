@@ -60,7 +60,7 @@ integration-suites:
     backends:
     - integration-test
     systems: [ubuntu-24.04-s390x]
-    auto-discover: true
+    auto-discover: false
     discover-path: ./tests/integration/
     pytest-arguments-template: '-x --log-format="%(asctime)s %(levelname)s %(message)s" --keep-models --model testing'
     pytest-environment-template: |
