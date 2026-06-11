@@ -61,7 +61,6 @@ integration-suites:
     - integration-test
     systems: [ubuntu-24.04-s390x]
     auto-discover: false
-    discover-path: ./tests/integration/
     pytest-arguments-template: '-x --log-format="%(asctime)s %(levelname)s %(message)s" --keep-models --model testing'
     pytest-environment-template: |
       {% for build in artifacts.charms[0].builds if build.arch == arch %}
