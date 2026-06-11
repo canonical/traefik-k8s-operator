@@ -25,6 +25,12 @@ variable "constraints" {
   default = "arch=amd64"
 }
 
+variable "expose" {
+  description = "Make the application publicly available over the network. Only takes effect when `external_hostname` is set in `config`."
+  type        = bool
+  default     = false
+}
+
 variable "model_uuid" {
   description = "ID of the model to deploy to"
   type        = string
