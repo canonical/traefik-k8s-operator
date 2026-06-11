@@ -14,12 +14,12 @@ providers:
     bootstrap: true
     bootstrap-constraints:
       root-disk: "2G"
-    features:
-      load-balancer:
-        l2-mode: "true"
-        cidrs: "10.43.45.0/28"
-      local-storage: {}
-      network: {}
+    # features:
+    #   load-balancer:
+    #     l2-mode: "true"
+    #     cidrs: "10.43.45.0/28"
+    #   local-storage: {}
+    #   network: {}
 
 host:
   snaps:

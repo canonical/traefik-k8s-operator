@@ -25,7 +25,7 @@ integration-suites:
     summary: integration tests
     backends:
     - integration-test
-    # systems: [-ubuntu-24.04-s390x]
+    systems: [ubuntu-24.04]
     auto-discover: true
     pytest-arguments-template: '-x --log-format="%(asctime)s %(levelname)s %(message)s" --keep-models --model testing'
     pytest-environment-template: |
@@ -39,18 +39,34 @@ integration-suites:
       CONCIERGE/jubilant_test_dynamic_configs_juju4: concierge-juju4.yaml
       CONCIERGE/jubilant_test_https_multi_unit_juju4: concierge-juju4.yaml
       CONCIERGE/jubilant_test_receive_ca_cert_status_juju4: concierge-juju4.yaml
-  # tests/integration/s390x:
-  #   working-dir: ./
-  #   summary: integration tests s390x
-  #   backends:
-  #   - integration-test
-  #   systems: [ubuntu-24.04-s390x]
-  #   auto-discover: true
-  #   discover-path: ./tests/integration/
-  #   pytest-arguments-template: '-x --log-format="%(asctime)s %(levelname)s %(message)s" --keep-models --model testing'
-  #   pytest-environment-template: |
-  #     {% for build in artifacts.charms[0].builds if build.arch == arch %}
-  #     CHARM_PATH={{ build.path }}
-  #     {% endfor %}
-  #   environment:
-  #     CONCIERGE: concierge-s390x.yaml
+  tests/integration/arm64:  # Just one to test it works.
+    working-dir: ./
+    summary: integration tests
+    backends:
+    - integration-test
+    systems:
+    - ubuntu-24.04-arm64
+    auto-discover: true
+    pytest-arguments-template: '-x --log-format="%(asctime)s %(levelname)s %(message)s" --keep-models --model testing'
+    pytest-environment-template: |
+      {% for build in artifacts.charms[0].builds if build.arch == arch %}
+      CHARM_PATH={{ build.path }}
+      {% endfor %}
+    environment:
+      MODULE/legacy_test_charm_tcp: tests/integration/legacy/test_charm_tcp.py
+  tests/integration/s390x:  # Just one to test it DOES not work.
+    working-dir: ./
+    summary: integration tests s390x
+    backends:
+    - integration-test
+    systems: [ubuntu-24.04-s390x]
+    auto-discover: true
+    discover-path: ./tests/integration/
+    pytest-arguments-template: '-x --log-format="%(asctime)s %(levelname)s %(message)s" --keep-models --model testing'
+    pytest-environment-template: |
+      {% for build in artifacts.charms[0].builds if build.arch == arch %}
+      CHARM_PATH={{ build.path }}
+      {% endfor %}
+    environment:
+      CONCIERGE: concierge-s390x.yaml
+      MODULE/legacy_test_charm_tcp: tests/integration/legacy/test_charm_tcp.py
