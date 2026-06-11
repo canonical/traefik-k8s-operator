@@ -5,6 +5,7 @@ type: charm
 
 platforms:
   ubuntu@26.04:amd64:
+  ubuntu@26.04:arm64:
   ubuntu@26.04:s390x:
 
 parts:
