@@ -54,6 +54,7 @@ integration-suites:
       {% endfor %}
     environment:
       MODULE/legacy_test_charm_tcp: tests/integration/legacy/test_charm_tcp.py
+      # MODULE/legacy_test_charm_ipa: tests/integration/legacy/test_charm_ipa.py
   tests/integration/s390x:  # Just one to test it DOES not work.
     working-dir: ./
     summary: integration tests s390x
