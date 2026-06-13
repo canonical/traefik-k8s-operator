@@ -1332,41 +1332,43 @@ wheels = [
 
 [[package]]
 name = "pyright"
-version = "1.1.318"
+version = "1.1.410"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "nodeenv" },
+    { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/7c/ce/58f6e45a1c8d5a09b755dec1dfc5aaf6b0dd3102218c5e67b00182fea899/pyright-1.1.318.tar.gz", hash = "sha256:69dcf9c32d5be27d531750de627e76a7cadc741d333b547c09044278b508db7b", size = 16823, upload-time = "2023-07-21T09:35:53.859Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/10/53/e4d8ea1391bd4355231be6f91bf239479aa0014260ed3fb5526eeb12a1f2/pyright-1.1.410.tar.gz", hash = "sha256:07a073b8ba6749826773c1269773efa11b93440d9a6aa60419d9a3172d6dc488", size = 4062013, upload-time = "2026-06-01T17:35:48.894Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/28/2d/da1e79917b71298d5b1f8b492735ced8b00df9466a7daefac1a3e435b12a/pyright-1.1.318-py3-none-any.whl", hash = "sha256:056c1b2e711c3526e32919de1684ae599d34b7ec27e94398858a43f56ac9ba9b", size = 17624, upload-time = "2023-07-21T09:35:52.702Z" },
+    { url = "https://files.pythonhosted.org/packages/d7/33/288b5868fa00846dacf249633719d747893e54aebd196b9968ac1878a5d3/pyright-1.1.410-py3-none-any.whl", hash = "sha256:5e961bed37cacf96b3f7cd7b1da39b350a9239aa2e69138d0e88f728cfaf296c", size = 6082448, upload-time = "2026-06-01T17:35:46.387Z" },
 ]
 
 [[package]]
 name = "pytest"
-version = "8.3.5"
+version = "8.4.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "colorama", marker = "sys_platform == 'win32'" },
     { name = "iniconfig" },
     { name = "packaging" },
     { name = "pluggy" },
+    { name = "pygments" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ae/3c/c9d525a414d506893f0cd8a8d0de7706446213181570cdbd766691164e40/pytest-8.3.5.tar.gz", hash = "sha256:f4efe70cc14e511565ac476b57c279e12a855b11f48f212af1080ef2263d3845", size = 1450891, upload-time = "2025-03-02T12:54:54.503Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/a3/5c/00a0e072241553e1a7496d638deababa67c5058571567b92a7eaa258397c/pytest-8.4.2.tar.gz", hash = "sha256:86c0d0b93306b961d58d62a4db4879f27fe25513d4b969df351abdddb3c30e01", size = 1519618, upload-time = "2025-09-04T14:34:22.711Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/30/3d/64ad57c803f1fa1e963a7946b6e0fea4a70df53c1a7fed304586539c2bac/pytest-8.3.5-py3-none-any.whl", hash = "sha256:c69214aa47deac29fad6c2a4f590b9c4a9fdb16a403176fe154b79c0b4d4d820", size = 343634, upload-time = "2025-03-02T12:54:52.069Z" },
+    { url = "https://files.pythonhosted.org/packages/a8/a4/20da314d277121d6534b3a980b29035dcd51e6744bd79075a6ce8fa4eb8d/pytest-8.4.2-py3-none-any.whl", hash = "sha256:872f880de3fc3a5bdc88a11b39c9710c3497a547cfa9320bc3c5e62fbf272e79", size = 365750, upload-time = "2025-09-04T14:34:20.226Z" },
 ]
 
 [[package]]
 name = "pytest-asyncio"
-version = "0.21.2"
+version = "0.26.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pytest" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ae/53/57663d99acaac2fcdafdc697e52a9b1b7d6fcf36616281ff9768a44e7ff3/pytest_asyncio-0.21.2.tar.gz", hash = "sha256:d67738fc232b94b326b9d060750beb16e0074210b98dd8b58a5239fa2a154f45", size = 30656, upload-time = "2024-04-29T13:23:24.738Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/8e/c4/453c52c659521066969523e87d85d54139bbd17b78f09532fb8eb8cdb58e/pytest_asyncio-0.26.0.tar.gz", hash = "sha256:c4df2a697648241ff39e7f0e4a73050b03f123f760673956cf0d72a4990e312f", size = 54156, upload-time = "2025-03-25T06:22:28.883Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/9c/ce/1e4b53c213dce25d6e8b163697fbce2d43799d76fa08eea6ad270451c370/pytest_asyncio-0.21.2-py3-none-any.whl", hash = "sha256:ab664c88bb7998f711d8039cacd4884da6430886ae8bbd4eded552ed2004f16b", size = 13368, upload-time = "2024-04-29T13:23:23.126Z" },
+    { url = "https://files.pythonhosted.org/packages/20/7f/338843f449ace853647ace35870874f69a764d251872ed1b4de9f234822c/pytest_asyncio-0.26.0-py3-none-any.whl", hash = "sha256:7b51ed894f4fbea1340262bdae5135797ebbe21d8638978e35d31c6d19f72fb0", size = 19694, upload-time = "2025-03-25T06:22:27.807Z" },
 ]
 
 [[package]]
@@ -1386,7 +1388,7 @@ wheels = [
 
 [[package]]
 name = "pytest-operator"
-version = "0.43.1"
+version = "0.31.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "ipdb" },
@@ -1396,9 +1398,9 @@ dependencies = [
     { name = "pytest-asyncio" },
     { name = "pyyaml" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ea/e5/6bdb380d88a7c1bebf31a5e65e785e34dacec6ec1c8d8b4d0227322da828/pytest_operator-0.43.1.tar.gz", hash = "sha256:fd76c7e34c56624176405b47f981de3fe0c3efb71d7875109483cc01f221be99", size = 149695, upload-time = "2025-07-03T16:05:09.797Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ad/71/9ebf0de859b5a2d423b5809d609eaa9390e8fbafa0f84942bf9dc873415e/pytest-operator-0.31.0.tar.gz", hash = "sha256:c12baf4e690d1dbba92369e4fd567f1dfc1dff5b7c955797e495e49b0671451d", size = 22470, upload-time = "2023-10-30T19:59:57.195Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d6/a9/4bffc59bc343ca82ec0e9d6ae96a2ffd2de65e1eeb578523c2fc4e57cd71/pytest_operator-0.43.1-py3-none-any.whl", hash = "sha256:092e010fef884ea6166c3f71ec4ca717ed9158cf09de67f28e23cfdd780c46fa", size = 48338, upload-time = "2025-07-03T16:05:08.644Z" },
+    { url = "https://files.pythonhosted.org/packages/44/97/f2c8c8400f7c0ebff4f1dc95fb29376abe37e18bcdbb660464aed58a40b5/pytest_operator-0.31.0-py3-none-any.whl", hash = "sha256:afa47f1278e53eca3fbed80e777735df069da8987f5b941f86ac510e10d3aece", size = 22264, upload-time = "2023-10-30T19:59:55.395Z" },
 ]
 
 [[package]]
@@ -1682,7 +1684,7 @@ requires-dist = [
     { name = "coverage", extras = ["toml"], marker = "extra == 'dev'" },
     { name = "cryptography" },
     { name = "deepmerge" },
-    { name = "importlib-metadata", specifier = "==8.5.0" },
+    { name = "importlib-metadata", specifier = "==8.9.0" },
     { name = "ipdb", marker = "extra == 'dev'" },
     { name = "jsonschema" },
     { name = "jubilant", marker = "extra == 'dev'" },
@@ -1699,9 +1701,9 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.11" },
     { name = "pylint", marker = "extra == 'dev'", specifier = ">=3.2.7" },
     { name = "pylint-pydantic", marker = "extra == 'dev'", specifier = ">=0.3.5" },
-    { name = "pyright", marker = "extra == 'dev'", specifier = "==1.1.318" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = "==8.3.5" },
-    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = "==0.21.2" },
+    { name = "pyright", marker = "extra == 'dev'", specifier = "==1.1.410" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = "==8.4.2" },
+    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = "==0.26.0" },
     { name = "pytest-interface-tester", marker = "extra == 'dev'", specifier = ">0.3" },
     { name = "pytest-operator", marker = "extra == 'dev'" },
     { name = "pytest-subtests", marker = "extra == 'dev'" },
