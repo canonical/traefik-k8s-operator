@@ -37,7 +37,7 @@ run "expose_false_by_default" {
   }
 }
 
-run "expose_true_without_hostname_is_gated" {
+run "expose_true_without_hostname_errors" {
   command = plan
 
   variables {
@@ -49,10 +49,9 @@ run "expose_true_without_hostname_is_gated" {
     expose = true
   }
 
-  assert {
-    condition     = length(juju_application.traefik.expose) == 0
-    error_message = "expose block should not be created when external_hostname is unset"
-  }
+  expect_failures = [
+    var.expose,
+  ]
 }
 
 run "expose_true_with_hostname" {

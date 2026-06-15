@@ -36,7 +36,7 @@ No modules.
 | <a name="input_channel"></a> [channel](#input\_channel) | Channel that the charm is deployed from | `string` | n/a | yes |
 | <a name="input_config"></a> [config](#input\_config) | Map of the charm configuration options | `map(string)` | `{}` | no |
 | <a name="input_constraints"></a> [constraints](#input\_constraints) | String listing constraints for this application | `string` | `"arch=amd64"` | no |
-| <a name="input_expose"></a> [expose](#input\_expose) | Make the application publicly available over the network. Only takes effect when `external_hostname` is set in `config`. | `bool` | `false` | no |
+| <a name="input_expose"></a> [expose](#input\_expose) | Make the application publicly available over the network. Requires `external_hostname` to be set in `config`. | `bool` | `false` | no |
 | <a name="input_model_uuid"></a> [model\_uuid](#input\_model\_uuid) | ID of the model to deploy to | `string` | n/a | yes |
 | <a name="input_resources"></a> [resources](#input\_resources) | The charm's resources i.e., a resource revision number from CharmHub or a custom OCI image resource | `map(string)` | `{}` | no |
 | <a name="input_revision"></a> [revision](#input\_revision) | Revision number of the charm | `number` | `null` | no |
@@ -64,6 +64,6 @@ module "traefik" {
 }
 ```
 
-Juju refuses to expose a Kubernetes (container) application unless `juju-external-hostname` is set, so the module derives `juju-external-hostname` from `external_hostname` automatically. As a result, `expose` only takes effect when `external_hostname` is present in `config` — otherwise it is silently a no-op (this avoids a hard Juju error). This mirrors the pattern used by the [IS COS Terraform module](https://github.com/canonical/is-terraform-modules/blob/main/juju/applications/cos/traefik.tf).
+Juju refuses to expose a Kubernetes (container) application unless `juju-external-hostname` is set, so the module derives `juju-external-hostname` from `external_hostname` automatically. Because of this, setting `expose = true` without `external_hostname` in `config` is rejected at plan time by a variable validation rule, instead of failing later when Juju rejects the apply. This mirrors the pattern used by the [IS COS Terraform module](https://github.com/canonical/is-terraform-modules/blob/main/juju/applications/cos/traefik.tf).
 
 Per-CIDR / per-endpoint / per-space restrictions are intentionally not supported: the traefik-k8s charm manages its own Kubernetes `LoadBalancer` Service and does not honour Juju's expose restrictions, so they would have no effect. To restrict who can reach Traefik, use the charm's `loadbalancer_annotations` config instead.
