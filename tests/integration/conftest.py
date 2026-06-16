@@ -35,11 +35,14 @@ def pytest_addoption(parser: pytest.Parser) -> None:
 
 @pytest.fixture(scope="module")
 def traefik_charm(charm_paths, pytestconfig: pytest.Config):
-    traefik_charm_path = charm_paths["traefik-k8s"]
-    if len(traefik_charm_path) > 1:
+    traefik_charm_paths = charm_paths["traefik-k8s"]
+    if len(traefik_charm_paths) > 1:
         base = pytestconfig.getoption("--base")
-        return traefik_charm_path[base]
-    return traefik_charm_path.path
+        traefik_charm_path = traefik_charm_paths[base]
+    else:
+        traefik_charm_path = traefik_charm_paths.path
+    logger.warning("Using traefik charm path: %s", traefik_charm_path)
+    return traefik_charm_path
 
 
 @pytest.fixture(scope="module", name="traefik_app")
