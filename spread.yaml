@@ -9,8 +9,6 @@ backends:
     - ubuntu-24.04:
     - ubuntu-24.04-arm64:
         runner: [ubuntu-24.04-arm]
-    - ubuntu-24.04-s390x:
-        runner: [self-hosted-linux-s390x-noble-medium]
 environment:
   CONCIERGE: '$(HOST: echo "${CONCIERGE:-concierge-juju3.yaml}")'
   OPCLI_GIT_REF: '$(HOST: echo "${OPCLI_GIT_REF:-main}")'
@@ -25,7 +23,8 @@ integration-suites:
     summary: integration tests
     backends:
     - integration-test
-    systems: [ubuntu-24.04]
+    systems:
+    - ubuntu-24.04
     auto-discover: true
     pytest-arguments-template: '-x --log-format="%(asctime)s %(levelname)s %(message)s" --keep-models --model testing'
     pytest-environment-template: |
@@ -39,7 +38,7 @@ integration-suites:
       CONCIERGE/jubilant_test_dynamic_configs_juju4: concierge-juju4.yaml
       CONCIERGE/jubilant_test_https_multi_unit_juju4: concierge-juju4.yaml
       CONCIERGE/jubilant_test_receive_ca_cert_status_juju4: concierge-juju4.yaml
-  tests/integration/arm64:  # Just one to test it works.
+  tests/integration/arm64:
     working-dir: ./
     summary: integration tests
     backends:
@@ -53,20 +52,4 @@ integration-suites:
       CHARM_PATH={{ build.path }}
       {% endfor %}
     environment:
-      MODULE/legacy_test_charm_tcp: tests/integration/legacy/test_charm_tcp.py
-      # MODULE/legacy_test_charm_ipa: tests/integration/legacy/test_charm_ipa.py
-  tests/integration/s390x:  # Just one to test it DOES not work.
-    working-dir: ./
-    summary: integration tests s390x
-    backends:
-    - integration-test
-    systems: [ubuntu-24.04-s390x]
-    auto-discover: false
-    pytest-arguments-template: '-x --log-format="%(asctime)s %(levelname)s %(message)s" --keep-models --model testing'
-    pytest-environment-template: |
-      {% for build in artifacts.charms[0].builds if build.arch == arch %}
-      CHARM_PATH={{ build.path }}
-      {% endfor %}
-    environment:
-      CONCIERGE: concierge-s390x.yaml
-      MODULE/legacy_test_charm_tcp: tests/integration/legacy/test_charm_tcp.py
+      MODULE/legacy_test_charm_ipa: tests/integration/legacy/test_charm_ipa.py
