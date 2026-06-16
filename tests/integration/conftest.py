@@ -1,7 +1,6 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 import logging
-import os
 import subprocess
 from pathlib import Path
 from typing import cast
@@ -22,18 +21,28 @@ TRAEFIK_RESOURCES = {
 ALERTMANAGER_APP_NAME = "alertmanager"
 TRAEFIK_APP_NAME = "traefik"
 
-@pytest.fixture(scope="module")
-def traefik_charm():
-    charm_path = os.environ.get("CHARM_PATH")
-    if charm_path:
-        return Path(charm_path).resolve()
-    charms = sorted(Path(".").glob("traefik*.charm"))
-    if charms:
-        return charms[0]
-    raise FileNotFoundError(
-        "Set CHARM_PATH to the built traefik charm, "
-        "or place a traefik*.charm file in the repo root."
+
+def pytest_addoption(parser: pytest.Parser) -> None:
+    """Parse additional pytest options.
+
+    Args:
+        parser: Pytest parser.
+    """
+    parser.addoption(
+        "--base", action="store", default="ubuntu@26.04", help="Base to use for the integration test",
     )
+
+
+@pytest.fixture(scope="module")
+def traefik_charm(charm_paths, pytestconfig: pytest.Config):
+    traefik_charm_paths = charm_paths["traefik-k8s"]
+    if len(traefik_charm_paths) > 1:
+        base = pytestconfig.getoption("--base")
+        traefik_charm_path = traefik_charm_paths[base]
+    else:
+        traefik_charm_path = traefik_charm_paths.path
+    logger.warning("Using traefik charm path: %s", traefik_charm_path)
+    return traefik_charm_path
 
 
 @pytest.fixture(scope="module", name="traefik_app")

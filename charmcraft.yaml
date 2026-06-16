@@ -4,6 +4,7 @@
 type: charm
 
 platforms:
+  ubuntu@20.04:amd64:
   ubuntu@26.04:amd64:
   ubuntu@26.04:arm64:
   ubuntu@26.04:s390x:
@@ -14,11 +15,6 @@ parts:
     plugin: uv
     build-packages: [git, libffi-dev, pkg-config, libssl-dev]
     build-snaps: [astral-uv, rustup]
-    build-environment:
-      # Several locked deps (cffi, rpds-py, pydantic-core) have no Python 3.14
-      # wheels and build from source on the ubuntu@26.04 base. Their PyO3-based
-      # builds reject Python 3.14 unless ABI3 forward-compatibility is enabled.
-      - PYO3_USE_ABI3_FORWARD_COMPATIBILITY: "1"
     override-build: |
       rustup default stable
       craftctl default

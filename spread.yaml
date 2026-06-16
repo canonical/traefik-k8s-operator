@@ -26,18 +26,18 @@ integration-suites:
     systems:
     - ubuntu-24.04
     auto-discover: true
-    pytest-arguments-template: '-x --log-format="%(asctime)s %(levelname)s %(message)s" --keep-models --model testing'
-    pytest-environment-template: |
-      {% for build in artifacts.charms[0].builds if build.arch == arch %}
-      CHARM_PATH={{ build.path }}
-      {% endfor %}
+    pytest-arguments-template: '-x --log-format="%(asctime)s %(levelname)s %(message)s" --keep-models --model testing --base {{ env.get("BASE", "ubuntu@26.04") }}'
     environment:
+      # Juju 4 tests
       MODULE/jubilant_test_dynamic_configs_juju4: tests/integration/test_dynamic_configs.py
       MODULE/jubilant_test_https_multi_unit_juju4: tests/integration/test_https_multi_unit.py
       MODULE/jubilant_test_receive_ca_cert_status_juju4: tests/integration/test_receive_ca_cert_status.py
       CONCIERGE/jubilant_test_dynamic_configs_juju4: concierge-juju4.yaml
       CONCIERGE/jubilant_test_https_multi_unit_juju4: concierge-juju4.yaml
       CONCIERGE/jubilant_test_receive_ca_cert_status_juju4: concierge-juju4.yaml
+      # Base 20.04 tests
+      BASE/legacy_test_charm_ipa_2004: ubuntu@20.04
+      MODULE/legacy_test_charm_ipa_2004: tests/integration/legacy/test_charm_ipa.py
   tests/integration/arm64:
     working-dir: ./
     summary: integration tests
@@ -47,9 +47,5 @@ integration-suites:
     - ubuntu-24.04-arm64
     auto-discover: false
     pytest-arguments-template: '-x --log-format="%(asctime)s %(levelname)s %(message)s" --keep-models --model testing'
-    pytest-environment-template: |
-      {% for build in artifacts.charms[0].builds if build.arch == arch %}
-      CHARM_PATH={{ build.path }}
-      {% endfor %}
     environment:
       MODULE/legacy_test_charm_ipa: tests/integration/legacy/test_charm_ipa.py
