@@ -40,7 +40,7 @@ dev = [
     "minio",
     "pyright==1.1.318",
     "ops-scenario~=6.0",
-    "opcli@git+https://github.com/canonical/charm-ci.git@main ; python_version >= '3.12'",
+    "opcli@git+https://github.com/canonical/charm-ci.git@v0.0.1-alpha.4 ; python_version >= '3.12'",
     "pytest-interface-tester>0.3",
     "types-pyyaml>=6.0.12.20241230",
     "mypy>=1.14.1",

@@ -1333,7 +1333,7 @@ wheels = [
 [[package]]
 name = "opcli"
 version = "0.0.1a2"
-source = { git = "https://github.com/canonical/charm-ci.git?rev=main#b4788978c987440a24360f3fb7cb879961ddb4c5" }
+source = { git = "https://github.com/canonical/charm-ci.git?rev=v0.0.1-alpha.4#b4788978c987440a24360f3fb7cb879961ddb4c5" }
 dependencies = [
     { name = "pydantic", version = "2.13.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
     { name = "ruamel-yaml", marker = "python_full_version >= '3.12'" },
@@ -3310,7 +3310,7 @@ requires-dist = [
     { name = "lightkube-models", specifier = ">=1.22.0.4" },
     { name = "minio", marker = "extra == 'dev'" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.14.1" },
-    { name = "opcli", marker = "python_full_version >= '3.12' and extra == 'dev'", git = "https://github.com/canonical/charm-ci.git?rev=main" },
+    { name = "opcli", marker = "python_full_version >= '3.12' and extra == 'dev'", git = "https://github.com/canonical/charm-ci.git?rev=v0.0.1-alpha.4" },
     { name = "opentelemetry-api", specifier = ">=1.33" },
     { name = "opentelemetry-exporter-otlp-proto-http", specifier = ">=1.33" },
     { name = "ops", specifier = ">=2.10.0" },
