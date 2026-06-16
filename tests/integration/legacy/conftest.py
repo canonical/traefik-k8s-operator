@@ -91,24 +91,6 @@ def copy_traefik_library_into_tester_charms(request):
 
 @pytest.fixture(scope="module")
 @timed_memoizer
-async def traefik_charm(ops_test):
-    charm_path = os.environ.get("CHARM_PATH")
-    if charm_path:
-        return Path(charm_path).resolve()
-    count = 0
-    while True:
-        try:
-            charm = await ops_test.build_charm(".", verbosity="debug")
-            return charm
-        except RuntimeError:
-            logger.warning("Failed to build traefik. Trying again!")
-            count += 1
-            if count == 3:
-                raise
-
-
-@pytest.fixture(scope="module")
-@timed_memoizer
 async def forward_auth_tester_charm(ops_test):
     charm_path = (Path(__file__).parent.parent / "testers" / "forward-auth").absolute()
     count = 0
