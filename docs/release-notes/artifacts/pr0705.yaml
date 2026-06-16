@@ -1,0 +1,16 @@
+# Version of the artifact schema
+version_schema: 2
+# The key holding the change(s)
+changes:
+  - title: Added support for arm64 and s390x
+    author: javierdelapuente
+    type: minor
+    description: |
+      Added support for arm64 and s390x.
+    urls:
+      pr:
+        - https://github.com/canonical/traefik-k8s-operator/pull/705
+      related_doc:
+      related_issue:
+    visibility: public
+    highlight: false
