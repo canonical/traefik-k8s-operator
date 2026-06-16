@@ -25,6 +25,22 @@ variable "constraints" {
   default = "arch=amd64"
 }
 
+variable "expose" {
+  description = "Make the application publicly available over the network. Requires `external_hostname` to be set in `config`."
+  type        = bool
+  default     = false
+
+  validation {
+    # Juju refuses to expose a Kubernetes (container) application unless
+    # `juju-external-hostname` is set, which this module derives from the charm's
+    # `external_hostname` config. Fail fast at plan time instead of letting Juju
+    # reject the apply with `cannot expose a container application without a
+    # "juju-external-hostname" value set`.
+    condition     = !var.expose || lookup(var.config, "external_hostname", "") != ""
+    error_message = "When `expose` is true, `external_hostname` must be set in `config`."
+  }
+}
+
 variable "model_uuid" {
   description = "ID of the model to deploy to"
   type        = string
