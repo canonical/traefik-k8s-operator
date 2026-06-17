@@ -2,34 +2,9 @@
 
 # How to integrate
 
-The [Traefik charm](https://charmhub.io/traefik-k8s) is a charm to provide ingress to
-another charmed application 'the Juju way'. The idea is that if a charm integrates with
-`traefik-k8s` then you can relate the two applications and your application will
-receive the URL at which ingress is made available.
+Traefik provides ingress to other charmed applications. If a charm integrates with Traefik, it can delegate the responsibility of providing ingress to Traefik.
 
-The Traefik charm supports two standardized interfaces:
-
-- [ingress](https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/ingress/v2#readme) 
-
-  Using this interface, each charmed application can request a single, cluster-unique URL for ingress.
-  You can choose between a domain-name-based URL (`your.parameters.domain.com`) and a path-based URL (`domain.com\your\parameters`).
-- [`ingress-per-unit`](https://github.com/canonical/charm-relation-interfaces/blob/main/interfaces/ingress_per_unit/v0/README.md)
-
-  Using this interface, each charmed application can request a cluster-unique URL for each
-  existing unit. This is for applications such as Prometheus, where each remote-write
-  endpoint needs to be routed to separately, and database applications who wish to do
-  client-side load-balancing.
-
-## Traefik route
-
-The [Traefik route charm](https://charmhub.io/traefik-route-k8s) is a proxy charm that sits
-between Traefik and a charm in need of ingress, and is used to provide low-level access to
-Traefik configuration, as well as to allow configuration for each relation. 
-
-Want to have full access to all the expressive power of
-[Traefik's routing configuration](https://doc.traefik.io/traefik/routing/overview/)? Want to
-have one Traefik instance, and provide domain-name-based URL routing to some charms, but
-path-based URL routing to some others? This is how you do it.
+See {ref}`Ingress-related integrations <reference_ingress_integrations>` for more details on the Traefik charm ingress-related integrations.
 
 ## Add ingress to your charm
 
@@ -40,7 +15,7 @@ latest version for the libraries is by visiting the documentation pages on Charm
 - [`ingress`](https://charmhub.io/traefik-k8s/libraries/ingress)
 - [`ingress_per_unit`](https://charmhub.io/traefik-k8s/libraries/ingress_per_unit)
 
-The following steps assume we want to use `ingress`. The process for `ingress_per_unit` is very similar.
+The following steps assume we want to use `ingress`. The usage process for `ingress_per_unit` is very similar, the difference is `ingress_per_unit` provides ingress for each unit of the charm. A important feature is that `ingress_per_unit` does support listening ingress changes for all units of the charm, which is often useful for the leader unit to monitor the ingress status of the entire application. See the documentation page for details on this.
 
 ### Fetch the latest `ingress` library
 
