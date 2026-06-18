@@ -76,7 +76,7 @@ LIBAPI = 4
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 29
+LIBPATCH = 30
 
 PYDEPS = [
     "cryptography>=43.0.0",
@@ -1168,6 +1168,26 @@ class CertificateRequestAttributes:
             and self.additional_critical_extensions == other.additional_critical_extensions
         )
 
+    def __hash__(self) -> int:
+        """Return hash of the CertificateRequestAttributes object."""
+        return hash(
+            (
+                self.common_name,
+                frozenset(self.sans_dns) if self.sans_dns else None,
+                frozenset(self.sans_ip) if self.sans_ip else None,
+                frozenset(self.sans_oid) if self.sans_oid else None,
+                self.email_address,
+                self.organization,
+                self.organizational_unit,
+                self.country_name,
+                self.state_or_province_name,
+                self.locality_name,
+                self.is_ca,
+                self.add_unique_id_to_subject_name,
+                tuple(self.additional_critical_extensions),
+            )
+        )
+
     def is_valid(self) -> bool:
         """Validate the attributes of the certificate request.
 
@@ -1758,6 +1778,7 @@ class TLSCertificatesRequiresV4(Object):
         self._cleanup_certificate_requests()
         self._send_certificate_requests()
         self._find_available_certificates()
+        self._renew_expiring_certificates()
 
     def _mode_is_valid(self, mode: Mode) -> bool:
         return mode in [Mode.UNIT, Mode.APP]
@@ -1890,6 +1911,9 @@ class TLSCertificatesRequiresV4(Object):
         if self._private_key_generated():
             logger.debug("Private key already generated")
             return
+        if self.mode == Mode.APP and not self.model.unit.is_leader():
+            logger.debug("Not leader, skipping private key generation in APP mode")
+            return
         self._generate_private_key()
 
     def regenerate_private_key(self) -> None:
@@ -1906,6 +1930,9 @@ class TLSCertificatesRequiresV4(Object):
                 "Private key is passed by the charm through the private_key parameter, "
                 "this function can't be used"
             )
+        if self.mode == Mode.APP and not self.model.unit.is_leader():
+            logger.warning("Only the leader can regenerate the private key in APP mode")
+            return
         if not self._private_key_generated():
             logger.warning("No private key to regenerate")
             return
@@ -1943,7 +1970,8 @@ class TLSCertificatesRequiresV4(Object):
             secret.set_content({"private-key": str(private_key)})
             secret.get_content(refresh=True)
         except SecretNotFoundError:
-            self.charm.unit.add_secret(
+            app_or_unit = self._get_app_or_unit()
+            app_or_unit.add_secret(
                 content={"private-key": str(private_key)},
                 label=self._get_private_key_secret_label(),
             )
@@ -1951,6 +1979,9 @@ class TLSCertificatesRequiresV4(Object):
     def _remove_private_key_secret(self) -> None:
         """Remove the private key secret."""
         self._cached_private_key = None
+        if self.mode == Mode.APP and not self.model.unit.is_leader():
+            logger.debug("Not leader, cannot remove app owned private key secret")
+            return
         try:
             secret = self.charm.model.get_secret(label=self._get_private_key_secret_label())
             secret.remove_all_revisions()
@@ -2232,6 +2263,32 @@ class TLSCertificatesRequiresV4(Object):
                 logger.info(
                     "Removed CSR from relation data because it did not match the private key"  # noqa: E501
                 )
+
+    def _renew_expiring_certificates(self) -> None:
+        """Renew certificates approaching expiry that haven't been renewed yet.
+
+        This acts as a safety net for cases where secret_expired failed to trigger or complete.
+        Checks certificates at a threshold slightly after the configured renewal time but before
+        expiry to prevent downtime.
+        """
+        now = datetime.now(timezone.utc)
+        safety_threshold = min(0.99, self.renewal_relative_time + 0.05)
+
+        assigned_certificates, _ = self.get_assigned_certificates()
+
+        for provider_certificate in assigned_certificates:
+            cert = provider_certificate.certificate
+            validity_start = cert.validity_start_time
+            validity_end = cert.expiry_time
+            validity_period = validity_end - validity_start
+            safety_renewal_time = validity_start + (validity_period * safety_threshold)
+
+            if now >= safety_renewal_time and now < validity_end:
+                logger.warning(
+                    "Certificate approaching expiry but not renewed - "
+                    "triggering renewal as safety net"
+                )
+                self._renew_certificate_request(provider_certificate.certificate_signing_request)
 
     def _tls_relation_created(self) -> bool:
         relation = self.model.get_relation(self.relationship_name)

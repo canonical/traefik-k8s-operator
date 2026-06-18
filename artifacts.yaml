@@ -1,0 +1,15 @@
+version: 1
+rocks: []
+charms:
+- name: traefik-k8s
+  charmcraft-yaml: charmcraft.yaml
+  resources:
+    traefik-image:
+      type: oci-image
+  platforms:
+  - arch: amd64
+  - arch: arm64
+    runner: [ubuntu-24.04-arm]
+  - arch: s390x
+    runner: [self-hosted-linux-s390x-noble-medium]
+snaps: []

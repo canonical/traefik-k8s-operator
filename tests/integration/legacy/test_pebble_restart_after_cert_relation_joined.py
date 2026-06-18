@@ -12,8 +12,9 @@ from pathlib import Path
 
 import pytest
 import yaml
-from helpers import fetch_with_retry
 from pytest_operator.plugin import OpsTest
+
+from tests.integration.legacy.helpers import fetch_with_retry
 
 logger = logging.getLogger(__name__)
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())

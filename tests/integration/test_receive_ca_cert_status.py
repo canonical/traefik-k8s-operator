@@ -4,7 +4,6 @@
 
 """Regression test for receive-ca-cert status after relation removal (#670)."""
 
-import os
 import time
 from pathlib import Path
 
@@ -24,20 +23,6 @@ def juju():
     with jubilant.temp_model() as juju:
         juju.wait_timeout = 10 * 60
         yield juju
-
-
-@pytest.fixture(scope="module")
-def traefik_charm():
-    charm_path = os.environ.get("CHARM_PATH")
-    if charm_path:
-        return Path(charm_path)
-    charms = sorted(Path(".").glob("traefik*.charm"))
-    if charms:
-        return charms[0]
-    raise FileNotFoundError(
-        "Set CHARM_PATH to the built traefik charm, "
-        "or place a traefik*.charm file in the repo root."
-    )
 
 
 def test_build_and_deploy(juju: jubilant.Juju, traefik_charm):

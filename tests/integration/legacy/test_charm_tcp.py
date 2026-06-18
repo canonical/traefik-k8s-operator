@@ -8,13 +8,13 @@ import pytest
 import yaml
 from pytest_operator.plugin import OpsTest
 
-from tests.integration.conftest import deploy_traefik_if_not_deployed, get_relation_data
-from tests.integration.helpers import get_k8s_service_address, remove_application
+from tests.integration.legacy.conftest import deploy_traefik_if_not_deployed, get_relation_data
+from tests.integration.legacy.helpers import get_k8s_service_address, remove_application
 
 logger = logging.getLogger(__name__)
 
 
-tcp_charm_root = (Path(__file__).parent / "testers" / "tcp").absolute()
+tcp_charm_root = (Path(__file__).parent.parent / "testers" / "tcp").absolute()
 tcp_charm_meta = yaml.safe_load((tcp_charm_root / "metadata.yaml").read_text())
 tcp_charm_resources = {
     name: val["upstream-source"] for name, val in tcp_charm_meta["resources"].items()
