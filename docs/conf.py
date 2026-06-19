@@ -189,7 +189,7 @@ templates_path = ["_templates"]
 #       the sphinx_reredirects extension will be disabled.
 
 redirects = {
-    "how-to/force-https-redirect": "../index.html",
+    "how-to/force-https-redirect": "/",
 }
 
 
