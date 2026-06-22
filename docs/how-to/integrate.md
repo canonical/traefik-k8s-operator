@@ -46,13 +46,13 @@ from charms.traefik_k8s.v2.ingress import IngressPerAppRequirer, IngressReadyEve
 
     def _foo(self):
         self.ingress.provide_ingress_requirements(host="foo.com", port=42)
-
-
 ```
+
+Once you have added the `ingress` library the charm would need to be re-packed with `charmcraft pack`.
 
 `IngressPerAppRequirer` will take care of communicating over the `ingress` relation with
 `traefik-k8s` and notifying the charm whenever Traefik replies with an ingress URL or
-that URL is revoked for some reason (e.g. the cloud admin removed the relation). 
+that URL is revoked for some reason (e.g. the cloud admin removed the relation).
 
 ## Get the proxied endpoint exposed by Traefik
 
