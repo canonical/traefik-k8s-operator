@@ -1,16 +1,16 @@
 ---
 myst:
   html_meta:
-    "description lang=en": "Learn more about the ingress-related integrations of the Traefik charm."
+    "description lang=en": "Learn more about the ingress-related relations (integrations) of the Traefik charm."
 ---
 
 (reference_ingress_integrations)=
 
-# Ingress-related integrations
+# Ingress-related relations
 
-The [Traefik charm](https://charmhub.io/traefik-k8s) is a charm to provide ingress to
-another charmed application 'the Juju way'. The idea is that if a charm integrates with
-`traefik-k8s` then you can relate the two applications and your application will
+The [Traefik charm](https://charmhub.io/traefik-k8s) provides ingress to
+another charmed application through a Juju relation. The idea is that if a charm integrates with
+`traefik-k8s` then you can integrate the two applications and your application will
 receive the URL at which ingress is made available.
 
 The Traefik charm supports two standardized interfaces:
@@ -32,7 +32,7 @@ The [Traefik route charm](https://charmhub.io/traefik-route-k8s) is a proxy char
 between Traefik and a charm in need of ingress, and is used to provide low-level access to
 Traefik configuration, as well as to allow configuration for each relation. 
 
-Want to have full access to all the expressive power of
-[Traefik's routing configuration](https://doc.traefik.io/traefik/routing/overview/)? Want to
-have one Traefik instance, and provide domain-name-based URL routing to some charms, but
-path-based URL routing to some others? This is how you do it.
+This charm is ideal for use cases where you need the full expressive power of
+[Traefik's routing configuration](https://doc.traefik.io/traefik/routing/overview/),
+or if you want to use a single Traefik instance to provide domain-name-based
+URL routing to some charms, but path-based URL routing to others.

@@ -1,10 +1,10 @@
 (how_to_integrate)=
 
-# How to integrate
+# How to integrate your charm to Traefik
 
 Traefik provides ingress to other charmed applications. If a charm integrates with Traefik, it can delegate the responsibility of providing ingress to Traefik.
 
-See {ref}`Ingress-related integrations <reference_ingress_integrations>` for more details on the Traefik charm ingress-related integrations.
+See {ref}`Ingress-related relations <reference_ingress_integrations>` for more details on the Traefik charm ingress-related relations.
 
 ## Add ingress to your charm
 
@@ -15,9 +15,11 @@ latest version for the libraries is by visiting the documentation pages on Charm
 - [`ingress`](https://charmhub.io/traefik-k8s/libraries/ingress)
 - [`ingress_per_unit`](https://charmhub.io/traefik-k8s/libraries/ingress_per_unit)
 
-The following steps assume we want to use `ingress`. The usage process for `ingress_per_unit` is very similar, the difference is `ingress_per_unit` provides ingress for each unit of the charm. A important feature is that `ingress_per_unit` does support listening ingress changes for all units of the charm, which is often useful for the leader unit to monitor the ingress status of the entire application. See the documentation page for details on this.
+The following steps assume we want to use `ingress`. Using `ingress_per_unit` is very similar, but the difference is `ingress_per_unit` provides ingress for each unit of the charm. An important feature is that `ingress_per_unit` supports listening for ingress changes for all units of the charm, which is often useful for the leader unit to monitor the ingress status of the entire application. See the documentation page for details on this.
 
-### Fetch the latest `ingress` library
+### Add `ingress` to your charm
+
+First, fetch the latest `ingress` library:
 
 ```
 charmcraft fetch-lib charms.traefik_k8s.v2.ingress
@@ -29,7 +31,6 @@ You can immediately pass to it the host and port of the server you want ingress 
 or you can defer that decision to a later moment by using the `IngressPerAppRequirer.provide_ingress_requirements` API.
 
 ```python
-# src/charm.py
 from charms.traefik_k8s.v2.ingress import IngressPerAppRequirer, IngressReadyEvent
 
 ... # your charm's __init__(self, ...):
@@ -56,7 +57,9 @@ that URL is revoked for some reason (e.g. the cloud admin removed the relation).
 ## Get the proxied endpoint exposed by Traefik
 
 You have added an ingress integration to your charm and you have deployed it alongside
-`traefik-k8s` and integrated them. Run the following command to get a list of the
+Deploy your charm alongside `traefik-k8s` and integrate them.
+
+Use the `show-proxied-endpoints` action to get a list of the
 endpoints currently exposed by `traefik`, one for each application integrated over
 `ingress` and one for each *unit* related over `ingress_per_unit`.
 
