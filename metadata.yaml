@@ -18,7 +18,7 @@ description: |
 website: https://charmhub.io/traefik-k8s
 source: https://github.com/canonical/traefik-k8s-operator
 issues: https://github.com/canonical/traefik-k8s-operator/issues
-docs: https://documentation.ubuntu.com/traefik-k8s-charm/
+docs: https://canonical.com/juju/docs/traefik-k8s-charm
 
 containers:
   traefik:

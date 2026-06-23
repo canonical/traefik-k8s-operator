@@ -12,6 +12,10 @@ Each revision is versioned by the date of the revision.
 
 - Removed "How to force HTTPS redirect" documentation as it is stale code. 
 
+## 2026-06-18
+
+- Migrated the RTD documentation URL under the Canonical domain.
+
 ## 2026-06-08
 
 - Added an `expose` input to the Terraform module to make Traefik publicly available over the network.
