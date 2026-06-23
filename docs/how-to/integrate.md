@@ -56,7 +56,6 @@ that URL is revoked for some reason (e.g. the cloud admin removed the relation).
 
 ## Get the proxied endpoint exposed by Traefik
 
-You have added an ingress integration to your charm and you have deployed it alongside
 Deploy your charm alongside `traefik-k8s` and integrate them.
 
 Use the `show-proxied-endpoints` action to get a list of the
