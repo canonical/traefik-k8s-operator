@@ -15,14 +15,14 @@ receive the URL at which ingress is made available.
 
 The Traefik charm supports two standardized interfaces:
 
-- [ingress](https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/ingress/v2#readme) 
+- [`ingress`](https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/ingress/v2#readme) 
 
   Using this interface, each charmed application can request a single, cluster-unique URL for ingress.
   You can choose between a domain-name-based URL (`your.parameters.domain.com`) and a path-based URL (`domain.com\your\parameters`).
 - [`ingress-per-unit`](https://github.com/canonical/charm-relation-interfaces/blob/main/interfaces/ingress_per_unit/v0/README.md)
 
   Using this interface, each charmed application can request a cluster-unique URL for each
-  existing unit. This is for applications such as Prometheus, where each remote-write
+  existing unit. This is ideal for applications such as Prometheus, where each remote-write
   endpoint needs to be routed to separately, and database applications who wish to do
   client-side load-balancing.
 
