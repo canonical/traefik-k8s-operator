@@ -14,7 +14,6 @@ These guides accompany you through the complete Traefik charm operations lifecyc
 
 Once you've set up the charm, you can take advantage of the built-in features and capabilities to customize the charm based on your specific needs and use cases.
 
-* {ref}`Force HTTPS redirect <how_to_force_https_redirect>`
 * {ref}`Integrate with traefik and traefik-route <how_to_integrate>`
 
 ## Troubleshooting
@@ -35,7 +34,6 @@ Upgrades and community contributions ensure the Traefik charm stays current and 
 ```{toctree}
 :hidden:
 
-Force HTTPS redirect <force-https-redirect>
 Enable BasicAuth <enable-basicauth>
 Integrate <integrate>
 Troubleshoot "Gateway Address Unavailable" <troubleshoot-gateway-address-unavailable>

@@ -29,7 +29,6 @@ If Traefik serves HTTP, the traffic between Traefik and the clients will be unen
 #### Best practices
 
 - Always enable HTTPS by integrating with a charm providing the [`certificates`](https://charmhub.io/traefik-k8s/integrations#certificates) integration to configure TLS.
-- {ref}`Force HTTPS redirect <how_to_force_https_redirect>` unless you need unencrypted traffic to be supported.
 - Consider encrypting in-cluster traffic, specially if your cluster is multi-tenant.
 
 ### Authentication
