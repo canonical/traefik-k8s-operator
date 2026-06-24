@@ -53,6 +53,7 @@ TLS_CIPHER_SUITES = [
 ]
 
 _DIAGNOSTICS_PORT = 8082  # Prometheus metrics, healthcheck/ping
+_ENTRYPOINT_READ_TIMEOUT = "0s"
 
 
 @dataclasses.dataclass
@@ -321,6 +322,12 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
                 "redirections": {"entryPoint": {"to": "websecure", "scheme": "https"}},
             }
 
+        # Traefik v2.11.2 changed the default readTimeout to 60s, which can break
+        # large uploads and slow requests. Keep the historic Traefik behavior.
+        entrypoint_transport_config = {
+            "transport": {"respondingTimeouts": {"readTimeout": _ENTRYPOINT_READ_TIMEOUT}}
+        }
+
         static_config = {
             "global": {
                 "checknewversion": False,
@@ -330,10 +337,19 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             },
             "entryPoints": {
                 "diagnostics": {"address": f":{_DIAGNOSTICS_PORT}"},
-                "web": web_config,
-                "websecure": {"address": f":{self.tls_port}"},
+                "web": {
+                    **web_config,
+                    **entrypoint_transport_config,
+                },
+                "websecure": {
+                    "address": f":{self.tls_port}",
+                    **entrypoint_transport_config,
+                },
                 **{
-                    tcp_entrypoint_name: {"address": f":{port}"}
+                    tcp_entrypoint_name: {
+                        "address": f":{port}",
+                        **entrypoint_transport_config,
+                    }
                     for tcp_entrypoint_name, port in tcp_entrypoints.items()
                 },
                 **{
