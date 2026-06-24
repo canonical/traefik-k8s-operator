@@ -76,7 +76,10 @@ async def test_static_config_updated(ops_test: OpsTest):
     # the route tester charm does:
     # static = {"entryPoints": {"test-port": {"address": ":4545"}},
     # "test-udp-port": {"address": ":4646/udp"}}},
-    assert contents_yaml["entryPoints"]["test-port"] == {"address": ":4545"}
+    assert contents_yaml["entryPoints"]["test-port"] == {
+        "address": ":4545",
+        "transport": {"respondingTimeouts": {"readTimeout": "0s"}},
+    }
     assert contents_yaml["entryPoints"]["test-udp-port"] == {"address": ":4646/udp"}
 
 
