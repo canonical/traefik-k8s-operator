@@ -15,7 +15,7 @@ latest version for the libraries is by visiting the documentation pages on Charm
 - [`ingress`](https://charmhub.io/traefik-k8s/libraries/ingress)
 - [`ingress_per_unit`](https://charmhub.io/traefik-k8s/libraries/ingress_per_unit)
 
-The following steps assume we want to use `ingress`. Using `ingress_per_unit` is very similar, but the difference is `ingress_per_unit` provides ingress for each unit of the charm. An important feature is that `ingress_per_unit` supports listening for ingress changes for all units of the charm, which is often useful for the leader unit to monitor the ingress status of the entire application. See the documentation page for details on this.
+The following steps assume we want to use `ingress`. Using `ingress_per_unit` is very similar, but the difference is `ingress_per_unit` provides ingress for each unit of the charm. An important feature is that `ingress_per_unit` supports listening for ingress changes for all units of the charm, which is often useful for the leader unit to monitor the ingress status of the entire application. See the documentation page for more details.
 
 ### Add `ingress` to your charm
 
