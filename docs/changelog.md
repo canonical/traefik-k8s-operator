@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 Each revision is versioned by the date of the revision.
 
+## 2026-06-24
+
+- Fixed Traefik entrypoint `readTimeout` defaults for HTTP and TCP traffic entrypoints so large uploads are not cut off after 60 seconds on Traefik v2.11.2+.
+
 ## 2026-06-19
 
 - Removed "How to force HTTPS redirect" documentation as it is stale code. 
