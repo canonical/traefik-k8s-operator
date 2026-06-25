@@ -11,6 +11,7 @@ Each revision is versioned by the date of the revision.
 ## 2026-06-24
 
 - Fixed Traefik entrypoint `readTimeout` defaults for HTTP and TCP traffic entrypoints so large uploads are not cut off after 60 seconds on Traefik v2.11.2+.
+- Added integration tests for Traefik charm upgrade.
 
 ## 2026-06-19
 

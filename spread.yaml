@@ -38,6 +38,8 @@ integration-suites:
       # Base 20.04 tests
       BASE/legacy_test_charm_ipa_2004: ubuntu@20.04
       MODULE/legacy_test_charm_ipa_2004: tests/integration/legacy/test_charm_ipa.py
+      BASE/jubilant_test_upgrade_2004: ubuntu@20.04
+      MODULE/jubilant_test_upgrade_2004: tests/integration/test_upgrade.py
   tests/integration/arm64:
     working-dir: ./
     summary: integration tests
