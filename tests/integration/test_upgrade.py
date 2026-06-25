@@ -15,7 +15,7 @@ INGRESS_REQUIRER_APP_NAME = "alertmanager"
 TRAEFIK_SOURCE_CHANNEL = "latest/edge"
 
 
-def test_upgrade(juju: jubilant.Juju, traefik_charm):
+def test_upgrade(juju: jubilant.Juju, traefik_charm, pytestconfig):
     """
     Refresh traefik from the latest revision on charmhub to the current
     local charm, and verify all charms are active and idle.
@@ -24,6 +24,7 @@ def test_upgrade(juju: jubilant.Juju, traefik_charm):
         "ch:traefik-k8s",
         TRAEFIK_APP_NAME,
         channel=TRAEFIK_SOURCE_CHANNEL,
+        base=pytestconfig.getoption("--base"),
         config={"external_hostname": "traefik-demo.local"},
         trust=True,
     )
