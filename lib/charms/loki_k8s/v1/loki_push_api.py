@@ -544,7 +544,7 @@ LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 26
+LIBPATCH = 30
 
 PYDEPS = ["cosl"]
 
@@ -1188,7 +1188,10 @@ class LokiPushApiProvider(Object):
                 )
                 continue
 
-            alerts[identifier] = self._tool.apply_label_matchers(alert_rules)  # type: ignore
+            # Topology labels are already injected by _inject_alert_expr_labels using
+            # alert_expression_dict, which intentionally excludes juju_charm and juju_unit.
+            # Don't call apply_label_matchers here as it would re-inject juju_charm.
+            alerts[identifier] = alert_rules
 
             _, errmsg = self._tool.validate_alert_rules(cast(OfficialRuleFileFormat, alert_rules))
             if errmsg:
@@ -1198,6 +1201,10 @@ class LokiPushApiProvider(Object):
                 if self._charm.unit.is_leader():
                     relation.data[self._charm.app]["event"] = json.dumps({"errors": errmsg})
                 continue
+            if self._charm.unit.is_leader():
+                event_data = json.loads(relation.data[self._charm.app].get("event", "{}"))
+                event_data.pop("errors", None)
+                relation.data[self._charm.app]["event"] = json.dumps(event_data)
 
             alerts[identifier] = alert_rules
 
@@ -1279,10 +1286,13 @@ class LokiPushApiProvider(Object):
                             charm_name=labels.get("juju_charm", ""),
                         )
 
-                        # Inject topology and put it back in the list
+                        # Inject topology and put it back in the list.
+                        # Use alert_expression_dict (excludes juju_charm) instead of
+                        # label_matcher_dict because subordinate charms (e.g. otelcol)
+                        # label logs with their own charm name, not the principal's.
                         rule["expr"] = self._tool.inject_label_matchers(
                             re.sub(r"%%juju_topology%%,?", "", rule["expr"]),
-                            topology.label_matcher_dict,
+                            topology.alert_expression_dict,
                         )
                     except KeyError:
                         # Some required JujuTopology key is missing. Just move on.
@@ -1405,7 +1415,6 @@ class ConsumerBase(Object):
                 endpoints.append(deserialized_endpoint)
 
         return endpoints
-
 
 
 class LokiPushApiConsumer(ConsumerBase):
@@ -1700,7 +1709,7 @@ class LogProxyConsumer(ConsumerBase):
         self._promtails_ports = self._generate_promtails_ports(logs_scheme)
 
         # architecture used for promtail binary
-        arch = platform.processor()
+        arch = platform.machine()
         if arch in ["x86_64", "amd64"]:
             self._arch = "amd64"
         elif arch in ["aarch64", "arm64", "armv8b", "armv8l"]:
@@ -2294,6 +2303,7 @@ class _PebbleLogClient:
                         "juju_model_uuid": topology._model_uuid,
                         "juju_application": topology._application,
                         "juju_unit": topology._unit,
+                        "job": f"juju_{topology.identifier}",
                     },
                 }
             )
