@@ -466,7 +466,13 @@ class TestTraefikIngressCharm(unittest.TestCase):
         assert cfg["log"] == {"level": "DEBUG"}
         assert cfg["entryPoints"]["diagnostics"]["address"]
         assert cfg["entryPoints"]["web"]["address"]
+        assert cfg["entryPoints"]["web"]["transport"]["respondingTimeouts"] == {
+            "readTimeout": "0s"
+        }
         assert cfg["entryPoints"]["websecure"]["address"]
+        assert cfg["entryPoints"]["websecure"]["transport"]["respondingTimeouts"] == {
+            "readTimeout": "0s"
+        }
         assert cfg["ping"]["entryPoint"] == "diagnostics"
         assert cfg["providers"]["file"]["directory"]
         assert cfg["providers"]["file"]["watch"] is True
@@ -495,7 +501,10 @@ class TestTraefikIngressCharm(unittest.TestCase):
         prefix = charm._get_prefix(data)
         assert charm._tcp_entrypoints() == {prefix: 3000}
 
-        expected_entrypoint = {"address": ":3000"}
+        expected_entrypoint = {
+            "address": ":3000",
+            "transport": {"respondingTimeouts": {"readTimeout": "0s"}},
+        }
         static_config = charm.unit.get_container("traefik").pull(STATIC_CONFIG_PATH).read()
         assert yaml.safe_load(static_config)["entryPoints"][prefix] == expected_entrypoint
 

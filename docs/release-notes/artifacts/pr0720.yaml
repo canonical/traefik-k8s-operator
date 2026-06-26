@@ -1,0 +1,18 @@
+# Version of the artifact schema
+version_schema: 2
+# The key holding the change(s)
+changes:
+  - title: Restored unlimited read timeout for traffic entrypoints
+    author: swetha1654
+    type: bugfix
+    description: |
+      Explicitly set Traefik's entrypoint read timeout to `0s` for HTTP and TCP
+      traffic entrypoints so large uploads are not truncated by the Traefik v2.11.2+
+      default of 60s.
+    urls:
+      pr:
+        - https://github.com/canonical/traefik-k8s-operator/pull/720
+      related_doc:
+      related_issue: https://github.com/canonical/traefik-k8s-operator/issues/719
+    visibility: public
+    highlight: false

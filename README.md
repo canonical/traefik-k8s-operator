@@ -4,7 +4,7 @@
 [![Release](https://github.com/canonical/traefik-k8s-operator/actions/workflows/release.yaml/badge.svg)](https://github.com/canonical/traefik-k8s-operator/actions/workflows/release.yaml)
 [![Discourse Status](https://img.shields.io/discourse/status?server=https%3A%2F%2Fdiscourse.charmhub.io&style=flat&label=CharmHub%20Discourse)](https://discourse.charmhub.io)
 
-This [Juju](https://juju.is) charmed operator written with the [Operator Lifecycle Manager Framework](https://juju.is/docs/olm), powering _ingress controller-like_ capabilities on Kubernetes.
+This [Juju](https://juju.is) charmed operator powering _ingress controller-like_ capabilities on Kubernetes.
 By _ingress controller-like_ capabilities, we mean that the Traefik Kubernetes charmed operator exposes Juju applications to the outside of a Kubernetes cluster, **without** relying on the [`ingress` resource](https://kubernetes.io/docs/concepts/services-networking/ingress/) of Kubernetes.
 Rather, Traefik is instructed to expose Juju applications by means of relations with them.
 
@@ -83,8 +83,9 @@ juju add-relation traefik-ingress:metrics-endpoint prometheus
 
 ## Documentation
 
-Our documentation is stored in the `docs` directory.
-It is based on the Canonical starter pack
+Our documentation is stored in the `docs` directory
+and can be viewed at https://canonical.com/juju/docs/traefik-k8s-charm.
+It is based on the Canonical Sphinx Stack
 and hosted on [Read the Docs](https://about.readthedocs.com/). In structuring,
 the documentation employs the [Diátaxis](https://diataxis.fr/) approach.
 
@@ -112,4 +113,4 @@ make lint-md
 
 ## Contributing
 
-Please see the [Juju SDK docs](https://juju.is/docs/sdk) for guidelines on enhancements to this charm following best practice guidelines, and [CONTRIBUTING.md](https://github.com/canonical/traefik-k8s-operator/blob/main/CONTRIBUTING.md) for developer guidance.
+Please see the [Juju docs](https://canonical.com/juju/docs/juju-cli/) for guidelines on enhancements to this charm following best practice guidelines, and [CONTRIBUTING.md](https://github.com/canonical/traefik-k8s-operator/blob/main/CONTRIBUTING.md) for developer guidance.
