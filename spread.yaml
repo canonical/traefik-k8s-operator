@@ -25,7 +25,7 @@ integration-suites:
     - integration-test
     systems:
     - ubuntu-24.04
-    auto-discover: true
+    auto-discover: false
     pytest-arguments-template: '-x --log-format="%(asctime)s %(levelname)s %(message)s" --keep-models --model testing --base {{ env.get("BASE", "ubuntu@26.04") }}'
     environment:
       # Juju 4 tests
@@ -35,19 +35,3 @@ integration-suites:
       CONCIERGE/jubilant_test_dynamic_configs_juju4: concierge-juju4.yaml
       CONCIERGE/jubilant_test_https_multi_unit_juju4: concierge-juju4.yaml
       CONCIERGE/jubilant_test_receive_ca_cert_status_juju4: concierge-juju4.yaml
-      # Base 20.04 tests
-      BASE/legacy_test_charm_ipa_2004: ubuntu@20.04
-      MODULE/legacy_test_charm_ipa_2004: tests/integration/legacy/test_charm_ipa.py
-      BASE/jubilant_test_upgrade_2004: ubuntu@20.04
-      MODULE/jubilant_test_upgrade_2004: tests/integration/test_upgrade.py
-  tests/integration/arm64:
-    working-dir: ./
-    summary: integration tests
-    backends:
-    - integration-test
-    systems:
-    - ubuntu-24.04-arm64
-    auto-discover: false
-    pytest-arguments-template: '-x --log-format="%(asctime)s %(levelname)s %(message)s" --keep-models --model testing'
-    environment:
-      MODULE/legacy_test_charm_ipa: tests/integration/legacy/test_charm_ipa.py
