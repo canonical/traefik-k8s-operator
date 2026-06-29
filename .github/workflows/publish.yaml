@@ -7,7 +7,7 @@ on:
 
 jobs:
   publish:
-    uses: canonical/charm-ci/.github/workflows/publish-artifacts.yml@v0.0.1-alpha.1
+    uses: canonical/charm-ci/.github/workflows/publish-artifacts.yml@v0.0.1-alpha.4
     permissions:
       actions: read
       contents: write
@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout the source
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           path: charm
       - name: Release libraries

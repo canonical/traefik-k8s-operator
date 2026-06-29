@@ -94,11 +94,6 @@ juju deploy --trust ./tls-demo.yaml
 
 ## Reach an application's endpoint with ingress
 
-```{note}
-By default, the Traefik charm sets up Traefik in a way that allows both HTTP and HTTPS access.
-To force HTTPS redirect, see {ref}`Force HTTPS redirect <how_to_force_https_redirect>`.
-```
-
 ### HTTP
 
 First, obtain the ingress URL by using a Traefik action:

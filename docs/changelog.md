@@ -8,6 +8,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 Each revision is versioned by the date of the revision.
 
+## 2026-06-24
+
+- Fixed Traefik entrypoint `readTimeout` defaults for HTTP and TCP traffic entrypoints so large uploads are not cut off after 60 seconds on Traefik v2.11.2+.
+- Added integration tests for Traefik charm upgrade.
+
+## 2026-06-19
+
+- Removed "How to force HTTPS redirect" documentation as it is stale code. 
+
+## 2026-06-18
+
+- Migrated the RTD documentation URL under the Canonical domain.
+
+## 2026-06-08
+
+- Added an `expose` input to the Terraform module to make Traefik publicly available over the network.
+
 ## 2026-06-05
 
 - Added support for `ubuntu@26.04` on the charm.
