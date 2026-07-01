@@ -1,0 +1,16 @@
+# Version of the artifact schema
+version_schema: 2
+# The key holding the change(s)
+changes:
+  - title: Added support for providing `base` through Terraform.
+    author: swetha1654
+    type: minor
+    description: |
+      Added support for providing `base` through Terraform.
+    urls:
+      pr:
+        - https://github.com/canonical/traefik-k8s-operator/pull/726
+      related_doc:
+      related_issue:
+    visibility: public
+    highlight: false
