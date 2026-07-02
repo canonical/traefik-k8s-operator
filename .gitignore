@@ -58,3 +58,6 @@ terraform.rc
 .spread-reuse.*
 .spread-run-*/
 artifacts.build.yaml
+
+# Git worktrees
+.worktrees/
