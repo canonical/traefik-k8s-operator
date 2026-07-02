@@ -22,12 +22,18 @@ This module requires a `juju` model to be available. Refer to the [usage section
 
 No modules.
 
+## Resources
+
+| Name | Type |
+|------|------|
+| [juju_application.traefik](https://registry.terraform.io/providers/juju/juju/latest/docs/resources/application) | resource |
+
 ## Inputs
 
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
 | <a name="input_app_name"></a> [app\_name](#input\_app\_name) | Name to give the deployed application | `string` | `"traefik"` | no |
-| <a name="input_base"></a> [base](#input\_base) | The operating system on which to deploy. E.g. ubuntu@26.04. Check Charmhub for per-charm base support. | `string` | `"ubuntu@26.04"` | no |
+| <a name="input_base"></a> [base](#input\_base) | The operating system on which to deploy. E.g. ubuntu@26.04. Check Charmhub for per-charm base support. | `string` | `null` | no |
 | <a name="input_channel"></a> [channel](#input\_channel) | Channel that the charm is deployed from | `string` | n/a | yes |
 | <a name="input_config"></a> [config](#input\_config) | Map of the charm configuration options | `map(string)` | `{}` | no |
 | <a name="input_constraints"></a> [constraints](#input\_constraints) | String listing constraints for this application | `string` | `"arch=amd64"` | no |
@@ -42,9 +48,9 @@ No modules.
 
 | Name | Description |
 |------|-------------|
-| <a name="output_app_name"></a> [app\_name](#output\_app\_name) | n/a |
+| <a name="output_app_name"></a> [app\_name](#output\_app\_name) | Legacy output: name of the deployed application |
 | <a name="output_application"></a> [application](#output\_application) | The deployed traefik-k8s application. |
-| <a name="output_endpoints"></a> [endpoints](#output\_endpoints) | n/a |
+| <a name="output_endpoints"></a> [endpoints](#output\_endpoints) | Legacy output: endpoints exposed by the application |
 | <a name="output_provides"></a> [provides](#output\_provides) | Map of the provides endpoints exposed by the charm. |
 | <a name="output_requires"></a> [requires](#output\_requires) | Map of the requires endpoints consumed by the charm. |
 <!-- END_TF_DOCS -->

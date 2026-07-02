@@ -3,7 +3,7 @@ version_schema: 2
 # The key holding the change(s)
 changes:
   - title: Added support for providing `base` through Terraform.
-    author: swetha1654
+    author: sinapah
     type: minor
     description: |
       Added support for providing `base` through Terraform.
