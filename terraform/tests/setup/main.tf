@@ -5,7 +5,7 @@ terraform {
   required_version = ">= 1.9.0"
   required_providers {
     juju = {
-      version = "1.5.4"
+      version = "~> 1.0"
       source  = "juju/juju"
     }
   }
