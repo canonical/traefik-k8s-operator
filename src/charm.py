@@ -43,6 +43,7 @@ from charms.tempo_coordinator_k8s.v0.tracing import (
 )
 from charms.tls_certificates_interface.v4.tls_certificates import (
     CertificateRequestAttributes,
+    LIBID as TLS_CERTIFICATES_LIBID,
     Mode,
     TLSCertificatesRequiresV4,
 )
@@ -310,6 +311,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         observe(self.on.remove, self._on_remove)
         observe(self.on.update_status, self._on_update_status)
         observe(self.on.config_changed, self._on_change)
+        observe(self.on.upgrade_charm, self._on_upgrade_charm)  # type: ignore
         observe(
             self.certs.on.certificate_available,  # pyright: ignore
             self._on_cert_changed,
@@ -368,6 +370,52 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         as we refactor the charm to be more hollistic.
         """
         self.traefik.cleanup_tls_configuration()
+
+    def _on_upgrade_charm(self, _: EventBase) -> None:
+        """Handle the upgrade-charm event.
+
+        When upgrading from revisions that used unit-scoped TLS state, we block
+        and ask operators to follow the documented upgrade workflow.
+        """
+        if not self.unit.is_leader():
+            return
+
+        if not self._has_legacy_unit_mode_tls_state():
+            return
+
+        logger.warning(
+            "Detected legacy unit-mode TLS state during upgrade. "
+            "Operator intervention is required to complete the documented "
+            "upgrade workflow."
+        )
+        self.unit.status = BlockedStatus(
+            "Legacy unit-mode TLS state detected. Follow the upgrade documentation."
+        )
+
+    def _has_legacy_unit_mode_tls_state(self) -> bool:
+        """Return whether unit-mode TLS artifacts are present.
+
+        We treat both of these as legacy unit-mode state:
+        1. Unit-scoped private-key secret label used by the old TLS mode.
+        2. Unit databag CSR entries under the certificates relation.
+        """
+        unit_number = self.unit.name.split("/")[1]
+        old_label = (
+            f"{TLS_CERTIFICATES_LIBID}-private-key-{unit_number}-{CERTIFICATES_RELATION_NAME}"
+        )
+
+        try:
+            self.model.get_secret(label=old_label)
+            return True
+        except SecretNotFoundError:
+            pass
+
+        certs_relation = self.model.get_relation(CERTIFICATES_RELATION_NAME)
+        if not certs_relation:
+            return False
+
+        unit_data = certs_relation.data.get(self.unit, {})
+        return bool(unit_data.get("certificate_signing_requests"))
 
     def _get_valid_csrs(self) -> List[CertificateRequestAttributes]:
         """Return a list of valid certificate requests."""
