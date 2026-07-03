@@ -14,7 +14,7 @@ Some revisions require additional manual steps after upgrading. Check the sectio
 
 (upgrade_to_rev308)=
 
-### Upgrading to revision 308 or later
+### Upgrade to revision 308 or later
 
 Revision 308 officially switch the certificates management in Traefik from UNIT mode to APP mode. If your deployment was running any revision before 308, follow these steps.
 
