@@ -4,6 +4,13 @@ variable "app_name" {
   default     = "traefik"
 }
 
+variable "base" {
+  description = "The operating system on which to deploy. E.g. ubuntu@26.04. Check Charmhub for per-charm base support."
+  type        = string
+  nullable    = true
+  default     = null
+}
+
 variable "channel" {
   description = "Channel that the charm is deployed from"
   type        = string
