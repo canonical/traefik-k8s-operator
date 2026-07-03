@@ -16,7 +16,9 @@ Some revisions require additional manual steps after upgrading. Check the sectio
 
 ### Upgrade to revision 308 or later
 
-Revision 308 officially switch the certificates management in Traefik from UNIT mode to APP mode. If your deployment was running any revision before 308, follow these steps.
+Revision 308 officially switches the certificates management in Traefik from UNIT mode to APP mode. If your deployment uses any revision before 308, follow these steps to preserve your TLS certificates.
+
+This guide assumes that you have [`jhack`](https://snapcraft.io/jhack) installed.
 
 #### Important: Preserving TLS certificates
 
