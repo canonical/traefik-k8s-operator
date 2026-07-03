@@ -55,7 +55,7 @@ juju secrets --format json \
   | jq '.[] | select(.label | test("private-key"; "i")) | {id, label, owner}'
 ```
 
-The `owner` field should show the application name (e.g. `traefik-k8s`) rather than a unit name. The charm will use this shared key for all CSRs going forward, and leader changes will no longer trigger unnecessary certificate renewals.
+The `owner` field should show the application name (e.g. `traefik-k8s`) rather than a unit name. The charm will use this shared key for all certificate signing requests going forward, and leader changes will no longer trigger unnecessary certificate renewals.
 
 ## Preserving TLS certificates after upgrade
 
@@ -98,7 +98,7 @@ jhack eval traefik-k8s/leader self._update_private_key()
 jhack fire traefik-k8s/leader config-changed
 ```
 
-After this, the original CSR will reappear in the relation databag. You can then provide the previously signed certificate without any re-signing:
+After this, a CSR created by the original private key will reappear in the relation data bag. You can then provide the previously signed certificate without any re-signing:
 
 ```
 juju run manual-tls-certificates/leader provide-certificate \
