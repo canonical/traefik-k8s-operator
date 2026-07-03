@@ -58,7 +58,7 @@ After deletion, trigger a reconciliation on the leader unit so the charm creates
 jhack fire traefik-k8s/leader config-changed
 ```
 
-#### Verification
+#### Verify secrets
 
 After either option, confirm that the private-key secret is now application-scoped:
 
