@@ -36,7 +36,7 @@ In some cases, a bug might occur during a node restart or a leader change that c
 `/opt/traefik/juju`. Look at other units to see if they still contain the original certificate and private key. In an HA deployment, you can also get them by looking at the `peer` relation data.
 ```
 
-#### Steps
+#### Update secrets
 
 After running `juju refresh traefik-k8s --revision 308` (or later), check whether stale unit-scoped secrets remain:
 
