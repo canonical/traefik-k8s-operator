@@ -71,7 +71,7 @@ The `owner` field should show the application name (e.g. `traefik-k8s`) rather t
 
 ## Preserve TLS certificates after upgrade
 
-Assuming that you've done the necessary steps to backup the private key and certificate mentioned above, you should be able to now restore the private key on the leader unit and "re-provide" the original signed certificates.
+Assuming that you've backed up the private key and certificate, you should be able to now restore the private key on the leader unit and re-provide the original signed certificates.
 
 ### Steps
 
