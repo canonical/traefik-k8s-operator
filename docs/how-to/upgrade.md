@@ -67,7 +67,7 @@ To avoid this, you can restore the original private key immediately after the re
 
 **1. Before upgrading**, retrieve and save the current private key and certificate from any Traefik unit:
 
-```
+```bash
 juju ssh --container traefik traefik-k8s/0 cat /opt/traefik/juju/<hostname>.key
 juju ssh --container traefik traefik-k8s/0 cat /opt/traefik/juju/<hostname>.crt
 ```
