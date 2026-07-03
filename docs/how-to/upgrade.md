@@ -60,7 +60,7 @@ jhack fire traefik-k8s/leader config-changed
 
 #### Verify secrets
 
-After either option, confirm that the private-key secret is now application-scoped:
+Confirm that the private-key secret is now application-scoped:
 
 ```bash
 juju secrets --format json \
