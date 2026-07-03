@@ -20,7 +20,7 @@ Revision 308 officially switch the certificates management in Traefik from UNIT 
 
 #### Important: Preserving TLS certificates
 
-By default, `juju refresh` to a revision that uses APP mode will cause Traefik to generate a new private key, which triggers a new Certificate Signing Request (CSR). If you are using `manual-tls-certificates` or `notary` as your TLS provider, this means you will need to sign and provide a new certificate.
+By default, upgrading to a revision that uses APP mode will cause Traefik to generate a new private key, which triggers a new Certificate Signing Request (CSR). If you use `manual-tls-certificates` or `notary` as your TLS provider, this means you will need to sign and provide a new certificate.
 
 To avoid this, you can restore the original private key immediately after the refresh, so that Traefik re-uses the same key and produces the same CSR that was already signed. This allows you to provide the original certificate without any re-signing.
 
