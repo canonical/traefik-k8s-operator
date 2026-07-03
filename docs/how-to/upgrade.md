@@ -73,8 +73,6 @@ The `owner` field should show the application name (e.g. `traefik-k8s`) rather t
 
 Assuming that you've backed up the private key and certificate, you should be able to now restore the private key on the leader unit and re-provide the original signed certificates.
 
-### Steps
-
 **1. Restore the private key on the leader unit.**
 
 On the `charm` container of the leader unit, create a temporary helper in `/var/lib/juju/agent/unit-<>/charm/src/charm.py` by appending the following method to the `TraefikIngressCharm` class. Replace the placeholder key with the one you saved before upgrading:
