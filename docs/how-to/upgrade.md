@@ -2,6 +2,13 @@
 
 # How to upgrade
 
+If you are using `manual-tls-certificates` or `notary` and want to preserve the current certificate, first save the existing private key and certificate **before** running `juju refresh`:
+
+```bash
+juju ssh --container traefik traefik-k8s/0 cat /opt/traefik/juju/<hostname>.key
+juju ssh --container traefik traefik-k8s/0 cat /opt/traefik/juju/<hostname>.crt
+```
+
 The Traefik charm has a stateless workload. It can safely be upgraded through the `juju refresh` command:
 
 ```
@@ -65,16 +72,9 @@ To avoid this, you can restore the original private key immediately after the re
 
 ### Steps
 
-**1. Before upgrading**, retrieve and save the current private key and certificate from any Traefik unit:
+**1. Restore the private key on the leader unit.**
 
-```bash
-juju ssh --container traefik traefik-k8s/0 cat /opt/traefik/juju/<hostname>.key
-juju ssh --container traefik traefik-k8s/0 cat /opt/traefik/juju/<hostname>.crt
-```
-
-**2. Restore the private key on the leader unit.**
-
-On the `charm` container of the leader unit, create a temporary helper in `/var/lib/juju/agent/unit-<>/charm/src/charm.py` by appending the following method to the `TraefikIngressCharm` class. Replace the placeholder key with the one you saved in step 1:
+On the `charm` container of the leader unit, create a temporary helper in `/var/lib/juju/agent/unit-<>/charm/src/charm.py` by appending the following method to the `TraefikIngressCharm` class. Replace the placeholder key with the one you saved before upgrading:
 
 ```python
 def _update_private_key(self) -> None:
@@ -92,7 +92,7 @@ You can then run this method on the leader unit using `jhack`:
 jhack eval traefik-k8s/leader self._update_private_key()
 ```
 
-**3. Fire a `config-changed` event** to trigger Traefik to re-generate the CSR with the restored key:
+**2. Fire a `config-changed` event** to trigger Traefik to re-generate the CSR with the restored key:
 
 ```
 jhack fire traefik-k8s/leader config-changed
@@ -107,4 +107,4 @@ juju run manual-tls-certificates/leader provide-certificate \
   certificate-signing-request="$(base64 -w0 original.csr)"
 ```
 
-**4. Clean up** by removing the temporary `_update_private_key` method from `charm.py`.
+**3. Clean up** by removing the temporary `_update_private_key` method from `charm.py`.
