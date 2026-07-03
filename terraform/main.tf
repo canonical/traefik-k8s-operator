@@ -15,6 +15,7 @@ resource "juju_application" "traefik" {
   units              = var.units
 
   charm {
+    base     = var.base
     name     = "traefik-k8s"
     channel  = var.channel
     revision = var.revision
