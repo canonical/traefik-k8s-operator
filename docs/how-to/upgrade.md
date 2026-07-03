@@ -2,13 +2,6 @@
 
 # How to upgrade
 
-If you are using `manual-tls-certificates` or `notary` and want to preserve the current certificate, first save the existing private key and certificate **before** running `juju refresh`:
-
-```bash
-juju ssh --container traefik traefik-k8s/0 cat /opt/traefik/juju/<hostname>.key
-juju ssh --container traefik traefik-k8s/0 cat /opt/traefik/juju/<hostname>.crt
-```
-
 The Traefik charm has a stateless workload. It can safely be upgraded through the `juju refresh` command:
 
 ```
@@ -19,17 +12,27 @@ juju refresh traefik-k8s
 
 Some revisions require additional manual steps after upgrading. Check the section that applies to your current revision before refreshing.
 
-(upgrade_rev281_to_rev308)=
+(upgrade_to_rev308)=
 
-### Upgrading from rev281–rev307 to rev308 or later
+### Upgrading to revision 308 or later
 
-Revision 308 fixes a bug where Traefik could request a new TLS certificate unnecessarily after a Juju leader change. If your deployment was running any revision between 281 and 307, follow these steps.
+Revision 308 officially switch the certificates management in Traefik from UNIT mode to APP mode. If your deployment was running any revision before 308, follow these steps.
 
-#### Background
+#### Important: Preserving TLS certificates
 
-Revisions 281–307 stored the TLS private key in a **unit-scoped** Juju secret. Because each unit held its own private key, only the leader unit's key was used to generate the Certificate Signing Request (CSR). When the leader changed, the new leader had a different private key that did not match the existing certificate, causing an unnecessary certificate re-request.
+By default, `juju refresh` to a revision that uses APP mode will cause Traefik to generate a new private key, which triggers a new Certificate Signing Request (CSR). If you are using `manual-tls-certificates` or `notary` as your TLS provider, this means you will need to sign and provide a new certificate.
 
-Revision 308 corrects this by storing the private key in a single **application-scoped** secret shared across all units. However, when upgrading from a previously affected revision, the old unit-scoped secrets are not automatically removed by Juju. Because the charm identifies secrets by label and `juju secret get` matches both unit-scoped and application-scoped secrets, the charm may find the stale unit-scoped secret and never create the correct application-scoped one.
+To avoid this, you can restore the original private key immediately after the refresh, so that Traefik re-uses the same key and produces the same CSR that was already signed. This allows you to provide the original certificate without any re-signing.
+
+Before proceeding with the upgrade, save the existing private key and certificate **before** running `juju refresh`:
+
+```bash
+juju ssh --container traefik traefik-k8s/0 cat /opt/traefik/juju/<hostname>.key
+juju ssh --container traefik traefik-k8s/0 cat /opt/traefik/juju/<hostname>.crt
+```
+
+> Note: In some cases, a bug might occur during a node restart or a leader change that causes the leader unit to wipe out the certificates information in
+`/opt/traefik/juju`, you can look at other units to see if they still contain the original certificate and private key. In an HA deployment, you can also get them by looking at the `peer` relation data.
 
 #### Steps
 
@@ -66,9 +69,7 @@ The `owner` field should show the application name (e.g. `traefik-k8s`) rather t
 
 ## Preserving TLS certificates after upgrade
 
-By default, `juju refresh` to a revision that uses APP mode will cause Traefik to generate a new private key, which triggers a new Certificate Signing Request (CSR). If you are using `manual-tls-certificates` or `notary` as your TLS provider, this means you will need to sign and provide a new certificate.
-
-To avoid this, you can restore the original private key immediately after the refresh, so that Traefik re-uses the same key and produces the same CSR that was already signed. This allows you to provide the original certificate without any re-signing.
+Assuming that you've done the necessary steps to backup the private key and certificate mentioned above, you should be able to now restore the private key on the leader unit and "re-provide" the original signed certificates.
 
 ### Steps
 
