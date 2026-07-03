@@ -31,8 +31,10 @@ juju ssh --container traefik traefik-k8s/0 cat /opt/traefik/juju/<hostname>.key
 juju ssh --container traefik traefik-k8s/0 cat /opt/traefik/juju/<hostname>.crt
 ```
 
-> Note: In some cases, a bug might occur during a node restart or a leader change that causes the leader unit to wipe out the certificates information in
-`/opt/traefik/juju`, you can look at other units to see if they still contain the original certificate and private key. In an HA deployment, you can also get them by looking at the `peer` relation data.
+```{note}
+In some cases, a bug might occur during a node restart or a leader change that causes the leader unit to wipe out the certificates information in
+`/opt/traefik/juju`. Look at other units to see if they still contain the original certificate and private key. In an HA deployment, you can also get them by looking at the `peer` relation data.
+```
 
 #### Steps
 
