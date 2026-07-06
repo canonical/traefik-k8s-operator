@@ -32,9 +32,9 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     )
 
 
-@pytest.fixture(scope="module", autouse=True)
-def _configure_juju(juju: jubilant.Juju):
-    """Configure the juju fixture for all integration test modules.
+@pytest.fixture(scope="module")
+def juju(juju: jubilant.Juju) -> jubilant.Juju:
+    """Wrap pytest-jubilant's juju fixture with project-specific configuration.
 
     - Sets a longer wait_timeout (jubilant's default is 3 min; charm operations need 10 min).
     - Pre-grants secret RBAC permissions so Juju 4 + canonical k8s secret hooks work reliably.
@@ -43,6 +43,7 @@ def _configure_juju(juju: jubilant.Juju):
     """
     juju.wait_timeout = 10 * 60
     _grant_secret_rbac(juju.model)
+    return juju
 
 
 @pytest.fixture(scope="module")
