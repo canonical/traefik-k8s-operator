@@ -33,17 +33,18 @@ def pytest_addoption(parser: pytest.Parser) -> None:
 
 
 @pytest.fixture(scope="module")
-def juju(juju: jubilant.Juju) -> jubilant.Juju:
-    """Wrap pytest-jubilant's juju fixture with project-specific configuration.
+def juju(juju_factory) -> jubilant.Juju:
+    """Wrap pytest-jubilant's juju_factory with project-specific configuration.
 
     - Sets a longer wait_timeout (jubilant's default is 3 min; charm operations need 10 min).
     - Pre-grants secret RBAC permissions so Juju 4 + canonical k8s secret hooks work reliably.
       This is safe for both newly-created and pre-existing models because kubectl apply is
       idempotent.
     """
-    juju.wait_timeout = 10 * 60
-    _grant_secret_rbac(juju.model)
-    return juju
+    _juju = juju_factory.get_juju("")
+    _juju.wait_timeout = 10 * 60
+    _grant_secret_rbac(_juju.model)
+    return _juju
 
 
 @pytest.fixture(scope="module")
