@@ -28,6 +28,8 @@ header:
     - '.woke.yaml'
     - 'templates/**'
     - '**/src/loki_alert_rules/*.rule'
+    - '**/src/prometheus_alert_rules/*.rule'
+    - '**/src/grafana_dashboards/*.json.tmpl'
     - 'docs/release-notes/**/*.yaml'
     - '**/*.md.j2'
     - '**/lib/**'
@@ -38,4 +40,5 @@ header:
     - '.readthedocs.yaml'
     - 'docs/**'
     - '.lycheeignore'
+    - 'icon.svg'
   comment: on-failure

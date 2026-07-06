@@ -1,3 +1,6 @@
+# Copyright 2026 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 """Tests that Traefik works correctly when it has an upstream ingress."""
 
 import asyncio

@@ -1,3 +1,6 @@
+# Copyright 2026 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 # # Deploy bundle
 # juju deploy --trust ./bundle.yaml
 #

@@ -1,3 +1,5 @@
+# Copyright 2026 Canonical Ltd.
+# See LICENSE file for licensing details.
 
 import unittest
 from unittest.mock import PropertyMock, patch
