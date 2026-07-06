@@ -3,7 +3,6 @@
 import logging
 import subprocess
 from pathlib import Path
-from typing import cast
 
 import jubilant
 import pytest
@@ -31,6 +30,19 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     parser.addoption(
         "--base", action="store", default="ubuntu@26.04", help="Base to use for the integration test",
     )
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _configure_juju(juju: jubilant.Juju):
+    """Configure the juju fixture for all integration test modules.
+
+    - Sets a longer wait_timeout (jubilant's default is 3 min; charm operations need 10 min).
+    - Pre-grants secret RBAC permissions so Juju 4 + canonical k8s secret hooks work reliably.
+      This is safe for both newly-created and pre-existing models because kubectl apply is
+      idempotent.
+    """
+    juju.wait_timeout = 10 * 60
+    _grant_secret_rbac(juju.model)
 
 
 @pytest.fixture(scope="module")
@@ -72,27 +84,6 @@ def alertmanager_fixture(juju, traefik_app):
     juju.integrate(f"{ALERTMANAGER_APP_NAME}:ingress", traefik_app)
     juju.wait(jubilant.all_active, timeout=600)
     return ALERTMANAGER_APP_NAME
-
-
-@pytest.fixture(scope="module", name="juju")
-def juju_fixture(request):
-    """Jubilant Juju fixture.
-
-    Honours ``--model`` (use a pre-existing model, e.g. the one bootstrapped by
-    concierge in CI) and ``--keep-models`` (preserve the temp model on failure).
-    """
-    model = request.config.getoption("--model")
-    if model:
-        _juju = jubilant.Juju(model=model)
-        _juju.wait_timeout = 10 * 60
-        _grant_secret_rbac(model)
-        yield _juju
-        return
-
-    keep_models = cast(bool, request.config.getoption("--keep-models"))
-    with jubilant.temp_model(keep=keep_models) as _juju:
-        _juju.wait_timeout = 10 * 60
-        yield _juju
 
 
 def _grant_secret_rbac(namespace: str) -> None:

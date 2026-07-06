@@ -2382,6 +2382,19 @@ wheels = [
 ]
 
 [[package]]
+name = "pytest-jubilant"
+version = "2.1.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "jubilant" },
+    { name = "pytest" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/bb/11/3baee677f3cf51ef41e06a7cbcfe8551613723695a458997b9d63026e0b5/pytest_jubilant-2.1.1.tar.gz", hash = "sha256:04c083ef1366f92237da79e3d499094ca50f50519a19462f388c38c699ee495a", size = 17971, upload-time = "2026-06-09T23:01:56.332Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/dd/ea/33ecce9a52a022547544ab3b6393368944b1b55480a35ae00b7d9bd02f39/pytest_jubilant-2.1.1-py3-none-any.whl", hash = "sha256:d710cf9c41fb8daed6218d7b6ce68f4d4c234c5b0ee066d2be1dc9dd07265d35", size = 14922, upload-time = "2026-06-09T23:01:55.13Z" },
+]
+
+[[package]]
 name = "pytest-operator"
 version = "0.43.1"
 source = { registry = "https://pypi.org/simple" }
@@ -3284,6 +3297,7 @@ dev = [
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "pytest-interface-tester" },
+    { name = "pytest-jubilant" },
     { name = "pytest-operator" },
     { name = "pytest-subtests" },
     { name = "ruff" },
@@ -3322,6 +3336,7 @@ requires-dist = [
     { name = "pytest", marker = "extra == 'dev'", specifier = "==8.3.5" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = "==0.21.2" },
     { name = "pytest-interface-tester", marker = "extra == 'dev'", specifier = ">0.3" },
+    { name = "pytest-jubilant", marker = "extra == 'dev'" },
     { name = "pytest-operator", marker = "extra == 'dev'" },
     { name = "pytest-subtests", marker = "extra == 'dev'" },
     { name = "ruff", marker = "extra == 'dev'" },
