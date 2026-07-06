@@ -1,0 +1,17 @@
+name: Tests
+
+on:
+  pull_request:
+
+jobs:
+  test:
+    uses: canonical/operator-workflows/.github/workflows/test.yaml@main
+    secrets: inherit
+    permissions:
+      actions: read
+      contents: write
+      pull-requests: write
+    with:
+      runs-on-base: ubuntu-24.04
+      self-hosted-runner: false
+      with-uv: true
