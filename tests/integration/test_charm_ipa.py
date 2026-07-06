@@ -50,13 +50,14 @@ _ANY_CHARM_SRC_OVERWRITE = {
                 )
 
             def _on_ingress_joined(self, event):
-                # v2 protocol: model+name+port in app databag, host in unit databag
+                # v2 protocol: each value is json-encoded; model+name+port in
+                # app databag, host in unit databag
                 event.relation.data[self.app].update({
-                    "model": self.model.name,
-                    "name": self.app.name,
-                    "port": str(_PORT),
+                    "model": json.dumps(self.model.name),
+                    "name": json.dumps(self.app.name),
+                    "port": json.dumps(_PORT),
                 })
-                event.relation.data[self.unit]["host"] = _HOST
+                event.relation.data[self.unit]["host"] = json.dumps(_HOST)
 
             def get_relation_data(self):
                 rel = self.model.get_relation("require-ingress")
@@ -69,10 +70,20 @@ _ANY_CHARM_SRC_OVERWRITE = {
                         if raw:
                             url = json.loads(raw).get("url")
                         break
+
+                def _decode(d):
+                    result = {}
+                    for k, v in d.items():
+                        try:
+                            result[k] = json.loads(v)
+                        except (json.JSONDecodeError, TypeError):
+                            result[k] = v
+                    return result
+
                 return json.dumps({
                     "url": url,
-                    "app_data": dict(rel.data[self.app]),
-                    "unit_data": dict(rel.data[self.unit]),
+                    "app_data": _decode(dict(rel.data[self.app])),
+                    "unit_data": _decode(dict(rel.data[self.unit])),
                 })
         """
     ),
@@ -80,7 +91,7 @@ _ANY_CHARM_SRC_OVERWRITE = {
 
 
 def _rpc(juju: jubilant.Juju, method: str) -> str:
-    return juju.run(f"{IPA_TESTER_APP}/0", "rpc", method=method).results["return"]
+    return juju.run(f"{IPA_TESTER_APP}/0", "rpc", params={"method": method}).results["return"]
 
 
 def test_deployment(juju: jubilant.Juju, traefik_charm):
@@ -117,7 +128,7 @@ def test_relation_data_shape(juju: jubilant.Juju):
 
     # Requirer app databag (v2): name + port present; host must NOT be here
     assert data["app_data"].get("name") == IPA_TESTER_APP
-    assert data["app_data"].get("port") == "80"
+    assert data["app_data"].get("port") == 80
     assert "host" not in data["app_data"], "v2: host must not be in app databag"
 
     # Requirer unit databag (v2): host IS here
