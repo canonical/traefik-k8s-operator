@@ -28,25 +28,51 @@ _TRAEFIK_RESOURCES = {
 # any-charm injects this code into its src/ at deploy time, replicating the
 # legacy ipa-tester charm: request ingress with known host/port and expose
 # all relation data in a single RPC call.
+#
+# We intentionally avoid importing our ingress library (which requires pydantic)
+# and instead implement the v2 ingress protocol directly: host in unit databag,
+# model+name+port in app databag; provider writes back via "ingress" key.
 _ANY_CHARM_SRC_OVERWRITE = {
-    "ingress.py": Path("lib/charms/traefik_k8s/v2/ingress.py").read_text(),
     "any_charm.py": textwrap.dedent(
         """\
         import json
-        from ingress import IngressPerAppRequirer
+        from ops import Application
         from any_charm_base import AnyCharmBase
+
+        _HOST = "foo.bar"
+        _PORT = 80
 
         class AnyCharm(AnyCharmBase):
             def __init__(self, *args, **kwargs):
                 super().__init__(*args, **kwargs)
-                self.ipa = IngressPerAppRequirer(self, host="foo.bar", port=80)
+                self.framework.observe(
+                    self.on.require_ingress_relation_joined, self._on_ingress_joined
+                )
+
+            def _on_ingress_joined(self, event):
+                # v2 protocol: model+name+port in app databag, host in unit databag
+                event.relation.data[self.app].update({
+                    "model": self.model.name,
+                    "name": self.app.name,
+                    "port": str(_PORT),
+                })
+                event.relation.data[self.unit]["host"] = _HOST
 
             def get_relation_data(self):
-                rel = self.model.get_relation("ingress")
+                rel = self.model.get_relation("require-ingress")
+                if rel is None:
+                    return json.dumps({"url": None, "app_data": {}, "unit_data": {}})
+                url = None
+                for bucket in rel.data:
+                    if isinstance(bucket, Application) and bucket.name != self.app.name:
+                        raw = rel.data[bucket].get("ingress")
+                        if raw:
+                            url = json.loads(raw).get("url")
+                        break
                 return json.dumps({
-                    "url": self.ipa.url,
-                    "app_data": dict(rel.data[self.app]) if rel else {},
-                    "unit_data": dict(rel.data[self.unit]) if rel else {},
+                    "url": url,
+                    "app_data": dict(rel.data[self.app]),
+                    "unit_data": dict(rel.data[self.unit]),
                 })
         """
     ),
@@ -69,7 +95,7 @@ def test_deployment(juju: jubilant.Juju, traefik_charm):
 
 
 def test_relate(juju: jubilant.Juju):
-    juju.integrate(f"{IPA_TESTER_APP}:ingress", f"{TRAEFIK_APP}:ingress")
+    juju.integrate(f"{IPA_TESTER_APP}:require-ingress", f"{TRAEFIK_APP}:ingress")
     juju.wait(all_settled, timeout=600)
 
 
@@ -99,7 +125,7 @@ def test_relation_data_shape(juju: jubilant.Juju):
 
 
 def test_remove_relation(juju: jubilant.Juju):
-    juju.remove_relation(f"{IPA_TESTER_APP}:ingress", f"{TRAEFIK_APP}:ingress")
+    juju.remove_relation(f"{IPA_TESTER_APP}:require-ingress", f"{TRAEFIK_APP}:ingress")
     juju.wait(
         lambda status: (
             jubilant.all_active(status, TRAEFIK_APP, IPA_TESTER_APP)
