@@ -50,7 +50,7 @@ If the output shows secrets with unit owners (e.g. `traefik-k8s/0`, `traefik-k8s
 
 ```bash
 juju secrets --format json \
-  | jq -r '.[] | select(.label | test("private-key"; "i")) | select(.owner | test("/")) | .id' \
+  | jq -r 'to_entries[] | select(.value.label | test("private-key"; "i")) | select(.value.owner | test("/")) | .key' \
   | xargs -I{} juju remove-secret {}
 ```
 
