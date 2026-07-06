@@ -46,6 +46,9 @@ _ANY_CHARM_SRC_OVERWRITE = {
             def __init__(self, *args, **kwargs):
                 super().__init__(*args, **kwargs)
                 self.framework.observe(
+                    self.on.require_ingress_relation_created, self._on_ingress_joined
+                )
+                self.framework.observe(
                     self.on.require_ingress_relation_joined, self._on_ingress_joined
                 )
 
@@ -62,7 +65,7 @@ _ANY_CHARM_SRC_OVERWRITE = {
             def get_relation_data(self):
                 rel = self.model.get_relation("require-ingress")
                 if rel is None:
-                    return json.dumps({"url": None, "app_data": {}, "unit_data": {}})
+                    return {"url": None, "app_data": {}, "unit_data": {}}
                 url = None
                 for bucket in rel.data:
                     if isinstance(bucket, Application) and bucket.name != self.app.name:
@@ -80,11 +83,11 @@ _ANY_CHARM_SRC_OVERWRITE = {
                             result[k] = v
                     return result
 
-                return json.dumps({
+                return {
                     "url": url,
                     "app_data": _decode(dict(rel.data[self.app])),
                     "unit_data": _decode(dict(rel.data[self.unit])),
-                })
+                }
         """
     ),
 }
