@@ -22,11 +22,12 @@ IPA_TESTER_APP = "ipa-tester"
 
 # any-charm injects this code into its src/ at deploy time.
 # It replicates exactly what the legacy ipa-tester charm did: request ingress
-# with a known host/port, and expose the received URL via RPC.
+# with a known host/port, and expose the received URL and databag contents via RPC.
 _ANY_CHARM_SRC_OVERWRITE = {
     "ingress.py": (Path("lib/charms/traefik_k8s/v2/ingress.py")).read_text(),
     "any_charm.py": textwrap.dedent(
         """\
+        import json
         from ingress import IngressPerAppRequirer
         from any_charm_base import AnyCharmBase
 
@@ -37,6 +38,18 @@ _ANY_CHARM_SRC_OVERWRITE = {
 
             def get_ingress_url(self):
                 return self.ipa.url
+
+            def get_requirer_app_data(self):
+                rel = self.model.get_relation("ingress")
+                if rel is None:
+                    return "{}"
+                return json.dumps(dict(rel.data[self.app]))
+
+            def get_requirer_unit_data(self):
+                rel = self.model.get_relation("ingress")
+                if rel is None:
+                    return "{}"
+                return json.dumps(dict(rel.data[self.unit]))
         """
     ),
 }
@@ -81,16 +94,28 @@ def test_ipa_charm_has_ingress(juju: jubilant.Juju):
 
 
 def test_relation_data_shape(juju: jubilant.Juju):
-    result = juju.run(f"{IPA_TESTER_APP}/0", "rpc", method="get_ingress_url")
-    url = result.results["return"]
+    # Provider side: check the URL the requirer received
+    url = juju.run(f"{IPA_TESTER_APP}/0", "rpc", method="get_ingress_url").results["return"]
     assert url, "Expected ingress URL to be set"
-
-    # Verify the URL structure: http://<host>/<model>-<app>
     parsed = urlparse(url)
     assert parsed.scheme == "http", f"Expected http scheme, got {parsed.scheme!r}"
     assert parsed.path == f"/{juju.model}-{IPA_TESTER_APP}", (
-        f"Expected path /{juju.model}-{IPA_TESTER_APP}, got {parsed.path!r}"
+        f"Expected path /{juju.model}-{IPA_TESTER_APP!r}, got {parsed.path!r}"
     )
+
+    # Requirer app databag (v2): name and port present; host must NOT be here
+    app_data = json.loads(
+        juju.run(f"{IPA_TESTER_APP}/0", "rpc", method="get_requirer_app_data").results["return"]
+    )
+    assert app_data.get("name") == IPA_TESTER_APP, f"Unexpected name in app data: {app_data}"
+    assert app_data.get("port") == "80", f"Unexpected port in app data: {app_data}"
+    assert "host" not in app_data, f"v2: host must not be in app databag, got: {app_data}"
+
+    # Requirer unit databag (v2): host IS here
+    unit_data = json.loads(
+        juju.run(f"{IPA_TESTER_APP}/0", "rpc", method="get_requirer_unit_data").results["return"]
+    )
+    assert unit_data.get("host") == "foo.bar", f"Unexpected host in unit data: {unit_data}"
 
 
 def test_remove_relation(juju: jubilant.Juju):
