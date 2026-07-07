@@ -1,6 +1,7 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 import asyncio
+import json
 import shlex
 import socket
 import urllib.error
@@ -112,16 +113,17 @@ async def test_scale_and_get_external_host(ops_test: OpsTest):
     unit_0 = ops_test.model.applications[TESTER_APP_NAME].units[0]
     unit_1 = ops_test.model.applications[TESTER_APP_NAME].units[1]
 
-    action_0 = await unit_0.run_action("get-external-host")
-    action_1 = await unit_1.run_action("get-external-host")
+    action_0 = await unit_0.run_action("rpc", method="get_external_host", kwargs="{}")
+    action_1 = await unit_1.run_action("rpc", method="get_external_host", kwargs="{}")
 
     result_0 = await action_0.wait()
     result_1 = await action_1.wait()
 
     traefik_ip = await get_k8s_service_address(ops_test, f"{APP_NAME}-lb")
 
-    external_host_0 = result_0.results.get("external-host")
-    external_host_1 = result_1.results.get("external-host")
+    # any-charm rpc returns JSON-encoded string under "return" key
+    external_host_0 = json.loads(result_0.results.get("return", "null"))
+    external_host_1 = json.loads(result_1.results.get("return", "null"))
 
     assert external_host_0 == external_host_1, (
         f"External host values should match: {external_host_0} vs {external_host_1}"

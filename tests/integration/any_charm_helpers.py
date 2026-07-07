@@ -97,13 +97,13 @@ def tcp_ipu_src_overwrite() -> str:
 
 
 def route_src_overwrite() -> str:
-    """Generate src-overwrite config for a traefik-route requirer."""
+    """Generate src-overwrite config for a traefik-route requirer with UDP echo server."""
     files = OrderedDict()
     files.update(_lib_files(
         "charms/traefik_k8s/v0/traefik_route.py",
         LIB_ROOT / "traefik_k8s" / "v0" / "traefik_route.py",
     ))
-    files.update(_read_src_files("route", ["any_charm.py"]))
+    files.update(_read_src_files("route", ["any_charm.py", "udp_echo_server.py"]))
     return json.dumps(files)
 
 

@@ -153,15 +153,16 @@ async def tcp_tester_charm(ops_test):
 
 @pytest.fixture(scope="module")
 async def route_tester_charm(ops_test):
-    """Return the any-charm deploy config for a traefik-route requirer."""
+    """Return the any-charm-k8s deploy config for a traefik-route requirer with UDP echo."""
     from tests.integration.any_charm_helpers import (
         ANY_CHARM_CHANNEL,
+        ANY_CHARM_K8S,
         PYTHON_PACKAGES,
         route_src_overwrite,
     )
 
     return {
-        "charm": "any-charm",
+        "charm": ANY_CHARM_K8S,
         "channel": ANY_CHARM_CHANNEL,
         "config": {
             "src-overwrite": route_src_overwrite(),
