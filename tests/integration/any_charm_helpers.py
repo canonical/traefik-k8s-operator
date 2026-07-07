@@ -10,22 +10,16 @@ The actual charm source lives in tests/integration/testers/any_charm_src/<name>/
 so that IDEs can lint and highlight it properly.
 
 NOTE: any-charm's src_overwrite() only creates one level of parent directories.
-Therefore, library files are shipped with flat key names (e.g. `_lib_ingress_v2.py`)
-and each any_charm.py bootstraps the proper nested package structure at import time.
+We work around this by including __init__.py entries in order so each level gets
+created before deeper files are written.
 """
 
 import json
+from collections import OrderedDict
 from pathlib import Path
 
 LIB_ROOT = Path(__file__).parent.parent.parent / "lib" / "charms"
 SRC_ROOT = Path(__file__).parent / "testers" / "any_charm_src"
-
-# Mapping from flat src-overwrite key -> actual library file on disk.
-_TRAEFIK_LIBS = {
-    "_lib_ingress_v2.py": LIB_ROOT / "traefik_k8s" / "v2" / "ingress.py",
-    "_lib_ingress_per_unit_v1.py": LIB_ROOT / "traefik_k8s" / "v1" / "ingress_per_unit.py",
-    "_lib_traefik_route_v0.py": LIB_ROOT / "traefik_k8s" / "v0" / "traefik_route.py",
-}
 
 # The oathkeeper auth_proxy library for forward-auth tests.
 _OATHKEEPER_LIB = (
@@ -44,12 +38,21 @@ ANY_CHARM_K8S = "any-charm-k8s"
 ANY_CHARM = "any-charm"
 
 
-def _read_libs(*lib_keys: str) -> dict:
-    """Read the specified library files and return them as a dict for src-overwrite."""
-    result = {}
-    for key in lib_keys:
-        result[key] = _TRAEFIK_LIBS[key].read_text(encoding="utf-8")
-    return result
+def _lib_files(lib_path: str, source: Path) -> OrderedDict:
+    """Return an ordered dict with __init__.py stubs and the lib file itself.
+
+    The entries are ordered so that any-charm's src_overwrite() creates each
+    parent directory before attempting to write deeper files.
+    """
+    parts = Path(lib_path).parts  # e.g. ('charms', 'traefik_k8s', 'v2', 'ingress.py')
+    files = OrderedDict()
+    # Create __init__.py for each intermediate package directory
+    for i in range(1, len(parts)):
+        init_path = str(Path(*parts[:i]) / "__init__.py")
+        files[init_path] = ""
+    # Then the actual library file
+    files[lib_path] = source.read_text(encoding="utf-8")
+    return files
 
 
 def _read_src_files(tester_name: str, filenames: list[str]) -> dict:
@@ -62,43 +65,70 @@ def _read_src_files(tester_name: str, filenames: list[str]) -> dict:
 
 def ipa_src_overwrite() -> str:
     """Generate src-overwrite config for a simple ingress-per-app requirer."""
-    files = _read_libs("_lib_ingress_v2.py")
+    files = OrderedDict()
+    files.update(_lib_files(
+        "charms/traefik_k8s/v2/ingress.py",
+        LIB_ROOT / "traefik_k8s" / "v2" / "ingress.py",
+    ))
     files.update(_read_src_files("ipa", ["any_charm.py"]))
     return json.dumps(files)
 
 
 def ipu_src_overwrite() -> str:
     """Generate src-overwrite config for a simple ingress-per-unit requirer."""
-    files = _read_libs("_lib_ingress_per_unit_v1.py")
+    files = OrderedDict()
+    files.update(_lib_files(
+        "charms/traefik_k8s/v1/ingress_per_unit.py",
+        LIB_ROOT / "traefik_k8s" / "v1" / "ingress_per_unit.py",
+    ))
     files.update(_read_src_files("ipu", ["any_charm.py"]))
     return json.dumps(files)
 
 
 def tcp_ipu_src_overwrite() -> str:
     """Generate src-overwrite config for a TCP ingress-per-unit requirer."""
-    files = _read_libs("_lib_ingress_per_unit_v1.py")
+    files = OrderedDict()
+    files.update(_lib_files(
+        "charms/traefik_k8s/v1/ingress_per_unit.py",
+        LIB_ROOT / "traefik_k8s" / "v1" / "ingress_per_unit.py",
+    ))
     files.update(_read_src_files("tcp_ipu", ["any_charm.py"]))
     return json.dumps(files)
 
 
 def route_src_overwrite() -> str:
     """Generate src-overwrite config for a traefik-route requirer."""
-    files = _read_libs("_lib_traefik_route_v0.py")
+    files = OrderedDict()
+    files.update(_lib_files(
+        "charms/traefik_k8s/v0/traefik_route.py",
+        LIB_ROOT / "traefik_k8s" / "v0" / "traefik_route.py",
+    ))
     files.update(_read_src_files("route", ["any_charm.py"]))
     return json.dumps(files)
 
 
 def forward_auth_src_overwrite() -> str:
     """Generate src-overwrite config for the IAP requirer (forward-auth tester)."""
-    files = _read_libs("_lib_ingress_v2.py")
-    files["_lib_auth_proxy_v0.py"] = _OATHKEEPER_LIB.read_text(encoding="utf-8")
+    files = OrderedDict()
+    files.update(_lib_files(
+        "charms/traefik_k8s/v2/ingress.py",
+        LIB_ROOT / "traefik_k8s" / "v2" / "ingress.py",
+    ))
+    files.update(_lib_files(
+        "charms/oathkeeper/v0/auth_proxy.py",
+        _OATHKEEPER_LIB,
+    ))
     files.update(_read_src_files("forward_auth", ["any_charm.py", "httpbin_server.py"]))
     return json.dumps(files)
 
 
 def health_src_overwrite() -> str:
     """Generate src-overwrite config for the health tester."""
-    files = _read_libs("_lib_ingress_v2.py")
+    files = OrderedDict()
+    files.update(_lib_files(
+        "charms/traefik_k8s/v2/ingress.py",
+        LIB_ROOT / "traefik_k8s" / "v2" / "ingress.py",
+    ))
     files.update(_read_src_files("health", ["any_charm.py", "health_server.py"]))
     return json.dumps(files)
 

@@ -16,23 +16,12 @@ import ops
 from any_charm_base import AnyCharmBase
 from ops.pebble import Layer
 
-# Bootstrap: recreate nested package structure from flat lib files.
-_src = pathlib.Path(os.path.dirname(__file__))
-_lib_dir = _src / "charms" / "traefik_k8s" / "v2"
-_lib_dir.mkdir(parents=True, exist_ok=True)
-(_src / "charms" / "__init__.py").touch(exist_ok=True)
-(_src / "charms" / "traefik_k8s" / "__init__.py").touch(exist_ok=True)
-(_src / "charms" / "traefik_k8s" / "v2" / "__init__.py").touch(exist_ok=True)
-_lib_src = _src / "_lib_ingress_v2.py"
-_lib_dst = _lib_dir / "ingress.py"
-if _lib_src.exists() and not _lib_dst.exists():
-    _lib_dst.write_text(_lib_src.read_text())
-
-sys.path.insert(0, str(_src))
+sys.path.insert(0, os.path.dirname(__file__))
 
 from charms.traefik_k8s.v2.ingress import IngressPerAppRequirer  # noqa: E402
 
 logger = logging.getLogger(__name__)
+_src = pathlib.Path(os.path.dirname(__file__))
 
 HEALTH_PORT = 8080
 
@@ -59,9 +48,7 @@ class AnyCharm(AnyCharmBase):
         container = event.workload
         # Install python3 in the minimal workload container
         container.exec(["apt-get", "update", "-qq"]).wait()
-        container.exec(
-            ["apt-get", "install", "-y", "-qq", "python3"]
-        ).wait()
+        container.exec(["apt-get", "install", "-y", "-qq", "python3"]).wait()
         # Push the server script
         server_script = (_src / "health_server.py").read_text()
         container.push("/bin/health_server.py", server_script, make_dirs=True)
@@ -90,4 +77,3 @@ class AnyCharm(AnyCharmBase):
             return "error: container not ready"
         self._start_health_service(container, healthy=is_healthy)
         return f"Health set to {is_healthy}"
-

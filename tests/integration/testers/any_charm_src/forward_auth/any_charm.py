@@ -16,34 +16,13 @@ import ops
 from any_charm_base import AnyCharmBase
 from ops.pebble import Layer
 
-# Bootstrap: recreate nested package structure from flat lib files.
-_src = pathlib.Path(os.path.dirname(__file__))
-
-_ingress_dir = _src / "charms" / "traefik_k8s" / "v2"
-_ingress_dir.mkdir(parents=True, exist_ok=True)
-(_src / "charms" / "__init__.py").touch(exist_ok=True)
-(_src / "charms" / "traefik_k8s" / "__init__.py").touch(exist_ok=True)
-(_src / "charms" / "traefik_k8s" / "v2" / "__init__.py").touch(exist_ok=True)
-_lib_src = _src / "_lib_ingress_v2.py"
-_lib_dst = _ingress_dir / "ingress.py"
-if _lib_src.exists() and not _lib_dst.exists():
-    _lib_dst.write_text(_lib_src.read_text())
-
-_auth_dir = _src / "charms" / "oathkeeper" / "v0"
-_auth_dir.mkdir(parents=True, exist_ok=True)
-(_src / "charms" / "oathkeeper" / "__init__.py").touch(exist_ok=True)
-(_src / "charms" / "oathkeeper" / "v0" / "__init__.py").touch(exist_ok=True)
-_auth_src = _src / "_lib_auth_proxy_v0.py"
-_auth_dst = _auth_dir / "auth_proxy.py"
-if _auth_src.exists() and not _auth_dst.exists():
-    _auth_dst.write_text(_auth_src.read_text())
-
-sys.path.insert(0, str(_src))
+sys.path.insert(0, os.path.dirname(__file__))
 
 from charms.oathkeeper.v0.auth_proxy import AuthProxyConfig, AuthProxyRequirer  # noqa: E402
 from charms.traefik_k8s.v2.ingress import IngressPerAppRequirer  # noqa: E402
 
 logger = logging.getLogger(__name__)
+_src = pathlib.Path(os.path.dirname(__file__))
 
 AUTH_PROXY_ALLOWED_ENDPOINTS = ["anything/allowed"]
 AUTH_PROXY_HEADERS = ["X-User"]
@@ -63,10 +42,7 @@ class AnyCharm(AnyCharmBase):
         self.auth_proxy = AuthProxyRequirer(
             self, self._auth_proxy_config, "require-auth-proxy"
         )
-        self.framework.observe(
-            self.on["any"].pebble_ready,
-            self._on_pebble_ready,
-        )
+        self.framework.observe(self.on["any"].pebble_ready, self._on_pebble_ready)
         self.framework.observe(self.ingress.on.ready, self._on_ingress_ready)
 
     @property
