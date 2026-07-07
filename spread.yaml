@@ -40,6 +40,13 @@ integration-suites:
       MODULE/legacy_test_charm_ipa_2004: tests/integration/legacy/test_charm_ipa.py
       BASE/jubilant_test_upgrade_2004: ubuntu@20.04
       MODULE/jubilant_test_upgrade_2004: tests/integration/test_upgrade.py
+      # Manual-TLS upgrade tests: the source Charmhub revisions come up on
+      # ubuntu@20.04, so the upgrade target must match that base (a base
+      # mismatch breaks the charm venv). Override BASE on the auto-discovered
+      # variants so these run only on 20.04.
+      BASE/test_upgrade_manual_tls_from_280: ubuntu@20.04
+      BASE/test_upgrade_manual_tls_from_281: ubuntu@20.04
+      BASE/test_upgrade_manual_tls_from_280_via_281: ubuntu@20.04
   tests/integration/arm64:
     working-dir: ./
     summary: integration tests

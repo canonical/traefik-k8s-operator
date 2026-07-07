@@ -9,6 +9,12 @@ import jubilant
 import pytest
 import yaml
 
+from tests.integration.constants import (
+    ALERTMANAGER_APP_NAME,
+    MANUAL_TLS_APP_NAME,
+    MANUAL_TLS_CHANNEL,
+    TRAEFIK_APP_NAME,
+)
 from tests.integration.helpers import all_settled
 
 logger = logging.getLogger(__name__)
@@ -17,9 +23,6 @@ METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 TRAEFIK_RESOURCES = {
     name: val["upstream-source"] for name, val in METADATA["resources"].items()
 }
-
-ALERTMANAGER_APP_NAME = "alertmanager"
-TRAEFIK_APP_NAME = "traefik"
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
@@ -60,18 +63,26 @@ def deploy_traefik(juju, traefik_charm):
 
 
 @pytest.fixture(scope="module", name="alertmanager_app")
-def alertmanager_fixture(juju, traefik_app):
-    """Deploy alertmanager and integrate with traefik."""
+def alertmanager_fixture(juju):
+    """Deploy alertmanager-k8s."""
     juju.deploy(
         "ch:alertmanager-k8s",
         ALERTMANAGER_APP_NAME,
         channel="2/edge",
         trust=True,
     )
-    juju.wait(jubilant.all_active, timeout=600)
-    juju.integrate(f"{ALERTMANAGER_APP_NAME}:ingress", traefik_app)
-    juju.wait(jubilant.all_active, timeout=600)
+    juju.wait(
+        lambda status: jubilant.all_active(status, ALERTMANAGER_APP_NAME),
+        timeout=600,
+    )
     return ALERTMANAGER_APP_NAME
+
+
+@pytest.fixture(scope="module", name="manual_tls_app")
+def manual_tls_fixture(juju):
+    """Deploy the manual-tls-certificates charm (v4-capable ``1/stable`` track)."""
+    juju.deploy(MANUAL_TLS_APP_NAME, MANUAL_TLS_APP_NAME, channel=MANUAL_TLS_CHANNEL)
+    return MANUAL_TLS_APP_NAME
 
 
 @pytest.fixture(scope="module", name="juju")

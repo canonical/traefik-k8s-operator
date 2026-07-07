@@ -4,7 +4,6 @@
 
 """Test TLS certificates on all traefik units."""
 
-import json
 import logging
 from pathlib import Path
 
@@ -12,6 +11,7 @@ import jubilant
 import pytest
 import requests
 from dns_adapter import DNSResolverHTTPSAdapter
+from helpers import _alertmanager_url
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +46,7 @@ def test_https_on_all_units(
     juju: jubilant.Juju, traefik_app, ssc_app, alertmanager_app, tmp_path: Path
 ):
     """HTTPS endpoints are accessible through every traefik unit IP."""
+    juju.integrate(f"{alertmanager_app}:ingress", traefik_app)
     juju.add_unit(traefik_app, num_units=NUM_TRAEFIK_UNITS - 1)
 
     def all_active_and_idle_with_expected_units(status):
@@ -69,9 +70,7 @@ def test_https_on_all_units(
     logger.info("Pulled CA cert (%d bytes) to %s", len(ca_cert), ca_cert_path)
 
     # Get the alertmanager endpoint from traefik's proxied endpoints action.
-    result = juju.run(f"{traefik_app}/0", "show-proxied-endpoints")
-    endpoints = json.loads(result.results["proxied-endpoints"])
-    alertmanager_url = endpoints[alertmanager_app]["url"]
+    alertmanager_url = _alertmanager_url(juju)
 
     # Get unit IPs from status
     status = juju.status()
