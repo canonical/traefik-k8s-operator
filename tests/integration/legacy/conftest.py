@@ -1,12 +1,9 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
-import functools
 import logging
 import socket
 import subprocess
-from collections import defaultdict
 from dataclasses import dataclass
-from datetime import datetime
 from pathlib import Path
 from typing import Dict
 
@@ -20,54 +17,10 @@ trfk_root = Path(__file__).parent.parent.parent.parent
 trfk_meta = yaml.safe_load((trfk_root / "metadata.yaml").read_text())
 trfk_resources = {name: val["upstream-source"] for name, val in trfk_meta["resources"].items()}
 
-_JUJU_DATA_CACHE = {}
 _JUJU_KEYS = ("egress-subnets", "ingress-address", "private-address")
 
 logger = logging.getLogger(__name__)
 
-
-class Store(defaultdict):
-    def __init__(self):
-        """Initialize the store."""
-        super(Store, self).__init__(Store)
-
-    def __getattr__(self, key):
-        """Override __getattr__ so dot syntax works on keys."""
-        try:
-            return self[key]
-        except KeyError:
-            raise AttributeError(key)
-
-    def __setattr__(self, key, value):
-        """Override __setattr__ so dot syntax works on keys."""
-        self[key] = value
-
-
-store = Store()
-
-
-def timed_memoizer(func):
-    @functools.wraps(func)
-    async def wrapper(*args, **kwargs):
-        fname = func.__qualname__
-        logger.info("Started: %s" % fname)
-        start_time = datetime.now()
-        if fname in store.keys():
-            ret = store[fname]
-        else:
-            logger.info("Return for {} not cached".format(fname))
-            ret = await func(*args, **kwargs)
-            store[fname] = ret
-        logger.info("Finished: {} in: {} seconds".format(fname, datetime.now() - start_time))
-        return ret
-
-    return wrapper
-
-
-@pytest.fixture(scope="module", autouse=True)
-def copy_traefik_library_into_tester_charms(request):
-    """No-op: tester charms are now deployed via any-charm from charmhub."""
-    pass
 
 
 @pytest.fixture(scope="module")
@@ -275,7 +228,6 @@ def get_unit_info(unit_name: str, model: str = None) -> dict:
         raise KeyError(unit_name, f"not in {data!r}")
 
     unit_data = data[unit_name]
-    _JUJU_DATA_CACHE[unit_name] = unit_data
     return unit_data
 
 

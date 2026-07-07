@@ -18,8 +18,6 @@ from tests.integration.legacy.helpers import get_k8s_service_address, remove_app
 APP_NAME = "traefik"
 TESTER_APP_NAME = "route"
 
-route_charm_resources = {}
-
 
 @pytest.mark.abort_on_fail
 @pytest.mark.setup

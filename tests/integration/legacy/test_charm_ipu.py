@@ -72,9 +72,9 @@ async def test_relation_data_shape(ops_test: OpsTest):
     # model: foo
     # name: ipu-tester/0
     # port: 9090
-    assert dequote(requirer_unit_data["name"] == "ipu-tester/0")
-    assert dequote(requirer_unit_data["port"] == "80")
-    assert dequote(requirer_unit_data["host"] == "foo.bar")
+    assert dequote(requirer_unit_data["name"]) == "ipu-tester/0"
+    assert dequote(requirer_unit_data["port"]) == "80"
+    assert dequote(requirer_unit_data["host"]) == "foo.bar"
     model = dequote(requirer_unit_data["model"])
 
     provider_app_data = yaml.safe_load(data.provider.application_data["ingress"])

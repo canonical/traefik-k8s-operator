@@ -18,8 +18,6 @@ IPU_TESTER = "ipu-tester"
 ROUTE_TESTER = "route-tester"
 CERTIFICATE_PROVIDER = "self-signed-certificates"
 
-INGRESS_REQUIRER_TESTER_RESOURCES = {}
-
 
 @pytest.mark.abort_on_fail
 async def test_deployment(ops_test: OpsTest, traefik_charm):

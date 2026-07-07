@@ -13,9 +13,6 @@ from tests.integration.legacy.helpers import get_k8s_service_address, remove_app
 logger = logging.getLogger(__name__)
 
 
-tcp_charm_resources = {}
-
-
 @pytest.mark.abort_on_fail
 async def test_deployment(ops_test: OpsTest, traefik_charm, tcp_tester_charm):
     await deploy_traefik_if_not_deployed(ops_test, traefik_charm)

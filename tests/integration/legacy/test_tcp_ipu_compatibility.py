@@ -15,7 +15,6 @@ from tests.integration.legacy.test_charm_ipa import assert_ipa_charm_has_ingress
 from tests.integration.legacy.test_charm_ipu import assert_ipu_charm_has_ingress  # noqa
 from tests.integration.legacy.test_charm_tcp import (  # noqa
     assert_tcp_charm_has_ingress,
-    tcp_charm_resources,
 )
 
 
