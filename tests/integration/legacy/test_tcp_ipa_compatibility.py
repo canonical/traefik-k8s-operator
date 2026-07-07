@@ -26,13 +26,23 @@ async def tcp_ipa_deployment(
     await asyncio.gather(
         deploy_traefik_if_not_deployed(ops_test, traefik_charm),
         deploy_charm_if_not_deployed(
-            ops_test, tcp_tester_charm, "tcp-tester", resources=tcp_charm_resources
+            ops_test,
+            tcp_tester_charm["charm"],
+            "tcp-tester",
+            channel=tcp_tester_charm["channel"],
+            config=tcp_tester_charm.get("config", {}),
         ),
-        deploy_charm_if_not_deployed(ops_test, ipa_tester_charm, "ipa-tester"),
+        deploy_charm_if_not_deployed(
+            ops_test,
+            ipa_tester_charm["charm"],
+            "ipa-tester",
+            channel=ipa_tester_charm["channel"],
+            config=ipa_tester_charm.get("config", {}),
+        ),
     )
     await asyncio.gather(
-        safe_relate(ops_test, "tcp-tester:ingress-per-unit", "traefik-k8s:ingress-per-unit"),
-        safe_relate(ops_test, "ipa-tester:ingress", "traefik-k8s:ingress"),
+        safe_relate(ops_test, "tcp-tester:require-ingress-per-unit", "traefik-k8s:ingress-per-unit"),
+        safe_relate(ops_test, "ipa-tester:require-ingress", "traefik-k8s:ingress"),
     )
 
     await ops_test.model.wait_for_idle(

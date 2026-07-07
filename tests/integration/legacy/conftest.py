@@ -2,8 +2,6 @@
 # See LICENSE file for licensing details.
 import functools
 import logging
-import os
-import shutil
 import socket
 import subprocess
 from collections import defaultdict
@@ -68,138 +66,150 @@ def timed_memoizer(func):
 
 @pytest.fixture(scope="module", autouse=True)
 def copy_traefik_library_into_tester_charms(request):
-    """Ensure the tester charms have the requisite libraries."""
-    libraries = [
-        "traefik_k8s/v2/ingress.py",
-        "traefik_k8s/v1/ingress_per_unit.py",
-        "traefik_k8s/v0/traefik_route.py",
-    ]
-    for tester in [
-        "forward-auth",
-        "ipa",
-        "ipu",
-        "tcp",
-        "route",
-        "health",
-        "ingress-requirer-mock",
-    ]:
-        for lib in libraries:
-            install_path = f"tests/integration/testers/{tester}/lib/charms/{lib}"
-            os.makedirs(os.path.dirname(install_path), exist_ok=True)
-            shutil.copyfile(f"lib/charms/{lib}", install_path)
+    """No-op: tester charms are now deployed via any-charm from charmhub."""
+    pass
 
 
 @pytest.fixture(scope="module")
-@timed_memoizer
 async def forward_auth_tester_charm(ops_test):
-    charm_path = (Path(__file__).parent.parent / "testers" / "forward-auth").absolute()
-    count = 0
-    while True:
-        try:
-            charm = await ops_test.build_charm(charm_path, verbosity="debug")
-            return charm
-        except RuntimeError:
-            logger.warning("Failed to build forward auth tester. Trying again!")
-            count += 1
-            if count == 3:
-                raise
+    """Return config for deploying forward-auth tester via any-charm-k8s.
+
+    Uses any-charm-k8s (which has a container) to run a minimal httpbin-like server
+    and the oathkeeper auth_proxy + traefik ingress libs.
+    """
+    from tests.integration.any_charm_helpers import (
+        ANY_CHARM_CHANNEL,
+        ANY_CHARM_K8S,
+        PYTHON_PACKAGES,
+        forward_auth_src_overwrite,
+    )
+
+    return {
+        "charm": ANY_CHARM_K8S,
+        "channel": ANY_CHARM_CHANNEL,
+        "config": {
+            "src-overwrite": forward_auth_src_overwrite(),
+            "python-packages": PYTHON_PACKAGES,
+        },
+    }
 
 
 @pytest.fixture(scope="module")
-@timed_memoizer
 async def ipa_tester_charm(ops_test):
-    charm_path = (Path(__file__).parent.parent / "testers" / "ipa").absolute()
-    count = 0
-    while True:
-        try:
-            charm = await ops_test.build_charm(charm_path, verbosity="debug")
-            return charm
-        except RuntimeError:
-            logger.warning("Failed to build ipa tester. Trying again!")
-            count += 1
-            if count == 3:
-                raise
+    """Return the any-charm deploy config for an IPA requirer."""
+    from tests.integration.any_charm_helpers import (
+        ANY_CHARM_CHANNEL,
+        PYTHON_PACKAGES,
+        ipa_src_overwrite,
+    )
+
+    return {
+        "charm": "any-charm",
+        "channel": ANY_CHARM_CHANNEL,
+        "config": {
+            "src-overwrite": ipa_src_overwrite(),
+            "python-packages": PYTHON_PACKAGES,
+        },
+    }
 
 
 @pytest.fixture(scope="module")
-@timed_memoizer
-async def ingress_requirer_mock(ops_test):
-    charm_path = (Path(__file__).parent.parent / "testers" / "ingress-requirer-mock").absolute()
-    count = 0
-    while True:
-        try:
-            charm = await ops_test.build_charm(charm_path, verbosity="debug")
-            return charm
-        except RuntimeError:
-            logger.warning("Failed to build ingress-requirer-mock. Trying again!")
-            count += 1
-
-            if count == 3:
-                raise
-
-
-@pytest.fixture(scope="module")
-@timed_memoizer
 async def ipu_tester_charm(ops_test):
-    charm_path = (Path(__file__).parent.parent / "testers" / "ipu").absolute()
-    count = 0
-    while True:
-        try:
-            charm = await ops_test.build_charm(charm_path, verbosity="debug")
-            return charm
-        except RuntimeError:
-            logger.warning("Failed to build ipu tester. Trying again!")
-            count += 1
-            if count == 3:
-                raise
+    """Return the any-charm deploy config for an IPU requirer."""
+    from tests.integration.any_charm_helpers import (
+        ANY_CHARM_CHANNEL,
+        PYTHON_PACKAGES,
+        ipu_src_overwrite,
+    )
+
+    return {
+        "charm": "any-charm",
+        "channel": ANY_CHARM_CHANNEL,
+        "config": {
+            "src-overwrite": ipu_src_overwrite(),
+            "python-packages": PYTHON_PACKAGES,
+        },
+    }
 
 
 @pytest.fixture(scope="module")
-@timed_memoizer
 async def tcp_tester_charm(ops_test):
-    charm_path = (Path(__file__).parent.parent / "testers" / "tcp").absolute()
-    count = 0
-    while True:
-        try:
-            charm = await ops_test.build_charm(charm_path, verbosity="debug")
-            return charm
-        except RuntimeError:
-            logger.warning("Failed to build tcp tester. Trying again!")
-            count += 1
-            if count == 3:
-                raise
+    """Return the any-charm deploy config for a TCP IPU requirer."""
+    from tests.integration.any_charm_helpers import (
+        ANY_CHARM_CHANNEL,
+        PYTHON_PACKAGES,
+        tcp_ipu_src_overwrite,
+    )
+
+    return {
+        "charm": "any-charm",
+        "channel": ANY_CHARM_CHANNEL,
+        "config": {
+            "src-overwrite": tcp_ipu_src_overwrite(),
+            "python-packages": PYTHON_PACKAGES,
+        },
+    }
 
 
 @pytest.fixture(scope="module")
-@timed_memoizer
 async def route_tester_charm(ops_test):
-    charm_path = (Path(__file__).parent.parent / "testers" / "route").absolute()
-    count = 0
-    while True:
-        try:
-            charm = await ops_test.build_charm(charm_path, verbosity="debug")
-            return charm
-        except RuntimeError:
-            logger.warning("Failed to build route tester. Trying again!")
-            count += 1
-            if count == 3:
-                raise
+    """Return the any-charm deploy config for a traefik-route requirer."""
+    from tests.integration.any_charm_helpers import (
+        ANY_CHARM_CHANNEL,
+        PYTHON_PACKAGES,
+        route_src_overwrite,
+    )
+
+    return {
+        "charm": "any-charm",
+        "channel": ANY_CHARM_CHANNEL,
+        "config": {
+            "src-overwrite": route_src_overwrite(),
+            "python-packages": PYTHON_PACKAGES,
+        },
+    }
 
 
 @pytest.fixture(scope="module")
-@timed_memoizer
 async def health_tester_charm(ops_test: OpsTest):
-    charm_path = (Path(__file__).parent.parent / "testers" / "health").absolute()
-    count = 0
-    while True:
-        try:
-            charm = await ops_test.build_charm(charm_path, verbosity="debug")
-            return charm
-        except RuntimeError:
-            logger.warning("Failed to build health tester. Trying again!")
-            count += 1
-            if count == 3:
-                raise
+    """Return config for deploying health tester via any-charm-k8s.
+
+    Uses any-charm-k8s (which has a container) to run a minimal HTTP health server.
+    """
+    from tests.integration.any_charm_helpers import (
+        ANY_CHARM_CHANNEL,
+        ANY_CHARM_K8S,
+        PYTHON_PACKAGES,
+        health_src_overwrite,
+    )
+
+    return {
+        "charm": ANY_CHARM_K8S,
+        "channel": ANY_CHARM_CHANNEL,
+        "config": {
+            "src-overwrite": health_src_overwrite(),
+            "python-packages": PYTHON_PACKAGES,
+        },
+    }
+
+
+@pytest.fixture(scope="module")
+async def ingress_requirer_mock(ops_test):
+    """Return the any-charm deploy config for the ingress-requirer-mock (IPA mode)."""
+    from tests.integration.any_charm_helpers import (
+        ANY_CHARM_CHANNEL,
+        PYTHON_PACKAGES,
+        ipa_src_overwrite,
+    )
+
+    return {
+        "charm": "any-charm",
+        "channel": ANY_CHARM_CHANNEL,
+        "config": {
+            "src-overwrite": ipa_src_overwrite(),
+            "python-packages": PYTHON_PACKAGES,
+        },
+    }
 
 
 @pytest.fixture(scope="module")
@@ -391,9 +401,18 @@ async def deploy_traefik_if_not_deployed(ops_test: OpsTest, traefik_charm):
     await ops_test.model.wait_for_idle(["traefik-k8s"], timeout=1000)
 
 
-async def deploy_charm_if_not_deployed(ops_test: OpsTest, charm, app_name: str, resources=None):
+async def deploy_charm_if_not_deployed(
+    ops_test: OpsTest, charm, app_name: str, resources=None, channel=None, config=None
+):
     if not ops_test.model.applications.get(app_name):
-        await ops_test.model.deploy(charm, resources=resources, application_name=app_name)
+        kwargs = {"application_name": app_name}
+        if resources:
+            kwargs["resources"] = resources
+        if channel:
+            kwargs["channel"] = channel
+        if config:
+            kwargs["config"] = config
+        await ops_test.model.deploy(charm, **kwargs)
 
     # block until app goes to active/idle
     # if we're running this locally, we need to wait for "waiting"

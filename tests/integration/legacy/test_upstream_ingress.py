@@ -18,7 +18,7 @@ IPU_TESTER = "ipu-tester"
 ROUTE_TESTER = "route-tester"
 CERTIFICATE_PROVIDER = "self-signed-certificates"
 
-INGRESS_REQUIRER_TESTER_RESOURCES = {"echo-server-image": "jmalloc/echo-server:v0.3.7"}
+INGRESS_REQUIRER_TESTER_RESOURCES = {}
 
 
 @pytest.mark.abort_on_fail
@@ -59,13 +59,22 @@ async def test_deploy_dependencies(ops_test: OpsTest, traefik_charm):
 async def test_deploy_testers(ops_test: OpsTest, ingress_requirer_mock):
     await asyncio.gather(
         ops_test.model.deploy(
-            ingress_requirer_mock, IPA_TESTER, resources=INGRESS_REQUIRER_TESTER_RESOURCES
+            ingress_requirer_mock["charm"],
+            IPA_TESTER,
+            channel=ingress_requirer_mock["channel"],
+            config=ingress_requirer_mock.get("config", {}),
         ),
         ops_test.model.deploy(
-            ingress_requirer_mock, IPU_TESTER, resources=INGRESS_REQUIRER_TESTER_RESOURCES
+            ingress_requirer_mock["charm"],
+            IPU_TESTER,
+            channel=ingress_requirer_mock["channel"],
+            config=ingress_requirer_mock.get("config", {}),
         ),
         ops_test.model.deploy(
-            ingress_requirer_mock, ROUTE_TESTER, resources=INGRESS_REQUIRER_TESTER_RESOURCES
+            ingress_requirer_mock["charm"],
+            ROUTE_TESTER,
+            channel=ingress_requirer_mock["channel"],
+            config=ingress_requirer_mock.get("config", {}),
         ),
     )
 
@@ -76,9 +85,13 @@ async def test_deploy_testers(ops_test: OpsTest, ingress_requirer_mock):
 
 @pytest.mark.abort_on_fail
 async def test_relate_testers(ops_test: OpsTest):
-    await ops_test.model.add_relation(f"{TRAEFIK}:ingress", f"{IPA_TESTER}:ingress")
-    await ops_test.model.add_relation(f"{TRAEFIK}:ingress-per-unit", f"{IPU_TESTER}")
-    await ops_test.model.add_relation(f"{TRAEFIK}:traefik-route", f"{ROUTE_TESTER}")
+    await ops_test.model.add_relation(f"{TRAEFIK}:ingress", f"{IPA_TESTER}:require-ingress")
+    await ops_test.model.add_relation(
+        f"{TRAEFIK}:ingress-per-unit", f"{IPU_TESTER}:require-ingress-per-unit"
+    )
+    await ops_test.model.add_relation(
+        f"{TRAEFIK}:traefik-route", f"{ROUTE_TESTER}:require-traefik-route"
+    )
     await ops_test.model.wait_for_idle([TRAEFIK, IPA_TESTER, IPU_TESTER, ROUTE_TESTER])
 
 
