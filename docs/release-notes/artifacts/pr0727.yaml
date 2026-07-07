@@ -1,0 +1,17 @@
+# Version of the artifact schema
+version_schema: 2
+# The key holding the change(s)
+changes:
+  - title: Relaxed the Terraform module Juju provider version constraint
+    author: swetha1654
+    type: bugfix
+    description: |
+      Relaxed the Terraform module Juju provider version constraint to
+      allow supported provider versions instead of pinning a single release.
+    urls:
+      pr:
+        - https://github.com/canonical/traefik-k8s-operator/pull/727
+      related_doc:
+      related_issue:
+    visibility: hidden
+    highlight: false

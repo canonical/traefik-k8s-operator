@@ -8,7 +8,6 @@ import time
 from pathlib import Path
 
 import jubilant
-import pytest
 import yaml
 
 APP_NAME = "traefik-rca"
@@ -16,14 +15,6 @@ SSC_NAME = "ssc-rca"
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 RESOURCES = {"traefik-image": METADATA["resources"]["traefik-image"]["upstream-source"]}
-
-
-@pytest.fixture(scope="module")
-def juju():
-    with jubilant.temp_model() as juju:
-        juju.wait_timeout = 10 * 60
-        yield juju
-
 
 def test_build_and_deploy(juju: jubilant.Juju, traefik_charm):
     juju.deploy(

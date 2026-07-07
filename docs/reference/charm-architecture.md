@@ -69,7 +69,7 @@ The traefik-k8s charm uses the official Ubuntu Traefik OCI image (`docker.io/ubu
 We use [Rockcraft](https://canonical-rockcraft.readthedocs-hosted.com/en/latest/) to build the OCI image for the Traefik charm. 
 The image is published to [Charmhub](https://charmhub.io/traefik-k8s) as a charm resource.
 
-See more: [How to publish your charm on Charmhub](https://documentation.ubuntu.com/charmcraft/stable/howto/manage-charms/#publish-a-charm-on-charmhub)
+See more: [How to publish your charm on Charmhub](https://documentation.ubuntu.com/charmcraft/stable/howto/manage-charms/#publish-a-charm)
 
 ## Metrics
 
