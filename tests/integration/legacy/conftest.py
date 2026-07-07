@@ -134,15 +134,16 @@ async def ipu_tester_charm(ops_test):
 
 @pytest.fixture(scope="module")
 async def tcp_tester_charm(ops_test):
-    """Return the any-charm deploy config for a TCP IPU requirer."""
+    """Return the any-charm-k8s deploy config for a TCP IPU requirer with echo server."""
     from tests.integration.any_charm_helpers import (
         ANY_CHARM_CHANNEL,
+        ANY_CHARM_K8S,
         PYTHON_PACKAGES,
         tcp_ipu_src_overwrite,
     )
 
     return {
-        "charm": "any-charm",
+        "charm": ANY_CHARM_K8S,
         "channel": ANY_CHARM_CHANNEL,
         "config": {
             "src-overwrite": tcp_ipu_src_overwrite(),
@@ -196,18 +197,23 @@ async def health_tester_charm(ops_test: OpsTest):
 
 @pytest.fixture(scope="module")
 async def ingress_requirer_mock(ops_test):
-    """Return the any-charm deploy config for the ingress-requirer-mock (IPA mode)."""
+    """Return the any-charm-k8s deploy config for the ingress-requirer-mock.
+
+    Runs an HTTP server and supports IPA, IPU, and traefik-route ingress types.
+    Deploy multiple instances (one per ingress type).
+    """
     from tests.integration.any_charm_helpers import (
         ANY_CHARM_CHANNEL,
+        ANY_CHARM_K8S,
         PYTHON_PACKAGES,
-        ipa_src_overwrite,
+        ingress_requirer_mock_src_overwrite,
     )
 
     return {
-        "charm": "any-charm",
+        "charm": ANY_CHARM_K8S,
         "channel": ANY_CHARM_CHANNEL,
         "config": {
-            "src-overwrite": ipa_src_overwrite(),
+            "src-overwrite": ingress_requirer_mock_src_overwrite(),
             "python-packages": PYTHON_PACKAGES,
         },
     }

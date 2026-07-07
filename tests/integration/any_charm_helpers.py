@@ -86,13 +86,13 @@ def ipu_src_overwrite() -> str:
 
 
 def tcp_ipu_src_overwrite() -> str:
-    """Generate src-overwrite config for a TCP ingress-per-unit requirer."""
+    """Generate src-overwrite config for a TCP ingress-per-unit requirer with echo server."""
     files = OrderedDict()
     files.update(_lib_files(
         "charms/traefik_k8s/v1/ingress_per_unit.py",
         LIB_ROOT / "traefik_k8s" / "v1" / "ingress_per_unit.py",
     ))
-    files.update(_read_src_files("tcp_ipu", ["any_charm.py"]))
+    files.update(_read_src_files("tcp_ipu", ["any_charm.py", "tcp_echo_server.py"]))
     return json.dumps(files)
 
 
@@ -130,5 +130,28 @@ def health_src_overwrite() -> str:
         LIB_ROOT / "traefik_k8s" / "v2" / "ingress.py",
     ))
     files.update(_read_src_files("health", ["any_charm.py", "health_server.py"]))
+    return json.dumps(files)
+
+
+def ingress_requirer_mock_src_overwrite() -> str:
+    """Generate src-overwrite config for the ingress-requirer-mock (IPA+IPU+traefik-route).
+
+    Runs an HTTP server via pebble and supports all three ingress relation types.
+    Deploy multiple instances (each related to a different endpoint) to test all modes.
+    """
+    files = OrderedDict()
+    files.update(_lib_files(
+        "charms/traefik_k8s/v2/ingress.py",
+        LIB_ROOT / "traefik_k8s" / "v2" / "ingress.py",
+    ))
+    files.update(_lib_files(
+        "charms/traefik_k8s/v1/ingress_per_unit.py",
+        LIB_ROOT / "traefik_k8s" / "v1" / "ingress_per_unit.py",
+    ))
+    files.update(_lib_files(
+        "charms/traefik_k8s/v0/traefik_route.py",
+        LIB_ROOT / "traefik_k8s" / "v0" / "traefik_route.py",
+    ))
+    files.update(_read_src_files("mock", ["any_charm.py", "http_server.py"]))
     return json.dumps(files)
 

@@ -41,7 +41,7 @@ async def test_relate(ops_test: OpsTest):
 
 def assert_ipu_charm_has_ingress(ops_test: OpsTest):
     data = get_relation_data(
-        requirer_endpoint="ipu-tester/0:ingress-per-unit",
+        requirer_endpoint="ipu-tester/0:require-ingress-per-unit",
         provider_endpoint="traefik-k8s/0:ingress-per-unit",
         model=ops_test.model_full_name,
     )
@@ -61,7 +61,7 @@ async def test_ipu_charm_has_ingress(ops_test: OpsTest):
 @pytest.mark.abort_on_fail
 async def test_relation_data_shape(ops_test: OpsTest):
     data = get_relation_data(
-        requirer_endpoint="ipu-tester/0:ingress-per-unit",
+        requirer_endpoint="ipu-tester/0:require-ingress-per-unit",
         provider_endpoint="traefik-k8s/0:ingress-per-unit",
         model=ops_test.model_full_name,
     )

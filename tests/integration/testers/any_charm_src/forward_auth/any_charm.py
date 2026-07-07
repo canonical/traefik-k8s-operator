@@ -59,6 +59,9 @@ class AnyCharm(AnyCharmBase):
 
     def _on_pebble_ready(self, event):
         container = event.workload
+        # Install python3 in the minimal workload container
+        container.exec(["apt-get", "update", "-qq"]).wait()
+        container.exec(["apt-get", "install", "-y", "-qq", "python3"]).wait()
         # Push the server script to the workload container
         server_script = (_src / "httpbin_server.py").read_text()
         container.push("/httpbin_server.py", server_script, make_dirs=True)
