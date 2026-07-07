@@ -90,7 +90,7 @@ async def test_relation_data_shape(ops_test: OpsTest):
 
 @pytest.mark.abort_on_fail
 async def test_remove_relation(ops_test: OpsTest):
-    await ops_test.juju("relate", "ipu-tester:require-ingress-per-unit", "traefik-k8s:ingress-per-unit")
+    await ops_test.juju("remove-relation", "ipu-tester:require-ingress-per-unit", "traefik-k8s:ingress-per-unit")
     await ops_test.model.wait_for_idle(["traefik-k8s", "ipu-tester"], status="active")
 
 
