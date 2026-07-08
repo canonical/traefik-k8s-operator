@@ -34,6 +34,45 @@ _TRAEFIK_RESOURCES = {
 }
 
 
+def test_deployment(juju: jubilant.Juju, traefik_charm):
+    juju.deploy(traefik_charm, TRAEFIK_APP, resources=_TRAEFIK_RESOURCES, trust=True)
+    juju.deploy(
+        f"ch:{ANY_CHARM}",
+        IPA_TESTER_APP,
+        channel=ANY_CHARM_CHANNEL,
+        config={
+            "src-overwrite": ipa_src_overwrite(),
+            "python-packages": PYTHON_PACKAGES,
+        },
+    )
+    juju.wait(all_settled, timeout=1000)
+
+
+def test_relate(juju: jubilant.Juju):
+    juju.integrate(f"{IPA_TESTER_APP}:require-ingress", f"{TRAEFIK_APP}:ingress")
+    juju.wait(all_settled, timeout=600)
+
+
+def test_ipa_charm_ingress_noauth(juju: jubilant.Juju):
+    juju.config(TRAEFIK_APP, {"basic_auth_user": ""})
+    juju.wait(all_settled, timeout=600)
+    _assert_status(_get_tester_url(juju), SUCCESS_STATUS)
+
+
+def test_ipa_charm_ingress_auth(juju: jubilant.Juju):
+    tester_url = _get_tester_url(juju)
+    juju.config(TRAEFIK_APP, {"basic_auth_user": TEST_AUTH_USER})
+    juju.wait(all_settled, timeout=600)
+    _assert_status(tester_url, 401)
+    _assert_status(tester_url, SUCCESS_STATUS, auth=(USERNAME, PASSWORD))
+
+
+def test_ipa_charm_ingress_auth_disable(juju: jubilant.Juju):
+    juju.config(TRAEFIK_APP, {"basic_auth_user": ""})
+    juju.wait(all_settled, timeout=600)
+    _assert_status(_get_tester_url(juju), SUCCESS_STATUS)
+
+
 def _relation_info(
     juju: jubilant.Juju,
     remote_unit: str,
@@ -82,42 +121,3 @@ def _assert_status(
             pass
         time.sleep(2)
     raise AssertionError(f"Expected HTTP {expected_status} from {url}")
-
-
-def test_deployment(juju: jubilant.Juju, traefik_charm):
-    juju.deploy(traefik_charm, TRAEFIK_APP, resources=_TRAEFIK_RESOURCES, trust=True)
-    juju.deploy(
-        f"ch:{ANY_CHARM}",
-        IPA_TESTER_APP,
-        channel=ANY_CHARM_CHANNEL,
-        config={
-            "src-overwrite": ipa_src_overwrite(),
-            "python-packages": PYTHON_PACKAGES,
-        },
-    )
-    juju.wait(all_settled, timeout=1000)
-
-
-def test_relate(juju: jubilant.Juju):
-    juju.integrate(f"{IPA_TESTER_APP}:require-ingress", f"{TRAEFIK_APP}:ingress")
-    juju.wait(all_settled, timeout=600)
-
-
-def test_ipa_charm_ingress_noauth(juju: jubilant.Juju):
-    juju.config(TRAEFIK_APP, {"basic_auth_user": ""})
-    juju.wait(all_settled, timeout=600)
-    _assert_status(_get_tester_url(juju), SUCCESS_STATUS)
-
-
-def test_ipa_charm_ingress_auth(juju: jubilant.Juju):
-    tester_url = _get_tester_url(juju)
-    juju.config(TRAEFIK_APP, {"basic_auth_user": TEST_AUTH_USER})
-    juju.wait(all_settled, timeout=600)
-    _assert_status(tester_url, 401)
-    _assert_status(tester_url, SUCCESS_STATUS, auth=(USERNAME, PASSWORD))
-
-
-def test_ipa_charm_ingress_auth_disable(juju: jubilant.Juju):
-    juju.config(TRAEFIK_APP, {"basic_auth_user": ""})
-    juju.wait(all_settled, timeout=600)
-    _assert_status(_get_tester_url(juju), SUCCESS_STATUS)

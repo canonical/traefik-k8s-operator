@@ -27,6 +27,29 @@ _TRAEFIK_RESOURCES = {
 }
 
 
+def test_setup_env(juju: jubilant.Juju):
+    juju.model_config({"logging-config": "<root>=WARNING; unit=DEBUG"})
+
+
+def test_workload_tracing_is_present(juju: jubilant.Juju, traefik_charm):
+    _deploy_tempo_cluster(juju)
+
+    juju.deploy(traefik_charm, TRAEFIK_APP, resources=_TRAEFIK_RESOURCES, trust=True)
+    juju.wait(lambda status: jubilant.all_active(status, TRAEFIK_APP), timeout=300)
+
+    juju.integrate(f"{TRAEFIK_APP}:workload-tracing", f"{TEMPO_APP}:tracing")
+    juju.integrate(f"{TEMPO_APP}:ingress", f"{TRAEFIK_APP}:traefik-route")
+    juju.wait(all_settled, timeout=1000)
+
+    traefik_endpoints = json.loads(
+        juju.run(f"{TRAEFIK_APP}/0", "show-external-endpoints").results["external-endpoints"]
+    )
+    fetch_with_retry(traefik_endpoints[TEMPO_APP]["url"])
+
+    tempo_host = juju.status().apps[TEMPO_APP].address
+    assert _get_traces_patiently(tempo_host)
+
+
 def _deploy_tempo_cluster(juju: jubilant.Juju) -> None:
     juju.deploy("ch:tempo-worker-k8s", TEMPO_WORKER_APP, channel="2/edge", trust=True)
     juju.deploy("ch:tempo-coordinator-k8s", TEMPO_APP, channel="2/edge", trust=True)
@@ -78,26 +101,3 @@ def _get_traces_patiently(tempo_host: str, service_name: str = TRAEFIK_APP) -> l
     traces = response.json()["traces"]
     assert traces
     return traces
-
-
-def test_setup_env(juju: jubilant.Juju):
-    juju.model_config({"logging-config": "<root>=WARNING; unit=DEBUG"})
-
-
-def test_workload_tracing_is_present(juju: jubilant.Juju, traefik_charm):
-    _deploy_tempo_cluster(juju)
-
-    juju.deploy(traefik_charm, TRAEFIK_APP, resources=_TRAEFIK_RESOURCES, trust=True)
-    juju.wait(lambda status: jubilant.all_active(status, TRAEFIK_APP), timeout=300)
-
-    juju.integrate(f"{TRAEFIK_APP}:workload-tracing", f"{TEMPO_APP}:tracing")
-    juju.integrate(f"{TEMPO_APP}:ingress", f"{TRAEFIK_APP}:traefik-route")
-    juju.wait(all_settled, timeout=1000)
-
-    traefik_endpoints = json.loads(
-        juju.run(f"{TRAEFIK_APP}/0", "show-external-endpoints").results["external-endpoints"]
-    )
-    fetch_with_retry(traefik_endpoints[TEMPO_APP]["url"])
-
-    tempo_host = juju.status().apps[TEMPO_APP].address
-    assert _get_traces_patiently(tempo_host)

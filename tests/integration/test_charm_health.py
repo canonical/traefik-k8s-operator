@@ -29,23 +29,6 @@ _TRAEFIK_RESOURCES = {
 }
 
 
-def _rpc(juju: jubilant.Juju, unit: str, method: str, **kwargs: Any) -> Any:
-    params = {"method": method}
-    if kwargs:
-        params["kwargs"] = json.dumps(kwargs)
-    raw = juju.run(unit, "rpc", params=params).results["return"]
-    return json.loads(raw)
-
-
-def _fetch_health(url: str) -> tuple[int, Any]:
-    response = requests.get(url, timeout=10)
-    try:
-        content = response.json()
-    except ValueError:
-        content = {}
-    return response.status_code, content
-
-
 def test_deployment(juju: jubilant.Juju, traefik_charm):
     juju.deploy(traefik_charm, TRAEFIK_APP, resources=_TRAEFIK_RESOURCES, trust=True)
     juju.deploy(
@@ -92,3 +75,20 @@ def test_health(juju: jubilant.Juju):
 
 def test_cleanup(juju: jubilant.Juju):
     remove_application(juju, TRAEFIK_APP, timeout=60)
+
+
+def _rpc(juju: jubilant.Juju, unit: str, method: str, **kwargs: Any) -> Any:
+    params = {"method": method}
+    if kwargs:
+        params["kwargs"] = json.dumps(kwargs)
+    raw = juju.run(unit, "rpc", params=params).results["return"]
+    return json.loads(raw)
+
+
+def _fetch_health(url: str) -> tuple[int, Any]:
+    response = requests.get(url, timeout=10)
+    try:
+        content = response.json()
+    except ValueError:
+        content = {}
+    return response.status_code, content

@@ -39,25 +39,6 @@ _TRAEFIK_RESOURCES = {
 }
 
 
-def _rpc(juju: jubilant.Juju, unit: str, method: str) -> Any:
-    raw = juju.run(unit, "rpc", params={"method": method}).results["return"]
-    return json.loads(raw)
-
-
-def _wait_for_tcp_echo(host: str, port: int, payload: bytes = b"Hello, world") -> None:
-    deadline = time.monotonic() + 300
-    while time.monotonic() < deadline:
-        try:
-            with socket.create_connection((host, port), timeout=10) as sock:
-                sock.sendall(payload)
-                response = sock.recv(1024)
-            assert response == payload
-            return
-        except OSError:
-            time.sleep(5)
-    raise AssertionError(f"Timed out waiting for TCP echo on {host}:{port}")
-
-
 def test_deployment(juju: jubilant.Juju, traefik_charm):
     juju.deploy(traefik_charm, TRAEFIK_APP, resources=_TRAEFIK_RESOURCES, trust=True)
     juju.deploy(
@@ -112,3 +93,22 @@ def test_tcp_ipu_compatibility(juju: jubilant.Juju):
 
 def test_cleanup(juju: jubilant.Juju):
     remove_application(juju, TCP_TESTER_APP, IPU_TESTER_APP, TRAEFIK_APP, timeout=300)
+
+
+def _rpc(juju: jubilant.Juju, unit: str, method: str) -> Any:
+    raw = juju.run(unit, "rpc", params={"method": method}).results["return"]
+    return json.loads(raw)
+
+
+def _wait_for_tcp_echo(host: str, port: int, payload: bytes = b"Hello, world") -> None:
+    deadline = time.monotonic() + 300
+    while time.monotonic() < deadline:
+        try:
+            with socket.create_connection((host, port), timeout=10) as sock:
+                sock.sendall(payload)
+                response = sock.recv(1024)
+            assert response == payload
+            return
+        except OSError:
+            time.sleep(5)
+    raise AssertionError(f"Timed out waiting for TCP echo on {host}:{port}")

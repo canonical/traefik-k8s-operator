@@ -34,34 +34,6 @@ _TRAEFIK_RESOURCES = {
 }
 
 
-def _endpoints(model: str, scheme: str, netloc: str) -> list[str]:
-    return [
-        f"{scheme}://{netloc}/{model}-{PROMETHEUS_APP}-0",
-        f"{scheme}://{netloc}/{model}-{ALERTMANAGER_APP}",
-        f"{scheme}://{netloc}/{model}-{GRAFANA_APP}",
-    ]
-
-
-def _pull_server_cert(juju: jubilant.Juju) -> Path:
-    _ARTIFACT_DIR.mkdir(exist_ok=True)
-    cert = juju.ssh(
-        f"{TRAEFIK_APP}/0",
-        "cat /opt/traefik/juju/server.cert",
-        container="traefik",
-    )
-    _CERT_PATH.write_text(cert, encoding="utf-8")
-    return _CERT_PATH
-
-
-def _assert_https_endpoints(juju: jubilant.Juju, cert_path: Path, traefik_ip: str) -> None:
-    session = requests.Session()
-    session.mount("https://", DNSResolverHTTPSAdapter(MOCK_HOSTNAME, traefik_ip))
-    session.verify = str(cert_path)
-    for endpoint in _endpoints(juju.model, "https", MOCK_HOSTNAME):
-        response = session.get(endpoint, timeout=30)
-        response.raise_for_status()
-
-
 def test_build_and_deploy(juju: jubilant.Juju, traefik_charm):
     juju.deploy(traefik_charm, TRAEFIK_APP, resources=_TRAEFIK_RESOURCES, trust=True)
     juju.deploy("ch:prometheus-k8s", PROMETHEUS_APP, channel="1/stable", trust=True)
@@ -123,3 +95,31 @@ def test_disintegrate(juju: jubilant.Juju):
 def test_cleanup(juju: jubilant.Juju):
     delete_k8s_service(juju.model, f"{TRAEFIK_APP}-lb")
     remove_application(juju, TRAEFIK_APP, timeout=60)
+
+
+def _endpoints(model: str, scheme: str, netloc: str) -> list[str]:
+    return [
+        f"{scheme}://{netloc}/{model}-{PROMETHEUS_APP}-0",
+        f"{scheme}://{netloc}/{model}-{ALERTMANAGER_APP}",
+        f"{scheme}://{netloc}/{model}-{GRAFANA_APP}",
+    ]
+
+
+def _pull_server_cert(juju: jubilant.Juju) -> Path:
+    _ARTIFACT_DIR.mkdir(exist_ok=True)
+    cert = juju.ssh(
+        f"{TRAEFIK_APP}/0",
+        "cat /opt/traefik/juju/server.cert",
+        container="traefik",
+    )
+    _CERT_PATH.write_text(cert, encoding="utf-8")
+    return _CERT_PATH
+
+
+def _assert_https_endpoints(juju: jubilant.Juju, cert_path: Path, traefik_ip: str) -> None:
+    session = requests.Session()
+    session.mount("https://", DNSResolverHTTPSAdapter(MOCK_HOSTNAME, traefik_ip))
+    session.verify = str(cert_path)
+    for endpoint in _endpoints(juju.model, "https", MOCK_HOSTNAME):
+        response = session.get(endpoint, timeout=30)
+        response.raise_for_status()

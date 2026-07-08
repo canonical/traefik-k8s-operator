@@ -32,17 +32,6 @@ _TRAEFIK_RESOURCES = {
 }
 
 
-def _traefik_url(juju: jubilant.Juju, app_name: str) -> str:
-    action = juju.run(f"{app_name}/0", "show-external-endpoints")
-    endpoints = json.loads(action.results["external-endpoints"])
-    return endpoints[app_name]["url"]
-
-
-def _assert_url_returns(url: str, expected: int) -> None:
-    response = requests.get(url, timeout=10, verify=False)
-    assert response.status_code == expected, f"Expected {expected} from {url}, got {response.status_code}"
-
-
 def test_deployment(juju: jubilant.Juju, traefik_charm):
     juju.deploy(traefik_charm, TRAEFIK, resources=_TRAEFIK_RESOURCES, trust=True)
     juju.wait(all_settled, timeout=1000)
@@ -170,3 +159,14 @@ def test_traefik_route_ingressed_through_upstream_ingress_with_tls(juju: jubilan
             f"{juju.model}-{TRAEFIK}/{juju.model}-{ROUTE_TESTER}-traefik-route"
         )
     )
+
+
+def _traefik_url(juju: jubilant.Juju, app_name: str) -> str:
+    action = juju.run(f"{app_name}/0", "show-external-endpoints")
+    endpoints = json.loads(action.results["external-endpoints"])
+    return endpoints[app_name]["url"]
+
+
+def _assert_url_returns(url: str, expected: int) -> None:
+    response = requests.get(url, timeout=10, verify=False)
+    assert response.status_code == expected, f"Expected {expected} from {url}, got {response.status_code}"

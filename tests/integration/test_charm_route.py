@@ -35,24 +35,6 @@ _TRAEFIK_RESOURCES = {
 }
 
 
-def _rpc(juju: jubilant.Juju, unit: str, method: str) -> Any:
-    raw = juju.run(unit, "rpc", params={"method": method}).results["return"]
-    return json.loads(raw)
-
-
-def _route_config_path(juju: jubilant.Juju) -> str:
-    output = juju.ssh(
-        f"{TRAEFIK_APP}/0",
-        (
-            "find /opt/traefik/juju -maxdepth 1 "
-            "-name 'juju_ingress_traefik-route_*_route.yaml' -print"
-        ),
-        container="traefik",
-    ).strip()
-    assert output, "Expected a traefik-route dynamic config file"
-    return output.splitlines()[0]
-
-
 def test_deployment(juju: jubilant.Juju, traefik_charm):
     juju.deploy(traefik_charm, TRAEFIK_APP, resources=_TRAEFIK_RESOURCES, trust=True)
     juju.deploy(
@@ -149,3 +131,21 @@ def test_remove_relation(juju: jubilant.Juju):
 
 def test_cleanup(juju: jubilant.Juju):
     remove_application(juju, TRAEFIK_APP, timeout=60)
+
+
+def _rpc(juju: jubilant.Juju, unit: str, method: str) -> Any:
+    raw = juju.run(unit, "rpc", params={"method": method}).results["return"]
+    return json.loads(raw)
+
+
+def _route_config_path(juju: jubilant.Juju) -> str:
+    output = juju.ssh(
+        f"{TRAEFIK_APP}/0",
+        (
+            "find /opt/traefik/juju -maxdepth 1 "
+            "-name 'juju_ingress_traefik-route_*_route.yaml' -print"
+        ),
+        container="traefik",
+    ).strip()
+    assert output, "Expected a traefik-route dynamic config file"
+    return output.splitlines()[0]

@@ -90,11 +90,6 @@ _ANY_CHARM_SRC_OVERWRITE = {
 }
 
 
-def _rpc(juju: jubilant.Juju, method: str) -> Any:
-    raw = juju.run(f"{IPA_TESTER_APP}/0", "rpc", params={"method": method}).results["return"]
-    return json.loads(raw)  # rpc action json.dumps the return value
-
-
 def test_deployment(juju: jubilant.Juju, traefik_charm):
     juju.deploy(traefik_charm, TRAEFIK_APP, resources=_TRAEFIK_RESOURCES, trust=True)
     juju.deploy(
@@ -151,3 +146,8 @@ def test_remove_relation(juju: jubilant.Juju):
 
 def test_cleanup(juju: jubilant.Juju):
     remove_application(juju, TRAEFIK_APP, timeout=60)
+
+
+def _rpc(juju: jubilant.Juju, method: str) -> Any:
+    raw = juju.run(f"{IPA_TESTER_APP}/0", "rpc", params={"method": method}).results["return"]
+    return json.loads(raw)  # rpc action json.dumps the return value

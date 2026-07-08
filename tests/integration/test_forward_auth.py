@@ -33,17 +33,6 @@ _TRAEFIK_RESOURCES = {
 }
 
 
-@pytest.fixture(scope="module")
-def lightkube_client(juju: jubilant.Juju) -> Client:
-    return Client(field_manager=OATHKEEPER_APP, namespace=juju.model)
-
-
-def _reverse_proxy_app_url(juju: jubilant.Juju, ingress_app_name: str, app_name: str) -> str:
-    address = get_k8s_service_address(juju.model, f"{ingress_app_name}-lb")
-    assert address, "Expected a traefik load balancer address"
-    return f"http://{address}/{juju.model}-{app_name}/"
-
-
 def test_deployment(juju: jubilant.Juju, traefik_charm):
     juju.deploy(traefik_charm, TRAEFIK_APP, resources=_TRAEFIK_RESOURCES, trust=True)
     juju.config(TRAEFIK_APP, {"enable_experimental_forward_auth": "True"})
@@ -110,6 +99,26 @@ def test_forward_auth_url_response_headers(
     _assert_anonymous_response(protected_url)
 
 
+def test_remove_forward_auth_integration(juju: jubilant.Juju):
+    juju.remove_relation(OATHKEEPER_APP, f"{TRAEFIK_APP}:experimental-forward-auth")
+    juju.wait(all_settled, timeout=600)
+
+
+def test_cleanup(juju: jubilant.Juju):
+    remove_application(juju, TRAEFIK_APP, timeout=60)
+
+
+@pytest.fixture(scope="module")
+def lightkube_client(juju: jubilant.Juju) -> Client:
+    return Client(field_manager=OATHKEEPER_APP, namespace=juju.model)
+
+
+def _reverse_proxy_app_url(juju: jubilant.Juju, ingress_app_name: str, app_name: str) -> str:
+    address = get_k8s_service_address(juju.model, f"{ingress_app_name}-lb")
+    assert address, "Expected a traefik load balancer address"
+    return f"http://{address}/{juju.model}-{app_name}/"
+
+
 @retry(
     wait=wait_exponential(multiplier=3, min=1, max=30),
     stop=stop_after_attempt(30),
@@ -155,12 +164,3 @@ def _update_config_configmap(juju: jubilant.Juju, lightkube_client: Client) -> N
         namespace=juju.model,
         obj=patch,
     )
-
-
-def test_remove_forward_auth_integration(juju: jubilant.Juju):
-    juju.remove_relation(OATHKEEPER_APP, f"{TRAEFIK_APP}:experimental-forward-auth")
-    juju.wait(all_settled, timeout=600)
-
-
-def test_cleanup(juju: jubilant.Juju):
-    remove_application(juju, TRAEFIK_APP, timeout=60)
