@@ -45,7 +45,7 @@ password and formatting the configuration string.
 
 ## List of packages and cryptographic tech used
 
-- to generate private keys for setting up TLS communication: the `rsa.generate_private_key` function from the [`rsa` package](https://stuvel.eu/software/rsa/). They use the following parameters (hardcoded, not user-configurable):
+- to generate private keys for setting up TLS communication: the `rsa.generate_private_key` function from the [`cryptography` package](https://github.com/pyca/cryptography/). They use the following parameters (hardcoded, not user-configurable):
   - `key_size = 2048`
   - `public_exponent = 65537`
 - to generate admin passwords for user admin login: the  [`secrets`](https://docs.python.org/3/library/secrets.html) module from the Python standard library. See for example: [usage in grafana](https://github.com/canonical/grafana-k8s-operator/blob/main/src/charm.py#L1289).
