@@ -127,6 +127,9 @@ def test_traefik_route_ingressed_through_upstream_ingress(juju: jubilant.Juju):
 
 
 def test_traefik_with_upstream_ingress_blocked_if_in_subdomain_mode(juju: jubilant.Juju):
+    assert juju.status().apps[TRAEFIK].app_status.current == "active", (
+        "Expected Traefik to be active before triggering subdomain-mode block"
+    )
     juju.config(TRAEFIK, {"routing_mode": "subdomain"})
     juju.wait(lambda status: status.apps[TRAEFIK].app_status.current == "blocked", timeout=300)
 

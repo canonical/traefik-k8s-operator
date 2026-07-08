@@ -13,7 +13,12 @@ from urllib.parse import urlparse
 import jubilant
 import yaml
 
-from tests.integration.helpers import all_settled, assert_can_connect, remove_application
+from tests.integration.helpers import (
+    all_settled,
+    assert_can_connect,
+    get_k8s_service_address,
+    remove_application,
+)
 
 TRAEFIK_APP = "traefik-k8s"
 IPA_TESTER_APP = "ipa-tester"
@@ -117,12 +122,13 @@ def test_ipa_charm_has_ingress(juju: jubilant.Juju):
 def test_relation_data_shape(juju: jubilant.Juju):
     data = _rpc(juju, "get_relation_data")
 
-    # Provider gave back a well-formed URL
-    parsed = urlparse(data["url"])
-    assert parsed.scheme == "http"
-    assert parsed.path == f"/{juju.model}-{IPA_TESTER_APP}"
+    # Provider gave back a well-formed URL pointing at the actual LB IP
+    traefik_address = get_k8s_service_address(juju.model, f"{TRAEFIK_APP}-lb")
+    assert traefik_address, "Expected a traefik load balancer address"
+    assert data["url"] == f"http://{traefik_address}/{juju.model}-{IPA_TESTER_APP}"
 
-    # Requirer app databag (v2): name + port present; host must NOT be here
+    # Requirer app databag (v2): model + name + port present; host must NOT be here
+    assert data["app_data"].get("model") == juju.model
     assert data["app_data"].get("name") == IPA_TESTER_APP
     assert data["app_data"].get("port") == 80
     assert "host" not in data["app_data"], "v2: host must not be in app databag"
