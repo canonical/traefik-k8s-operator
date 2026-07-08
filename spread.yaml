@@ -36,8 +36,8 @@ integration-suites:
       CONCIERGE/jubilant_test_https_multi_unit_juju4: concierge-juju4.yaml
       CONCIERGE/jubilant_test_receive_ca_cert_status_juju4: concierge-juju4.yaml
       # Base 20.04 tests
-      BASE/legacy_test_charm_ipa_2004: ubuntu@20.04
-      MODULE/legacy_test_charm_ipa_2004: tests/integration/legacy/test_charm_ipa.py
+      BASE/jubilant_test_charm_ipa_2004: ubuntu@20.04
+      MODULE/jubilant_test_charm_ipa_2004: tests/integration/test_charm_ipa.py
       BASE/jubilant_test_upgrade_2004: ubuntu@20.04
       MODULE/jubilant_test_upgrade_2004: tests/integration/test_upgrade.py
   tests/integration/arm64:
@@ -50,4 +50,4 @@ integration-suites:
     auto-discover: false
     pytest-arguments-template: '-x --log-format="%(asctime)s %(levelname)s %(message)s" --no-juju-teardown --juju-model testing --keep-models --model testing'
     environment:
-      MODULE/legacy_test_charm_ipa: tests/integration/legacy/test_charm_ipa.py
+      MODULE/jubilant_test_charm_ipa: tests/integration/test_charm_ipa.py
