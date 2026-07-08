@@ -13,7 +13,7 @@ import yaml
 from minio import Minio
 from tenacity import retry, stop_after_attempt, wait_exponential
 
-from tests.integration.helpers import all_settled, fetch_with_retry
+from tests.integration.helpers import all_settled
 
 TRAEFIK_APP = "traefik"
 TEMPO_APP = "tempo"
@@ -40,11 +40,6 @@ def test_workload_tracing_is_present(juju: jubilant.Juju, traefik_charm):
     juju.integrate(f"{TRAEFIK_APP}:workload-tracing", f"{TEMPO_APP}:tracing")
     juju.integrate(f"{TEMPO_APP}:ingress", f"{TRAEFIK_APP}:traefik-route")
     juju.wait(all_settled, timeout=1000)
-
-    traefik_endpoints = json.loads(
-        juju.run(f"{TRAEFIK_APP}/0", "show-external-endpoints").results["external-endpoints"]
-    )
-    fetch_with_retry(traefik_endpoints[TEMPO_APP]["url"])
 
     tempo_host = juju.status().apps[TEMPO_APP].address
     assert _get_traces_patiently(tempo_host)
