@@ -103,7 +103,7 @@ def test_deployment(juju: jubilant.Juju, traefik_charm):
         channel="beta",
         config={"src-overwrite": json.dumps(_ANY_CHARM_SRC_OVERWRITE)},
     )
-    juju.wait(all_settled, timeout=1000)
+    juju.wait(all_settled, timeout=600)
 
 
 def test_relate(juju: jubilant.Juju):
