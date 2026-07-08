@@ -12,6 +12,12 @@ from typing import List, Optional
 
 import jubilant
 import requests
+from charms.tls_certificates_interface.v4.tls_certificates import (
+    Certificate,
+    CertificateRequestAttributes,
+    CertificateSigningRequest,
+    PrivateKey,
+)
 from constants import (
     ALERTMANAGER_APP_NAME,
     MANUAL_TLS_APP_NAME,
@@ -19,10 +25,6 @@ from constants import (
     SSC_APP_NAME,
     TRAEFIK_APP_NAME,
 )
-from cryptography import x509
-from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import rsa
-from cryptography.x509.oid import NameOID
 from dns_adapter import DNSResolverHTTPSAdapter
 from tenacity import (
     before_sleep_log,
@@ -35,8 +37,8 @@ from tenacity import (
 
 logger = logging.getLogger(__name__)
 
-ca_key: Optional[rsa.RSAPrivateKey] = None
-ca_cert: Optional[x509.Certificate] = None
+ca_key: Optional[PrivateKey] = None
+ca_cert: Optional[Certificate] = None
 ca_cert_path: Optional[Path] = None
 
 
@@ -52,48 +54,23 @@ def generate_ca(tmp_path: Path) -> None:
     the signing and verification helpers can reuse the same CA.
     """
     global ca_key, ca_cert, ca_cert_path
-    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "traefik-itest-ca")])
-    now = datetime.datetime.now(datetime.timezone.utc)
-    cert = (
-        x509.CertificateBuilder()
-        .subject_name(name)
-        .issuer_name(name)
-        .public_key(key.public_key())
-        .serial_number(x509.random_serial_number())
-        .not_valid_before(now - datetime.timedelta(days=1))
-        .not_valid_after(now + datetime.timedelta(days=3650))
-        .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
-        .sign(key, hashes.SHA256())
+    ca_key = PrivateKey.generate()
+    attributes = CertificateRequestAttributes(
+        common_name="traefik-itest-ca",
+        add_unique_id_to_subject_name=False,
     )
-    ca_key = key
-    ca_cert = cert
+    ca_cert = Certificate.generate_self_signed_ca(
+        attributes, ca_key, datetime.timedelta(days=3650)
+    )
     ca_cert_path = tmp_path / "ca.cert"
-    ca_cert_path.write_text(cert.public_bytes(serialization.Encoding.PEM).decode())
+    ca_cert_path.write_text(str(ca_cert))
 
 
-def sign_csr(
-    ca_key: rsa.RSAPrivateKey, ca_cert: x509.Certificate, csr_pem: str
-) -> str:
+def sign_csr(ca_key: PrivateKey, ca_cert: Certificate, csr_pem: str) -> str:
     """Sign a PEM CSR with the CA and return the certificate PEM."""
-    csr = x509.load_pem_x509_csr(csr_pem.encode())
-    now = datetime.datetime.now(datetime.timezone.utc)
-    builder = (
-        x509.CertificateBuilder()
-        .subject_name(csr.subject)
-        .issuer_name(ca_cert.subject)
-        .public_key(csr.public_key())
-        .serial_number(x509.random_serial_number())
-        .not_valid_before(now - datetime.timedelta(days=1))
-        .not_valid_after(now + datetime.timedelta(days=365))
-    )
-    try:
-        san = csr.extensions.get_extension_for_class(x509.SubjectAlternativeName)
-        builder = builder.add_extension(san.value, critical=False)
-    except x509.ExtensionNotFound:
-        pass
-    certificate = builder.sign(ca_key, hashes.SHA256())
-    return certificate.public_bytes(serialization.Encoding.PEM).decode()
+    csr = CertificateSigningRequest(raw=csr_pem)
+    cert = Certificate.generate(csr, ca_cert, ca_key, datetime.timedelta(days=365))
+    return str(cert)
 
 
 # --- manual-tls-certificates actions ---------------------------------------
@@ -115,7 +92,7 @@ def provide_certificate(
     assert ca_key is not None and ca_cert is not None, (
         "CA not initialised; call generate_ca()/bring_up_certified_traefik() first"
     )
-    ca_pem = ca_cert.public_bytes(serialization.Encoding.PEM).decode()
+    ca_pem = str(ca_cert)
     for request in outstanding_csrs:
         csr_pem = request["csr"]
         certificate_pem = sign_csr(ca_key, ca_cert, csr_pem)
@@ -305,6 +282,13 @@ def force_leader_change(juju: jubilant.Juju, app: str = TRAEFIK_APP_NAME) -> str
         ) from exc
     new_leader = leader_unit_name(juju, app)
     logger.info("Leadership moved from %s to %s", old_leader, new_leader)
+    # Trigger a hook on the new leader so it can react to the leadership change. 
+    # Traefik currently does not observe leader-elected hook.
+    juju.config(app, {"loadbalancer_annotations": " "})
+    # Bring the old leader back: re-enable liveness checks and restart its container-agent.
+    logger.info("Restarting container-agent and liveness checks on %s", old_leader)
+    juju.exec("/charm/bin/pebble", "start-checks", "liveness", unit=old_leader)
+    juju.exec("/charm/bin/pebble", "start", "container-agent", unit=old_leader)
     return new_leader
 
 

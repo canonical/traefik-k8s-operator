@@ -401,7 +401,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             private_key = PrivateKey.from_string(raw_key)
         except (ValueError, TypeError) as exc:
             raise RuntimeError(
-                "Found an existing TLS private key in a Juju secret but it is invalid. "
+                "Found an existing TLS private key in a Juju secret but it could not be parsed. "
                 "The secret is likely corrupt and requires manual intervention."
             ) from exc
 

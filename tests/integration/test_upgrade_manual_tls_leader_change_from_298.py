@@ -9,13 +9,14 @@ Scenario:
 1. Deploy traefik-k8s (3 units) at revision 298 and integrate it with
    ``manual-tls-certificates`` and ``alertmanager``; sign the CSRs and confirm
    HTTPS works on every unit.
-2. Force a leadership change (by stopping the container-agent and its liveness check).
-   On revision 298 the TLS private key is not app-scoped, so the newly elected leader
-   cannot reproduce the served certificate and its ingress breaks.
-3. Assert the ingress URL is indeed broken over HTTPS on leader and not broken on non-leaders.
+2. Force a leadership change; the old leader is restored afterwards.
+   On revision 298 the TLS private key is not app-scoped, so the newly elected
+   leader cannot reproduce the served certificate and its ingress breaks.
+3. Assert the ingress URL is broken over HTTPS on the new leader only; all other
+   units (including the restored old leader) continue to serve correctly.
 4. Refresh traefik to the locally built charm (the version under test).
 5. Assert the new leader is blocked with "Certificate not available yet" and
-    manual-tls has exactly one outstanding CSR.
+   manual-tls has exactly one outstanding CSR.
 """
 
 import logging
@@ -30,10 +31,10 @@ from constants import (
     TRAEFIK_CHARM,
 )
 from helpers import (
+    all_settled,
     bring_up_certified_traefik,
     force_leader_change,
     get_outstanding_csrs,
-    leader_unit_name,
     verify_https_broken_on_unit,
     verify_https_on_unit,
 )
@@ -60,33 +61,18 @@ def test_leader_change_breaks_tls_then_upgrade_blocks_and_requests_certificate(
     alertmanager_url = bring_up_certified_traefik(juju, tmp_path)
 
     # newly elected leader is expected to break.
-    previous_leader = leader_unit_name(juju, TRAEFIK_APP_NAME)
     new_leader = force_leader_change(juju, TRAEFIK_APP_NAME)
 
-    # Trigger any hook on Traefik as it doesn't observe leadership changes automatically.
-    juju.config(TRAEFIK_APP_NAME, {"loadbalancer_annotations": " "})
+    juju.wait(all_settled, timeout=300)
 
-    surviving_units = [
+    # All units except the new leader should still serve valid HTTPS (their per-unit
+    # private keys are intact). The new leader lost the old leader's key on rev 298.
+    working_units = [
         name
         for name in juju.status().apps[TRAEFIK_APP_NAME].units
-        if name != previous_leader
+        if name != new_leader
     ]
-    juju.wait(
-        lambda status: all(
-            (
-                unit_name in status.apps[TRAEFIK_APP_NAME].units
-                and status.apps[TRAEFIK_APP_NAME].units[unit_name].workload_status.current
-                == "active"
-                and status.apps[TRAEFIK_APP_NAME].units[unit_name].juju_status.current
-                == "idle"
-            )
-            for unit_name in surviving_units
-        ),
-        timeout=300,
-    )
-    for unit_name in surviving_units:
-        if unit_name == new_leader:
-            continue
+    for unit_name in working_units:
         verify_https_on_unit(juju, unit_name, alertmanager_url)
 
     juju.wait(lambda _: len(get_outstanding_csrs(juju)) == 1, timeout=300)
