@@ -12,10 +12,6 @@ from pytest_operator.plugin import OpsTest
 from tests.integration.legacy.conftest import trfk_resources
 from tests.integration.legacy.helpers import get_k8s_service_address, remove_application
 
-health_tester_resources = {
-    "python-image": "ubuntu/python:3.10-22.04_stable",
-}
-
 
 def fetch_health_sync(url: str):
     """Perform a simple HTTP GET using http.client.
@@ -46,10 +42,11 @@ async def test_deployment(ops_test: OpsTest, traefik_charm, health_tester_charm)
             trust=True,
         ),
         ops_test.model.deploy(
-            health_tester_charm,
+            health_tester_charm["charm"],
             "health-tester",
+            channel=health_tester_charm["channel"],
+            config=health_tester_charm.get("config", {}),
             num_units=3,
-            resources=health_tester_resources,
         ),
     )
 
@@ -60,7 +57,7 @@ async def test_deployment(ops_test: OpsTest, traefik_charm, health_tester_charm)
 
 @pytest.mark.abort_on_fail
 async def test_relate(ops_test: OpsTest):
-    await ops_test.model.add_relation("health-tester:ingress", "traefik-k8s:ingress")
+    await ops_test.model.add_relation("health-tester:require-ingress", "traefik-k8s:ingress")
     await ops_test.model.wait_for_idle(["traefik-k8s", "health-tester"])
 
 
@@ -70,7 +67,7 @@ async def test_health(ops_test: OpsTest):
 
     third_application_unit = ops_test.model.applications["health-tester"].units[2]
     set_health_action = await third_application_unit.run_action(
-        "set-health", **{"is-healthy": False}
+        "rpc", method="set_health", kwargs=json.dumps({"is_healthy": False})
     )
     await set_health_action.wait()
     await ops_test.model.wait_for_idle(["traefik-k8s", "health-tester"])
@@ -85,7 +82,7 @@ async def test_health(ops_test: OpsTest):
 
     second_application_unit = ops_test.model.applications["health-tester"].units[1]
     set_health_action = await second_application_unit.run_action(
-        "set-health", **{"is-healthy": False}
+        "rpc", method="set_health", kwargs=json.dumps({"is_healthy": False})
     )
     await set_health_action.wait()
     await ops_test.model.wait_for_idle(["traefik-k8s", "health-tester"])

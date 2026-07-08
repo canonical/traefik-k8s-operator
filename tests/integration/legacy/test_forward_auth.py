@@ -56,16 +56,17 @@ async def test_deployment(ops_test: OpsTest, traefik_charm, forward_auth_tester_
         trust=True,
     )
 
-    # Deploy the iap-requirer charm with integrations
+    # Deploy the iap-requirer charm via any-charm-k8s
     await ops_test.model.deploy(
+        forward_auth_tester_charm["charm"],
         application_name=IAP_REQUIRER_CHARM,
-        entity_url=forward_auth_tester_charm,
-        resources={"oci-image": "kennethreitz/httpbin"},
+        channel=forward_auth_tester_charm["channel"],
+        config=forward_auth_tester_charm.get("config", {}),
         trust=True,
     )
 
-    await ops_test.model.integrate(f"{IAP_REQUIRER_CHARM}:ingress", TRAEFIK_CHARM)
-    await ops_test.model.integrate(f"{IAP_REQUIRER_CHARM}:auth-proxy", OATHKEEPER_CHARM)
+    await ops_test.model.integrate(f"{IAP_REQUIRER_CHARM}:require-ingress", TRAEFIK_CHARM)
+    await ops_test.model.integrate(f"{IAP_REQUIRER_CHARM}:require-auth-proxy", OATHKEEPER_CHARM)
 
     await ops_test.model.integrate(f"{TRAEFIK_CHARM}:experimental-forward-auth", OATHKEEPER_CHARM)
 
