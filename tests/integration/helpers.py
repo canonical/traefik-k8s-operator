@@ -16,7 +16,7 @@ from constants import (
     ALERTMANAGER_APP_NAME,
     MANUAL_TLS_APP_NAME,
     MOCK_HOSTNAME,
-    NUM_TRAEFIK_UNITS,
+    SSC_APP_NAME,
     TRAEFIK_APP_NAME,
 )
 from cryptography import x509
@@ -162,6 +162,19 @@ def sign_csrs_and_provide_cert(
     provide_certificate(juju, outstanding_csrs)
 
 
+def pull_ssc_ca_certificate(
+    juju: jubilant.Juju, tmp_path: Path, ssc_app: str = SSC_APP_NAME
+) -> Path:
+    """Pull the self-signed provider CA certificate and store it for HTTPS verification."""
+    global ca_cert_path
+    result = juju.run(f"{ssc_app}/0", "get-ca-certificate")
+    ca_pem = result.results["ca-certificate"]
+    ca_cert_path = tmp_path / "ca.cert"
+    ca_cert_path.write_text(ca_pem)
+    logger.info("Pulled CA cert (%d bytes) from %s to %s", len(ca_pem), ssc_app, ca_cert_path)
+    return ca_cert_path
+
+
 # --- Verification -----------------------------------------------------------
 def _alertmanager_url(juju: jubilant.Juju) -> str:
     # show-proxied-endpoints only returns the full endpoint map on the leader.
@@ -190,7 +203,8 @@ def _get_with_retry(session: requests.Session, url: str) -> None:
 
 
 def verify_https_on_all_units(
-    juju: jubilant.Juju, expected_url: Optional[str] = None
+    juju: jubilant.Juju,
+    expected_url: Optional[str] = None,
 ) -> str:
     """Assert HTTPS is reachable through every traefik unit with the CA cert.
 
@@ -205,9 +219,6 @@ def verify_https_on_all_units(
 
     status = juju.status()
     units = status.apps[TRAEFIK_APP_NAME].units
-    assert len(units) == NUM_TRAEFIK_UNITS, (
-        f"Expected {NUM_TRAEFIK_UNITS} traefik units, got {len(units)}"
-    )
 
     for unit_name, unit_status in units.items():
         unit_ip = unit_status.address
@@ -215,6 +226,38 @@ def verify_https_on_all_units(
         session = requests.Session()
         session.mount("https://", DNSResolverHTTPSAdapter(MOCK_HOSTNAME, unit_ip))
         session.verify = str(ca_cert_path)
+        _get_with_retry(session, alertmanager_url)
+
+    return alertmanager_url
+
+
+def verify_http_on_all_units(
+    juju: jubilant.Juju,
+    expected_url: Optional[str] = None,
+) -> str:
+    """Assert HTTP is reachable through every traefik unit.
+
+    Returns the alertmanager URL that was verified so callers can assert it is
+    unchanged across an upgrade.
+    """
+    alertmanager_url = _alertmanager_url(juju)
+    assert alertmanager_url.startswith("http://"), (
+        "expected plain HTTP proxied URL without a certificate provider, got "
+        f"{alertmanager_url!r}"
+    )
+    if expected_url is not None:
+        assert alertmanager_url == expected_url, (
+            f"Proxied URL changed across upgrade: {expected_url!r} -> {alertmanager_url!r}"
+        )
+
+    status = juju.status()
+    units = status.apps[TRAEFIK_APP_NAME].units
+
+    for unit_name, unit_status in units.items():
+        unit_ip = unit_status.address
+        logger.info("Verifying HTTP on %s (%s) -> %s", unit_name, unit_ip, alertmanager_url)
+        session = requests.Session()
+        session.headers["Host"] = MOCK_HOSTNAME
         _get_with_retry(session, alertmanager_url)
 
     return alertmanager_url
@@ -243,7 +286,7 @@ def force_leader_change(juju: jubilant.Juju, app: str = TRAEFIK_APP_NAME) -> str
     juju.exec("/charm/bin/pebble", "stop-checks", "liveness", unit=old_leader)
     # Run the agent stop in the background: a blocking juju exec would otherwise
     # wait for the task to complete, but the task kills the agent that reports
-    # completion and can therefore hang until Juju times it out.
+    # completion and can therefore get stuck until Juju times it out.
     juju.exec(
         "nohup /charm/bin/pebble stop container-agent >/dev/null 2>&1 &",
         unit=old_leader,
@@ -274,6 +317,19 @@ def verify_https_on_unit(juju: jubilant.Juju, unit_name: str, alertmanager_url: 
     session.verify = str(ca_cert_path)
     response = session.get(alertmanager_url, timeout=30)
     response.raise_for_status()
+
+
+def verify_http_on_unit(juju: jubilant.Juju, unit_name: str, alertmanager_url: str) -> None:
+    """Assert HTTP returns 200 on a specific traefik unit."""
+    assert alertmanager_url.startswith("http://"), (
+        "expected plain HTTP proxied URL without a certificate provider, got "
+        f"{alertmanager_url!r}"
+    )
+    unit_ip = _unit_address(juju, unit_name)
+    logger.info("Verifying HTTP on %s (%s) -> %s", unit_name, unit_ip, alertmanager_url)
+    session = requests.Session()
+    session.headers["Host"] = MOCK_HOSTNAME
+    _get_with_retry(session, alertmanager_url)
 
 
 def verify_https_broken_on_unit(juju: jubilant.Juju, unit_name: str, alertmanager_url: str) -> None:
@@ -313,4 +369,24 @@ def bring_up_certified_traefik(juju: jubilant.Juju, tmp_path: Path) -> str:
     juju.wait(all_settled, timeout=900)
 
     return verify_https_on_all_units(juju)
+
+
+def bring_up_self_signed_traefik(
+    juju: jubilant.Juju, tmp_path: Path, ssc_app: str = SSC_APP_NAME
+) -> str:
+    """Integrate self-signed-certificates + alertmanager and verify HTTPS on traefik."""
+    juju.integrate(f"{ssc_app}:certificates", f"{TRAEFIK_APP_NAME}:certificates")
+    juju.integrate(f"{ALERTMANAGER_APP_NAME}:ingress", TRAEFIK_APP_NAME)
+
+    juju.wait(all_settled, delay=5, timeout=900)
+    pull_ssc_ca_certificate(juju, tmp_path, ssc_app=ssc_app)
+
+    return verify_https_on_all_units(juju)
+
+
+def bring_up_traefik_without_certificate_provider(juju: jubilant.Juju) -> str:
+    """Integrate alertmanager only and verify plain HTTP on all traefik units."""
+    juju.integrate(f"{ALERTMANAGER_APP_NAME}:ingress", TRAEFIK_APP_NAME)
+    juju.wait(all_settled, delay=5, timeout=900)
+    return verify_http_on_all_units(juju)
 

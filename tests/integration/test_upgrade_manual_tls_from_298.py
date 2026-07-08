@@ -39,7 +39,7 @@ SOURCE_REVISION = 298
 
 
 @pytest.mark.setup
-def test_upgrade_from_revision_298(
+def test_upgrade_manual_tls_from_revision_298(
     juju: jubilant.Juju, traefik_charm, manual_tls_app, alertmanager_app, tmp_path
 ):
     """Traefik keeps serving the same certificate after upgrading from rev 298."""
