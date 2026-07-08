@@ -2,15 +2,15 @@
 version_schema: 2
 # The key holding the change(s)
 changes:
-  - title: Preserved the existing TLS private key on charm upgrade
+  - title: Handle TLS private key and CSR migration
     author: swetha1654
     type: bugfix
     description: |
       Reworked the TLS private key handling so that an existing private key,
       stored in a Juju secret by an earlier revision, is reused on upgrade
-      instead of generating a new one. This prevents an unnecessary new CSR
-      and certificate re-issuance, supporting both the app-owned `tls-key`
-      secret (rev >= 281) and the legacy per-unit secret (rev <= 280).
+      instead of generating a new one. Also during migration from unit to app mode,
+      copy the CSR from the unit databag to app databag. This prevents an 
+      unnecessary new CSR re-issuance.
     urls:
       pr:
         - https://github.com/canonical/traefik-k8s-operator/pull/729
