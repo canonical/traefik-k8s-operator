@@ -66,20 +66,29 @@ def test_ipu_charm_has_ingress(juju: jubilant.Juju):
 
 
 def test_relation_data_shape(juju: jubilant.Juju):
-    relation = _relation_info(
+    # Requirer unit data is visible from the provider (traefik) side
+    traefik_rel = _relation_info(
         juju,
         remote_unit=f"{TRAEFIK_APP}/0",
         remote_endpoint="ingress-per-unit",
         local_unit=f"{IPU_TESTER_APP}/0",
         local_endpoint="require-ingress-per-unit",
     )
-    requirer_unit_data = relation["related-units"][f"{IPU_TESTER_APP}/0"]["data"]
+    requirer_unit_data = traefik_rel["related-units"][f"{IPU_TESTER_APP}/0"]["data"]
     assert _dequote(requirer_unit_data["name"]) == f"{IPU_TESTER_APP}/0"
     assert _dequote(requirer_unit_data["port"]) == "80"
     assert _dequote(requirer_unit_data["host"]) == "foo.bar"
     model = _dequote(requirer_unit_data["model"])
 
-    provider_app_data = yaml.safe_load(relation["application-data"]["ingress"])
+    # Provider app data (ingress URL) is visible from the requirer side
+    tester_rel = _relation_info(
+        juju,
+        remote_unit=f"{IPU_TESTER_APP}/0",
+        remote_endpoint="require-ingress-per-unit",
+        local_unit=f"{TRAEFIK_APP}/0",
+        local_endpoint="ingress-per-unit",
+    )
+    provider_app_data = yaml.safe_load(tester_rel["application-data"]["ingress"])
     traefik_address = get_k8s_service_address(juju.model, f"{TRAEFIK_APP}-lb")
     assert traefik_address, "Expected a traefik load balancer address"
     assert provider_app_data == {

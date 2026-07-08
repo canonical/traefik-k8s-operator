@@ -83,10 +83,10 @@ def test_tcp_ipa_compatibility(juju: jubilant.Juju):
 
     ipa_relation = _relation_info(
         juju,
-        remote_unit=f"{TRAEFIK_APP}/0",
-        remote_endpoint="ingress",
-        local_unit=f"{IPA_TESTER_APP}/0",
-        local_endpoint="require-ingress",
+        remote_unit=f"{IPA_TESTER_APP}/0",
+        remote_endpoint="require-ingress",
+        local_unit=f"{TRAEFIK_APP}/0",
+        local_endpoint="ingress",
     )
     ipa_url = yaml.safe_load(ipa_relation["application-data"]["ingress"])["url"]
     parsed = urlparse(ipa_url)

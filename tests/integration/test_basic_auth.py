@@ -95,12 +95,13 @@ def _relation_info(
 
 
 def _get_tester_url(juju: jubilant.Juju) -> str:
+    # Provider app data (ingress URL) is in application-data when viewing from the requirer side
     relation = _relation_info(
         juju,
-        remote_unit=f"{TRAEFIK_APP}/0",
-        remote_endpoint="ingress",
-        local_unit=f"{IPA_TESTER_APP}/0",
-        local_endpoint="require-ingress",
+        remote_unit=f"{IPA_TESTER_APP}/0",
+        remote_endpoint="require-ingress",
+        local_unit=f"{TRAEFIK_APP}/0",
+        local_endpoint="ingress",
     )
     app_data = yaml.safe_load(relation["application-data"]["ingress"])
     return app_data["url"]

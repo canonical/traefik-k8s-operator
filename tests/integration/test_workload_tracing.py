@@ -65,6 +65,15 @@ def _deploy_tempo_cluster(juju: jubilant.Juju) -> None:
     juju.integrate(f"{TEMPO_APP}:s3", f"{S3_INTEGRATOR_APP}:s3-credentials")
     juju.integrate(f"{TEMPO_APP}:tempo-cluster", f"{TEMPO_WORKER_APP}:tempo-cluster")
 
+    # Wait for minio to be active and have an address before connecting to it
+    juju.wait(
+        lambda status: (
+            jubilant.all_active(status, MINIO_APP)
+            and bool(status.apps[MINIO_APP].units.get(f"{MINIO_APP}/0", None))
+            and bool(status.apps[MINIO_APP].units[f"{MINIO_APP}/0"].address)
+        ),
+        timeout=600,
+    )
     minio_addr = juju.status().apps[MINIO_APP].units[f"{MINIO_APP}/0"].address
     client = Minio(
         f"{minio_addr}:9000",
