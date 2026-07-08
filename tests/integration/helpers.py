@@ -282,7 +282,7 @@ def force_leader_change(juju: jubilant.Juju, app: str = TRAEFIK_APP_NAME) -> str
         ) from exc
     new_leader = leader_unit_name(juju, app)
     logger.info("Leadership moved from %s to %s", old_leader, new_leader)
-    # Trigger a hook on the new leader so it can react to the leadership change. 
+    # Trigger a hook on the new leader so it can react to the leadership change.
     # Traefik currently does not observe leader-elected hook.
     juju.config(app, {"loadbalancer_annotations": " "})
     # Bring the old leader back: re-enable liveness checks and restart its container-agent.
