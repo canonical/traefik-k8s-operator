@@ -18,8 +18,6 @@ IPU_TESTER = "ipu-tester"
 ROUTE_TESTER = "route-tester"
 CERTIFICATE_PROVIDER = "self-signed-certificates"
 
-INGRESS_REQUIRER_TESTER_RESOURCES = {"echo-server-image": "jmalloc/echo-server:v0.3.7"}
-
 
 @pytest.mark.abort_on_fail
 async def test_deployment(ops_test: OpsTest, traefik_charm):
@@ -59,13 +57,22 @@ async def test_deploy_dependencies(ops_test: OpsTest, traefik_charm):
 async def test_deploy_testers(ops_test: OpsTest, ingress_requirer_mock):
     await asyncio.gather(
         ops_test.model.deploy(
-            ingress_requirer_mock, IPA_TESTER, resources=INGRESS_REQUIRER_TESTER_RESOURCES
+            ingress_requirer_mock["charm"],
+            IPA_TESTER,
+            channel=ingress_requirer_mock["channel"],
+            config=ingress_requirer_mock.get("config", {}),
         ),
         ops_test.model.deploy(
-            ingress_requirer_mock, IPU_TESTER, resources=INGRESS_REQUIRER_TESTER_RESOURCES
+            ingress_requirer_mock["charm"],
+            IPU_TESTER,
+            channel=ingress_requirer_mock["channel"],
+            config=ingress_requirer_mock.get("config", {}),
         ),
         ops_test.model.deploy(
-            ingress_requirer_mock, ROUTE_TESTER, resources=INGRESS_REQUIRER_TESTER_RESOURCES
+            ingress_requirer_mock["charm"],
+            ROUTE_TESTER,
+            channel=ingress_requirer_mock["channel"],
+            config=ingress_requirer_mock.get("config", {}),
         ),
     )
 
@@ -76,9 +83,13 @@ async def test_deploy_testers(ops_test: OpsTest, ingress_requirer_mock):
 
 @pytest.mark.abort_on_fail
 async def test_relate_testers(ops_test: OpsTest):
-    await ops_test.model.add_relation(f"{TRAEFIK}:ingress", f"{IPA_TESTER}:ingress")
-    await ops_test.model.add_relation(f"{TRAEFIK}:ingress-per-unit", f"{IPU_TESTER}")
-    await ops_test.model.add_relation(f"{TRAEFIK}:traefik-route", f"{ROUTE_TESTER}")
+    await ops_test.model.add_relation(f"{TRAEFIK}:ingress", f"{IPA_TESTER}:require-ingress")
+    await ops_test.model.add_relation(
+        f"{TRAEFIK}:ingress-per-unit", f"{IPU_TESTER}:require-ingress-per-unit"
+    )
+    await ops_test.model.add_relation(
+        f"{TRAEFIK}:traefik-route", f"{ROUTE_TESTER}:require-traefik-route"
+    )
     await ops_test.model.wait_for_idle([TRAEFIK, IPA_TESTER, IPU_TESTER, ROUTE_TESTER])
 
 
@@ -201,6 +212,7 @@ async def test_ipa_ingressed_through_upstream_ingress_with_tls(ops_test: OpsTest
         200,
     )
 
+
 @pytest.mark.abort_on_fail
 async def test_ipu_ingressed_through_upstream_ingress_with_tls(ops_test: OpsTest):
     """Assert that the IPU app can be reached through the layered ingresses with TLS enabled."""
@@ -212,6 +224,7 @@ async def test_ipu_ingressed_through_upstream_ingress_with_tls(ops_test: OpsTest
         ),
         200,
     )
+
 
 @pytest.mark.abort_on_fail
 async def test_traefik_route_ingressed_through_upstream_ingress_with_tls(ops_test: OpsTest):
@@ -237,7 +250,7 @@ async def get_traefik_url(ops_test: OpsTest, traefik_app_name: str = TRAEFIK):
     external_endpoints = yaml.safe_load(external_endpoints_action_results["external-endpoints"])
     return external_endpoints[traefik_app_name]["url"]
 
-@retry(wait=wait_fixed(2), stop=stop_after_delay(5 * 1))
+@retry(wait=wait_fixed(5), stop=stop_after_delay(60))
 def assert_get_url_returns(url: str, expected: int):
     try:
         r = requests.get(url, timeout=1, verify=False)

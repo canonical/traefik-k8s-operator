@@ -20,7 +20,12 @@ from tests.integration.legacy.helpers import dequote, get_k8s_service_address, r
 @pytest.mark.abort_on_fail
 async def test_deployment(ops_test: OpsTest, traefik_charm, ipu_tester_charm):
     await deploy_traefik_if_not_deployed(ops_test, traefik_charm)
-    await ops_test.model.deploy(ipu_tester_charm, "ipu-tester")
+    await ops_test.model.deploy(
+        ipu_tester_charm["charm"],
+        "ipu-tester",
+        channel=ipu_tester_charm["channel"],
+        config=ipu_tester_charm.get("config", {}),
+    )
     await ops_test.model.wait_for_idle(
         ["traefik-k8s", "ipu-tester"], status="active", timeout=1000
     )
@@ -29,14 +34,14 @@ async def test_deployment(ops_test: OpsTest, traefik_charm, ipu_tester_charm):
 @pytest.mark.abort_on_fail
 async def test_relate(ops_test: OpsTest):
     await ops_test.model.add_relation(
-        "ipu-tester:ingress-per-unit", "traefik-k8s:ingress-per-unit"
+        "ipu-tester:require-ingress-per-unit", "traefik-k8s:ingress-per-unit"
     )
     await ops_test.model.wait_for_idle(["traefik-k8s", "ipu-tester"])
 
 
 def assert_ipu_charm_has_ingress(ops_test: OpsTest):
     data = get_relation_data(
-        requirer_endpoint="ipu-tester/0:ingress-per-unit",
+        requirer_endpoint="ipu-tester/0:require-ingress-per-unit",
         provider_endpoint="traefik-k8s/0:ingress-per-unit",
         model=ops_test.model_full_name,
     )
@@ -56,7 +61,7 @@ async def test_ipu_charm_has_ingress(ops_test: OpsTest):
 @pytest.mark.abort_on_fail
 async def test_relation_data_shape(ops_test: OpsTest):
     data = get_relation_data(
-        requirer_endpoint="ipu-tester/0:ingress-per-unit",
+        requirer_endpoint="ipu-tester/0:require-ingress-per-unit",
         provider_endpoint="traefik-k8s/0:ingress-per-unit",
         model=ops_test.model_full_name,
     )
@@ -67,9 +72,9 @@ async def test_relation_data_shape(ops_test: OpsTest):
     # model: foo
     # name: ipu-tester/0
     # port: 9090
-    assert dequote(requirer_unit_data["name"] == "ipu-tester/0")
-    assert dequote(requirer_unit_data["port"] == "80")
-    assert dequote(requirer_unit_data["host"] == "foo.bar")
+    assert dequote(requirer_unit_data["name"]) == "ipu-tester/0"
+    assert dequote(requirer_unit_data["port"]) == "80"
+    assert dequote(requirer_unit_data["host"]) == "foo.bar"
     model = dequote(requirer_unit_data["model"])
 
     provider_app_data = yaml.safe_load(data.provider.application_data["ingress"])
@@ -85,7 +90,7 @@ async def test_relation_data_shape(ops_test: OpsTest):
 
 @pytest.mark.abort_on_fail
 async def test_remove_relation(ops_test: OpsTest):
-    await ops_test.juju("relate", "ipu-tester:ingress-per-unit", "traefik-k8s:ingress-per-unit")
+    await ops_test.juju("remove-relation", "ipu-tester:require-ingress-per-unit", "traefik-k8s:ingress-per-unit")
     await ops_test.model.wait_for_idle(["traefik-k8s", "ipu-tester"], status="active")
 
 

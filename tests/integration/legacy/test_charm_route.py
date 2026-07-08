@@ -1,10 +1,10 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 import asyncio
+import json
 import shlex
 import socket
 import urllib.error
-from pathlib import Path
 from subprocess import PIPE, Popen
 from urllib.request import Request, urlopen
 
@@ -18,12 +18,6 @@ from tests.integration.legacy.helpers import get_k8s_service_address, remove_app
 APP_NAME = "traefik"
 TESTER_APP_NAME = "route"
 
-route_charm_root = (Path(__file__).parent.parent / "testers" / "route").absolute()
-route_charm_meta = yaml.safe_load((route_charm_root / "metadata.yaml").read_text())
-route_charm_resources = {
-    name: val["upstream-source"] for name, val in route_charm_meta["resources"].items()
-}
-
 
 @pytest.mark.abort_on_fail
 @pytest.mark.setup
@@ -32,7 +26,12 @@ async def test_deployment(ops_test: OpsTest, traefik_charm, route_tester_charm):
         ops_test.model.deploy(
             traefik_charm, application_name=APP_NAME, resources=trfk_resources, trust=True
         ),
-        ops_test.model.deploy(route_tester_charm, TESTER_APP_NAME, resources=route_charm_resources),
+        ops_test.model.deploy(
+            route_tester_charm["charm"],
+            TESTER_APP_NAME,
+            channel=route_tester_charm["channel"],
+            config=route_tester_charm.get("config", {}),
+        ),
     )
 
     await ops_test.model.wait_for_idle([APP_NAME, TESTER_APP_NAME], status="active", timeout=1000)
@@ -41,7 +40,7 @@ async def test_deployment(ops_test: OpsTest, traefik_charm, route_tester_charm):
 @pytest.mark.setup
 async def test_relate(ops_test: OpsTest):
     await ops_test.model.add_relation(
-        f"{TESTER_APP_NAME}:traefik-route", f"{APP_NAME}:traefik-route"
+        f"{TESTER_APP_NAME}:require-traefik-route", f"{APP_NAME}:traefik-route"
     )
     await ops_test.model.wait_for_idle([APP_NAME, TESTER_APP_NAME])
 
@@ -50,7 +49,7 @@ async def test_dynamic_config_created(ops_test: OpsTest):
     relation = [
         r
         for r in ops_test.model.relations
-        if r.matches(f"{TESTER_APP_NAME}:traefik-route", f"{APP_NAME}:traefik-route")
+        if r.matches(f"{TESTER_APP_NAME}:require-traefik-route", f"{APP_NAME}:traefik-route")
     ][0]
     relation_id = relation.entity_id
     cmd = (
@@ -112,16 +111,17 @@ async def test_scale_and_get_external_host(ops_test: OpsTest):
     unit_0 = ops_test.model.applications[TESTER_APP_NAME].units[0]
     unit_1 = ops_test.model.applications[TESTER_APP_NAME].units[1]
 
-    action_0 = await unit_0.run_action("get-external-host")
-    action_1 = await unit_1.run_action("get-external-host")
+    action_0 = await unit_0.run_action("rpc", method="get_external_host", kwargs="{}")
+    action_1 = await unit_1.run_action("rpc", method="get_external_host", kwargs="{}")
 
     result_0 = await action_0.wait()
     result_1 = await action_1.wait()
 
     traefik_ip = await get_k8s_service_address(ops_test, f"{APP_NAME}-lb")
 
-    external_host_0 = result_0.results.get("external-host")
-    external_host_1 = result_1.results.get("external-host")
+    # any-charm rpc returns JSON-encoded string under "return" key
+    external_host_0 = json.loads(result_0.results.get("return", "null"))
+    external_host_1 = json.loads(result_1.results.get("return", "null"))
 
     assert external_host_0 == external_host_1, (
         f"External host values should match: {external_host_0} vs {external_host_1}"
@@ -135,7 +135,7 @@ async def test_scale_and_get_external_host(ops_test: OpsTest):
 @pytest.mark.teardown
 async def test_remove_relation(ops_test: OpsTest):
     await ops_test.juju(
-        "remove-relation", f"{TESTER_APP_NAME}:traefik-route", f"{APP_NAME}:traefik-route"
+        "remove-relation", f"{TESTER_APP_NAME}:require-traefik-route", f"{APP_NAME}:traefik-route"
     )
     await ops_test.model.wait_for_idle([APP_NAME], status="active")
 

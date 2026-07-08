@@ -32,7 +32,12 @@ async def test_deployment(ops_test: OpsTest, traefik_charm, ipa_tester_charm):
         ops_test.model.deploy(
             traefik_charm, application_name=APP_NAME, resources=trfk_resources, trust=True
         ),
-        ops_test.model.deploy(ipa_tester_charm, IPA),
+        ops_test.model.deploy(
+            ipa_tester_charm["charm"],
+            IPA,
+            channel=ipa_tester_charm["channel"],
+            config=ipa_tester_charm.get("config", {}),
+        ),
     )
 
     await ops_test.model.wait_for_idle([APP_NAME, IPA], status="active", timeout=1000)
@@ -41,13 +46,13 @@ async def test_deployment(ops_test: OpsTest, traefik_charm, ipa_tester_charm):
 @pytest.mark.abort_on_fail
 @pytest.mark.skip_on_deployed
 async def test_relate(ops_test: OpsTest):
-    await ops_test.model.add_relation("ipa-tester:ingress", f"{APP_NAME}:ingress")
+    await ops_test.model.add_relation("ipa-tester:require-ingress", f"{APP_NAME}:ingress")
     await ops_test.model.wait_for_idle([APP_NAME, IPA])
 
 
 def get_tester_url(model):
     data = get_relation_data(
-        requirer_endpoint=f"{IPA}/0:ingress",
+        requirer_endpoint=f"{IPA}/0:require-ingress",
         provider_endpoint=f"{APP_NAME}/0:ingress",
         model=model,
     )
