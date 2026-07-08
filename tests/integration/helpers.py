@@ -12,6 +12,13 @@ from typing import List, Optional
 
 import jubilant
 import requests
+from constants import (
+    ALERTMANAGER_APP_NAME,
+    MANUAL_TLS_APP_NAME,
+    MOCK_HOSTNAME,
+    NUM_TRAEFIK_UNITS,
+    TRAEFIK_APP_NAME,
+)
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
@@ -24,14 +31,6 @@ from tenacity import (
     retry_if_result,
     stop_after_delay,
     wait_fixed,
-)
-
-from constants import (
-    ALERTMANAGER_APP_NAME,
-    MANUAL_TLS_APP_NAME,
-    MOCK_HOSTNAME,
-    NUM_TRAEFIK_UNITS,
-    TRAEFIK_APP_NAME,
 )
 
 logger = logging.getLogger(__name__)
@@ -221,6 +220,80 @@ def verify_https_on_all_units(
     return alertmanager_url
 
 
+def leader_unit_name(juju: jubilant.Juju, app: str = TRAEFIK_APP_NAME) -> str:
+    """Return the name of the current leader unit of *app*."""
+    for name, unit in juju.status().apps[app].units.items():
+        if unit.leader:
+            return name
+    raise AssertionError(f"no leader found for {app!r}")
+
+
+def _unit_address(juju: jubilant.Juju, unit_name: str, app: str = TRAEFIK_APP_NAME) -> str:
+    """Return unit IP address for *unit_name* in *app* or raise if missing."""
+    units = juju.status().apps[app].units
+    assert unit_name in units, f"{unit_name} not found in {app} units"
+    return units[unit_name].address
+
+
+def force_leader_change(juju: jubilant.Juju, app: str = TRAEFIK_APP_NAME) -> str:
+    """Force a leadership change by stopping the current leader's unit agent."""
+    old_leader = leader_unit_name(juju, app)
+    logger.info("Stopping the container-agent on leader %s to force a leadership change", old_leader)
+    # stop-checks liveness prevents pebble from restarting the agent as unhealthy.
+    juju.exec("/charm/bin/pebble", "stop-checks", "liveness", unit=old_leader)
+    # Run the agent stop in the background: a blocking juju exec would otherwise
+    # wait for the task to complete, but the task kills the agent that reports
+    # completion and can therefore hang until Juju times it out.
+    juju.exec(
+        "nohup /charm/bin/pebble stop container-agent >/dev/null 2>&1 &",
+        unit=old_leader,
+    )
+
+    def _reelected(status: jubilant.Status) -> bool:
+        units = status.apps[app].units
+        leaders = [name for name, unit in units.items() if unit.leader]
+        return len(leaders) == 1 and leaders[0] != old_leader
+
+    try:
+        juju.wait(_reelected, timeout=120, delay=5)
+    except TimeoutError as exc:
+        raise AssertionError(
+            f"leadership did not move away from {old_leader} within 2 minutes"
+        ) from exc
+    new_leader = leader_unit_name(juju, app)
+    logger.info("Leadership moved from %s to %s", old_leader, new_leader)
+    return new_leader
+
+
+def verify_https_on_unit(juju: jubilant.Juju, unit_name: str, alertmanager_url: str) -> None:
+    """Assert HTTPS returns 200 with the CA cert on a specific traefik unit."""
+    unit_ip = _unit_address(juju, unit_name)
+    logger.info("Verifying HTTPS on %s (%s) -> %s", unit_name, unit_ip, alertmanager_url)
+    session = requests.Session()
+    session.mount("https://", DNSResolverHTTPSAdapter(MOCK_HOSTNAME, unit_ip))
+    session.verify = str(ca_cert_path)
+    response = session.get(alertmanager_url, timeout=30)
+    response.raise_for_status()
+
+
+def verify_https_broken_on_unit(juju: jubilant.Juju, unit_name: str, alertmanager_url: str) -> None:
+    """Assert HTTPS is NOT reachable with the CA cert on a specific traefik unit."""
+    unit_ip = _unit_address(juju, unit_name)
+    logger.info("Expecting broken HTTPS on %s (%s) -> %s", unit_name, unit_ip, alertmanager_url)
+    session = requests.Session()
+    session.mount("https://", DNSResolverHTTPSAdapter(MOCK_HOSTNAME, unit_ip))
+    session.verify = str(ca_cert_path)
+    try:
+        response = session.get(alertmanager_url, timeout=30)
+        response.raise_for_status()
+    except (requests.exceptions.SSLError, requests.exceptions.ConnectionError):
+        return  # expected: cert no longer trusted / endpoint down
+    raise AssertionError(
+        f"HTTPS unexpectedly succeeded on {unit_name}; the served certificate "
+        "is still trusted after the leadership change"
+    )
+
+
 # --- Composite flows --------------------------------------------------------
 def bring_up_certified_traefik(juju: jubilant.Juju, tmp_path: Path) -> str:
     """Integrate the mTLS + alertmanager stack, sign traefik's CSRs and verify HTTPS.
@@ -235,7 +308,7 @@ def bring_up_certified_traefik(juju: jubilant.Juju, tmp_path: Path) -> str:
     juju.integrate(f"{MANUAL_TLS_APP_NAME}:certificates", f"{TRAEFIK_APP_NAME}:certificates")
     juju.integrate(f"{ALERTMANAGER_APP_NAME}:ingress", TRAEFIK_APP_NAME)
 
-    juju.wait(jubilant.all_agents_idle, timeout=900)
+    juju.wait(jubilant.all_agents_idle, timeout=900, delay=5, successes=5)
     sign_csrs_and_provide_cert(juju)
     juju.wait(all_settled, timeout=900)
 

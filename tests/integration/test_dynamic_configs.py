@@ -48,6 +48,7 @@ def _list_dynamic_configs(juju, traefik_app):
 
 def test_dynamic_configs_present(juju, traefik_app, alertmanager_app, deploy_catalogue):
     """After integrating 2 apps, verify dynamic config files exist in the container."""
+    juju.wait(all_settled, delay=5, timeout=600)
     files = _list_dynamic_configs(juju, traefik_app)
     logger.info("Dynamic config files in container: %s", files)
 

@@ -1,0 +1,20 @@
+# Version of the artifact schema
+version_schema: 2
+# The key holding the change(s)
+changes:
+  - title: Preserved the existing TLS private key on charm upgrade
+    author: swetha1654
+    type: bugfix
+    description: |
+      Reworked the TLS private key handling so that an existing private key,
+      stored in a Juju secret by an earlier revision, is reused on upgrade
+      instead of generating a new one. This prevents an unnecessary new CSR
+      and certificate re-issuance, supporting both the app-owned `tls-key`
+      secret (rev >= 281) and the legacy per-unit secret (rev <= 280).
+    urls:
+      pr:
+        - https://github.com/canonical/traefik-k8s-operator/pull/729
+      related_doc:
+      related_issue:
+    visibility: public
+    highlight: false

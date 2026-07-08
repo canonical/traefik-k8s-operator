@@ -139,6 +139,7 @@ CERTIFICATES_RELATION_NAME = "certificates"
 PEER_RELATION_NAME = "peers"
 TLS_KEY_LABEL = "tls-key"
 PRIVATE_KEY_FIELD = "private-key"
+CSR_DATABAG_KEY = "certificate_signing_requests"
 
 
 class _IngressRelationType(enum.Enum):
@@ -266,6 +267,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         )
 
         self.csrs = self._get_valid_csrs()
+        self._migrate_unit_csrs_to_app_databag()
         self.certs = TLSCertificatesRequiresV4(
             charm=self,
             relationship_name=CERTIFICATES_RELATION_NAME,
@@ -439,6 +441,12 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
                 "it is likely corrupt and requires manual intervention."
             ) from exc
 
+        if not private_keys:
+            raise RuntimeError(
+                "The 'tls-key' secret has an empty 'private-keys' map; "
+                "it is likely corrupt and requires manual intervention."
+            )
+
         # Exclude the user-provided config key stored under 'local-config'; every
         # remaining entry is the (identical) library-managed private key.
         for hostname, key in private_keys.items():
@@ -470,6 +478,29 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
                 "intervention."
             )
         return key
+
+    def _migrate_unit_csrs_to_app_databag(self) -> None:
+        """Migrate CSRs from unit relation data (Mode.UNIT) to app relation data (Mode.APP)."""
+        if not self.unit.is_leader():
+            return
+        relation = self.model.get_relation(CERTIFICATES_RELATION_NAME)
+        if not relation:
+            return
+        app_data = relation.data[self.app]
+        if app_data.get(CSR_DATABAG_KEY):
+            # Application slot already populated.
+            return
+        unit_csrs = relation.data[self.unit].get(CSR_DATABAG_KEY)
+        if not unit_csrs:
+            # No legacy unit-mode CSR to migrate.
+            return
+        # Copy the serialized CSR list verbatim so it matches exactly what the
+        # provider already signed.
+        app_data[CSR_DATABAG_KEY] = unit_csrs
+        logger.info(
+            "Migrated certificate signing request(s) from unit to application relation data "
+            "to preserve TLS across the Mode.UNIT -> Mode.APP upgrade."
+        )
 
     def _get_valid_csrs(self) -> List[CertificateRequestAttributes]:
         """Return a list of valid certificate requests."""
@@ -761,6 +792,20 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             and self.config.get("tls-key", None)
         ):
             return True
+        return False
+
+    def _certificates_pending(self) -> bool:
+        """Return True when a CSR has been sent but no certificate is available yet."""
+        if not self.unit.is_leader():
+            return False
+        if not self.model.relations.get(CERTIFICATES_RELATION_NAME):
+            return False
+        if not self.csrs:
+            return False
+        for csr in self.csrs:
+            cert, _ = self.certs.get_assigned_certificate(certificate_request=csr)
+            if cert is None:
+                return True
         return False
 
     def _on_workload_tracing_endpoint_removed(self, _: EventBase) -> None:
@@ -1327,6 +1372,10 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
 
         if not self.traefik.is_ready:
             self.unit.status = WaitingStatus(f"waiting for service: '{self.traefik.service_name}'")
+            return
+
+        if self._certificates_pending():
+            self.unit.status = BlockedStatus("Certificate not available yet")
             return
 
         # Update any upstream ingress relation with the current host, port, and scheme.

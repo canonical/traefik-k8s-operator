@@ -47,6 +47,7 @@ integration-suites:
       BASE/test_upgrade_manual_tls_from_280: ubuntu@20.04
       BASE/test_upgrade_manual_tls_from_298: ubuntu@20.04
       BASE/test_upgrade_manual_tls_from_280_via_298: ubuntu@20.04
+      BASE/test_upgrade_manual_tls_leader_change_from_298: ubuntu@20.04
   tests/integration/arm64:
     working-dir: ./
     summary: integration tests
