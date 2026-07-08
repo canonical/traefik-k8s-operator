@@ -8,7 +8,6 @@ httpbin-like HTTP server via pebble.
 """
 
 import logging
-import os
 import pathlib
 import sys
 
@@ -16,13 +15,13 @@ import ops
 from any_charm_base import AnyCharmBase
 from ops.pebble import Layer
 
-sys.path.insert(0, os.path.dirname(__file__))
+_src = pathlib.Path(__file__).parent
+sys.path.insert(0, str(_src))
 
 from charms.oathkeeper.v0.auth_proxy import AuthProxyConfig, AuthProxyRequirer  # noqa: E402
 from charms.traefik_k8s.v2.ingress import IngressPerAppRequirer  # noqa: E402
 
 logger = logging.getLogger(__name__)
-_src = pathlib.Path(os.path.dirname(__file__))
 
 AUTH_PROXY_ALLOWED_ENDPOINTS = ["anything/allowed"]
 AUTH_PROXY_HEADERS = ["X-User"]

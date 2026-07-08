@@ -7,7 +7,6 @@ Supports IPA, IPU, and traefik-route ingress modes (deploy multiple instances,
 each related to a different endpoint). Runs a minimal HTTP server via pebble.
 """
 
-import os
 import pathlib
 import socket
 import sys
@@ -16,13 +15,13 @@ import ops
 from any_charm_base import AnyCharmBase
 from ops.pebble import Layer
 
-sys.path.insert(0, os.path.dirname(__file__))
+_src = pathlib.Path(__file__).parent
+sys.path.insert(0, str(_src))
 
 from charms.traefik_k8s.v0.traefik_route import TraefikRouteRequirer  # noqa: E402
 from charms.traefik_k8s.v1.ingress_per_unit import IngressPerUnitRequirer  # noqa: E402
 from charms.traefik_k8s.v2.ingress import IngressPerAppRequirer  # noqa: E402
 
-_src = pathlib.Path(os.path.dirname(__file__))
 PORT = 8080
 
 
