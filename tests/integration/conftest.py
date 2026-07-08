@@ -1,7 +1,6 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 import logging
-import platform
 import subprocess
 from pathlib import Path
 
@@ -34,18 +33,17 @@ def pytest_addoption(parser: pytest.Parser) -> None:
 
 
 @pytest.fixture(scope="module")
-def juju(juju_factory) -> jubilant.Juju:
-    """Wrap pytest-jubilant's juju_factory with project-specific configuration.
+def juju(request: pytest.FixtureRequest) -> jubilant.Juju:
+    """Connect to the model pre-created by concierge (named by ``--juju-model``).
 
     - Sets a longer wait_timeout (jubilant's default is 3 min; charm operations need 10 min).
+    - Sets model constraints to the current machine arch so arm64 runners deploy arm64 units.
     - Pre-grants secret RBAC permissions so Juju 4 + canonical k8s secret hooks work reliably.
-      This is safe for both newly-created and pre-existing models because kubectl apply is
-      idempotent.
     """
-    _juju = juju_factory.get_juju("")
+    model = request.config.getoption("--juju-model") or "testing"
+    _juju = jubilant.Juju(model=model)
     _juju.wait_timeout = 10 * 60
-    _juju.cli("set-model-constraints", f"arch={_current_arch()}")
-    _grant_secret_rbac(_juju.model)
+    _grant_secret_rbac(model)
     return _juju
 
 
@@ -141,12 +139,3 @@ subjects:
         logger.warning("Could not pre-grant secret RBAC (kubectl not available?): %s", result.stderr)
     else:
         logger.info("Pre-granted secret RBAC in namespace %r", namespace)
-
-
-def _current_arch() -> str:
-    machine = platform.machine().lower()
-    if machine in ("x86_64", "amd64"):
-        return "amd64"
-    if machine in ("aarch64", "arm64"):
-        return "arm64"
-    return machine
