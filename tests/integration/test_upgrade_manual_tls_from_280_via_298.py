@@ -56,6 +56,7 @@ def test_upgrade_manual_tls_from_280_via_298(
         num_units=NUM_TRAEFIK_UNITS,
         trust=True,
     )
+    juju.wait(jubilant.all_agents_idle, timeout=900, delay=5, successes=5)
     url = bring_up_certified_traefik(juju, tmp_path)
 
     # Intermediate hop: 280 -> 298. The intermediate revision raises a fresh

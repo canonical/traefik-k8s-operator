@@ -52,6 +52,7 @@ def test_upgrade_manual_tls_from_revision_280(
         num_units=NUM_TRAEFIK_UNITS,
         trust=True,
     )
+    juju.wait(jubilant.all_agents_idle, timeout=900, delay=5, successes=5)
     url = bring_up_certified_traefik(juju, tmp_path)
 
     # Upgrade to the charm under test.

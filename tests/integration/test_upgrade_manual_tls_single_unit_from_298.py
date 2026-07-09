@@ -46,6 +46,7 @@ def test_upgrade_manual_tls_single_unit_from_298(
         revision=SOURCE_REVISION,
         trust=True,
     )
+    juju.wait(jubilant.all_agents_idle, timeout=900, delay=5, successes=5)
     url = bring_up_certified_traefik(juju, tmp_path)
     unit_name = next(iter(juju.status().apps[TRAEFIK_APP_NAME].units))
 

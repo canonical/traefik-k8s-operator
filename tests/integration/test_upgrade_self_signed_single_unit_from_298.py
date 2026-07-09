@@ -30,6 +30,7 @@ def test_upgrade_self_signed_single_unit_from_298(
         revision=SOURCE_REVISION,
         trust=True,
     )
+    juju.wait(jubilant.all_agents_idle, timeout=900, delay=5, successes=5)
     url = bring_up_self_signed_traefik(juju, tmp_path)
     unit_name = next(iter(juju.status().apps[TRAEFIK_APP_NAME].units))
 

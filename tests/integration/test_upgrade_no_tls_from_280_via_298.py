@@ -45,6 +45,7 @@ def test_upgrade_no_tls_from_280_via_298(
         num_units=NUM_TRAEFIK_UNITS,
         trust=True,
     )
+    juju.wait(jubilant.all_agents_idle, timeout=900, delay=5, successes=5)
     url = bring_up_traefik_without_certificate_provider(juju)
 
     juju.refresh(TRAEFIK_APP_NAME, channel=SOURCE_CHANNEL, revision=INTERMEDIATE_REVISION)

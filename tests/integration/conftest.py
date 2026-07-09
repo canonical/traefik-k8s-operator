@@ -75,6 +75,7 @@ def deploy_traefik(juju, traefik_charm):
         resources=TRAEFIK_RESOURCES,
         trust=True,
     )
+    juju.wait(jubilant.all_agents_idle, timeout=900, delay=5, successes=5)
     juju.config(TRAEFIK_APP_NAME, {"external_hostname": "traefik-demo.local"})
     juju.wait(all_settled, delay=5, timeout=600)
     return TRAEFIK_APP_NAME

@@ -23,6 +23,7 @@ def test_build_and_deploy(juju: jubilant.Juju, traefik_charm):
         resources=RESOURCES,
         trust=True,
     )
+    juju.wait(jubilant.all_agents_idle, timeout=900, delay=5, successes=5)
     juju.deploy(
         "ch:self-signed-certificates",
         SSC_NAME,

@@ -40,6 +40,7 @@ def test_upgrade_self_signed_from_revision_280(
         num_units=NUM_TRAEFIK_UNITS,
         trust=True,
     )
+    juju.wait(jubilant.all_agents_idle, timeout=900, delay=5, successes=5)
     url = bring_up_self_signed_traefik(juju, tmp_path)
 
     juju.refresh(TRAEFIK_APP_NAME, path=traefik_charm, resources=TRAEFIK_RESOURCES)

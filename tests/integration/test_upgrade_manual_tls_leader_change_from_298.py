@@ -58,6 +58,7 @@ def test_leader_change_breaks_tls_then_upgrade_blocks_and_requests_certificate(
         num_units=NUM_TRAEFIK_UNITS,
         trust=True,
     )
+    juju.wait(jubilant.all_agents_idle, timeout=900, delay=5, successes=5)
     alertmanager_url = bring_up_certified_traefik(juju, tmp_path)
 
     # newly elected leader is expected to break.

@@ -46,6 +46,7 @@ def test_upgrade_no_tls_leader_change_from_298(
         num_units=NUM_TRAEFIK_UNITS,
         trust=True,
     )
+    juju.wait(jubilant.all_agents_idle, timeout=900, delay=5, successes=5)
     alertmanager_url = bring_up_traefik_without_certificate_provider(juju)
 
     force_leader_change(juju, TRAEFIK_APP_NAME)
