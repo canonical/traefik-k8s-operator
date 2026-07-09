@@ -342,7 +342,7 @@ def bring_up_certified_traefik(juju: jubilant.Juju, tmp_path: Path) -> str:
 
     Creates the throwaway CA (populating the module-level CA globals) and assumes
     traefik, manual-tls-certificates and alertmanager have all been deployed (the
-    latter two via the ``manual_tls_app`` / ``alertmanager_app`` fixtures). Returns
+    latter two via the ``mtls_app`` / ``alertmanager_app`` fixtures). Returns
     the alertmanager URL so the caller can assert it is unchanged after upgrading.
     """
     generate_ca(tmp_path)

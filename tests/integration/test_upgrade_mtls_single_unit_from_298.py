@@ -2,11 +2,11 @@
 # Copyright 2026 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-"""Upgrade a single-unit traefik deployment from Charmhub revision 280.
+"""Upgrade a single-unit traefik deployment from Charmhub revision 298.
 
 Scenario:
 
-1. Deploy traefik-k8s (1 unit) at revision 280 and integrate it with
+1. Deploy traefik-k8s (1 unit) at revision 298 and integrate it with
    ``manual-tls-certificates`` and ``alertmanager``.
 2. Sign every outstanding CSR and provide the certificate back to traefik.
 3. Verify the ingress URL is reachable over HTTPS through the single traefik unit.
@@ -31,14 +31,14 @@ from helpers import (
 
 logger = logging.getLogger(__name__)
 
-SOURCE_REVISION = 280
+SOURCE_REVISION = 298
 
 
 @pytest.mark.setup
-def test_upgrade_manual_tls_single_unit_from_280(
-    juju: jubilant.Juju, traefik_charm, manual_tls_app, alertmanager_app, tmp_path
+def test_upgrade_mtls_single_unit_from_298(
+    juju: jubilant.Juju, traefik_charm, mtls_app, alertmanager_app, tmp_path
 ):
-    """A single traefik unit keeps serving the same certificate after upgrading from rev 280."""
+    """A single traefik unit keeps serving the same certificate after upgrading from rev 298."""
     juju.deploy(
         TRAEFIK_CHARM,
         TRAEFIK_APP_NAME,

@@ -96,8 +96,8 @@ def alertmanager_fixture(juju):
     return ALERTMANAGER_APP_NAME
 
 
-@pytest.fixture(scope="module", name="manual_tls_app")
-def manual_tls_fixture(juju):
+@pytest.fixture(scope="module", name="mtls_app")
+def mtls_fixture(juju):
     """Deploy the manual-tls-certificates charm (v4-capable ``1/stable`` track)."""
     juju.deploy(MANUAL_TLS_APP_NAME, MANUAL_TLS_APP_NAME, channel=MANUAL_TLS_CHANNEL)
     juju.wait(

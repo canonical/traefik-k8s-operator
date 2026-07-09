@@ -47,7 +47,7 @@ SOURCE_REVISION = 298
 
 @pytest.mark.setup
 def test_leader_change_breaks_tls_then_upgrade_blocks_and_requests_certificate(
-    juju: jubilant.Juju, traefik_charm, manual_tls_app, alertmanager_app, tmp_path
+    juju: jubilant.Juju, traefik_charm, mtls_app, alertmanager_app, tmp_path
 ):
     """A leadership change breaks TLS on rev 298; upgrade blocks and requests a cert."""
     juju.deploy(

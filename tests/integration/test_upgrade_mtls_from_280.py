@@ -2,17 +2,17 @@
 # Copyright 2026 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-"""Upgrade traefik from Charmhub revision 298 to the charm under test.
+"""Upgrade traefik from Charmhub revision 280 to the charm under test.
 
 Scenario:
 
-1. Deploy traefik-k8s (3 units) at revision 298 and integrate it with
+1. Deploy traefik-k8s (3 units) at revision 280 and integrate it with
    ``manual-tls-certificates`` and ``alertmanager``.
 2. Sign every outstanding CSR and provide the certificate back to traefik.
 3. Verify the ingress URL is reachable over HTTPS through every traefik unit.
 4. Refresh traefik to the locally built charm.
 5. Verify the *same* certificate still serves the *same* URL on every unit and
-   that the manual-tls charm has no outstanding certificate requests..
+   that the manual-tls charm has no outstanding certificate requests.
 """
 
 import logging
@@ -36,14 +36,14 @@ from helpers import (
 
 logger = logging.getLogger(__name__)
 
-SOURCE_REVISION = 298
+SOURCE_REVISION = 280
 
 
 @pytest.mark.setup
-def test_upgrade_manual_tls_from_revision_298(
-    juju: jubilant.Juju, traefik_charm, manual_tls_app, alertmanager_app, tmp_path
+def test_upgrade_mtls_from_revision_280(
+    juju: jubilant.Juju, traefik_charm, mtls_app, alertmanager_app, tmp_path
 ):
-    """Traefik keeps serving the same certificate after upgrading from rev 298."""
+    """Traefik keeps serving the same certificate after upgrading from rev 280."""
     juju.deploy(
         TRAEFIK_CHARM,
         TRAEFIK_APP_NAME,

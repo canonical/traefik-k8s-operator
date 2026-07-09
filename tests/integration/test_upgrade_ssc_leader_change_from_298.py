@@ -36,7 +36,7 @@ SOURCE_REVISION = 298
 
 
 @pytest.mark.setup
-def test_upgrade_self_signed_leader_change_from_298(
+def test_upgrade_ssc_leader_change_from_298(
     juju: jubilant.Juju, traefik_charm, ssc_app, alertmanager_app, tmp_path
 ):
     """Self-signed certs remain trusted on surviving units across leader change and upgrade."""
