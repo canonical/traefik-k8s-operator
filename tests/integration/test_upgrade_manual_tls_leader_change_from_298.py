@@ -23,6 +23,7 @@ import logging
 
 import jubilant
 import pytest
+import requests
 from conftest import TRAEFIK_APP_NAME, TRAEFIK_RESOURCES
 from constants import (
     MOCK_HOSTNAME,
@@ -35,7 +36,6 @@ from helpers import (
     bring_up_certified_traefik,
     force_leader_change,
     get_outstanding_csrs,
-    verify_https_broken_on_unit,
     verify_https_on_unit,
 )
 
@@ -76,7 +76,18 @@ def test_leader_change_breaks_tls_then_upgrade_blocks_and_requests_certificate(
         verify_https_on_unit(juju, unit_name, alertmanager_url)
 
     juju.wait(lambda _: len(get_outstanding_csrs(juju)) == 1, timeout=300)
-    verify_https_broken_on_unit(juju, new_leader, alertmanager_url)
+
+    # The new leader lost the old leader's key, so its served certificate is no
+    # longer trusted (or the endpoint is down) -- HTTPS must fail here.
+    try:
+        verify_https_on_unit(juju, new_leader, alertmanager_url)
+    except (requests.exceptions.SSLError, requests.exceptions.ConnectionError):
+        pass  # expected: cert no longer trusted / endpoint down
+    else:
+        raise AssertionError(
+            f"HTTPS unexpectedly succeeded on {new_leader}; the served certificate "
+            "is still trusted after the leadership change"
+        )
 
     # Upgrade to the charm under test.
     juju.refresh(TRAEFIK_APP_NAME, path=traefik_charm, resources=TRAEFIK_RESOURCES)

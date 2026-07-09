@@ -324,24 +324,6 @@ def verify_http_on_unit(juju: jubilant.Juju, unit_name: str, alertmanager_url: s
     _get_with_retry(session, _url_for_unit(alertmanager_url, unit_ip))
 
 
-def verify_https_broken_on_unit(juju: jubilant.Juju, unit_name: str, alertmanager_url: str) -> None:
-    """Assert HTTPS is NOT reachable with the CA cert on a specific traefik unit."""
-    unit_ip = _unit_address(juju, unit_name)
-    logger.info("Expecting broken HTTPS on %s (%s) -> %s", unit_name, unit_ip, alertmanager_url)
-    session = requests.Session()
-    session.mount("https://", DNSResolverHTTPSAdapter(MOCK_HOSTNAME, unit_ip))
-    session.verify = str(ca_cert_path)
-    try:
-        response = session.get(alertmanager_url, timeout=30)
-        response.raise_for_status()
-    except (requests.exceptions.SSLError, requests.exceptions.ConnectionError):
-        return  # expected: cert no longer trusted / endpoint down
-    raise AssertionError(
-        f"HTTPS unexpectedly succeeded on {unit_name}; the served certificate "
-        "is still trusted after the leadership change"
-    )
-
-
 # --- Composite flows --------------------------------------------------------
 def bring_up_certified_traefik(juju: jubilant.Juju, tmp_path: Path) -> str:
     """Integrate the mTLS + alertmanager stack, sign traefik's CSRs and verify HTTPS.

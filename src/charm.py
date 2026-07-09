@@ -1374,10 +1374,6 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             self.unit.status = WaitingStatus(f"waiting for service: '{self.traefik.service_name}'")
             return
 
-        if self._certificates_pending():
-            self.unit.status = BlockedStatus("Certificate not available yet")
-            return
-
         # Update any upstream ingress relation with the current host, port, and scheme.
         # Is a no-op if no upstream ingress is related to us.
         self.upstream_ingress.provide_ingress_requirements(
@@ -1389,6 +1385,9 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
 
         # After processing all ingress relations, check if cert hostnames changed
         self._refresh_certs_if_needed()
+
+        if self._certificates_pending() and isinstance(self.unit.status, ActiveStatus):
+            self.unit.status = BlockedStatus("Certificate not available yet")
 
     def _update_ingress_configurations(self) -> None:
         # step 1: determine whether the STATIC config should be changed and traefik restarted.
