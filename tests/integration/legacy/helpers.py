@@ -115,7 +115,7 @@ async def deploy_and_configure_minio(ops_test: OpsTest) -> None:
         "secret-key": "secretkey",
     }
     await ops_test.model.deploy("minio", channel="edge", trust=True, config=config)
-    await ops_test.model.wait_for_idle(apps=["minio"], status="active", timeout=2000)
+    await ops_test.model.wait_for_idle(apps=["minio"], status="active", timeout=1000)
     minio_addr = await get_address(ops_test, "minio", 0)
 
     mc_client = Minio(
@@ -173,7 +173,7 @@ async def deploy_tempo_cluster(ops_test: OpsTest):
         await ops_test.model.wait_for_idle(
             apps=[tempo_app, worker_app, "s3-integrator"],
             status="active",
-            timeout=2000,
+            timeout=1000,
             idle_period=30,
         )
 
