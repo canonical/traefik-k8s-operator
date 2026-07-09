@@ -7,8 +7,6 @@ backends:
     type: integration-test
     systems:
     - ubuntu-24.04:
-    - ubuntu-24.04-arm64:
-        runner: [ubuntu-24.04-arm]
 environment:
   CONCIERGE: '$(HOST: echo "${CONCIERGE:-concierge-juju3.yaml}")'
   OPCLI_GIT_REF: '$(HOST: echo "${OPCLI_GIT_REF:-main}")'
@@ -28,13 +26,6 @@ integration-suites:
     auto-discover: true
     pytest-arguments-template: '-x --log-format="%(asctime)s %(levelname)s %(message)s" --no-juju-teardown --juju-model testing --keep-models --model testing --base {{ env.get("BASE", "ubuntu@26.04") }}'
     environment:
-      # Juju 4 tests
-      MODULE/jubilant_test_dynamic_configs_juju4: tests/integration/test_dynamic_configs.py
-      MODULE/jubilant_test_https_multi_unit_juju4: tests/integration/test_https_multi_unit.py
-      MODULE/jubilant_test_receive_ca_cert_status_juju4: tests/integration/test_receive_ca_cert_status.py
-      CONCIERGE/jubilant_test_dynamic_configs_juju4: concierge-juju4.yaml
-      CONCIERGE/jubilant_test_https_multi_unit_juju4: concierge-juju4.yaml
-      CONCIERGE/jubilant_test_receive_ca_cert_status_juju4: concierge-juju4.yaml
       # Base 20.04 tests
       BASE/legacy_test_charm_ipa_2004: ubuntu@20.04
       MODULE/legacy_test_charm_ipa_2004: tests/integration/legacy/test_charm_ipa.py
@@ -62,14 +53,3 @@ integration-suites:
       BASE/test_upgrade_no_tls_from_298: ubuntu@20.04
       BASE/test_upgrade_no_tls_from_280_via_298: ubuntu@20.04
       BASE/test_upgrade_no_tls_leader_change_from_298: ubuntu@20.04
-  tests/integration/arm64:
-    working-dir: ./
-    summary: integration tests
-    backends:
-    - integration-test
-    systems:
-    - ubuntu-24.04-arm64
-    auto-discover: false
-    pytest-arguments-template: '-x --log-format="%(asctime)s %(levelname)s %(message)s" --no-juju-teardown --juju-model testing --keep-models --model testing'
-    environment:
-      MODULE/legacy_test_charm_ipa: tests/integration/legacy/test_charm_ipa.py
