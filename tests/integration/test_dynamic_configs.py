@@ -23,15 +23,14 @@ DYNAMIC_CONFIG_DIR = "/opt/traefik/juju"
 
 
 @pytest.fixture(scope="module")
-def deploy_catalogue(juju, traefik_app):
-    """Deploy catalogue and integrate with traefik."""
+def deploy_catalogue(juju):
+    """Deploy catalogue."""
     juju.deploy(
         "ch:catalogue-k8s",
         CATALOGUE_APP_NAME,
         channel="1/edge",
         trust=True,
     )
-    juju.integrate(f"{CATALOGUE_APP_NAME}:ingress", traefik_app)
     juju.wait(all_settled, delay=5, timeout=600)
     return CATALOGUE_APP_NAME
 
@@ -48,6 +47,8 @@ def _list_dynamic_configs(juju, traefik_app):
 
 def test_dynamic_configs_present(juju, traefik_app, alertmanager_app, deploy_catalogue):
     """After integrating 2 apps, verify dynamic config files exist in the container."""
+    juju.integrate(f"{CATALOGUE_APP_NAME}:ingress", traefik_app)
+    juju.integrate(f"{alertmanager_app}:ingress", traefik_app)
     juju.wait(all_settled, delay=5, timeout=600)
     files = _list_dynamic_configs(juju, traefik_app)
     logger.info("Dynamic config files in container: %s", files)
