@@ -4,94 +4,36 @@
 
 """Test TLS certificates on all traefik units."""
 
-import logging
-from pathlib import Path
-
 import jubilant
-import pytest
-import requests
-from dns_adapter import DNSResolverHTTPSAdapter
-from helpers import _alertmanager_url
-
-logger = logging.getLogger(__name__)
-
-SSC_APP_NAME = "ssc"
-MOCK_HOSTNAME = "traefik-demo.local"
-NUM_TRAEFIK_UNITS = 2
+from conftest import TRAEFIK_APP_NAME, TRAEFIK_RESOURCES
+from constants import MOCK_HOSTNAME, NUM_TRAEFIK_UNITS
+from helpers import all_settled, pull_ssc_ca_certificate, verify_https_on_all_units
 
 
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
-
-@pytest.fixture(scope="module", name="ssc_app")
-def ssc_fixture(juju, traefik_app):
-    """Deploy self-signed-certificates and integrate with traefik."""
-    juju.deploy(
-        "ch:self-signed-certificates",
-        SSC_APP_NAME,
-        channel="1/stable",
-        trust=True,
-    )
-    juju.wait(jubilant.all_active, timeout=600)
-    juju.integrate(f"{SSC_APP_NAME}:certificates", traefik_app)
-    juju.wait(jubilant.all_active, timeout=600)
-    return SSC_APP_NAME
-
-
-# ---------------------------------------------------------------------------
-# Test
-# ---------------------------------------------------------------------------
 def test_https_on_all_units(
-    juju: jubilant.Juju, traefik_app, ssc_app, alertmanager_app, tmp_path: Path
+    juju: jubilant.Juju, traefik_charm, ssc_app, alertmanager_app, tmp_path
 ):
     """HTTPS endpoints are accessible through every traefik unit IP."""
-    juju.integrate(f"{alertmanager_app}:ingress", traefik_app)
-    juju.add_unit(traefik_app, num_units=NUM_TRAEFIK_UNITS - 1)
+    juju.deploy(
+        traefik_charm,
+        TRAEFIK_APP_NAME,
+        resources=TRAEFIK_RESOURCES,
+        config={"external_hostname": MOCK_HOSTNAME},
+        num_units=NUM_TRAEFIK_UNITS,
+        trust=True,
+    )
 
-    def all_active_and_idle_with_expected_units(status):
-        app = status.apps.get(traefik_app)
-        if app is None or len(app.units) < NUM_TRAEFIK_UNITS:
-            return False
-        if not jubilant.all_active(status):
-            return False
-        for unit in app.units.values():
-            if unit.juju_status.current != "idle":
-                return False
-        return True
+    juju.integrate(f"{ssc_app}:certificates", TRAEFIK_APP_NAME)
+    juju.integrate(f"{alertmanager_app}:ingress", TRAEFIK_APP_NAME)
 
-    juju.wait(all_active_and_idle_with_expected_units, timeout=600)
+    juju.wait(all_settled, timeout=600, delay=5, successes=5)
 
-    # Pull the CA certificate from the SSC charm.
-    ca_cert_path = tmp_path / "ca.cert"
-    result = juju.run(f"{ssc_app}/0", "get-ca-certificate")
-    ca_cert = result.results["ca-certificate"]
-    ca_cert_path.write_text(ca_cert)
-    logger.info("Pulled CA cert (%d bytes) to %s", len(ca_cert), ca_cert_path)
+    # Pull the CA certificate from the SSC charm for HTTPS verification.
+    pull_ssc_ca_certificate(juju, tmp_path, ssc_app=ssc_app)
 
-    # Get the alertmanager endpoint from traefik's proxied endpoints action.
-    alertmanager_url = _alertmanager_url(juju)
-
-    # Get unit IPs from status
-    status = juju.status()
-    units = status.apps[traefik_app].units
-
+    units = juju.status().apps[TRAEFIK_APP_NAME].units
     assert len(units) == NUM_TRAEFIK_UNITS, (
         f"Expected {NUM_TRAEFIK_UNITS} traefik units, got {len(units)}"
     )
 
-    # Hit the HTTPS endpoint through every traefik unit
-    for unit_name, unit_status in units.items():
-        unit_ip = unit_status.address
-        logger.info("Testing TLS on %s (IP: %s) -> %s", unit_name, unit_ip, alertmanager_url)
-
-        session = requests.Session()
-        session.mount("https://", DNSResolverHTTPSAdapter(MOCK_HOSTNAME, unit_ip))
-        session.verify = str(ca_cert_path)
-
-        response = session.get(alertmanager_url, timeout=30)
-        logger.info(
-            "%s result: status=%s body=%s",
-            unit_name, response.status_code, response.text[:200],
-        )
-        response.raise_for_status()
+    verify_https_on_all_units(juju)
