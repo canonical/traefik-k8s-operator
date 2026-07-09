@@ -4,7 +4,6 @@
 
 """Integration test for Traefik workload tracing using jubilant."""
 
-import json
 from pathlib import Path
 
 import jubilant
