@@ -3,7 +3,6 @@
 import logging
 import subprocess
 from pathlib import Path
-from typing import cast
 
 import jubilant
 import pytest
@@ -101,6 +100,10 @@ def alertmanager_fixture(juju):
 def manual_tls_fixture(juju):
     """Deploy the manual-tls-certificates charm (v4-capable ``1/stable`` track)."""
     juju.deploy(MANUAL_TLS_APP_NAME, MANUAL_TLS_APP_NAME, channel=MANUAL_TLS_CHANNEL)
+    juju.wait(
+        lambda status: jubilant.all_active(status, MANUAL_TLS_APP_NAME),
+        timeout=600,
+    )
     return MANUAL_TLS_APP_NAME
 
 
@@ -113,27 +116,6 @@ def self_signed_certificates_fixture(juju):
         timeout=600,
     )
     return SSC_APP_NAME
-
-
-@pytest.fixture(scope="module", name="juju")
-def juju_fixture(request):
-    """Jubilant Juju fixture.
-
-    Honours ``--model`` (use a pre-existing model, e.g. the one bootstrapped by
-    concierge in CI) and ``--keep-models`` (preserve the temp model on failure).
-    """
-    model = request.config.getoption("--model")
-    if model:
-        _juju = jubilant.Juju(model=model)
-        _juju.wait_timeout = 10 * 60
-        _grant_secret_rbac(model)
-        yield _juju
-        return
-
-    keep_models = cast(bool, request.config.getoption("--keep-models"))
-    with jubilant.temp_model(keep=keep_models) as _juju:
-        _juju.wait_timeout = 10 * 60
-        yield _juju
 
 
 def _grant_secret_rbac(namespace: str) -> None:
