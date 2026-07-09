@@ -9,6 +9,7 @@ import json
 import logging
 from pathlib import Path
 from typing import List, Optional
+from urllib.parse import urlsplit, urlunsplit
 
 import jubilant
 import requests
@@ -179,6 +180,18 @@ def _get_with_retry(session: requests.Session, url: str) -> None:
     response.raise_for_status()
 
 
+def _url_for_unit(url: str, unit_ip: str) -> str:
+    """Rewrite *url* to target *unit_ip* directly, preserving the path.
+
+    The proxied URL uses the external hostname (``traefik-demo.local``), which is
+    not resolvable via DNS in the test runner. For plain HTTP we route the request
+    to the unit IP instead and rely on the ``Host`` header for traefik routing.
+    """
+    parts = urlsplit(url)
+    netloc = f"{unit_ip}:{parts.port}" if parts.port else unit_ip
+    return urlunsplit(parts._replace(netloc=netloc))
+
+
 def verify_https_on_all_units(
     juju: jubilant.Juju,
     expected_url: Optional[str] = None,
@@ -235,7 +248,7 @@ def verify_http_on_all_units(
         logger.info("Verifying HTTP on %s (%s) -> %s", unit_name, unit_ip, alertmanager_url)
         session = requests.Session()
         session.headers["Host"] = MOCK_HOSTNAME
-        _get_with_retry(session, alertmanager_url)
+        _get_with_retry(session, _url_for_unit(alertmanager_url, unit_ip))
 
     return alertmanager_url
 
@@ -260,14 +273,8 @@ def force_leader_change(juju: jubilant.Juju, app: str = TRAEFIK_APP_NAME) -> str
     old_leader = leader_unit_name(juju, app)
     logger.info("Stopping the container-agent on leader %s to force a leadership change", old_leader)
     # stop-checks liveness prevents pebble from restarting the agent as unhealthy.
-    juju.exec("/charm/bin/pebble", "stop-checks", "liveness", unit=old_leader)
-    # Run the agent stop in the background: a blocking juju exec would otherwise
-    # wait for the task to complete, but the task kills the agent that reports
-    # completion and can therefore get stuck until Juju times it out.
-    juju.exec(
-        "nohup /charm/bin/pebble stop container-agent >/dev/null 2>&1 &",
-        unit=old_leader,
-    )
+    juju.ssh(old_leader, "/charm/bin/pebble", "stop-checks", "liveness", container="charm")
+    juju.ssh(old_leader, "/charm/bin/pebble", "stop", "container-agent", container="charm")
 
     def _reelected(status: jubilant.Status) -> bool:
         units = status.apps[app].units
@@ -285,10 +292,11 @@ def force_leader_change(juju: jubilant.Juju, app: str = TRAEFIK_APP_NAME) -> str
     # Trigger a hook on the new leader so it can react to the leadership change.
     # Traefik currently does not observe leader-elected hook.
     juju.config(app, {"loadbalancer_annotations": " "})
-    # Bring the old leader back: re-enable liveness checks and restart its container-agent.
+    # Bring the old leader back: re-enable liveness checks and restart its
+    # container-agent.
     logger.info("Restarting container-agent and liveness checks on %s", old_leader)
-    juju.exec("/charm/bin/pebble", "start-checks", "liveness", unit=old_leader)
-    juju.exec("/charm/bin/pebble", "start", "container-agent", unit=old_leader)
+    juju.ssh(old_leader, "/charm/bin/pebble", "start", "container-agent", container="charm")
+    juju.ssh(old_leader, "/charm/bin/pebble", "start-checks", "liveness", container="charm")
     return new_leader
 
 
@@ -313,7 +321,7 @@ def verify_http_on_unit(juju: jubilant.Juju, unit_name: str, alertmanager_url: s
     logger.info("Verifying HTTP on %s (%s) -> %s", unit_name, unit_ip, alertmanager_url)
     session = requests.Session()
     session.headers["Host"] = MOCK_HOSTNAME
-    _get_with_retry(session, alertmanager_url)
+    _get_with_retry(session, _url_for_unit(alertmanager_url, unit_ip))
 
 
 def verify_https_broken_on_unit(juju: jubilant.Juju, unit_name: str, alertmanager_url: str) -> None:

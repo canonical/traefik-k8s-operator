@@ -15,6 +15,7 @@ from tests.integration.constants import (
     MANUAL_TLS_CHANNEL,
     SSC_APP_NAME,
     SSC_CHANNEL,
+    SSC_CHARM,
     TRAEFIK_APP_NAME,
 )
 from tests.integration.helpers import all_settled
@@ -105,7 +106,7 @@ def manual_tls_fixture(juju):
 @pytest.fixture(scope="module", name="ssc_app")
 def self_signed_certificates_fixture(juju):
     """Deploy the self-signed-certificates charm."""
-    juju.deploy(SSC_APP_NAME, SSC_APP_NAME, channel=SSC_CHANNEL, trust=True)
+    juju.deploy(SSC_CHARM, SSC_APP_NAME, channel=SSC_CHANNEL, trust=True)
     juju.wait(
         lambda status: jubilant.all_active(status, SSC_APP_NAME),
         timeout=600,
