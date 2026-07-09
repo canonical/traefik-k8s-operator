@@ -335,8 +335,9 @@ def bring_up_certified_traefik(juju: jubilant.Juju, tmp_path: Path) -> str:
     """
     generate_ca(tmp_path)
 
-    juju.integrate(f"{MANUAL_TLS_APP_NAME}:certificates", f"{TRAEFIK_APP_NAME}:certificates")
     juju.integrate(f"{ALERTMANAGER_APP_NAME}:ingress", TRAEFIK_APP_NAME)
+    juju.wait(all_settled, timeout=900, delay=5, successes=5)
+    juju.integrate(f"{MANUAL_TLS_APP_NAME}:certificates", f"{TRAEFIK_APP_NAME}:certificates")
 
     juju.wait(jubilant.all_agents_idle, timeout=900, delay=5, successes=5)
     sign_csrs_and_provide_cert(juju)
@@ -349,8 +350,9 @@ def bring_up_self_signed_traefik(
     juju: jubilant.Juju, tmp_path: Path, ssc_app: str = SSC_APP_NAME
 ) -> str:
     """Integrate self-signed-certificates + alertmanager and verify HTTPS on traefik."""
-    juju.integrate(f"{ssc_app}:certificates", f"{TRAEFIK_APP_NAME}:certificates")
     juju.integrate(f"{ALERTMANAGER_APP_NAME}:ingress", TRAEFIK_APP_NAME)
+    juju.wait(all_settled, timeout=900, delay=5, successes=5)
+    juju.integrate(f"{ssc_app}:certificates", f"{TRAEFIK_APP_NAME}:certificates")
 
     juju.wait(all_settled, delay=5, timeout=900)
     pull_ssc_ca_certificate(juju, tmp_path, ssc_app=ssc_app)
