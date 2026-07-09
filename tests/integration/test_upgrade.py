@@ -6,7 +6,7 @@
 
 import jubilant
 
-from tests.integration.helpers import all_settled
+from tests.integration.helpers import all_settled, assert_traefik_revision
 
 TRAEFIK_APP_NAME = "traefik"
 SSC_APP_NAME = "ssc"
@@ -55,3 +55,4 @@ def test_upgrade(juju: jubilant.Juju, traefik_charm, pytestconfig):
         path=traefik_charm,
     )
     juju.wait(all_settled, delay=5, timeout=900)
+    assert_traefik_revision(juju, 0)

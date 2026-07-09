@@ -30,6 +30,7 @@ from constants import (
 )
 from helpers import (
     all_settled,
+    assert_traefik_revision,
     bring_up_certified_traefik,
     get_outstanding_csrs,
     sign_csrs_and_provide_cert,
@@ -66,12 +67,14 @@ def test_upgrade_manual_tls_from_280_via_298(
 
     sign_csrs_and_provide_cert(juju, MANUAL_TLS_APP_NAME)
     juju.wait(all_settled, timeout=900)
+    assert_traefik_revision(juju, INTERMEDIATE_REVISION)
 
     verify_https_on_all_units(juju, expected_url=url)
 
     # Final hop: 298 -> charm under test.
     juju.refresh(TRAEFIK_APP_NAME, path=traefik_charm, resources=TRAEFIK_RESOURCES)
     juju.wait(all_settled, delay=5, timeout=900)
+    assert_traefik_revision(juju, 0)
 
     # The migrated key must still match the certificate on every unit ...
     verify_https_on_all_units(juju, expected_url=url)

@@ -33,6 +33,7 @@ from constants import (
 )
 from helpers import (
     all_settled,
+    assert_traefik_revision,
     bring_up_certified_traefik,
     force_leader_change,
     get_outstanding_csrs,
@@ -93,6 +94,7 @@ def test_leader_change_breaks_tls_then_upgrade_blocks_and_requests_certificate(
     # Upgrade to the charm under test.
     juju.refresh(TRAEFIK_APP_NAME, path=traefik_charm, resources=TRAEFIK_RESOURCES)
     juju.wait(jubilant.all_agents_idle, timeout=900, delay=5, successes=5)
+    assert_traefik_revision(juju, 0)
 
     status = juju.status()
     leader_status = status.apps[TRAEFIK_APP_NAME].units[new_leader].workload_status

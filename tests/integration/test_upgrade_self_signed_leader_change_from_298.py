@@ -24,6 +24,7 @@ from conftest import TRAEFIK_APP_NAME, TRAEFIK_RESOURCES
 from constants import MOCK_HOSTNAME, NUM_TRAEFIK_UNITS, SOURCE_CHANNEL, TRAEFIK_CHARM
 from helpers import (
     all_settled,
+    assert_traefik_revision,
     bring_up_self_signed_traefik,
     force_leader_change,
     verify_https_on_all_units,
@@ -58,4 +59,5 @@ def test_upgrade_self_signed_leader_change_from_298(
 
     juju.refresh(TRAEFIK_APP_NAME, path=traefik_charm, resources=TRAEFIK_RESOURCES)
     juju.wait(all_settled, timeout=900, delay=5)
+    assert_traefik_revision(juju, 0)
     verify_https_on_all_units(juju, alertmanager_url)

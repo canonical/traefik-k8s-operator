@@ -19,7 +19,12 @@ import jubilant
 import pytest
 from conftest import TRAEFIK_APP_NAME, TRAEFIK_RESOURCES
 from constants import MOCK_HOSTNAME, NUM_TRAEFIK_UNITS, SOURCE_CHANNEL, TRAEFIK_CHARM
-from helpers import all_settled, bring_up_self_signed_traefik, verify_https_on_all_units
+from helpers import (
+    all_settled,
+    assert_traefik_revision,
+    bring_up_self_signed_traefik,
+    verify_https_on_all_units,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -45,5 +50,6 @@ def test_upgrade_self_signed_from_revision_280(
 
     juju.refresh(TRAEFIK_APP_NAME, path=traefik_charm, resources=TRAEFIK_RESOURCES)
     juju.wait(all_settled, delay=5, timeout=900)
+    assert_traefik_revision(juju, 0)
 
     verify_https_on_all_units(juju, expected_url=url)

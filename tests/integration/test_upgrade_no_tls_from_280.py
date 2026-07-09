@@ -23,6 +23,7 @@ from conftest import TRAEFIK_APP_NAME, TRAEFIK_RESOURCES
 from constants import MOCK_HOSTNAME, NUM_TRAEFIK_UNITS, SOURCE_CHANNEL, TRAEFIK_CHARM
 from helpers import (
     all_settled,
+    assert_traefik_revision,
     bring_up_traefik_without_certificate_provider,
     verify_http_on_all_units,
 )
@@ -51,5 +52,6 @@ def test_upgrade_no_tls_from_revision_280(
 
     juju.refresh(TRAEFIK_APP_NAME, path=traefik_charm, resources=TRAEFIK_RESOURCES)
     juju.wait(all_settled, delay=5, timeout=900)
+    assert_traefik_revision(juju, 0)
 
     verify_http_on_all_units(juju, expected_url=url)

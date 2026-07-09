@@ -48,6 +48,18 @@ def all_settled(status: jubilant.Status) -> bool:
     return jubilant.all_active(status) and jubilant.all_agents_idle(status)
 
 
+def assert_traefik_revision(juju: jubilant.Juju, expected_revision: int) -> None:
+    """Assert traefik's deployed charm revision matches *expected_revision*.
+
+    The locally built charm reports revision ``0``; a charm refreshed to a
+    specific Charmhub revision reports that revision.
+    """
+    actual_revision = juju.status().apps[TRAEFIK_APP_NAME].charm_rev
+    assert actual_revision == expected_revision, (
+        f"Expected traefik at revision {expected_revision}, but found {actual_revision}"
+    )
+
+
 def generate_ca(tmp_path: Path) -> None:
     """Create a self-signed CA and write its certificate to disk.
 

@@ -25,6 +25,7 @@ from conftest import MANUAL_TLS_APP_NAME, TRAEFIK_APP_NAME, TRAEFIK_RESOURCES
 from constants import MOCK_HOSTNAME, SOURCE_CHANNEL, TRAEFIK_CHARM
 from helpers import (
     all_settled,
+    assert_traefik_revision,
     bring_up_certified_traefik,
     get_outstanding_csrs,
     sign_csrs_and_provide_cert,
@@ -59,11 +60,13 @@ def test_upgrade_manual_tls_single_unit_from_280_via_298(
 
     sign_csrs_and_provide_cert(juju, MANUAL_TLS_APP_NAME)
     juju.wait(all_settled, timeout=900)
+    assert_traefik_revision(juju, INTERMEDIATE_REVISION)
 
     verify_https_on_unit(juju, unit_name, url)
 
     juju.refresh(TRAEFIK_APP_NAME, path=traefik_charm, resources=TRAEFIK_RESOURCES)
     juju.wait(all_settled, delay=5, timeout=900)
+    assert_traefik_revision(juju, 0)
 
     verify_https_on_unit(juju, unit_name, url)
     assert len(get_outstanding_csrs(juju)) == 0, (
