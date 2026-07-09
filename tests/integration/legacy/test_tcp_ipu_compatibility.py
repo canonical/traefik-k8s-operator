@@ -15,7 +15,6 @@ from tests.integration.legacy.test_charm_ipa import assert_ipa_charm_has_ingress
 from tests.integration.legacy.test_charm_ipu import assert_ipu_charm_has_ingress  # noqa
 from tests.integration.legacy.test_charm_tcp import (  # noqa
     assert_tcp_charm_has_ingress,
-    tcp_charm_resources,
 )
 
 
@@ -26,13 +25,23 @@ async def tcp_ipu_deployment(
     await asyncio.gather(
         deploy_traefik_if_not_deployed(ops_test, traefik_charm),
         deploy_charm_if_not_deployed(
-            ops_test, tcp_tester_charm, "tcp-tester", resources=tcp_charm_resources
+            ops_test,
+            tcp_tester_charm["charm"],
+            "tcp-tester",
+            channel=tcp_tester_charm["channel"],
+            config=tcp_tester_charm.get("config", {}),
         ),
-        deploy_charm_if_not_deployed(ops_test, ipu_tester_charm, "ipu-tester"),
+        deploy_charm_if_not_deployed(
+            ops_test,
+            ipu_tester_charm["charm"],
+            "ipu-tester",
+            channel=ipu_tester_charm["channel"],
+            config=ipu_tester_charm.get("config", {}),
+        ),
     )
     await asyncio.gather(
-        safe_relate(ops_test, "tcp-tester:ingress-per-unit", "traefik-k8s:ingress-per-unit"),
-        safe_relate(ops_test, "ipu-tester:ingress-per-unit", "traefik-k8s:ingress-per-unit"),
+        safe_relate(ops_test, "tcp-tester:require-ingress-per-unit", "traefik-k8s:ingress-per-unit"),
+        safe_relate(ops_test, "ipu-tester:require-ingress-per-unit", "traefik-k8s:ingress-per-unit"),
     )
 
     # Use "idle_period" to make sure traefik is functioning
