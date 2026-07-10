@@ -26,7 +26,7 @@ integration-suites:
     systems:
     - ubuntu-24.04
     auto-discover: true
-    pytest-arguments-template: '-x --log-format="%(asctime)s %(levelname)s %(message)s" --keep-models --model testing --base {{ env.get("BASE", "ubuntu@26.04") }}'
+    pytest-arguments-template: '-x --log-format="%(asctime)s %(levelname)s %(message)s" --no-juju-teardown --juju-model testing --keep-models --model testing --base {{ env.get("BASE", "ubuntu@26.04") }}'
     environment:
       # Juju 4 tests
       MODULE/jubilant_test_dynamic_configs_juju4: tests/integration/test_dynamic_configs.py
@@ -40,6 +40,28 @@ integration-suites:
       MODULE/legacy_test_charm_ipa_2004: tests/integration/legacy/test_charm_ipa.py
       BASE/jubilant_test_upgrade_2004: ubuntu@20.04
       MODULE/jubilant_test_upgrade_2004: tests/integration/test_upgrade.py
+      # Manual-TLS upgrade tests: the source Charmhub revisions come up on
+      # ubuntu@20.04, so the upgrade target must match that base (a base
+      # mismatch breaks the charm venv). Override BASE on the auto-discovered
+      # variants so these run only on 20.04.
+      BASE/test_upgrade_mtls_from_280: ubuntu@20.04
+      BASE/test_upgrade_mtls_from_298: ubuntu@20.04
+      BASE/test_upgrade_mtls_from_280_via_298: ubuntu@20.04
+      BASE/test_upgrade_mtls_leader_change_from_298: ubuntu@20.04
+      BASE/test_upgrade_mtls_single_unit_from_280: ubuntu@20.04
+      BASE/test_upgrade_mtls_single_unit_from_298: ubuntu@20.04
+      BASE/test_upgrade_mtls_single_unit_from_280_via_298: ubuntu@20.04
+      BASE/test_upgrade_ssc_from_280: ubuntu@20.04
+      BASE/test_upgrade_ssc_from_298: ubuntu@20.04
+      BASE/test_upgrade_ssc_from_280_via_298: ubuntu@20.04
+      BASE/test_upgrade_ssc_leader_change_from_298: ubuntu@20.04
+      BASE/test_upgrade_ssc_single_unit_from_280: ubuntu@20.04
+      BASE/test_upgrade_ssc_single_unit_from_298: ubuntu@20.04
+      BASE/test_upgrade_ssc_single_unit_from_280_via_298: ubuntu@20.04
+      BASE/test_upgrade_no_tls_from_280: ubuntu@20.04
+      BASE/test_upgrade_no_tls_from_298: ubuntu@20.04
+      BASE/test_upgrade_no_tls_from_280_via_298: ubuntu@20.04
+      BASE/test_upgrade_no_tls_leader_change_from_298: ubuntu@20.04
   tests/integration/arm64:
     working-dir: ./
     summary: integration tests
@@ -48,6 +70,6 @@ integration-suites:
     systems:
     - ubuntu-24.04-arm64
     auto-discover: false
-    pytest-arguments-template: '-x --log-format="%(asctime)s %(levelname)s %(message)s" --keep-models --model testing'
+    pytest-arguments-template: '-x --log-format="%(asctime)s %(levelname)s %(message)s" --no-juju-teardown --juju-model testing --keep-models --model testing'
     environment:
       MODULE/legacy_test_charm_ipa: tests/integration/legacy/test_charm_ipa.py

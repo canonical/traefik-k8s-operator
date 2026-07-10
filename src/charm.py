@@ -42,8 +42,12 @@ from charms.tempo_coordinator_k8s.v0.tracing import (
     charm_tracing_config,
 )
 from charms.tls_certificates_interface.v4.tls_certificates import (
+    LIBID as TLS_CERTIFICATES_LIBID,
+)
+from charms.tls_certificates_interface.v4.tls_certificates import (
     CertificateRequestAttributes,
     Mode,
+    PrivateKey,
     TLSCertificatesRequiresV4,
 )
 from charms.traefik_k8s.v0.traefik_route import (
@@ -134,6 +138,8 @@ PYDANTIC_IS_V1 = int(pydantic.version.VERSION.split(".")[0]) < 2  # pylint: disa
 CERTIFICATES_RELATION_NAME = "certificates"
 PEER_RELATION_NAME = "peers"
 TLS_KEY_LABEL = "tls-key"
+PRIVATE_KEY_FIELD = "private-key"
+CSR_DATABAG_KEY = "certificate_signing_requests"
 
 
 class _IngressRelationType(enum.Enum):
@@ -261,11 +267,13 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         )
 
         self.csrs = self._get_valid_csrs()
+        self._migrate_unit_csrs_to_app_databag()
         self.certs = TLSCertificatesRequiresV4(
             charm=self,
             relationship_name=CERTIFICATES_RELATION_NAME,
             certificate_requests=self.csrs,
             mode=Mode.APP,
+            private_key=self._load_existing_private_key(),
             refresh_events=[self.on.config_changed],
         )
 
@@ -368,6 +376,131 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         as we refactor the charm to be more hollistic.
         """
         self.traefik.cleanup_tls_configuration()
+
+    def _load_existing_private_key(self) -> Optional[PrivateKey]:
+        """Return an existing TLS private key to hand to the certificates library.
+
+        When upgrading from an earlier revision the private key already lives in a
+        Juju secret. Re-using it stops the library from generating a new key, which
+        would otherwise trigger a fresh CSR and a re-issued certificate. Two legacy
+        layouts are supported:
+
+        * ``tls-key`` (Mode.APP, rev >= 281): an app-owned secret whose
+          ``private-keys`` field maps hostnames to the library's private key.
+        * ``<libid>-private-key-<unit>-certificates`` (Mode.UNIT, rev <= 280): a
+          per-unit secret storing the key under the ``private-key`` field.
+
+        Returns ``None`` when no key is found, letting the library generate one.
+        Raises ``RuntimeError`` if a key is found but cannot be parsed or is invalid.
+        """
+        raw_key = self._read_key_from_tls_key_secret() or self._read_key_from_unit_secret()
+        if not raw_key:
+            return None
+
+        try:
+            private_key = PrivateKey.from_string(raw_key)
+        except (ValueError, TypeError) as exc:
+            raise RuntimeError(
+                "Found an existing TLS private key in a Juju secret but it could not be parsed. "
+                "The secret is likely corrupt and requires manual intervention."
+            ) from exc
+
+        if not private_key.is_valid():
+            raise RuntimeError(
+                "Found an existing TLS private key in a Juju secret but it is invalid. "
+                "The secret is likely corrupt and requires manual intervention."
+            )
+        return private_key
+
+    def _read_key_from_tls_key_secret(self) -> Optional[str]:
+        """Read the library private key from the app-owned ``tls-key`` secret.
+
+        Returns ``None`` when the secret does not exist (nothing to migrate) or
+        when it holds only a user-supplied 'local-config' key.
+        Raises ``RuntimeError`` if the secret exists but its contents are missing
+        or unparseable.
+        """
+        try:
+            secret = self.model.get_secret(label=TLS_KEY_LABEL)
+            content = secret.get_content(refresh=True)
+        except SecretNotFoundError:
+            return None
+
+        raw_map = content.get("private-keys")
+        if not raw_map:
+            raise RuntimeError(
+                "The 'tls-key' secret exists but has no 'private-keys' content; "
+                "it is likely corrupt and requires manual intervention."
+            )
+
+        try:
+            private_keys = cast(Dict[str, str], json.loads(raw_map))
+        except json.JSONDecodeError as exc:
+            raise RuntimeError(
+                "Could not parse 'private-keys' from the 'tls-key' secret; "
+                "it is likely corrupt and requires manual intervention."
+            ) from exc
+
+        if not private_keys:
+            raise RuntimeError(
+                "The 'tls-key' secret has an empty 'private-keys' map; "
+                "it is likely corrupt and requires manual intervention."
+            )
+
+        # Exclude the user-provided config key stored under 'local-config'; every
+        # remaining entry is the (identical) library-managed private key.
+        for hostname, key in private_keys.items():
+            if hostname != "local-config" and key:
+                return key
+        return None
+
+    def _read_key_from_unit_secret(self) -> Optional[str]:
+        """Read the private key from the legacy per-unit (Mode.UNIT) secret.
+
+        Returns ``None`` when the secret does not exist (nothing to migrate).
+        Raises ``RuntimeError`` if the secret exists but has no private key.
+        """
+        unit_number = self.unit.name.split("/")[1]
+        unit_key_label = (
+            f"{TLS_CERTIFICATES_LIBID}-private-key-{unit_number}-{CERTIFICATES_RELATION_NAME}"
+        )
+        try:
+            secret = self.model.get_secret(label=unit_key_label)
+            content = secret.get_content(refresh=True)
+        except SecretNotFoundError:
+            return None
+
+        key = content.get(PRIVATE_KEY_FIELD)
+        if not key:
+            raise RuntimeError(
+                f"The per-unit private key secret '{unit_key_label}' exists but has no "
+                f"'{PRIVATE_KEY_FIELD}' content; it is likely corrupt and requires manual "
+                "intervention."
+            )
+        return key
+
+    def _migrate_unit_csrs_to_app_databag(self) -> None:
+        """Migrate CSRs from unit relation data (Mode.UNIT) to app relation data (Mode.APP)."""
+        if not self.unit.is_leader():
+            return
+        relation = self.model.get_relation(CERTIFICATES_RELATION_NAME)
+        if not relation:
+            return
+        app_data = relation.data[self.app]
+        if app_data.get(CSR_DATABAG_KEY):
+            # Application slot already populated.
+            return
+        unit_csrs = relation.data[self.unit].get(CSR_DATABAG_KEY)
+        if not unit_csrs:
+            # No legacy unit-mode CSR to migrate.
+            return
+        # Copy the serialized CSR list verbatim so it matches exactly what the
+        # provider already signed.
+        app_data[CSR_DATABAG_KEY] = unit_csrs
+        logger.info(
+            "Migrated certificate signing request(s) from unit to application relation data "
+            "to preserve TLS across the Mode.UNIT -> Mode.APP upgrade."
+        )
 
     def _get_valid_csrs(self) -> List[CertificateRequestAttributes]:
         """Return a list of valid certificate requests."""
@@ -659,6 +792,20 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             and self.config.get("tls-key", None)
         ):
             return True
+        return False
+
+    def _certificates_pending(self) -> bool:
+        """Return True when a CSR has been sent but no certificate is available yet."""
+        if not self.unit.is_leader():
+            return False
+        if not self.model.relations.get(CERTIFICATES_RELATION_NAME):
+            return False
+        if not self.csrs:
+            return False
+        for csr in self.csrs:
+            cert, _ = self.certs.get_assigned_certificate(certificate_request=csr)
+            if cert is None:
+                return True
         return False
 
     def _on_workload_tracing_endpoint_removed(self, _: EventBase) -> None:
@@ -1238,6 +1385,9 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
 
         # After processing all ingress relations, check if cert hostnames changed
         self._refresh_certs_if_needed()
+
+        if self._certificates_pending() and isinstance(self.unit.status, ActiveStatus):
+            self.unit.status = BlockedStatus("Certificate not available yet")
 
     def _update_ingress_configurations(self) -> None:
         # step 1: determine whether the STATIC config should be changed and traefik restarted.
