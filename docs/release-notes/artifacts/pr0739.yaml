@@ -8,9 +8,7 @@ changes:
     description: |
       Changed the unit status shown while a certificate signing request is
       outstanding from blocked to active, keeping the "Certificate not available
-      yet" message. Traefik continues serving existing routes while waiting for
-      the certificate provider to respond, so this state no longer surfaces as
-      a blocking error.
+      yet" message.
     urls:
       pr:
         - https://github.com/canonical/traefik-k8s-operator/pull/739
