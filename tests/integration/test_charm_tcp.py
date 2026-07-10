@@ -50,7 +50,7 @@ def test_relate(juju: jubilant.Juju):
         f"{TCP_TESTER_APP}:require-ingress-per-unit",
         f"{TRAEFIK_APP}:ingress-per-unit",
     )
-    juju.wait(all_settled, timeout=600)
+    juju.wait(all_settled, timeout=600, delay=2)
 
 
 def test_relation_data_shape(juju: jubilant.Juju):
