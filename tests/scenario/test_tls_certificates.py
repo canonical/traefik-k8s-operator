@@ -198,6 +198,7 @@ def test_cleanup_tls_configuration(tls_enabled: bool):
 @patch("charm.TraefikIngressCharm._static_config_changed", PropertyMock(return_value=False))
 @patch("charm.TraefikIngressCharm.version", PropertyMock(return_value="0.0.0"))
 @patch("traefik.Traefik.update_cert_configuration", MagicMock())
+@patch("charm.TraefikIngressCharm._load_existing_private_key", MagicMock(return_value=None))
 class TestLeaderPublishesCerts:
     """Test that the leader publishes certs to peer databag and Juju secret."""
 
@@ -304,6 +305,7 @@ class TestLeaderPublishesCerts:
 @patch("charm.TraefikIngressCharm._static_config_changed", PropertyMock(return_value=False))
 @patch("charm.TraefikIngressCharm.version", PropertyMock(return_value="0.0.0"))
 @patch("traefik.Traefik.update_cert_configuration", MagicMock())
+@patch("charm.TraefikIngressCharm._load_existing_private_key", MagicMock(return_value=None))
 class TestNonLeaderReadsCerts:
     """Test that non-leader units read certs from peer databag and secret."""
 

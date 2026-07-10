@@ -8,6 +8,15 @@ import jubilant
 import pytest
 import yaml
 
+from tests.integration.constants import (
+    ALERTMANAGER_APP_NAME,
+    MANUAL_TLS_APP_NAME,
+    MANUAL_TLS_CHANNEL,
+    SSC_APP_NAME,
+    SSC_CHANNEL,
+    SSC_CHARM,
+    TRAEFIK_APP_NAME,
+)
 from tests.integration.helpers import all_settled
 
 logger = logging.getLogger(__name__)
@@ -16,9 +25,6 @@ METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 TRAEFIK_RESOURCES = {
     name: val["upstream-source"] for name, val in METADATA["resources"].items()
 }
-
-ALERTMANAGER_APP_NAME = "alertmanager"
-TRAEFIK_APP_NAME = "traefik"
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
@@ -68,24 +74,48 @@ def deploy_traefik(juju, traefik_charm):
         resources=TRAEFIK_RESOURCES,
         trust=True,
     )
+    juju.wait(jubilant.all_agents_idle, timeout=900, delay=5, successes=5)
     juju.config(TRAEFIK_APP_NAME, {"external_hostname": "traefik-demo.local"})
     juju.wait(all_settled, delay=5, timeout=600)
     return TRAEFIK_APP_NAME
 
 
 @pytest.fixture(scope="module", name="alertmanager_app")
-def alertmanager_fixture(juju, traefik_app):
-    """Deploy alertmanager and integrate with traefik."""
+def alertmanager_fixture(juju):
+    """Deploy alertmanager-k8s."""
     juju.deploy(
         "ch:alertmanager-k8s",
         ALERTMANAGER_APP_NAME,
         channel="2/edge",
         trust=True,
     )
-    juju.wait(jubilant.all_active, timeout=600)
-    juju.integrate(f"{ALERTMANAGER_APP_NAME}:ingress", traefik_app)
-    juju.wait(jubilant.all_active, timeout=600)
+    juju.wait(
+        lambda status: jubilant.all_active(status, ALERTMANAGER_APP_NAME),
+        timeout=600,
+    )
     return ALERTMANAGER_APP_NAME
+
+
+@pytest.fixture(scope="module", name="mtls_app")
+def mtls_fixture(juju):
+    """Deploy the manual-tls-certificates charm (v4-capable ``1/stable`` track)."""
+    juju.deploy(MANUAL_TLS_APP_NAME, MANUAL_TLS_APP_NAME, channel=MANUAL_TLS_CHANNEL)
+    juju.wait(
+        lambda status: jubilant.all_active(status, MANUAL_TLS_APP_NAME),
+        timeout=600,
+    )
+    return MANUAL_TLS_APP_NAME
+
+
+@pytest.fixture(scope="module", name="ssc_app")
+def self_signed_certificates_fixture(juju):
+    """Deploy the self-signed-certificates charm."""
+    juju.deploy(SSC_CHARM, SSC_APP_NAME, channel=SSC_CHANNEL, trust=True)
+    juju.wait(
+        lambda status: jubilant.all_active(status, SSC_APP_NAME),
+        timeout=600,
+    )
+    return SSC_APP_NAME
 
 
 def _grant_secret_rbac(namespace: str) -> None:
