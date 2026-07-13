@@ -15,7 +15,7 @@ Scenario:
 3. Assert the ingress URL is broken over HTTPS on the new leader only; all other
    units (including the restored old leader) continue to serve correctly.
 4. Refresh traefik to the locally built charm (the version under test).
-5. Assert the new leader is blocked with "Certificate not available yet" and
+5. Assert the new leader is active with "Certificate not available yet" and
    manual-tls has exactly one outstanding CSR.
 """
 
@@ -98,11 +98,11 @@ def test_leader_change_breaks_tls_then_upgrade_blocks_and_requests_certificate(
 
     status = juju.status()
     leader_status = status.apps[TRAEFIK_APP_NAME].units[new_leader].workload_status
-    assert leader_status.current == "blocked", (
-        f"expected {new_leader} to be blocked after upgrade, got {leader_status.current!r}"
+    assert leader_status.current == "active", (
+        f"expected {new_leader} to be active after upgrade, got {leader_status.current!r}"
     )
     assert leader_status.message == "Certificate not available yet", (
-        "unexpected blocked message on upgraded leader: "
+        "unexpected active message on upgraded leader: "
         f"{leader_status.message!r}"
     )
 

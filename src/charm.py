@@ -1387,7 +1387,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         self._refresh_certs_if_needed()
 
         if self._certificates_pending() and isinstance(self.unit.status, ActiveStatus):
-            self.unit.status = BlockedStatus("Certificate not available yet")
+            self.unit.status = ActiveStatus("Certificate not available yet")
 
     def _update_ingress_configurations(self) -> None:
         # step 1: determine whether the STATIC config should be changed and traefik restarted.
