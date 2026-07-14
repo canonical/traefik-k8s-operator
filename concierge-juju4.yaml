@@ -11,7 +11,7 @@ providers:
     enable: true
     bootstrap: true
     bootstrap-constraints:
-      root-disk: "2G"
+      root-disk: "4G"
     features:
       load-balancer:
         l2-mode: "true"
