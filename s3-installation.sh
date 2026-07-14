@@ -12,7 +12,15 @@ log() {
     echo "[s3-installation $(date -u +%H:%M:%S)] $*"
 }
 
-trap 'log "FAILED at line ${LINENO}: ${BASH_COMMAND}"' ERR
+on_error() {
+    log "FAILED at line $1: $2"
+    log "Diagnostics:"
+    sudo microceph status || true
+    sudo snap services microceph || true
+    sudo ss -tlnp || true
+}
+
+trap 'on_error "${LINENO}" "${BASH_COMMAND}"' ERR
 
 log "Installing microceph snap..."
 sudo snap install microceph
@@ -25,7 +33,8 @@ sudo microceph enable rgw --port 7480 --wait
 log "RGW enabled."
 
 log "Waiting for RGW endpoint to respond..."
-curl --connect-timeout 2 --max-time 3 --retry 5 --retry-delay 2 --retry-connrefused -s http://127.0.0.1:7480
+curl --connect-timeout 2 --max-time 5 --retry 30 --retry-delay 4 --retry-all-errors -s -o /dev/null \
+    http://127.0.0.1:7480
 log "RGW endpoint is responding."
 
 log "Creating ci-user..."
