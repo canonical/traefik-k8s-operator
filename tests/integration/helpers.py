@@ -7,8 +7,11 @@ import base64
 import datetime
 import json
 import logging
+import socket
+import subprocess
+import time
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, List, Optional
 from urllib.parse import urlsplit, urlunsplit
 
 import jubilant
@@ -46,6 +49,140 @@ ca_cert_path: Optional[Path] = None
 def all_settled(status: jubilant.Status) -> bool:
     """Return True when all apps are active and all agents are idle."""
     return jubilant.all_active(status) and jubilant.all_agents_idle(status)
+
+
+def assert_can_connect(ip: str, port: int) -> None:
+    """Assert that a TCP connection can be established to ip:port."""
+    target = (ip, int(port))
+    logger.info("Attempting to connect to %s", target)
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(10)
+        s.connect(target)
+    except Exception as exc:
+        raise AssertionError(f"{ip}:{port} is down/unreachable") from exc
+    finally:
+        s.close()
+
+
+def get_k8s_service_address(model: str, service_name: str) -> Optional[str]:
+    """Get the address of a LoadBalancer Kubernetes service using kubectl.
+
+    Args:
+        model: Juju model name (used as the Kubernetes namespace).
+        service_name: The name of the Kubernetes service.
+
+    Returns:
+        The LoadBalancer IP as a string, or None if not found.
+    """
+    try:
+        result = subprocess.run(
+            [
+                "kubectl",
+                "-n", model,
+                "get", f"service/{service_name}",
+                "-o=jsonpath={.status.loadBalancer.ingress[0].ip}",
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return result.stdout.strip() or None
+    except Exception as e:
+        logger.error("Error retrieving service address: %s", e, exc_info=True)
+        return None
+
+
+def remove_application(
+    juju: jubilant.Juju,
+    *app_names: str,
+    timeout: int = 300,
+    destroy_storage: bool = True,
+    force: bool = True,
+) -> None:
+    """Remove applications if present and wait until Juju no longer reports them."""
+    existing_apps = [app_name for app_name in app_names if app_name in juju.status().apps]
+    if not existing_apps:
+        return
+
+    juju.remove_application(
+        *existing_apps,
+        destroy_storage=destroy_storage,
+        force=force,
+    )
+    juju.wait(
+        lambda status: all(app_name not in status.apps for app_name in existing_apps),
+        timeout=timeout,
+    )
+
+
+def get_relation_info(
+    juju: jubilant.Juju,
+    remote_unit: str,
+    remote_endpoint: str,
+    local_unit: str,
+    local_endpoint: str,
+) -> dict[str, Any]:
+    """Return relation data as seen from remote_unit's perspective.
+
+    Args:
+        juju: The Juju instance.
+        remote_unit: The unit whose view of the relation we query (e.g. "traefik/0").
+        remote_endpoint: The endpoint name on the remote side.
+        local_unit: The unit we want to find in the related-units dict.
+        local_endpoint: The endpoint name on the local (requirer) side.
+
+    Returns:
+        The matching relation-info dict from ``juju show-unit``.
+
+    Raises:
+        AssertionError: If no matching relation is found.
+    """
+    data = json.loads(juju.cli("show-unit", remote_unit, "--format", "json"))[remote_unit]
+    for relation in data.get("relation-info", []):
+        if (
+            relation.get("endpoint") == remote_endpoint
+            and relation.get("related-endpoint") == local_endpoint
+            and local_unit in relation.get("related-units", {})
+        ):
+            return relation
+    raise AssertionError(
+        f"No relation data for {remote_unit}:{remote_endpoint} and "
+        f"{local_unit}:{local_endpoint}"
+    )
+
+
+def wait_for_tcp_echo(host: str, port: int, payload: bytes = b"Hello, world") -> None:
+    """Connect to host:port, send payload, and assert the echo matches."""
+    deadline = time.monotonic() + 300
+    while time.monotonic() < deadline:
+        try:
+            with socket.create_connection((host, port), timeout=10) as sock:
+                sock.sendall(payload)
+                response = sock.recv(1024)
+            assert response == payload
+            return
+        except OSError:
+            time.sleep(5)
+    raise AssertionError(f"Timed out waiting for TCP echo on {host}:{port}")
+
+
+def fetch_with_retry(url: str, expected_status: int = 200) -> requests.Response:
+    """Fetch a URL with retries until the expected status is returned."""
+    @retry(
+        stop=stop_after_delay(150),
+        wait=wait_fixed(5),
+        retry=(
+            retry_if_result(lambda r: r.status_code != expected_status)
+            | retry_if_exception_type(requests.exceptions.RequestException)
+        ),
+        reraise=True,
+        before_sleep=before_sleep_log(logger, logging.DEBUG),
+    )
+    def _fetch() -> requests.Response:
+        return requests.get(url, verify=False, allow_redirects=True, timeout=10)
+
+    return _fetch()
 
 
 def assert_traefik_revision(juju: jubilant.Juju, expected_revision: int) -> None:
