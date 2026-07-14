@@ -11,7 +11,7 @@ import socket
 import subprocess
 import time
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, List, Optional
 from urllib.parse import urlsplit, urlunsplit
 
 import jubilant
@@ -93,17 +93,6 @@ def get_k8s_service_address(model: str, service_name: str) -> Optional[str]:
         return None
 
 
-def delete_k8s_service(model: str, service_name: str) -> None:
-    """Delete a Kubernetes service in the model namespace."""
-    result = subprocess.run(
-        ["kubectl", "-n", model, "delete", f"service/{service_name}"],
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode not in (0, 1):
-        logger.warning("Failed deleting service %s: %s", service_name, result.stderr.strip())
-
-
 def remove_application(
     juju: jubilant.Juju,
     *app_names: str,
@@ -127,22 +116,73 @@ def remove_application(
     )
 
 
-def fetch_with_retry(url: str, expected_status: int = 200, retries: int = 30, delay: float = 5.0) -> requests.Response:
-    """Fetch a URL with retries until the expected status is returned."""
-    last_exc: Optional[Exception] = None
-    for _ in range(retries):
-        try:
-            response = requests.get(url, verify=False, allow_redirects=True, timeout=10)
-            if response.status_code == expected_status:
-                return response
-        except Exception as exc:
-            last_exc = exc
-        time.sleep(delay)
-    if last_exc:
-        raise AssertionError(f"Failed to reach {url} after {retries} retries") from last_exc
+def get_relation_info(
+    juju: jubilant.Juju,
+    remote_unit: str,
+    remote_endpoint: str,
+    local_unit: str,
+    local_endpoint: str,
+) -> dict[str, Any]:
+    """Return relation data as seen from remote_unit's perspective.
+
+    Args:
+        juju: The Juju instance.
+        remote_unit: The unit whose view of the relation we query (e.g. "traefik/0").
+        remote_endpoint: The endpoint name on the remote side.
+        local_unit: The unit we want to find in the related-units dict.
+        local_endpoint: The endpoint name on the local (requirer) side.
+
+    Returns:
+        The matching relation-info dict from ``juju show-unit``.
+
+    Raises:
+        AssertionError: If no matching relation is found.
+    """
+    data = json.loads(juju.cli("show-unit", remote_unit, "--format", "json"))[remote_unit]
+    for relation in data.get("relation-info", []):
+        if (
+            relation.get("endpoint") == remote_endpoint
+            and relation.get("related-endpoint") == local_endpoint
+            and local_unit in relation.get("related-units", {})
+        ):
+            return relation
     raise AssertionError(
-        f"Expected status {expected_status} from {url} after {retries} retries"
+        f"No relation data for {remote_unit}:{remote_endpoint} and "
+        f"{local_unit}:{local_endpoint}"
     )
+
+
+def wait_for_tcp_echo(host: str, port: int, payload: bytes = b"Hello, world") -> None:
+    """Connect to host:port, send payload, and assert the echo matches."""
+    deadline = time.monotonic() + 300
+    while time.monotonic() < deadline:
+        try:
+            with socket.create_connection((host, port), timeout=10) as sock:
+                sock.sendall(payload)
+                response = sock.recv(1024)
+            assert response == payload
+            return
+        except OSError:
+            time.sleep(5)
+    raise AssertionError(f"Timed out waiting for TCP echo on {host}:{port}")
+
+
+def fetch_with_retry(url: str, expected_status: int = 200) -> requests.Response:
+    """Fetch a URL with retries until the expected status is returned."""
+    @retry(
+        stop=stop_after_delay(150),
+        wait=wait_fixed(5),
+        retry=(
+            retry_if_result(lambda r: r.status_code != expected_status)
+            | retry_if_exception_type(requests.exceptions.RequestException)
+        ),
+        reraise=True,
+        before_sleep=before_sleep_log(logger, logging.DEBUG),
+    )
+    def _fetch() -> requests.Response:
+        return requests.get(url, verify=False, allow_redirects=True, timeout=10)
+
+    return _fetch()
 
 
 def assert_traefik_revision(juju: jubilant.Juju, expected_revision: int) -> None:

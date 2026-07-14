@@ -56,7 +56,7 @@ def test_relate(juju: jubilant.Juju):
 
 
 def test_dynamic_config_created(juju: jubilant.Juju):
-    config_path = _route_config_path(juju)
+    config_path = _get_route_config_path(juju)
     contents = juju.ssh(
         f"{TRAEFIK_APP}/0",
         f"cat {config_path}",
@@ -138,7 +138,7 @@ def _rpc(juju: jubilant.Juju, unit: str, method: str) -> Any:
     return json.loads(raw)
 
 
-def _route_config_path(juju: jubilant.Juju) -> str:
+def _get_route_config_path(juju: jubilant.Juju) -> str:
     output = juju.ssh(
         f"{TRAEFIK_APP}/0",
         (

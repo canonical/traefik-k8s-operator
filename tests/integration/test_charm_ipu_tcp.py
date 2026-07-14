@@ -5,8 +5,6 @@
 """Integration tests for TCP ingress-per-unit using jubilant."""
 
 import json
-import socket
-import time
 from pathlib import Path
 from typing import Any
 
@@ -19,7 +17,13 @@ from tests.integration.any_charm_helpers import (
     PYTHON_PACKAGES,
     tcp_ipu_src_overwrite,
 )
-from tests.integration.helpers import all_settled, get_k8s_service_address, remove_application
+from tests.integration.helpers import (
+    all_settled,
+    get_k8s_service_address,
+    get_relation_info,
+    remove_application,
+    wait_for_tcp_echo,
+)
 
 TRAEFIK_APP = "traefik-k8s"
 TCP_TESTER_APP = "tcp-tester"
@@ -55,7 +59,7 @@ def test_relate(juju: jubilant.Juju):
 
 def test_relation_data_shape(juju: jubilant.Juju):
     # Requirer unit data is visible from the provider (traefik) side
-    traefik_rel = _relation_info(
+    traefik_rel = get_relation_info(
         juju,
         remote_unit=f"{TRAEFIK_APP}/0",
         remote_endpoint="ingress-per-unit",
@@ -68,7 +72,7 @@ def test_relation_data_shape(juju: jubilant.Juju):
     assert port.isdigit()
 
     # Provider app data (ingress URL) is visible from the requirer side
-    tester_rel = _relation_info(
+    tester_rel = get_relation_info(
         juju,
         remote_unit=f"{TCP_TESTER_APP}/0",
         remote_endpoint="require-ingress-per-unit",
@@ -89,7 +93,7 @@ def test_tcp_connection(juju: jubilant.Juju):
     url = ingress["urls"].get(f"{TCP_TESTER_APP}/0")
     assert url, f"Expected URL for {TCP_TESTER_APP}/0"
     port = int(url.rsplit(":", 1)[1])
-    _wait_for_tcp_echo(traefik_ip, port)
+    wait_for_tcp_echo(traefik_ip, port)
 
 
 def test_remove_relation(juju: jubilant.Juju):
@@ -111,41 +115,6 @@ def test_cleanup(juju: jubilant.Juju):
 def _rpc(juju: jubilant.Juju, unit: str, method: str) -> Any:
     raw = juju.run(unit, "rpc", params={"method": method}).results["return"]
     return json.loads(raw)
-
-
-def _relation_info(
-    juju: jubilant.Juju,
-    remote_unit: str,
-    remote_endpoint: str,
-    local_unit: str,
-    local_endpoint: str,
-) -> dict[str, Any]:
-    data = json.loads(juju.cli("show-unit", remote_unit, "--format", "json"))[remote_unit]
-    for relation in data.get("relation-info", []):
-        if (
-            relation.get("endpoint") == remote_endpoint
-            and relation.get("related-endpoint") == local_endpoint
-            and local_unit in relation.get("related-units", {})
-        ):
-            return relation
-    raise AssertionError(
-        f"No relation data for {remote_unit}:{remote_endpoint} and "
-        f"{local_unit}:{local_endpoint}"
-    )
-
-
-def _wait_for_tcp_echo(host: str, port: int, payload: bytes = b"Hello, world") -> None:
-    deadline = time.monotonic() + 300
-    while time.monotonic() < deadline:
-        try:
-            with socket.create_connection((host, port), timeout=10) as sock:
-                sock.sendall(payload)
-                response = sock.recv(1024)
-            assert response == payload
-            return
-        except OSError:
-            time.sleep(5)
-    raise AssertionError(f"Timed out waiting for TCP echo on {host}:{port}")
 
 
 def _dequote(value: str) -> str:

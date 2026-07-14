@@ -4,14 +4,12 @@
 
 """Integration tests for Traefik basic auth using jubilant."""
 
-import json
-import time
 from pathlib import Path
-from typing import Any
 
 import jubilant
 import requests
 import yaml
+from tenacity import retry, retry_if_exception_type, retry_if_result, stop_after_delay, wait_fixed
 
 from tests.integration.any_charm_helpers import (
     ANY_CHARM,
@@ -19,7 +17,7 @@ from tests.integration.any_charm_helpers import (
     PYTHON_PACKAGES,
     ipa_src_overwrite,
 )
-from tests.integration.helpers import all_settled
+from tests.integration.helpers import all_settled, get_relation_info
 
 TRAEFIK_APP = "traefik"
 IPA_TESTER_APP = "ipa-tester"
@@ -73,30 +71,9 @@ def test_ipa_charm_ingress_auth_disable(juju: jubilant.Juju):
     _assert_status(_get_tester_url(juju), SUCCESS_STATUS)
 
 
-def _relation_info(
-    juju: jubilant.Juju,
-    remote_unit: str,
-    remote_endpoint: str,
-    local_unit: str,
-    local_endpoint: str,
-) -> dict[str, Any]:
-    data = json.loads(juju.cli("show-unit", remote_unit, "--format", "json"))[remote_unit]
-    for relation in data.get("relation-info", []):
-        if (
-            relation.get("endpoint") == remote_endpoint
-            and relation.get("related-endpoint") == local_endpoint
-            and local_unit in relation.get("related-units", {})
-        ):
-            return relation
-    raise AssertionError(
-        f"No relation data for {remote_unit}:{remote_endpoint} and "
-        f"{local_unit}:{local_endpoint}"
-    )
-
-
 def _get_tester_url(juju: jubilant.Juju) -> str:
     # Provider app data (ingress URL) is in application-data when viewing from the requirer side
-    relation = _relation_info(
+    relation = get_relation_info(
         juju,
         remote_unit=f"{IPA_TESTER_APP}/0",
         remote_endpoint="require-ingress",
@@ -112,13 +89,16 @@ def _assert_status(
     expected_status: int,
     auth: tuple[str, str] | None = None,
 ) -> None:
-    deadline = time.monotonic() + 60
-    while time.monotonic() < deadline:
-        try:
-            response = requests.get(url, auth=auth, verify=False, timeout=10)
-            if response.status_code == expected_status:
-                return
-        except requests.RequestException:
-            pass
-        time.sleep(2)
-    raise AssertionError(f"Expected HTTP {expected_status} from {url}")
+    @retry(
+        stop=stop_after_delay(60),
+        wait=wait_fixed(2),
+        retry=(
+            retry_if_result(lambda r: r.status_code != expected_status)
+            | retry_if_exception_type(requests.exceptions.RequestException)
+        ),
+        reraise=True,
+    )
+    def _fetch() -> requests.Response:
+        return requests.get(url, auth=auth, verify=False, timeout=10)
+
+    _fetch()

@@ -14,7 +14,6 @@ import yaml
 from tests.integration.dns_adapter import DNSResolverHTTPSAdapter
 from tests.integration.helpers import (
     all_settled,
-    delete_k8s_service,
     get_k8s_service_address,
     remove_application,
 )
@@ -93,8 +92,7 @@ def test_disintegrate(juju: jubilant.Juju):
 
 
 def test_cleanup(juju: jubilant.Juju):
-    delete_k8s_service(juju.model, f"{TRAEFIK_APP}-lb")
-    remove_application(juju, TRAEFIK_APP, timeout=60)
+    remove_application(juju, TRAEFIK_APP, timeout=60, force=False)
 
 
 def _endpoints(model: str, scheme: str, netloc: str) -> list[str]:

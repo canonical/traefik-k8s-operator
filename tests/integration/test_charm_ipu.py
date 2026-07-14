@@ -22,6 +22,7 @@ from tests.integration.helpers import (
     all_settled,
     assert_can_connect,
     get_k8s_service_address,
+    get_relation_info,
     remove_application,
 )
 
@@ -67,7 +68,7 @@ def test_ipu_charm_has_ingress(juju: jubilant.Juju):
 
 def test_relation_data_shape(juju: jubilant.Juju):
     # Requirer unit data is visible from the provider (traefik) side
-    traefik_rel = _relation_info(
+    traefik_rel = get_relation_info(
         juju,
         remote_unit=f"{TRAEFIK_APP}/0",
         remote_endpoint="ingress-per-unit",
@@ -81,7 +82,7 @@ def test_relation_data_shape(juju: jubilant.Juju):
     model = _dequote(requirer_unit_data["model"])
 
     # Provider app data (ingress URL) is visible from the requirer side
-    tester_rel = _relation_info(
+    tester_rel = get_relation_info(
         juju,
         remote_unit=f"{IPU_TESTER_APP}/0",
         remote_endpoint="require-ingress-per-unit",
@@ -119,27 +120,6 @@ def test_cleanup(juju: jubilant.Juju):
 def _rpc(juju: jubilant.Juju, unit: str, method: str) -> Any:
     raw = juju.run(unit, "rpc", params={"method": method}).results["return"]
     return json.loads(raw)
-
-
-def _relation_info(
-    juju: jubilant.Juju,
-    remote_unit: str,
-    remote_endpoint: str,
-    local_unit: str,
-    local_endpoint: str,
-) -> dict[str, Any]:
-    data = json.loads(juju.cli("show-unit", remote_unit, "--format", "json"))[remote_unit]
-    for relation in data.get("relation-info", []):
-        if (
-            relation.get("endpoint") == remote_endpoint
-            and relation.get("related-endpoint") == local_endpoint
-            and local_unit in relation.get("related-units", {})
-        ):
-            return relation
-    raise AssertionError(
-        f"No relation data for {remote_unit}:{remote_endpoint} and "
-        f"{local_unit}:{local_endpoint}"
-    )
 
 
 def _dequote(value: str) -> str:

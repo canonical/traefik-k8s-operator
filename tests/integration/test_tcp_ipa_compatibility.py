@@ -5,8 +5,6 @@
 """Compatibility test for simultaneous TCP and IPA ingress using jubilant."""
 
 import json
-import socket
-import time
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -26,7 +24,9 @@ from tests.integration.helpers import (
     all_settled,
     assert_can_connect,
     get_k8s_service_address,
+    get_relation_info,
     remove_application,
+    wait_for_tcp_echo,
 )
 
 TRAEFIK_APP = "traefik-k8s"
@@ -79,9 +79,9 @@ def test_tcp_ipa_compatibility(juju: jubilant.Juju):
     tcp_data = _rpc(juju, f"{TCP_TESTER_APP}/0", "get_tcp_ingress_data")
     tcp_url = tcp_data["urls"].get(f"{TCP_TESTER_APP}/0")
     assert tcp_url, f"Expected URL for {TCP_TESTER_APP}/0"
-    _wait_for_tcp_echo(traefik_ip, int(tcp_url.rsplit(":", 1)[1]))
+    wait_for_tcp_echo(traefik_ip, int(tcp_url.rsplit(":", 1)[1]))
 
-    ipa_relation = _relation_info(
+    ipa_relation = get_relation_info(
         juju,
         remote_unit=f"{IPA_TESTER_APP}/0",
         remote_endpoint="require-ingress",
@@ -100,38 +100,3 @@ def test_cleanup(juju: jubilant.Juju):
 def _rpc(juju: jubilant.Juju, unit: str, method: str) -> Any:
     raw = juju.run(unit, "rpc", params={"method": method}).results["return"]
     return json.loads(raw)
-
-
-def _relation_info(
-    juju: jubilant.Juju,
-    remote_unit: str,
-    remote_endpoint: str,
-    local_unit: str,
-    local_endpoint: str,
-) -> dict[str, Any]:
-    data = json.loads(juju.cli("show-unit", remote_unit, "--format", "json"))[remote_unit]
-    for relation in data.get("relation-info", []):
-        if (
-            relation.get("endpoint") == remote_endpoint
-            and relation.get("related-endpoint") == local_endpoint
-            and local_unit in relation.get("related-units", {})
-        ):
-            return relation
-    raise AssertionError(
-        f"No relation data for {remote_unit}:{remote_endpoint} and "
-        f"{local_unit}:{local_endpoint}"
-    )
-
-
-def _wait_for_tcp_echo(host: str, port: int, payload: bytes = b"Hello, world") -> None:
-    deadline = time.monotonic() + 300
-    while time.monotonic() < deadline:
-        try:
-            with socket.create_connection((host, port), timeout=10) as sock:
-                sock.sendall(payload)
-                response = sock.recv(1024)
-            assert response == payload
-            return
-        except OSError:
-            time.sleep(5)
-    raise AssertionError(f"Timed out waiting for TCP echo on {host}:{port}")
