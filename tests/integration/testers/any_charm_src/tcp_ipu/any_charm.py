@@ -24,6 +24,12 @@ _TCP_PORT = 9999
 class AnyCharm(AnyCharmBase):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.ipu = IngressPerUnitRequirer(
+            self,
+            mode="tcp",
+            port=_TCP_PORT,
+            relation_name="require-ingress-per-unit",
+        )
         self.unit.open_port("tcp", _TCP_PORT)
         self.framework.observe(self.on["any"].pebble_ready, self._on_pebble_ready)
         self.framework.observe(
@@ -53,7 +59,8 @@ class AnyCharm(AnyCharmBase):
         self.unit.status = ops.ActiveStatus("ready")
 
     def _ipu_created(self, _event):
-        ipu = IngressPerUnitRequirer(
-            self, mode="tcp", relation_name="require-ingress-per-unit"
-        )
-        ipu.provide_ingress_requirements(port=_TCP_PORT)
+        self.ipu.provide_ingress_requirements(port=_TCP_PORT)
+
+    def get_tcp_ingress_data(self):
+        """Return ingress URL info for this unit. Callable via rpc action."""
+        return {"url": self.ipu.url, "urls": self.ipu.urls or {}}

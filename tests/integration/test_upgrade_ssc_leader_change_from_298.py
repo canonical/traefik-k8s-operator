@@ -54,7 +54,7 @@ def test_upgrade_ssc_leader_change_from_298(
 
     force_leader_change(juju, TRAEFIK_APP_NAME)
 
-    juju.wait(all_settled, timeout=900, delay=5)
+    juju.wait(all_settled, timeout=900, delay=5, successes=5)
     verify_https_on_all_units(juju, alertmanager_url)
 
     juju.refresh(TRAEFIK_APP_NAME, path=traefik_charm, resources=TRAEFIK_RESOURCES)
