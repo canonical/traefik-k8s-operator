@@ -1,9 +1,8 @@
 juju:
-  channel: 4.0/edge
+  channel: 4.1/edge
   model-defaults:
     test-mode: "true"
     automatically-retry-hooks: "true"
-  extra-bootstrap-args: --config agent-stream=proposed
 
 providers:
   lxd:
