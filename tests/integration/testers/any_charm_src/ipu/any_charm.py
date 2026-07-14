@@ -18,3 +18,7 @@ class AnyCharm(AnyCharmBase):
         self.ipu = IngressPerUnitRequirer(
             self, host="foo.bar", port=80, relation_name="require-ingress-per-unit"
         )
+
+    def get_ingress_data(self):
+        """Return ingress URL info for this unit. Callable via rpc action."""
+        return {"url": self.ipu.url, "urls": self.ipu.urls or {}}

@@ -65,7 +65,7 @@ def test_leader_change_breaks_tls_then_upgrade_blocks_and_requests_certificate(
     # newly elected leader is expected to break.
     new_leader = force_leader_change(juju, TRAEFIK_APP_NAME)
 
-    juju.wait(all_settled, timeout=300)
+    juju.wait(all_settled, timeout=300, delay=5, successes=5)
 
     # All units except the new leader should still serve valid HTTPS (their per-unit
     # private keys are intact). The new leader lost the old leader's key on rev 298.
