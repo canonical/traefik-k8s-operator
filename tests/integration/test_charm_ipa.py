@@ -4,9 +4,7 @@
 
 """Integration tests for ingress-per-app (IPA) using jubilant."""
 
-import json
 from pathlib import Path
-from typing import Any
 from urllib.parse import urlparse
 
 import jubilant
@@ -23,6 +21,7 @@ from tests.integration.helpers import (
     assert_can_connect,
     get_k8s_service_address,
     remove_application,
+    rpc,
 )
 
 TRAEFIK_APP = "traefik-k8s"
@@ -54,7 +53,7 @@ def test_relate(juju: jubilant.Juju):
 
 
 def test_ipa_charm_has_ingress(juju: jubilant.Juju):
-    data = _rpc(juju, "get_relation_data")
+    data = rpc(juju, f"{IPA_TESTER_APP}/0", "get_relation_data")
     url = data["url"]
     assert url, "Expected a non-empty ingress URL"
     parsed = urlparse(url)
@@ -62,7 +61,7 @@ def test_ipa_charm_has_ingress(juju: jubilant.Juju):
 
 
 def test_relation_data_shape(juju: jubilant.Juju):
-    data = _rpc(juju, "get_relation_data")
+    data = rpc(juju, f"{IPA_TESTER_APP}/0", "get_relation_data")
 
     # Provider gave back a well-formed URL pointing at the actual LB IP
     traefik_address = get_k8s_service_address(juju.model, f"{TRAEFIK_APP}-lb")
@@ -88,14 +87,9 @@ def test_remove_relation(juju: jubilant.Juju):
         ),
         timeout=300,
     )
-    data = _rpc(juju, "get_relation_data")
+    data = rpc(juju, f"{IPA_TESTER_APP}/0", "get_relation_data")
     assert not data["url"], "Expected ingress URL to be cleared after relation removal"
 
 
 def test_cleanup(juju: jubilant.Juju):
     remove_application(juju, TRAEFIK_APP, timeout=60)
-
-
-def _rpc(juju: jubilant.Juju, method: str) -> Any:
-    raw = juju.run(f"{IPA_TESTER_APP}/0", "rpc", params={"method": method}).results["return"]
-    return json.loads(raw)  # rpc action json.dumps the return value

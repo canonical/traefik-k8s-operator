@@ -4,7 +4,6 @@
 
 """Integration tests for ingress health checks using jubilant."""
 
-import json
 from pathlib import Path
 from typing import Any
 
@@ -18,7 +17,7 @@ from tests.integration.any_charm_helpers import (
     PYTHON_PACKAGES,
     health_src_overwrite,
 )
-from tests.integration.helpers import all_settled, get_k8s_service_address, remove_application
+from tests.integration.helpers import all_settled, get_k8s_service_address, remove_application, rpc
 
 TRAEFIK_APP = "traefik-k8s"
 HEALTH_TESTER_APP = "health-tester"
@@ -55,7 +54,7 @@ def test_health(juju: jubilant.Juju):
     assert traefik_address, "Expected a traefik load balancer address"
     health_address = f"http://{traefik_address}/{juju.model}-{HEALTH_TESTER_APP}/health"
 
-    _rpc(juju, f"{HEALTH_TESTER_APP}/2", "set_health", is_healthy=False)
+    rpc(juju, f"{HEALTH_TESTER_APP}/2", "set_health", is_healthy=False)
     juju.wait(all_settled, timeout=600)
     for _ in range(10):
         status, content = _fetch_health(health_address)
@@ -65,7 +64,7 @@ def test_health(juju: jubilant.Juju):
             {"host": "health-tester-1", "status": "up"},
         ]
 
-    _rpc(juju, f"{HEALTH_TESTER_APP}/1", "set_health", is_healthy=False)
+    rpc(juju, f"{HEALTH_TESTER_APP}/1", "set_health", is_healthy=False)
     juju.wait(all_settled, timeout=600)
     for _ in range(10):
         status, content = _fetch_health(health_address)
@@ -75,14 +74,6 @@ def test_health(juju: jubilant.Juju):
 
 def test_cleanup(juju: jubilant.Juju):
     remove_application(juju, TRAEFIK_APP, timeout=60)
-
-
-def _rpc(juju: jubilant.Juju, unit: str, method: str, **kwargs: Any) -> Any:
-    params = {"method": method}
-    if kwargs:
-        params["kwargs"] = json.dumps(kwargs)
-    raw = juju.run(unit, "rpc", params=params).results["return"]
-    return json.loads(raw)
 
 
 def _fetch_health(url: str) -> tuple[int, Any]:

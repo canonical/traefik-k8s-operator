@@ -4,9 +4,7 @@
 
 """Integration tests for TCP ingress-per-unit using jubilant."""
 
-import json
 from pathlib import Path
-from typing import Any
 
 import jubilant
 import yaml
@@ -20,8 +18,8 @@ from tests.integration.any_charm_helpers import (
 from tests.integration.helpers import (
     all_settled,
     get_k8s_service_address,
-    get_relation_info,
     remove_application,
+    rpc,
     wait_for_tcp_echo,
 )
 
@@ -58,38 +56,27 @@ def test_relate(juju: jubilant.Juju):
 
 
 def test_relation_data_shape(juju: jubilant.Juju):
-    # Requirer unit data is visible from the provider (traefik) side
-    traefik_rel = get_relation_info(
-        juju,
-        remote_unit=f"{TRAEFIK_APP}/0",
-        remote_endpoint="ingress-per-unit",
-        local_unit=f"{TCP_TESTER_APP}/0",
-        local_endpoint="require-ingress-per-unit",
-    )
-    requirer_unit_data = traefik_rel["related-units"][f"{TCP_TESTER_APP}/0"]["data"]
-    assert _dequote(requirer_unit_data["name"]) == f"{TCP_TESTER_APP}/0"
-    port = _dequote(requirer_unit_data["port"])
-    assert port.isdigit()
+    # Read the raw relation databag (bypassing the traefik_k8s library's own
+    # parsing) to assert on the actual wire-format/interface contract.
+    data = rpc(juju, f"{TCP_TESTER_APP}/0", "get_relation_data")
 
-    # Provider app data (ingress URL) is visible from the requirer side
-    tester_rel = get_relation_info(
-        juju,
-        remote_unit=f"{TCP_TESTER_APP}/0",
-        remote_endpoint="require-ingress-per-unit",
-        local_unit=f"{TRAEFIK_APP}/0",
-        local_endpoint="ingress-per-unit",
-    )
-    provider_app_data = yaml.safe_load(tester_rel["application-data"]["ingress"])
+    # Requirer unit databag, as written by the library on our own side
+    unit_data = data["unit_data"]
+    assert unit_data.get("name") == f"{TCP_TESTER_APP}/0"
+    port = unit_data.get("port")
+    assert isinstance(port, int)
+
+    # Provider app data (ingress URL), as written by traefik
     traefik_ip = get_k8s_service_address(juju.model, f"{TRAEFIK_APP}-lb")
     assert traefik_ip, "Expected a traefik load balancer address"
-    assert provider_app_data == {f"{TCP_TESTER_APP}/0": {"url": f"{traefik_ip}:{port}"}}
+    assert data["app_data"]["ingress"] == {f"{TCP_TESTER_APP}/0": {"url": f"{traefik_ip}:{port}"}}
 
 
 def test_tcp_connection(juju: jubilant.Juju):
     traefik_ip = get_k8s_service_address(juju.model, f"{TRAEFIK_APP}-lb")
     assert traefik_ip, "Expected a traefik load balancer address"
 
-    ingress = _rpc(juju, f"{TCP_TESTER_APP}/0", "get_tcp_ingress_data")
+    ingress = rpc(juju, f"{TCP_TESTER_APP}/0", "get_tcp_ingress_data")
     url = ingress["urls"].get(f"{TCP_TESTER_APP}/0")
     assert url, f"Expected URL for {TCP_TESTER_APP}/0"
     port = int(url.rsplit(":", 1)[1])
@@ -110,14 +97,3 @@ def test_remove_relation(juju: jubilant.Juju):
 
 def test_cleanup(juju: jubilant.Juju):
     remove_application(juju, TRAEFIK_APP, timeout=60)
-
-
-def _rpc(juju: jubilant.Juju, unit: str, method: str) -> Any:
-    raw = juju.run(unit, "rpc", params={"method": method}).results["return"]
-    return json.loads(raw)
-
-
-def _dequote(value: str) -> str:
-    if value.startswith('"') and value.endswith('"'):
-        return value[1:-1]
-    return value

@@ -17,7 +17,7 @@ from tests.integration.any_charm_helpers import (
     PYTHON_PACKAGES,
     ipa_src_overwrite,
 )
-from tests.integration.helpers import all_settled, get_relation_info
+from tests.integration.helpers import all_settled, rpc
 
 TRAEFIK_APP = "traefik"
 IPA_TESTER_APP = "ipa-tester"
@@ -72,16 +72,8 @@ def test_ipa_charm_ingress_auth_disable(juju: jubilant.Juju):
 
 
 def _get_tester_url(juju: jubilant.Juju) -> str:
-    # Provider app data (ingress URL) is in application-data when viewing from the requirer side
-    relation = get_relation_info(
-        juju,
-        remote_unit=f"{IPA_TESTER_APP}/0",
-        remote_endpoint="require-ingress",
-        local_unit=f"{TRAEFIK_APP}/0",
-        local_endpoint="ingress",
-    )
-    app_data = yaml.safe_load(relation["application-data"]["ingress"])
-    return app_data["url"]
+    data = rpc(juju, f"{IPA_TESTER_APP}/0", "get_relation_data")
+    return data["url"]
 
 
 def _assert_status(

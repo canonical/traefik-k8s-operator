@@ -4,10 +4,8 @@
 
 """Integration tests for traefik-route using jubilant."""
 
-import json
 import socket
 from pathlib import Path
-from typing import Any
 
 import jubilant
 import yaml
@@ -22,6 +20,7 @@ from tests.integration.helpers import (
     fetch_with_retry,
     get_k8s_service_address,
     remove_application,
+    rpc,
 )
 
 TRAEFIK_APP = "traefik"
@@ -106,8 +105,8 @@ def test_scale_and_get_external_host(juju: jubilant.Juju):
         timeout=1000,
     )
 
-    external_host_0 = _rpc(juju, f"{ROUTE_TESTER_APP}/0", "get_external_host")
-    external_host_1 = _rpc(juju, f"{ROUTE_TESTER_APP}/1", "get_external_host")
+    external_host_0 = rpc(juju, f"{ROUTE_TESTER_APP}/0", "get_external_host")
+    external_host_1 = rpc(juju, f"{ROUTE_TESTER_APP}/1", "get_external_host")
     traefik_ip = get_k8s_service_address(juju.model, f"{TRAEFIK_APP}-lb")
 
     assert external_host_0 == external_host_1
@@ -131,11 +130,6 @@ def test_remove_relation(juju: jubilant.Juju):
 
 def test_cleanup(juju: jubilant.Juju):
     remove_application(juju, TRAEFIK_APP, timeout=60)
-
-
-def _rpc(juju: jubilant.Juju, unit: str, method: str) -> Any:
-    raw = juju.run(unit, "rpc", params={"method": method}).results["return"]
-    return json.loads(raw)
 
 
 def _get_route_config_path(juju: jubilant.Juju) -> str:
