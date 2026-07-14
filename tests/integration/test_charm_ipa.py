@@ -5,7 +5,6 @@
 """Integration tests for ingress-per-app (IPA) using jubilant."""
 
 import json
-import textwrap
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -13,6 +12,12 @@ from urllib.parse import urlparse
 import jubilant
 import yaml
 
+from tests.integration.any_charm_helpers import (
+    ANY_CHARM,
+    ANY_CHARM_CHANNEL,
+    PYTHON_PACKAGES,
+    ipa_src_overwrite,
+)
 from tests.integration.helpers import (
     all_settled,
     assert_can_connect,
@@ -28,80 +33,17 @@ _TRAEFIK_RESOURCES = {
     name: val["upstream-source"] for name, val in _METADATA["resources"].items()
 }
 
-# any-charm injects this code into its src/ at deploy time, replicating the
-# legacy ipa-tester charm: request ingress with known host/port and expose
-# all relation data in a single RPC call.
-#
-# We intentionally implement the v2 ingress protocol directly (rather than
-# importing our library) to avoid the pydantic dependency inside any-charm:
-#   - host in unit databag (json-encoded)
-#   - model + name + port in app databag (json-encoded)
-#   - provider writes back the URL via the "ingress" key in its app databag
-_ANY_CHARM_SRC_OVERWRITE = {
-    "any_charm.py": textwrap.dedent(
-        """\
-        import json
-        from ops import Application
-        from any_charm_base import AnyCharmBase
-
-        _HOST = "foo.bar"
-        _PORT = 80
-
-        class AnyCharm(AnyCharmBase):
-            def __init__(self, *args, **kwargs):
-                super().__init__(*args, **kwargs)
-                self.framework.observe(
-                    self.on.require_ingress_relation_joined, self._on_ingress_joined
-                )
-
-            def _on_ingress_joined(self, event):
-                # v2 protocol: each value is json-encoded; model+name+port in
-                # app databag, host in unit databag
-                event.relation.data[self.app].update({
-                    "model": json.dumps(self.model.name),
-                    "name": json.dumps(self.app.name),
-                    "port": json.dumps(_PORT),
-                })
-                event.relation.data[self.unit]["host"] = json.dumps(_HOST)
-
-            def get_relation_data(self):
-                rel = self.model.get_relation("require-ingress")
-                if rel is None:
-                    return {"url": None, "app_data": {}, "unit_data": {}}
-                url = None
-                for bucket in rel.data:
-                    if isinstance(bucket, Application) and bucket.name != self.app.name:
-                        raw = rel.data[bucket].get("ingress")
-                        if raw:
-                            url = json.loads(raw).get("url")
-                        break
-
-                def _decode(d):
-                    result = {}
-                    for k, v in d.items():
-                        try:
-                            result[k] = json.loads(v)
-                        except (json.JSONDecodeError, TypeError):
-                            result[k] = v
-                    return result
-
-                return {
-                    "url": url,
-                    "app_data": _decode(dict(rel.data[self.app])),
-                    "unit_data": _decode(dict(rel.data[self.unit])),
-                }
-        """
-    ),
-}
-
 
 def test_deployment(juju: jubilant.Juju, traefik_charm):
     juju.deploy(traefik_charm, TRAEFIK_APP, resources=_TRAEFIK_RESOURCES, trust=True)
     juju.deploy(
-        "ch:any-charm",
+        f"ch:{ANY_CHARM}",
         IPA_TESTER_APP,
-        channel="beta",
-        config={"src-overwrite": json.dumps(_ANY_CHARM_SRC_OVERWRITE)},
+        channel=ANY_CHARM_CHANNEL,
+        config={
+            "src-overwrite": ipa_src_overwrite(),
+            "python-packages": PYTHON_PACKAGES,
+        },
     )
     juju.wait(all_settled, timeout=600)
 
