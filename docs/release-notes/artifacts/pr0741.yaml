@@ -1,0 +1,17 @@
+# Version of the artifact schema
+version_schema: 2
+# The key holding the change(s)
+changes:
+  - title: Remove s390x architecture
+    author: javierdelapuente
+    type: minor
+    description: |
+      Temporary remove the packing of traefik-k8s for s390x, as the availability
+      of s390x runners is limited.
+    urls:
+      pr:
+        - https://github.com/canonical/traefik-k8s-operator/pull/741
+      related_doc:
+      related_issue:
+    visibility: public
+    highlight: false
