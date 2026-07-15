@@ -55,7 +55,7 @@ def test_health(juju: jubilant.Juju):
     health_address = f"http://{traefik_address}/{juju.model}-{HEALTH_TESTER_APP}/health"
 
     rpc(juju, f"{HEALTH_TESTER_APP}/2", "set_health", is_healthy=False)
-    juju.wait(all_settled, timeout=600)
+    juju.wait(all_settled, timeout=600, delay=5, successes=5)
     for _ in range(10):
         status, content = _fetch_health(health_address)
         assert status == 200
@@ -65,7 +65,7 @@ def test_health(juju: jubilant.Juju):
         ]
 
     rpc(juju, f"{HEALTH_TESTER_APP}/1", "set_health", is_healthy=False)
-    juju.wait(all_settled, timeout=600)
+    juju.wait(all_settled, timeout=600, delay=5, successes=5)
     for _ in range(10):
         status, content = _fetch_health(health_address)
         assert status == 200
