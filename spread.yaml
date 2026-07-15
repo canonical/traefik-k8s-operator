@@ -57,7 +57,7 @@ integration-suites:
       BASE/test_upgrade_no_tls_from_298: ubuntu@20.04
       BASE/test_upgrade_no_tls_from_280_via_298: ubuntu@20.04
       BASE/test_upgrade_no_tls_leader_change_from_298: ubuntu@20.04
-  tests/integration/juju4:
+  tests/integration/juju4/:
     working-dir: ./
     discover-path: tests/integration
     summary: integration tests
@@ -67,6 +67,7 @@ integration-suites:
     - ubuntu-24.04
     auto-discover: true
     pytest-arguments-template: '-x --log-format="%(asctime)s %(levelname)s %(message)s" --no-juju-teardown --juju-model testing --base {{ env.get("BASE", "ubuntu@26.04") }}'
+    environment:
       CONCIERGE: concierge-juju4.yaml
   tests/integration/arm64:
     working-dir: ./
