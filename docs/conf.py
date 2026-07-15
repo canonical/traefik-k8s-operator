@@ -155,6 +155,8 @@ html_baseurl = f"https://canonical.com/juju/docs/traefik-k8s-charm/{version}/"
 
 sitemap_url_scheme = '{link}'
 
+sitemap_filename = "doc-sitemap.xml"
+
 # Include `lastmod` dates in the sitemap:
 
 sitemap_show_lastmod = True
