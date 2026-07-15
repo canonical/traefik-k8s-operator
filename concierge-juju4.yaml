@@ -1,5 +1,5 @@
 juju:
-  channel: 4.1/edge
+  channel: 4.0/edge
   model-defaults:
     test-mode: "true"
     automatically-retry-hooks: "true"
@@ -18,7 +18,3 @@ providers:
         cidrs: "10.43.45.0/28"
       local-storage: {}
       network: {}
-
-host:
-  snaps:
-    charmcraft:
