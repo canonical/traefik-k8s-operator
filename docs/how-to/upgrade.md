@@ -20,7 +20,7 @@ Revision 308 officially switches the certificates management in Traefik from UNI
 
 This guide assumes that you have [`jhack`](https://snapcraft.io/jhack) installed.
 
-#### Important: Preserving TLS certificates
+#### Preserve TLS certificates
 
 By default, upgrading to a revision that uses APP mode will cause Traefik to generate a new private key, which triggers a new Certificate Signing Request (CSR). If you use `manual-tls-certificates` or `notary` as your TLS provider, this means you will need to sign and provide a new certificate.
 
