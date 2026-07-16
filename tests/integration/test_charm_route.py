@@ -51,7 +51,7 @@ def test_relate(juju: jubilant.Juju):
         f"{ROUTE_TESTER_APP}:require-traefik-route",
         f"{TRAEFIK_APP}:traefik-route",
     )
-    juju.wait(all_settled, timeout=600, delay=2)
+    juju.wait(all_settled, timeout=600, delay=3, successes=5)
 
 
 def test_dynamic_config_created(juju: jubilant.Juju):
