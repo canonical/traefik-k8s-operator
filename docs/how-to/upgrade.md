@@ -8,7 +8,7 @@ The Traefik charm has a stateless workload. It can safely be upgraded through th
 juju refresh traefik-k8s
 ```
 
-## Revision-specific upgrade notes
+## Revision-specific upgrades
 
 Some revisions require additional manual steps after upgrading. Check the section that applies to your current revision before refreshing.
 
