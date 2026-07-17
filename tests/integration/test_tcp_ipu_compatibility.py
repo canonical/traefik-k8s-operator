@@ -4,9 +4,7 @@
 
 """Compatibility test for simultaneous TCP and IPU ingress using jubilant."""
 
-import json
 from pathlib import Path
-from typing import Any
 from urllib.parse import urlparse
 
 import jubilant
@@ -25,6 +23,7 @@ from tests.integration.helpers import (
     assert_can_connect,
     get_k8s_service_address,
     remove_application,
+    rpc,
     wait_for_tcp_echo,
 )
 
@@ -78,12 +77,12 @@ def test_tcp_ipu_compatibility(juju: jubilant.Juju):
     traefik_ip = get_k8s_service_address(juju.model, f"{TRAEFIK_APP}-lb")
     assert traefik_ip, "Expected a traefik load balancer address"
 
-    tcp_data = _rpc(juju, f"{TCP_TESTER_APP}/0", "get_tcp_ingress_data")
+    tcp_data = rpc(juju, f"{TCP_TESTER_APP}/0", "get_tcp_ingress_data")
     tcp_url = tcp_data["urls"].get(f"{TCP_TESTER_APP}/0")
     assert tcp_url, f"Expected URL for {TCP_TESTER_APP}/0"
     wait_for_tcp_echo(traefik_ip, int(tcp_url.rsplit(":", 1)[1]))
 
-    ipu_data = _rpc(juju, f"{IPU_TESTER_APP}/0", "get_ingress_data")
+    ipu_data = rpc(juju, f"{IPU_TESTER_APP}/0", "get_ingress_data")
     ipu_url = ipu_data["urls"].get(f"{IPU_TESTER_APP}/0")
     assert ipu_url, f"Expected URL for {IPU_TESTER_APP}/0"
     parsed = urlparse(ipu_url)
@@ -92,8 +91,3 @@ def test_tcp_ipu_compatibility(juju: jubilant.Juju):
 
 def test_cleanup(juju: jubilant.Juju):
     remove_application(juju, TCP_TESTER_APP, IPU_TESTER_APP, TRAEFIK_APP, timeout=300)
-
-
-def _rpc(juju: jubilant.Juju, unit: str, method: str) -> Any:
-    raw = juju.run(unit, "rpc", params={"method": method}).results["return"]
-    return json.loads(raw)

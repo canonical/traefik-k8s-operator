@@ -1,9 +1,8 @@
 juju:
-  channel: 4.0/stable
+  channel: 4.0/edge
   model-defaults:
     test-mode: "true"
     automatically-retry-hooks: "true"
-  extra-bootstrap-args: --config agent-stream=proposed
 
 providers:
   lxd:
@@ -12,14 +11,10 @@ providers:
     enable: true
     bootstrap: true
     bootstrap-constraints:
-      root-disk: "2G"
+      root-disk: "4G"
     features:
       load-balancer:
         l2-mode: "true"
         cidrs: "10.43.45.0/28"
       local-storage: {}
       network: {}
-
-host:
-  snaps:
-    charmcraft:

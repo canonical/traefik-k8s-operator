@@ -4,12 +4,12 @@
 
 """Integration test for Traefik workload tracing using jubilant."""
 
+import socket
 from pathlib import Path
 
 import jubilant
 import requests
 import yaml
-from minio import Minio
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from tests.integration.helpers import all_settled
@@ -18,7 +18,12 @@ TRAEFIK_APP = "traefik"
 TEMPO_APP = "tempo"
 TEMPO_WORKER_APP = "tempo-worker"
 S3_INTEGRATOR_APP = "s3-integrator"
-MINIO_APP = "minio"
+
+# Must match the values set up by s3-installation.sh (microceph RGW).
+S3_ACCESS_KEY = "my-lovely-key"
+S3_SECRET_KEY = "this-is-very-secret"
+S3_BUCKET = "tests"
+S3_PORT = 7480
 
 _METADATA = yaml.safe_load(Path("./metadata.yaml").read_text(encoding="utf-8"))
 _TRAEFIK_RESOURCES = {
@@ -44,51 +49,46 @@ def test_workload_tracing_is_present(juju: jubilant.Juju, traefik_charm):
     assert _get_traces_patiently(tempo_host)
 
 
+def _get_routable_host_ip() -> str:
+    """Return this host's outbound-facing IP address.
+
+    ``socket.gethostbyname(socket.gethostname())`` is unreliable here: on Debian/Ubuntu
+    hosts, ``/etc/hosts`` commonly maps the hostname to ``127.0.1.1``, which is
+    unreachable from inside k8s pods. Opening a UDP "connection" (no packets are
+    actually sent) forces the kernel to pick the real outbound interface/IP via the
+    routing table, which is reachable from the single-node k8s cluster.
+    """
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+        sock.connect(("8.8.8.8", 80))
+        return sock.getsockname()[0]
+
+
 def _deploy_tempo_cluster(juju: jubilant.Juju) -> None:
     juju.deploy("ch:tempo-worker-k8s", TEMPO_WORKER_APP, channel="2/edge", trust=True)
     juju.deploy("ch:tempo-coordinator-k8s", TEMPO_APP, channel="2/edge", trust=True)
     juju.deploy("ch:s3-integrator", S3_INTEGRATOR_APP, channel="edge")
-    juju.deploy(
-        "ch:minio",
-        MINIO_APP,
-        channel="edge",
-        trust=True,
-        config={"access-key": "accesskey", "secret-key": "secretkey"},
-    )
 
     juju.integrate(f"{TEMPO_APP}:s3", f"{S3_INTEGRATOR_APP}:s3-credentials")
     juju.integrate(f"{TEMPO_APP}:tempo-cluster", f"{TEMPO_WORKER_APP}:tempo-cluster")
 
-    # Wait for minio to be active and have an address before connecting to it
-    juju.wait(
-        lambda status: (
-            jubilant.all_active(status, MINIO_APP)
-            and bool(status.apps[MINIO_APP].units.get(f"{MINIO_APP}/0", None))
-            and bool(status.apps[MINIO_APP].units[f"{MINIO_APP}/0"].address)
-        ),
-        timeout=600,
-    )
-    minio_addr = juju.status().apps[MINIO_APP].units[f"{MINIO_APP}/0"].address
-    client = Minio(
-        f"{minio_addr}:9000",
-        access_key="accesskey",
-        secret_key="secretkey",
-        secure=False,
-    )
-    if not client.bucket_exists("tempo"):
-        client.make_bucket("tempo")
+    # s3-integrator's unit agent must be up (installed) before we can run an action
+    # against it below.
+    juju.wait(jubilant.all_agents_idle, timeout=600)
 
+    # microceph's RGW runs on the spread runner host (set up by s3-installation.sh) and
+    # is reachable from the single-node k8s cluster via the host's own IP address.
+    host_ip = _get_routable_host_ip()
     juju.config(
         S3_INTEGRATOR_APP,
         {
-            "endpoint": f"minio-0.minio-endpoints.{juju.model}.svc.cluster.local:9000",
-            "bucket": "tempo",
+            "endpoint": f"http://{host_ip}:{S3_PORT}",
+            "bucket": S3_BUCKET,
         },
     )
     juju.run(
         f"{S3_INTEGRATOR_APP}/0",
         "sync-s3-credentials",
-        params={"access-key": "accesskey", "secret-key": "secretkey"},
+        params={"access-key": S3_ACCESS_KEY, "secret-key": S3_SECRET_KEY},
     )
     juju.wait(all_settled, timeout=2000)
 
