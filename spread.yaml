@@ -10,7 +10,9 @@ backends:
     - ubuntu-24.04-arm64:
         runner: [ubuntu-24.04-arm]
     prepare: |
-      ${SPREAD_PATH}/s3-installation.sh
+      if [ -n "${PRE_SCRIPT:-}" ]; then
+        bash "${SPREAD_PATH}/${PRE_SCRIPT}"
+      fi
 environment:
   CONCIERGE: '$(HOST: echo "${CONCIERGE:-concierge-juju3.yaml}")'
   OPCLI_GIT_REF: '$(HOST: echo "${OPCLI_GIT_REF:-main}")'
@@ -57,6 +59,7 @@ integration-suites:
       BASE/test_upgrade_no_tls_from_298: ubuntu@20.04
       BASE/test_upgrade_no_tls_from_280_via_298: ubuntu@20.04
       BASE/test_upgrade_no_tls_leader_change_from_298: ubuntu@20.04
+      PRE_SCRIPT/test_workload_tracing: s3-installation.sh
   tests/integration/arm64:
     working-dir: ./
     summary: integration tests
