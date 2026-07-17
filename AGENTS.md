@@ -48,7 +48,8 @@ charmcraft pack                                              # build the .charm 
 
 ## Unit/Scenario Tests
 
-- `tests/unit/` — mix of `ops.testing.Harness` (legacy) and `ops-scenario`.
+- `tests/unit/` — mix of `ops.testing.Harness` (legacy) and `ops-scenario`. Write new tests with
+  `ops-scenario`; `Harness` is kept only for existing tests.
 - `tests/scenario/` — exclusively `ops-scenario` (`ops-scenario~=6.0`).
 - Both run under `tox -e unit`.
 - Pattern:
@@ -86,10 +87,9 @@ Use `jubilant` (not `pytest-operator`) against a real Juju/k8s model. CI orchest
   `concierge-juju4.yaml`). Per-module `BASE/<module>`/`MODULE/<job>`/`CONCIERGE/<job>` overrides pin
   specific tests to a different base or Juju channel (e.g. mTLS/SSC upgrade-from-Charmhub tests
   need `ubuntu@20.04` to match the published source revision's base).
-- **`s3-installation.sh`** installs a local `microceph` RGW (S3-compatible) backend for tests
-  needing S3 (e.g. workload tracing). Runs unconditionally in `prepare:` for every job (no
-  per-test guard). Has a large curl retry budget and an `ERR` trap dumping diagnostics on failure —
-  RGW readiness timing is variable under CI load.
+- **`s3-installation.sh`** sets up a local `microceph` RGW (S3-compatible) backend, needed only for
+  `test_workload_tracing.py`. Run it (`sudo ./s3-installation.sh`) before that test locally; it runs
+  automatically in CI (`prepare:`, no per-test guard).
 - **any-charm testers**: tests deploy generic [`any-charm-k8s`](https://charmhub.io/any-charm) with
   custom code injected via `src-overwrite`, from
   `tests/integration/testers/any_charm_src/<name>/any_charm.py` (`ipu`, `tcp_ipu`, `health`, `route`,
