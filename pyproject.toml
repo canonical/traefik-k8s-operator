@@ -34,7 +34,7 @@ dev = [
     "pytest-asyncio==0.21.2",
     "jubilant",
     "pytest-jubilant",
-    "tenacity==8.5.0",
+    "tenacity==9.1.4",
     "sh",
     "pyright==1.1.318",
     "ops-scenario~=6.0",
