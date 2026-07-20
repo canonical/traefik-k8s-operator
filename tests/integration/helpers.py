@@ -116,40 +116,23 @@ def remove_application(
     )
 
 
-def get_relation_info(
-    juju: jubilant.Juju,
-    remote_unit: str,
-    remote_endpoint: str,
-    local_unit: str,
-    local_endpoint: str,
-) -> dict[str, Any]:
-    """Return relation data as seen from remote_unit's perspective.
+def rpc(juju: jubilant.Juju, unit: str, method: str, **kwargs: Any) -> Any:
+    """Call an any-charm tester's ``rpc`` action and return the decoded JSON result.
 
     Args:
         juju: The Juju instance.
-        remote_unit: The unit whose view of the relation we query (e.g. "traefik/0").
-        remote_endpoint: The endpoint name on the remote side.
-        local_unit: The unit we want to find in the related-units dict.
-        local_endpoint: The endpoint name on the local (requirer) side.
+        unit: The any-charm tester unit to run the action against (e.g. "ipu-tester/0").
+        method: The name of the method to call on the tester's AnyCharm instance.
+        **kwargs: Extra keyword arguments forwarded to the tester method, JSON-encoded.
 
     Returns:
-        The matching relation-info dict from ``juju show-unit``.
-
-    Raises:
-        AssertionError: If no matching relation is found.
+        The JSON-decoded return value of the remote method call.
     """
-    data = json.loads(juju.cli("show-unit", remote_unit, "--format", "json"))[remote_unit]
-    for relation in data.get("relation-info", []):
-        if (
-            relation.get("endpoint") == remote_endpoint
-            and relation.get("related-endpoint") == local_endpoint
-            and local_unit in relation.get("related-units", {})
-        ):
-            return relation
-    raise AssertionError(
-        f"No relation data for {remote_unit}:{remote_endpoint} and "
-        f"{local_unit}:{local_endpoint}"
-    )
+    params = {"method": method}
+    if kwargs:
+        params["kwargs"] = json.dumps(kwargs)
+    raw = juju.run(unit, "rpc", params=params).results["return"]
+    return json.loads(raw)
 
 
 def wait_for_tcp_echo(host: str, port: int, payload: bytes = b"Hello, world") -> None:
