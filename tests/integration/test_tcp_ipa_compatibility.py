@@ -4,9 +4,7 @@
 
 """Compatibility test for simultaneous TCP and IPA ingress using jubilant."""
 
-import json
 from pathlib import Path
-from typing import Any
 from urllib.parse import urlparse
 
 import jubilant
@@ -24,8 +22,8 @@ from tests.integration.helpers import (
     all_settled,
     assert_can_connect,
     get_k8s_service_address,
-    get_relation_info,
     remove_application,
+    rpc,
     wait_for_tcp_echo,
 )
 
@@ -76,27 +74,17 @@ def test_tcp_ipa_compatibility(juju: jubilant.Juju):
     traefik_ip = get_k8s_service_address(juju.model, f"{TRAEFIK_APP}-lb")
     assert traefik_ip, "Expected a traefik load balancer address"
 
-    tcp_data = _rpc(juju, f"{TCP_TESTER_APP}/0", "get_tcp_ingress_data")
+    tcp_data = rpc(juju, f"{TCP_TESTER_APP}/0", "get_tcp_ingress_data")
     tcp_url = tcp_data["urls"].get(f"{TCP_TESTER_APP}/0")
     assert tcp_url, f"Expected URL for {TCP_TESTER_APP}/0"
     wait_for_tcp_echo(traefik_ip, int(tcp_url.rsplit(":", 1)[1]))
 
-    ipa_relation = get_relation_info(
-        juju,
-        remote_unit=f"{IPA_TESTER_APP}/0",
-        remote_endpoint="require-ingress",
-        local_unit=f"{TRAEFIK_APP}/0",
-        local_endpoint="ingress",
-    )
-    ipa_url = yaml.safe_load(ipa_relation["application-data"]["ingress"])["url"]
+    ipa_data = rpc(juju, f"{IPA_TESTER_APP}/0", "get_relation_data")
+    ipa_url = ipa_data["url"]
+    assert ipa_url, f"Expected URL for {IPA_TESTER_APP}/0"
     parsed = urlparse(ipa_url)
     assert_can_connect(parsed.hostname, parsed.port or 80)
 
 
 def test_cleanup(juju: jubilant.Juju):
     remove_application(juju, TCP_TESTER_APP, IPA_TESTER_APP, TRAEFIK_APP, timeout=300)
-
-
-def _rpc(juju: jubilant.Juju, unit: str, method: str) -> Any:
-    raw = juju.run(unit, "rpc", params={"method": method}).results["return"]
-    return json.loads(raw)
