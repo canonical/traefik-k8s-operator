@@ -3,7 +3,7 @@ juju:
   model-defaults:
     test-mode: "true"
     automatically-retry-hooks: "true"
-  extra-bootstrap-args: --config agent-stream=proposed
+  extra-bootstrap-args: --bootstrap-timeout=20m --config agent-stream=proposed
 
 providers:
   lxd:
