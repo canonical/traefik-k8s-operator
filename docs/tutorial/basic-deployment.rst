@@ -17,7 +17,7 @@ What you'll do
 #. Deploy the Traefik charm
 #. Deploy the Mattermost charm with a database
 #. Integrate Mattermost and Traefik
-#. Inspect the routing
+#. Verify the routing
 
 What you'll need
 ----------------
@@ -173,7 +173,7 @@ Let's check what's going on with ``juju status --relations``:
     traefik-k8s:ingress            mattermost-k8s:ingress         ingress            regular  
     traefik-k8s:peers              traefik-k8s:peers              traefik_peers      peer  
 
-The key relation here is:
+The key relation here is the one between Traefik and Mattermost:
 
 .. code-block::
 
@@ -193,8 +193,8 @@ generating an external URL for Mattermost.
 
 We'll now test whether the routing works.
 
-Inspect the routing
--------------------
+Verify the routing
+------------------
 
 First, let's verify that the Mattermost application serves traffic. We'll need
 the IP address of the Mattermost application listed in the output of ``juju status``.
@@ -269,6 +269,6 @@ Next steps
 You achieved a basic deployment of the Traefik charm. If you want to go farther in your
 deployment or learn more about the charm, check out these pages:
 
-* Follow the advanced tutorial involving TLS terminiation using a local certificate authority in :ref:`tutorial_tls_termination_using_a_local_ca`.
+* Follow the advanced tutorial involving TLS termination using a local certificate authority in :ref:`tutorial_tls_termination_using_a_local_ca`.
 * Set up basic access authorization by :ref:`enabling BasicAuth <how_to_enable_basicauth>`.
 * Learn more about the ingress relations offered by the charm in :ref:`reference_ingress_integrations`.
