@@ -1,0 +1,20 @@
+# Version of the artifact schema
+version_schema: 2
+# The key holding the change(s)
+changes:
+  - title: Updated the Grafana dashboard for Traefik v2 metrics
+    author: copilot
+    type: minor
+    description: |
+      Replaced the outdated Grafana dashboard (based on the Traefik v1
+      community dashboard 6293) with the official Traefik Kubernetes
+      dashboard, which uses the current Traefik v2 metric names
+      (e.g. `traefik_service_requests_total` instead of the removed
+      `traefik_backend_requests_total`).
+    urls:
+      pr:
+        - https://github.com/canonical/traefik-k8s-operator/pull/753
+      related_doc:
+      related_issue: https://github.com/canonical/traefik-k8s-operator/issues/752
+    visibility: public
+    highlight: false
