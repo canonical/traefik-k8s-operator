@@ -204,8 +204,9 @@ Test the deployment using cURL:
 If the deployment is successful, the output should show HTML containing
 ``<title>Welcome to flask-k8s Charm</title>``.
 
-Now we can check the external URL set up by Traefik. To determine that URL,
-we need to use the charm's ``show-proxied-endpoints`` action:
+Now we can check the external URL set up by Traefik to verify that traffic
+is routed through Traefik. To determine the external URL,
+let's use the charm's ``show-proxied-endpoints`` action:
 
 .. code-block:: bash
 
@@ -277,6 +278,14 @@ application, and verified that the routing works by accessing the external URL.
 
 You can clean up your environment by following this guide:
 :ref:`Tear down your deployment <juju:tear-things-down>`
+
+.. note::
+
+    If you used Multipass for this tutorial, remove the route with:
+
+    .. code-block::
+
+        sudo ip route del 10.43.45.0
 
 Next steps
 ----------
