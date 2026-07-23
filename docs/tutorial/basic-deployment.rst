@@ -9,14 +9,14 @@ Deploy the Traefik charm
 As part of a Kubernetes deployment, Traefik provides reverse
 proxy capabilities to ingress-requiring applications. In this tutorial,
 we'll go step-by-step through the process of deploying and integrating
-the Traefik charm to set up a reverse proxy for a Mattermost application.
+the Traefik charm to set up a reverse proxy for a simple Flask application.
 
 What you'll do
 --------------
 
 #. Deploy the Traefik charm
-#. Deploy the Mattermost charm with a database
-#. Integrate Mattermost and Traefik
+#. Deploy a simple Flask application
+#. Integrate Traefik and the Flask application
 #. Verify the routing
 
 What you'll need
@@ -118,32 +118,28 @@ Once the deployment has finished, the output of ``juju status`` should look simi
 Traefik is active, idle, and ready to route traffic.
 Now we need to provide Traefik with an application.
 
-Deploy the Mattermost charm
----------------------------
+Deploy the Flask application
+----------------------------
 
-For this tutorial, we'll use the `Mattermost charm <https://charmhub.io/mattermost-k8s>`_
-as our application. Mattermost requires a database to deploy successfully,
-so let's deploy the charms for Mattermost and `PostgreSQL <https://charmhub.io/postgresql-k8s>`_
-and integrate them:
+For this tutorial, we'll use the `Flask K8s charm <https://charmhub.io/flask-k8s>`_
+as our application. Let's deploy it now:
 
 .. code-block::
 
-    juju deploy mattermost-k8s --channel latest/edge
-    juju deploy postgresql-k8s --channel 14/stable --trust
-    juju integrate mattermost-k8s postgresql-k8s
+    juju deploy flask-k8s 
 
-Integrate Mattermost and Traefik
---------------------------------
+Integrate Traefik and the Flask app
+-----------------------------------
 
-Let's now provide the communication pathway between Mattermost and Traefik
-by integrating them:
+Let's now provide the communication pathway between the Flask app
+and Traefik by integrating them:
 
 .. code-block::
 
-    juju integrate mattermost-k8s traefik-k8s
+    juju integrate traefik-k8s flask-k8s
 
 
-Let's check what's going on with ``juju status --relations``:
+We'll check what's going on with our deployment using ``juju status --relations``:
 
 .. terminal::
     :user: ubuntu
@@ -152,40 +148,34 @@ Let's check what's going on with ``juju status --relations``:
     juju status --relations
 
     Model             Controller     Cloud/Region  Version  SLA          Timestamp
-    traefik-tutorial  concierge-k8s  k8s           3.6.25   unsupported  14:42:00Z
+    traefik-tutorial  concierge-k8s  k8s           3.6.25   unsupported  16:48:25Z
 
-    App             Version  Status  Scale  Charm           Channel        Rev  Address         Exposed  Message
-    mattermost-k8s           active      1  mattermost-k8s  latest/edge     47  10.152.183.204  no       
-    postgresql-k8s  14.23    active      1  postgresql-k8s  14/stable      925  10.152.183.105  no       
-    traefik-k8s     2.11.49  active      1  traefik-k8s     latest/stable  377  10.152.183.235  no       Serving at http://10.43.45.0
+    App          Version  Status  Scale  Charm        Channel        Rev  Address        Exposed  Message
+    flask-k8s             active      1  flask-k8s    latest/edge     19  10.152.183.85  no       
+    traefik-k8s  2.11.49  active      1  traefik-k8s  latest/stable  377  10.152.183.62  no       Serving at http://10.43.45.0
 
-    Unit               Workload  Agent  Address     Ports  Message
-    mattermost-k8s/0*  active    idle   10.1.0.64          
-    postgresql-k8s/0*  active    idle   10.1.0.16          Primary
-    traefik-k8s/0*     active    idle   10.1.0.243         Serving at http://10.43.45.0
+    Unit            Workload  Agent  Address     Ports  Message
+    flask-k8s/0*    active    idle   10.1.0.85          
+    traefik-k8s/0*  active    idle   10.1.0.166         Serving at http://10.43.45.0
 
-    Integration provider           Requirer                       Interface          Type     Message
-    mattermost-k8s:secret-storage  mattermost-k8s:secret-storage  secret-storage     peer     
-    postgresql-k8s:database        mattermost-k8s:postgresql      postgresql_client  regular  
-    postgresql-k8s:database-peers  postgresql-k8s:database-peers  postgresql_peers   peer     
-    postgresql-k8s:restart         postgresql-k8s:restart         rolling_op         peer     
-    postgresql-k8s:upgrade         postgresql-k8s:upgrade         upgrade            peer     
-    traefik-k8s:ingress            mattermost-k8s:ingress         ingress            regular  
-    traefik-k8s:peers              traefik-k8s:peers              traefik_peers      peer  
+    Integration provider      Requirer                  Interface       Type     Message
+    flask-k8s:secret-storage  flask-k8s:secret-storage  secret-storage  peer     
+    traefik-k8s:ingress       flask-k8s:ingress         ingress         regular  
+    traefik-k8s:peers         traefik-k8s:peers         traefik_peers   peer  
 
-The key relation here is the one between Traefik and Mattermost:
+The key relation here is the one between Traefik and the Flask application:
 
 .. code-block::
 
-    Integration provider           Requirer                       Interface   
-    traefik-k8s:ingress            mattermost-k8s:ingress         ingress   
+    Integration provider      Requirer                  Interface   
+    traefik-k8s:ingress       flask-k8s:ingress         ingress  
 
-After we ran ``juju integrate mattermost-k8s traefik-k8s``,
+After we ran ``juju integrate traefik-k8s flask-k8s``,
 Juju connected the two applications together through the ``ingress`` relation endpoint.
-Mattermost can now provide Traefik with its internal IP address and port
-(which is ``8080`` by default). In return,
+The Flask application can now provide Traefik with its internal IP address and port
+(which is ``8000`` by default). In return,
 Traefik can now act as a reverse proxy for the application, automatically
-generating an external URL for Mattermost. 
+generating an external URL. 
 
 .. seealso::
 
@@ -196,30 +186,23 @@ We'll now test whether the routing works.
 Verify the routing
 ------------------
 
-First, let's verify that the Mattermost application serves traffic. We'll need
-the IP address of the Mattermost application listed in the output of ``juju status``.
-In the example terminal output above, the IP address is ``10.152.183.204``.
+First, let's verify that the Flask application serves traffic. We'll need
+the IP address of the Flask unit listed in the output of ``juju status``.
+In the example terminal output above, the IP address is ``10.1.0.85``.
 We can also grab this information generically using ``jq``:
 
 .. code-block:: bash
 
-    MATTERMOST_IP=$(juju status --format json | jq -r '.applications."mattermost-k8s".address')
+    FLASK_IP=$(juju status --format json | jq -r '.applications."flask-k8s".units."flask-k8s/0".address')
 
 Test the deployment using cURL:
 
 .. code-block:: bash
 
-    curl $MATTERMOST_IP:8080
+    curl $FLASK_IP:8000
 
-If the deployment is successful, the output should look similar to:
-
-.. terminal::
-    :user: ubuntu
-    :host: charm-tutorial-vm
-
-    curl $MATTERMOST_IP:8080
-
-    <a href="/traefik-tutorial-mattermost-k8s">Found</a>.
+If the deployment is successful, the output should show HTML containing
+``<title>Welcome to flask-k8s Charm</title>``.
 
 Now we can check the external URL set up by Traefik. To determine that URL,
 we need to use the charm's ``show-proxied-endpoints`` action:
@@ -241,24 +224,55 @@ output something similar to:
       - task 2 on unit-traefik-k8s-0
 
     Waiting for task 2...
-    proxied-endpoints: '{"traefik-k8s": {"url": "http://10.43.45.0"}, "mattermost-k8s":
-      {"url": "http://10.43.45.0/traefik-tutorial-mattermost-k8s"}}'
+    proxied-endpoints: '{"traefik-k8s": {"url": "http://10.43.45.0"}, "flask-k8s": {"url":
+      "http://10.43.45.0/traefik-tutorial-flask-k8s"}}'
 
-Notice that Traefik has set up the URL ``http://10.43.45.0/traefik-tutorial-mattermost-k8s``
-for our Mattermost application. Once again we'll test with cURL:
+Notice that Traefik has set up the URL ``http://10.43.45.0/traefik-tutorial-flask-k8s``
+for our Flask application. Once again we'll test with cURL:
 
 .. code-block::
 
-    curl http://10.43.45.0/traefik-tutorial-mattermost-k8s
+    curl http://10.43.45.0/traefik-tutorial-flask-k8s
 
-The terminal should show ``<a href="/traefik-tutorial-mattermost-k8s">Found</a>.``,
-just like it did when we directly tested the Mattermost application's IP address.
+The terminal should show the same HTML output as before, thus confirming that
+traffic is being routed through Traefik.
+
+Visit in a browser
+~~~~~~~~~~~~~~~~~~
+
+The HTML output from cURL can be difficult to read in a terminal.
+As a final step, let's visit the Flask application using a browser.
+
+.. note::
+
+    If you're using Multipass for this tutorial, you will need to route the
+    IP from Multipass. First you'll need the IP of the Multipass VM.
+    Outside the Multipass VM run:
+
+    .. code-block::
+
+        multipass info charm-tutorial-vm
+
+    Several IPs may be listed; use the first listed IP.
+
+    We also need the IP for the Traefik application listed in ``show-proxied-endpoints``.
+    In the output above, this IP is ``10.43.45.0``.
+
+    Then route:
+
+    .. code-block::
+
+        sudo ip route add 10.43.45.0 via <Multipass VM IP>
+
+Access the Flask application at ``http://10.43.45.0/traefik-tutorial-flask-k8s`` in
+your browser. You should see the message
+"Congratulations! You've successfully deployed the flask-k8s charm."
 
 Clean up the environment
 ------------------------
 
-Congratulations! You successfully deployed the Traefik charm, integrated it with a basic Mattermost
-application deployment, and verified that the routing works by accessing the external URL.
+Congratulations! You successfully deployed the Traefik charm, integrated it with a basic Flask
+application, and verified that the routing works by accessing the external URL.
 
 You can clean up your environment by following this guide:
 :ref:`Tear down your deployment <juju:tear-things-down>`
