@@ -76,8 +76,7 @@ Set up the Juju model
 ---------------------
 
 To manage resources effectively and to separate this tutorial's workload from
-your usual work, create a new model in the controller
-using the following command:
+your usual work, create a new model in the controller with:
 
 .. code-block:: bash
 
@@ -129,10 +128,10 @@ as our application. Let's deploy it now:
 
     juju deploy flask-k8s 
 
-Integrate Traefik and the Flask app
------------------------------------
+Integrate Traefik and the Flask application
+-------------------------------------------
 
-Let's now provide the communication pathway between the Flask app
+We'll provide a communication pathway between the Flask application
 and Traefik by integrating them:
 
 .. code-block::
@@ -140,7 +139,7 @@ and Traefik by integrating them:
     juju integrate traefik-k8s flask-k8s
 
 
-We'll check what's going on with our deployment using ``juju status --relations``:
+Let's check what's going on with our deployment using ``juju status --relations``:
 
 .. terminal::
     :user: ubuntu
@@ -242,7 +241,7 @@ Visit in a browser
 ~~~~~~~~~~~~~~~~~~
 
 The HTML output from cURL can be difficult to read in a terminal.
-As a final step, let's visit the Flask application using a browser.
+As a final step, let's visit the Flask application in a browser.
 
 .. note::
 
@@ -254,10 +253,11 @@ As a final step, let's visit the Flask application using a browser.
 
         multipass info charm-tutorial-vm
 
-    Several IPs may be listed; use the first listed IP.
+    Several IPs may be listed in the output; use the first listed IP.
 
-    We also need the IP for the Traefik application listed in ``show-proxied-endpoints``.
-    In the output above, this IP is ``10.43.45.0``.
+    We also need the IP for the Traefik application listed in the output from the
+    ``show-proxied-endpoints`` action.
+    In the output shown previously, this IP is ``10.43.45.0``.
 
     Then route:
 
