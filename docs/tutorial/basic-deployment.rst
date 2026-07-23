@@ -17,7 +17,7 @@ What you'll do
 #. Deploy the Traefik charm
 #. Deploy a simple Flask application
 #. Integrate Traefik and the Flask application
-#. Verify the routing
+#. Verify the routing in the terminal and in a browser
 
 What you'll need
 ----------------
@@ -33,15 +33,11 @@ Your working station should have at least 4 CPU cores, 8 GB of RAM, and 30 GB of
 
         multipass launch 24.04 --name charm-tutorial-vm --cpus 4 --memory 8G --disk 30G
 
-To be able to work inside the Multipass VM, log in with the following command:
+    To be able to work inside the Multipass VM, log in with the following command:
 
-.. code-block:: bash
+    .. code-block:: bash
 
-    multipass shell charm-tutorial-vm 
-
-.. note::
-
-    If you're working locally, you don't need to do this step.
+        multipass shell charm-tutorial-vm 
 
 This tutorial requires the following software to be installed on your working station
 (either locally or in the Multipass VM):
