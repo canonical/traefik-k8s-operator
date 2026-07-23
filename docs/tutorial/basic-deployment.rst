@@ -71,6 +71,11 @@ If Concierge did not perform the bootstrap, run:
 
     juju bootstrap k8s tutorial-controller
 
+Finally, for Traefik to receive an external IP address, the Kubernetes cluster
+must have a configured load balancer. Concierge should configure the load
+balancer for you, and you can verify by checking for ``load-balancer: enabled``
+in the output of ``sudo k8s status``.
+
 Set up the Juju model
 ---------------------
 
