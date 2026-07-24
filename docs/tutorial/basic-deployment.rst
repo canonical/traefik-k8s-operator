@@ -46,15 +46,53 @@ This tutorial requires the following software to be installed on your working st
 * Canonical Kubernetes 1.32+
 
 Use `Concierge <https://github.com/canonical/concierge>`_ to set up Juju
-and Canonical Kubernetes:
+and Canonical Kubernetes. Install Concierge with:
 
 .. code-block::
 
     sudo snap install --classic concierge
-    sudo concierge prepare -p k8s
 
-This first command installs Concierge, and the second command uses Concierge
-to install and configure Juju and Canonical Kubernetes.
+
+For Traefik to receive an external IP address, the Kubernetes cluster
+must have a configured load balancer. Concierge should configure the load
+balancer for you, but we'll use a custom configuration to set the IP
+of the load balancer to the IP of our working station or Multipass VM:
+
+.. code-block:: bash
+
+    VM_IP=$(hostname -I | awk '{print $1}')
+    cat << EOF > concierge.yaml
+    providers:
+    k8s:
+        enable: true
+        bootstrap: true
+        bootstrap-constraints:
+        root-disk: "5G"
+        features:
+        load-balancer:
+            l2-mode: "true"
+            cidrs: "$VM_IP/28"
+        local-storage: {}
+        network: {}
+        ingress:
+
+    host:
+    snaps:
+        aws-cli:
+    EOF
+
+    sudo concierge prepare -c concierge.yaml
+
+.. note::
+
+    If you're using Multipass for this tutorial, this
+    custom configuration means we can avoid setting up additional
+    routes later in the tutorial when we visit the Flask
+    application in a browser.
+
+    Verify that the load balancer is configured by running
+    ``sudo k8s status`` and checking for ``load-balancer: enabled``
+    in the output.
 
 For this tutorial, Juju must be bootstrapped to a Canonical Kubernetes controller.
 Concierge should complete this step for you, and you can verify by checking for
@@ -66,11 +104,6 @@ If Concierge did not perform the bootstrap, run:
 .. code-block:: bash
 
     juju bootstrap k8s tutorial-controller
-
-Finally, for Traefik to receive an external IP address, the Kubernetes cluster
-must have a configured load balancer. Concierge should configure the load
-balancer for you, and you can verify by checking for ``load-balancer: enabled``
-in the output of ``sudo k8s status``.
 
 Set up the Juju model
 ---------------------
@@ -107,13 +140,13 @@ Once the deployment has finished, the output of ``juju status`` should look simi
     juju status
 
     Model             Controller     Cloud/Region  Version  SLA          Timestamp
-    traefik-tutorial  concierge-k8s  k8s           3.6.25   unsupported  14:22:33Z
+    traefik-tutorial  concierge-k8s  k8s           3.6.25   unsupported  12:07:36Z
 
     App          Version  Status  Scale  Charm        Channel        Rev  Address         Exposed  Message
-    traefik-k8s  2.11.49  active      1  traefik-k8s  latest/stable  377  10.152.183.235  no       Serving at http://10.43.45.0
+    traefik-k8s  2.11.49  active      1  traefik-k8s  latest/stable  377  10.152.183.205  no       Serving at http://10.114.45.129
 
     Unit            Workload  Agent  Address     Ports  Message
-    traefik-k8s/0*  active    idle   10.1.0.243         Serving at http://10.43.45.0
+    traefik-k8s/0*  active    idle   10.1.0.75          Serving at http://10.114.45.129
 
 Traefik is active, idle, and ready to route traffic.
 Now we need to provide Traefik with an application.
@@ -126,7 +159,7 @@ as our application. Let's deploy it now:
 
 .. code-block::
 
-    juju deploy flask-k8s 
+    juju deploy flask-k8s --channel edge
 
 Integrate Traefik and the Flask application
 -------------------------------------------
@@ -148,20 +181,20 @@ Let's check what's going on with our deployment using ``juju status --relations`
     juju status --relations
 
     Model             Controller     Cloud/Region  Version  SLA          Timestamp
-    traefik-tutorial  concierge-k8s  k8s           3.6.25   unsupported  16:48:25Z
+    traefik-tutorial  concierge-k8s  k8s           3.6.25   unsupported  12:09:52Z
 
-    App          Version  Status  Scale  Charm        Channel        Rev  Address        Exposed  Message
-    flask-k8s             active      1  flask-k8s    latest/edge     19  10.152.183.85  no       
-    traefik-k8s  2.11.49  active      1  traefik-k8s  latest/stable  377  10.152.183.62  no       Serving at http://10.43.45.0
+    App          Version  Status  Scale  Charm        Channel        Rev  Address         Exposed  Message
+    flask-k8s             active      1  flask-k8s    latest/edge     19  10.152.183.209  no       
+    traefik-k8s  2.11.49  active      1  traefik-k8s  latest/stable  377  10.152.183.205  no       Serving at http://10.114.45.129
 
     Unit            Workload  Agent  Address     Ports  Message
-    flask-k8s/0*    active    idle   10.1.0.85          
-    traefik-k8s/0*  active    idle   10.1.0.166         Serving at http://10.43.45.0
+    flask-k8s/0*    active    idle   10.1.0.229         
+    traefik-k8s/0*  active    idle   10.1.0.75          Serving at http://10.114.45.129
 
     Integration provider      Requirer                  Interface       Type     Message
     flask-k8s:secret-storage  flask-k8s:secret-storage  secret-storage  peer     
     traefik-k8s:ingress       flask-k8s:ingress         ingress         regular  
-    traefik-k8s:peers         traefik-k8s:peers         traefik_peers   peer  
+    traefik-k8s:peers         traefik-k8s:peers         traefik_peers   peer    
 
 The key relation here is the one between Traefik and the Flask application:
 
@@ -188,7 +221,7 @@ Verify the routing
 
 First, let's verify that the Flask application serves traffic. We'll need
 the IP address of the Flask unit listed in the output of ``juju status``.
-In the example terminal output above, the IP address is ``10.1.0.85``.
+In the example terminal output above, the IP address is ``10.1.0.229``.
 We can also grab this information generically using ``jq``:
 
 .. code-block:: bash
@@ -225,15 +258,16 @@ output something similar to:
       - task 2 on unit-traefik-k8s-0
 
     Waiting for task 2...
-    proxied-endpoints: '{"traefik-k8s": {"url": "http://10.43.45.0"}, "flask-k8s": {"url":
-      "http://10.43.45.0/traefik-tutorial-flask-k8s"}}'
+    proxied-endpoints: '{"traefik-k8s": {"url": "http://10.114.45.129"}, "flask-k8s":
+      {"url": "http://10.114.45.129/traefik-tutorial-flask-k8s"}}
 
-Notice that Traefik has set up the URL ``http://10.43.45.0/traefik-tutorial-flask-k8s``
-for our Flask application. Once again we'll test with cURL:
+Notice that Traefik has set up the URL ``http://10.114.45.129/traefik-tutorial-flask-k8s``
+for our Flask application in this example output. 
+Once again we'll test with cURL:
 
 .. code-block::
 
-    curl http://10.43.45.0/traefik-tutorial-flask-k8s
+    curl http://10.114.45.129/traefik-tutorial-flask-k8s
 
 The terminal should show the same HTML output as before, thus confirming that
 traffic is being routed through Traefik.
@@ -244,29 +278,7 @@ Visit in a browser
 The HTML output from cURL can be difficult to read in a terminal.
 As a final step, let's visit the Flask application in a browser.
 
-.. note::
-
-    If you're using Multipass for this tutorial, you will need to route the
-    IP from Multipass. First you'll need the IP of the Multipass VM.
-    Outside the Multipass VM run:
-
-    .. code-block::
-
-        multipass info charm-tutorial-vm
-
-    Several IPs may be listed in the output; use the first listed IP.
-
-    We also need the IP for the Traefik application listed in the output from the
-    ``show-proxied-endpoints`` action.
-    In the output shown previously, this IP is ``10.43.45.0``.
-
-    Then route:
-
-    .. code-block::
-
-        sudo ip route add 10.43.45.0 via <Multipass VM IP>
-
-Access the Flask application at ``http://10.43.45.0/traefik-tutorial-flask-k8s`` in
+Access the Flask application at ``http://10.114.45.129/traefik-tutorial-flask-k8s`` in
 your browser. You should see the message
 "Congratulations! You've successfully deployed the flask-k8s charm."
 
@@ -278,14 +290,6 @@ application, and verified that the routing works by accessing the external URL.
 
 You can clean up your environment by following this guide:
 :ref:`Tear down your deployment <juju:tear-things-down>`
-
-.. note::
-
-    If you used Multipass for this tutorial, remove the route with:
-
-    .. code-block::
-
-        sudo ip route del 10.43.45.0
 
 Next steps
 ----------
