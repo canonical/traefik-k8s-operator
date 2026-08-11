@@ -12,12 +12,16 @@ This section contains a step-by-step guide to help you start exploring how to de
 
 ## Get started
 
-This tutorial walks through a basic deployment of the Traefik charm.
+Walk through a basic deployment of the Traefik charm in {ref}`tutorial_basic_deployment`.
 
-* {ref}`tutorial_tls_termination_using_a_local_ca`
+## Dive deeper
+
+Reach an application's endpoint using a local certificate authority in
+{ref}`tutorial_tls_termination_using_a_local_ca`.
 
 ```{toctree}
 :hidden:
 
+basic-deployment
 tls-termination-using-a-local-ca
 ```
