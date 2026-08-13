@@ -1,0 +1,19 @@
+# Version of the artifact schema
+version_schema: 2
+# The key holding the change(s)
+changes:
+  - title: Migrated CI workflows to operator-workflows
+    author: swetha1654
+    type: minor
+    description: |
+      Migrated the repository CI workflows from observability-owned reusable
+      workflows to operator-workflows, updated the pull request checks to use
+      the shared operator test workflow, and removed the unused Tiobe scan
+      workflow.
+    urls:
+      pr:
+        - https://github.com/canonical/traefik-k8s-operator/pull/755
+      related_doc:
+      related_issue:
+    visibility: internal
+    highlight: false
