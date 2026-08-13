@@ -1,3 +1,6 @@
+# Copyright 2026 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 resource "juju_application" "traefik" {
   name = var.app_name
   # Juju requires `juju-external-hostname` to be set before a Kubernetes application

@@ -1,3 +1,6 @@
+# Copyright 2026 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 # GIVEN a charm with ingress impl'd
 # WHEN a relation with traefik is formed
 # THEN traefik's config file's `server` section has all the units listed
