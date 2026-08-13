@@ -1,3 +1,6 @@
+# Copyright 2026 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 variable "app_name" {
   description = "Name to give the deployed application"
   type        = string

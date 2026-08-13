@@ -2764,7 +2764,7 @@ requires-dist = [
     { name = "coverage", extras = ["toml"], marker = "extra == 'dev'" },
     { name = "cryptography" },
     { name = "deepmerge" },
-    { name = "importlib-metadata", specifier = "==8.5.0" },
+    { name = "importlib-metadata", specifier = "==9.0.0" },
     { name = "ipdb", marker = "extra == 'dev'" },
     { name = "jsonschema" },
     { name = "jubilant", marker = "extra == 'dev'" },
