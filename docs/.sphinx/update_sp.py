@@ -1,5 +1,8 @@
 #! /usr/bin/env python
 
+# Copyright 2026 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 # Initial update script for the starter pack.
 #
 # Requires some manual intervention, but makes identifying updates and differences easier.
