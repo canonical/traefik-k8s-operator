@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 Each revision is versioned by the date of the revision.
 
+## 2026-08-12
+
+- Migrated repository CI workflows from observability-owned reusable workflows to operator-workflows, and removed the unused Tiobe scan workflow.
+
 ## 2026-07-22
 
 - Updated the Grafana dashboard to the official Traefik Kubernetes dashboard using Traefik v2 metric names (e.g. `traefik_service_requests_total`).

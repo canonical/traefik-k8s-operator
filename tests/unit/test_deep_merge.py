@@ -1,3 +1,6 @@
+# Copyright 2026 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 import pytest
 
 from traefik import StaticConfigMergeConflictError, static_config_deep_merge

@@ -7,14 +7,33 @@ on:
         type: choice
         description: Channel to promote from
         options:
-          - edge -> beta
-          - beta -> candidate
+          - edge -> candidate
           - candidate -> stable
 
 jobs:
   promote:
-    name: Promote
-    uses: canonical/observability/.github/workflows/charm-promote.yaml@v2
+    name: Promote ${{ matrix.base-name }} ${{ matrix.base-channel }} ${{ matrix.base-architecture }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - base-name: ubuntu
+            base-channel: "20.04"
+            base-architecture: amd64
+          - base-name: ubuntu
+            base-channel: "26.04"
+            base-architecture: amd64
+          - base-name: ubuntu
+            base-channel: "26.04"
+            base-architecture: arm64
+          - base-name: ubuntu
+            base-channel: "26.04"
+            base-architecture: s390x
+    uses: canonical/operator-workflows/.github/workflows/promote_charm.yaml@main
     with:
-      promotion: ${{ github.event.inputs.promotion }}
+      origin-channel: ${{ github.event.inputs.promotion == 'edge -> candidate' && 'latest/edge' || 'latest/candidate' }}
+      destination-channel: ${{ github.event.inputs.promotion == 'edge -> candidate' && 'latest/candidate' || 'latest/stable' }}
+      base-name: ${{ matrix.base-name }}
+      base-channel: ${{ matrix.base-channel }}
+      base-architecture: ${{ matrix.base-architecture }}
     secrets: inherit

@@ -1,3 +1,6 @@
+# Copyright 2026 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 #
 # TODO: implement
 # @pytest.mark.parametrize("scheme", ("http", "https", "h2c"))
