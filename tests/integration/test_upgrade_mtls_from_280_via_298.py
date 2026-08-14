@@ -15,6 +15,8 @@ Scenario:
 5. Refresh traefik to the locally built charm.
 6. Verify the *same* certificate still serves the *same* URL on every unit and
    that the manual-tls charm has no outstanding certificate requests.
+7. Remove and re-add the certificates relation.
+8. Verify manual-tls still has no outstanding certificate requests.
 """
 
 import logging
@@ -82,4 +84,16 @@ def test_upgrade_mtls_from_280_via_298(
     assert len(get_outstanding_csrs(juju)) == 0, (
         "manual-tls-certificates has outstanding requests after upgrade; "
         "the TLS private key was not reused during migration"
+    )
+
+    juju.remove_relation(f"{mtls_app}:certificates", f"{TRAEFIK_APP_NAME}:certificates")
+    juju.wait(all_settled, delay=5, timeout=900, successes=5)
+
+    juju.integrate(f"{mtls_app}:certificates", f"{TRAEFIK_APP_NAME}:certificates")
+    juju.wait(all_settled, delay=5, timeout=900, successes=5)
+
+    assert len(get_outstanding_csrs(juju)) == 0, (
+        "manual-tls-certificates has outstanding requests after the certificates "
+        "relation was removed and re-added; traefik should have reused its TLS "
+        "private key without issuing a fresh CSR"
     )
