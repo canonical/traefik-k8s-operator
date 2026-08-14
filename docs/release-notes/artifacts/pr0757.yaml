@@ -1,0 +1,18 @@
+# Version of the artifact schema
+version_schema: 2
+# The key holding the change(s)
+changes:
+  - title: Preserved the TLS private key across certificates relation removal
+    author: swetha1654
+    type: bugfix
+    description: |
+      Preserved the TLS private key when the `certificates` relation is
+      removed so re-adding the relation reuses the existing key instead of
+      requesting a new certificate.
+    urls:
+      pr:
+        - https://github.com/canonical/traefik-k8s-operator/pull/757
+      related_doc:
+      related_issue:
+    visibility: public
+    highlight: false
