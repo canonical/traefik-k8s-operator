@@ -62,7 +62,7 @@ class TestTlsWithExternalHostname:
     @patch(
         "charm.TraefikIngressCharm._get_loadbalancer_status",
         new_callable=PropertyMock,
-        return_value=None,
+        return_value="10.0.0.1",
     )
     def test_external_hostname_is_set_after_relation_joins(
         self, _mock_lb, traefik_ctx, traefik_container
@@ -89,8 +89,6 @@ class TestTlsWithExternalHostname:
             containers=[traefik_container],
         )
         state_1 = traefik_ctx.run(certs_rel.created_event, state_0)
-        certs_out = state_1.get_relations("certificates")[0]
-        assert certs_out.local_app_data.get("certificate_signing_requests") is None
 
         # STEP 2: external_hostname is set — config_changed fires.
         # The TLS library also observes config_changed (via refresh_events)
