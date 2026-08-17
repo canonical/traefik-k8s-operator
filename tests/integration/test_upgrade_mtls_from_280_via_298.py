@@ -16,7 +16,9 @@ Scenario:
 6. Verify the *same* certificate still serves the *same* URL on every unit and
    that the manual-tls charm has no outstanding certificate requests.
 7. Remove and re-add the certificates relation.
-8. Verify manual-tls still has no outstanding certificate requests.
+8. Provide the *old* certificate (from before the relation removal) for the
+   new CSRs and verify HTTPS still works — the reused private key means the
+   old certificate's public key matches the new CSR.
 """
 
 import logging
@@ -35,6 +37,7 @@ from helpers import (
     assert_traefik_revision,
     bring_up_certified_traefik,
     get_outstanding_csrs,
+    provide_existing_certificate,
     sign_csrs_and_provide_cert,
     verify_https_on_all_units,
 )
@@ -67,6 +70,8 @@ def test_upgrade_mtls_from_280_via_298(
     juju.refresh(TRAEFIK_APP_NAME, channel=SOURCE_CHANNEL, revision=INTERMEDIATE_REVISION)
     juju.wait(jubilant.all_agents_idle, timeout=900)
 
+    # Sign CSRs; the resulting cert PEMs are stored in the module-level
+    # ``signed_certificates`` global for re-use after the relation is re-created.
     sign_csrs_and_provide_cert(juju, MANUAL_TLS_APP_NAME)
     juju.wait(all_settled, timeout=900)
     assert_traefik_revision(juju, INTERMEDIATE_REVISION)
@@ -90,10 +95,23 @@ def test_upgrade_mtls_from_280_via_298(
     juju.wait(all_settled, delay=5, timeout=900, successes=5)
 
     juju.integrate(f"{mtls_app}:certificates", f"{TRAEFIK_APP_NAME}:certificates")
+    juju.wait(jubilant.all_agents_idle, delay=5, timeout=900, successes=5)
+
+    # A new CSR is expected (the relation data is fresh) but the private key
+    # is reused, so the old certificate's public key still matches. Provide
+    # the old certificate without re-signing and verify HTTPS works.
+    outstanding = get_outstanding_csrs(juju)
+    assert outstanding, (
+        "Expected outstanding CSRs after re-integrating the certificates "
+        "relation, but none were found"
+    )
+
+    provide_existing_certificate(juju, outstanding)
     juju.wait(all_settled, delay=5, timeout=900, successes=5)
 
     assert len(get_outstanding_csrs(juju)) == 0, (
-        "manual-tls-certificates has outstanding requests after the certificates "
-        "relation was removed and re-added; traefik should have reused its TLS "
-        "private key without issuing a fresh CSR"
+        "manual-tls-certificates still has outstanding requests after providing "
+        "the old certificate for the new CSRs"
     )
+
+    verify_https_on_all_units(juju, expected_url=url)
