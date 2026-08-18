@@ -1346,7 +1346,6 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             return
 
         if not self._get_loadbalancer_status:
-            self._wipe_ingress_for_all_relations()
             self.unit.status = WaitingStatus(
                 "Load balancer service has not yet obtained an external address."
             )
@@ -1450,7 +1449,6 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
     def ready(self) -> bool:
         """Check whether we have an external host set, and traefik is running."""
         if not self._get_loadbalancer_status:
-            self._wipe_ingress_for_all_relations()
             self.unit.status = WaitingStatus(
                 "Load balancer service has not yet obtained an external address."
             )
