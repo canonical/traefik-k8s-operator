@@ -324,7 +324,10 @@ class TestTraefikIngressCharm(unittest.TestCase):
             ),
         )
 
-        self.assertEqual(requirer.urls, {})
+        self.assertEqual(
+            requirer.urls,
+            {"remote/0": "http://testhostname/test-model-remote-0"},
+        )
 
     def test_relation_broken(self):
         self.harness.update_config({"external_hostname": "testhostname"})
