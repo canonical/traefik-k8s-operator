@@ -993,11 +993,6 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             logger.debug("App data not available in peer relation; nothing to clean up.")
             return
         app_data.pop("tls_certs", None)
-        try:
-            secret = self.model.get_secret(label=TLS_KEY_LABEL)
-            secret.remove_all_revisions()
-        except SecretNotFoundError:
-            pass
 
     def _get_certs_from_peer_databag(self) -> Dict[str, Dict[str, str]]:
         """Read certificates shared by the leader from the peer relation.
