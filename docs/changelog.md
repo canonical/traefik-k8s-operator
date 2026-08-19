@@ -8,6 +8,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 Each revision is versioned by the date of the revision.
 
+## 2026-08-19
+
+- Updated Sphinx Stack from 1.4.1 to 2.0 with the following changes:
+  - Migrated from `.sphinx/` to `_dev/` directory structure
+  - Migrated venv from `.sphinx/venv` to `.venv`
+  - Added `sphinx-rerediraffe` extension for improved redirects
+  - Added `sphinx-llm` extension for LLM documentation support
+  - Updated `canonical-sphinx` to 0.6.0
+  - Fixed broken Rockcraft documentation link
+
 ## 2026-08-14
 
 - Preserved the TLS private key when the `certificates` relation is removed so re-adding the relation reuses the existing key instead of requesting a new certificate.

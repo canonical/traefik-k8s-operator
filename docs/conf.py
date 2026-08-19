@@ -3,6 +3,7 @@
 
 import datetime
 import os
+import textwrap
 import yaml
 
 # Configuration for the Sphinx documentation builder.
@@ -212,8 +213,11 @@ redirects = {
 linkcheck_ignore = [
     "https://matrix.to/#/#charmhub-charmdev:ubuntu.com",
     "http://127.0.0.1:8000",
-    "https://github.com/canonical/ACME/*"
-    ]
+    "https://github.com",
+    "https://matrix\\.to/.*",
+    "https://example.com",
+    "https://.*\\.sourceforge\\.(net|io)/.*",
+]
 
 
 # A regex list of URLs where anchors are ignored by 'make linkcheck'
@@ -250,6 +254,7 @@ extensions = [
     "notfound.extension",
     "sphinx_design",
     "sphinx_reredirects",
+    "sphinx_rerediraffe",
     "sphinx_tabs.tabs",
     "sphinxcontrib.jquery",
     "sphinxext.opengraph",
@@ -265,12 +270,14 @@ extensions = [
     "sphinx_last_updated_by_git",
     "sphinx.ext.intersphinx",
     "sphinx_sitemap",
+    "sphinx_llm.txt",
 ]
 
 # Excludes files or directories from processing
 
 exclude_patterns = [
     "doc-cheat-sheet*",
+    ".venv*",
 ]
 
 # Adds custom CSS files, located under 'html_static_path'
@@ -346,3 +353,30 @@ intersphinx_mapping = {
     'starter-pack': ('https://canonical-starter-pack.readthedocs-hosted.com/stable/', None),
     'sphinxcontrib-mermaid': ('https://sphinxcontrib-mermaid-demo.readthedocs.io/en/latest', None)
 }
+
+#############
+# Redirects #
+#############
+
+# To use sphinx-rerediraffe for redirects (recommended), create a file
+# called `redirects.txt` and use `rediraffe_redirects`.
+# See https://github.com/canonical/sphinx-stack/blob/main/docs/reference/redirects.md
+# for more information about setting up redirects.
+
+# Strips '/index.html' from destination URLs when building with 'dirhtml'
+rediraffe_dir_only = True
+
+rediraffe_redirects = "redirects.txt"
+
+#############
+# LLMs.txt  #
+#############
+
+# This description is included in llms.txt to provide some initial context for your
+# product docs.
+llms_txt_description = textwrap.dedent(
+    """\
+    This is the documentation for the Traefik K8s charm, a Juju Kubernetes charm
+    for deploying and managing Traefik as an ingress controller.
+    """
+)
