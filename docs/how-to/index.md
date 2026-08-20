@@ -11,7 +11,7 @@ myst:
 Manage the full operations lifecycle of the Traefik charm, from integrating applications through
 production maintenance. Each guide assumes that you've already deployed the charm with Juju.
 
-## Integrations and security
+## Configuring and Integrating
 
 Once you've set up the charm, you can use Traefik's ingress and authentication features to route
 traffic to your applications and protect exposed endpoints.
