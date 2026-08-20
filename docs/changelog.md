@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 Each revision is versioned by the date of the revision.
 
+## 2026-08-17
+
+- Fixed charm incorrectly reporting active status when the LoadBalancer Service has no external IP, even with `external_hostname` configured. The charm now reports waiting status until the LB obtains an address.
+
 ## 2026-08-14
 
 - Preserved the TLS private key when the `certificates` relation is removed so re-adding the relation reuses the existing key instead of requesting a new certificate.

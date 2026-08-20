@@ -1384,6 +1384,11 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         if self._certificates_pending() and isinstance(self.unit.status, ActiveStatus):
             self.unit.status = ActiveStatus("Certificate not available yet")
 
+        if not self._get_loadbalancer_status:
+            self.unit.status = WaitingStatus(
+                "Load balancer service has not yet obtained an external address."
+            )
+
     def _update_ingress_configurations(self) -> None:
         # step 1: determine whether the STATIC config should be changed and traefik restarted.
 
