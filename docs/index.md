@@ -11,8 +11,9 @@ A [Juju](https://juju.is/) {ref}`charm <juju:charm>` deploying and managing [Tra
 integrator and reverse proxy for Kubernetes. It is an essential part of the [COS Lite bundle]
 and is intended to be used together with certificates provider over the `tls-certificates` interface.
 
-This operator handles instantiation, scaling, configuration, and Day 2 operations specific to Traefik.
-The charm drives the Traefik application, and it can be composed with other operators to deliver a complex application or service.
+The charm provides a managed ingress entry point for applications running in your Juju model,
+handling deployment, routing, configuration, TLS integration, and operational tasks specific to
+Traefik. It can be composed with other operators to deliver complex applications and services.
 
 The charm offers different kinds of ingress:
 
@@ -26,11 +27,35 @@ Ingress is a purely in-model concern. Traefik will happily cross-model relate wi
 
 ## In this documentation
 
-| | |
-|-|-|
-| {ref}`Tutorial <tutorial_index>`</br>  Get started - a hands-on introduction for new users deploying the charmed operator.</br> | {ref}`How-to guides <how_to_index>`</br> Step-by-step guides covering key operations and common tasks |
-| {ref}`Reference <reference_index>`</br> Technical information - specifications, APIs, architecture    | {ref}`Explanation <explanation_index>`</br> Concepts - discussion and clarification of key topics  |
-| {ref}`Release notes <release_notes_index>`</br> History of stable releases – new features, bug fixes and breaking changes | |
+```{list-table}
+:header-rows: 1
+:widths: 10 25
+
+* -
+  -
+* - **Get started**
+  - {ref}`Guided tutorial <tutorial_basic_deployment>`
+* - **Deployment**
+  - {ref}`Configure TLS termination using a local CA <how_to_tls_termination_using_a_local_ca>`
+* - **Operations**
+  - {ref}`Troubleshoot reachability <how_to_troubleshoot_reachability>` | {ref}`Troubleshoot Gateway Address Unavailable <how_to_troubleshoot_gateway_address_unavailable>` | {ref}`Upgrade <how_to_upgrade>`
+* - **Ingress and interfaces**
+  - {ref}`Integrate your charm with Traefik <how_to_integrate>` | {ref}`Ingress-related relations <reference_ingress_integrations>`
+* - **Design**
+  - {ref}`Charm architecture <reference_charm_architecture>`
+* - **Security**
+  - {ref}`Security overview <explanation_security>` | {ref}`Enable BasicAuth <how_to_enable_basicauth>` | {ref}`Cryptographic documentation <reference_cryptographic_documentation_for_cos_lite_charms>`
+```
+
+## How this documentation is organized
+
+This documentation uses the [Diátaxis documentation structure](https://diataxis.fr/).
+
+- The {ref}`Tutorial <tutorial_index>` takes you step-by-step through a basic Traefik deployment and shows how to expose a workload through ingress.
+- {ref}`How-to guides <how_to_index>` cover practical tasks for integrating applications, securing ingress, troubleshooting issues, upgrading, and contributing to the project.
+- {ref}`Reference <reference_index>` provides technical details on charm architecture, ingress-related relations, and cryptographic considerations.
+- {ref}`Explanation <explanation_index>` gives background and context for security-related topics.
+- {ref}`Release notes <release_notes_index>` track stable charm revisions, including new features, bug fixes, and compatibility notes.
 
 ## Contributing to this documentation
 

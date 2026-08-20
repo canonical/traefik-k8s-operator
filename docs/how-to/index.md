@@ -8,13 +8,17 @@ myst:
 
 # How-to guides
 
-These guides accompany you through the complete Traefik charm operations lifecycle.
+Manage the full operations lifecycle of the Traefik charm, from integrating applications through
+production maintenance. Each guide assumes that you've already deployed the charm with Juju.
 
-## Configuring and Integrating
+## Integrations and security
 
-Once you've set up the charm, you can take advantage of the built-in features and capabilities to customize the charm based on your specific needs and use cases.
+Once you've set up the charm, you can use Traefik's ingress and authentication features to route
+traffic to your applications and protect exposed endpoints.
 
 * {ref}`Integrate with traefik and traefik-route <how_to_integrate>`
+* {ref}`Configure TLS termination using a local CA <how_to_tls_termination_using_a_local_ca>`
+* {ref}`Enable BasicAuth <how_to_enable_basicauth>`
 
 ## Troubleshooting
 
@@ -36,6 +40,7 @@ Upgrades and community contributions ensure the Traefik charm stays current and 
 
 Enable BasicAuth <enable-basicauth>
 Integrate <integrate>
+Configure TLS termination using a local CA <tls-termination-using-a-local-ca>
 Troubleshoot "Gateway Address Unavailable" <troubleshoot-gateway-address-unavailable>
 Troubleshoot reachability <troubleshoot-reachability>
 Upgrade <upgrade>
