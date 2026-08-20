@@ -10,7 +10,7 @@ import ops.testing
 import yaml
 from charms.traefik_k8s.v2.ingress import IngressRequirerAppData, IngressRequirerUnitData
 from ops.charm import ActionEvent
-from ops.model import ActiveStatus, Application, BlockedStatus, Relation, WaitingStatus
+from ops.model import ActiveStatus, Application, BlockedStatus, Relation
 from ops.pebble import PathError
 from ops.testing import Harness
 
@@ -210,8 +210,8 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
         self.assertEqual(
             self.harness.charm.unit.status,
-            WaitingStatus(
-                "Load balancer service has not yet obtained an external address."
+            BlockedStatus(
+                "Traefik load balancer is unable to obtain an IP or hostname from the cluster."
             ),
         )
 
@@ -226,8 +226,8 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
         self.assertEqual(
             self.harness.charm.unit.status,
-            WaitingStatus(
-                "Load balancer service has not yet obtained an external address."
+            BlockedStatus(
+                "Traefik load balancer is unable to obtain an IP or hostname from the cluster."
             ),
         )
 
@@ -319,15 +319,12 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
         self.assertEqual(
             self.harness.charm.unit.status,
-            WaitingStatus(
-                "Load balancer service has not yet obtained an external address."
+            BlockedStatus(
+                "Traefik load balancer is unable to obtain an IP or hostname from the cluster."
             ),
         )
 
-        self.assertEqual(
-            requirer.urls,
-            {"remote/0": "http://testhostname/test-model-remote-0"},
-        )
+        self.assertEqual(requirer.urls, {})
 
     def test_relation_broken(self):
         self.harness.update_config({"external_hostname": "testhostname"})

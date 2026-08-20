@@ -1345,11 +1345,6 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             )
             return
 
-        if not self._get_loadbalancer_status:
-            self.unit.status = WaitingStatus(
-                "Load balancer service has not yet obtained an external address."
-            )
-            return
 
         hostname = self._traefik_external_address
 
@@ -1389,6 +1384,11 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
 
         if self._certificates_pending() and isinstance(self.unit.status, ActiveStatus):
             self.unit.status = ActiveStatus("Certificate not available yet")
+
+        if not self._get_loadbalancer_status:
+            self.unit.status = WaitingStatus(
+                "Load balancer service has not yet obtained an external address."
+            )
 
     def _update_ingress_configurations(self) -> None:
         # step 1: determine whether the STATIC config should be changed and traefik restarted.
@@ -1448,11 +1448,6 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
     @property
     def ready(self) -> bool:
         """Check whether we have an external host set, and traefik is running."""
-        if not self._get_loadbalancer_status:
-            self.unit.status = WaitingStatus(
-                "Load balancer service has not yet obtained an external address."
-            )
-            return False
         if not self._traefik_external_address:
             self._wipe_ingress_for_all_relations()  # fixme: no side-effects in prop
             self.unit.status = BlockedStatus(
