@@ -1345,7 +1345,6 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             )
             return
 
-
         hostname = self._traefik_external_address
 
         if not hostname:
