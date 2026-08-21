@@ -291,7 +291,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
     @patch(
         "charm.TraefikIngressCharm._get_loadbalancer_status",
         new_callable=PropertyMock,
-        return_value=None,
+        return_value="10.0.0.1",
     )
     def test_gateway_address_becomes_unavailable_after_relation_join(
         self, mock_get_loadbalancer_status
@@ -314,6 +314,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
         self.assertIsInstance(self.harness.charm.unit.status, ActiveStatus)
 
         _clear_cached_properties(self.harness.charm)
+        mock_get_loadbalancer_status.return_value = None
         self.harness.update_config(unset=["external_hostname"])
 
         self.assertEqual(
@@ -356,7 +357,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
     @patch(
         "charm.TraefikIngressCharm._get_loadbalancer_status",
         new_callable=PropertyMock,
-        return_value=None,
+        return_value="10.0.0.1",
     )
     def test_show_proxied_endpoints_action_no_relations(self, mock_get_loadbalancer_status):
         self.harness.begin_with_initial_hooks()
@@ -377,7 +378,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
     @patch(
         "charm.TraefikIngressCharm._get_loadbalancer_status",
         new_callable=PropertyMock,
-        return_value=None,
+        return_value="10.0.0.1",
     )
     def test_show_proxied_endpoints_action_only_ingress_per_app_relations(
         self, mock_get_loadbalancer_status
@@ -414,7 +415,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
     @patch(
         "charm.TraefikIngressCharm._get_loadbalancer_status",
         new_callable=PropertyMock,
-        return_value=None,
+        return_value="10.0.0.1",
     )
     def test_show_proxied_endpoints_action_only_ingress_per_unit_relations(
         self, mock_get_loadbalancer_status
