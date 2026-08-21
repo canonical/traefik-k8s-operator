@@ -1,0 +1,15 @@
+# Version of the artifact schema
+version_schema: 2
+changes:
+  - title: Updated sphinx-stack version
+    author: erinecon
+    type: minor
+    description: |
+      The sphinx-stack version of the documentation was updated to version 2.
+      In addition to restructuring changes, the extensions `sphinx-rerediraffe`
+      and `sphinx-llm` were added to the project.
+    urls:
+      pr:
+        - https://github.com/canonical/traefik-k8s-operator/pull/761
+    visibility: hidden
+    highlight: false
