@@ -6,7 +6,7 @@ myst:
 
 (tutorial_index)=
 
-# Tutorials
+# Tutorial
 
 This section contains a step-by-step guide to help you start exploring how to deploy and configure the Traefik charm to provide ingress to a backend application.
 

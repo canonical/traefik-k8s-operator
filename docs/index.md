@@ -44,7 +44,7 @@ Ingress is a purely in-model concern. Traefik will happily cross-model relate wi
 * - **Design**
   - {ref}`Charm architecture <reference_charm_architecture>`
 * - **Security**
-  - {ref}`Security overview <explanation_security>` | {ref}`Enable BasicAuth <how_to_enable_basicauth>` | {ref}`Cryptographic documentation <reference_cryptographic_documentation_for_cos_lite_charms>`
+  - {ref}`Overview <explanation_security>` | {ref}`Enable BasicAuth <how_to_enable_basicauth>` | {ref}`Cryptographic documentation <reference_cryptographic_documentation_for_cos_lite_charms>`
 ```
 
 ## How this documentation is organized
@@ -65,14 +65,14 @@ If there's a particular area of documentation that you'd like to see that's miss
 
 ## Project and community
 
-The Traefik operator is part of the Canonical Observability Stack. It’s an open source project that warmly welcomes community projects, contributions, suggestions, fixes and constructive feedback.
+The Traefik operator is an open source project that warmly welcomes community projects, contributions, suggestions, fixes and constructive feedback.
 
 * [Read our Code of conduct](https://ubuntu.com/community/code-of-conduct)
 * [Join the Discourse community forum](https://discourse.charmhub.io/tag/traefik)
 * [Join the Matrix community chat](https://matrix.to/#/#charmhub-charmdev:ubuntu.com)
 * [Contribute](how_to_contribute)
 
-Thinking about using the Canonical Observability Stack for your next project? [Get in touch!](https://matrix.to/#/#charmhub-charmdev:ubuntu.com)
+Thinking about using the Traefik charm for your next project? [Get in touch!](https://matrix.to/#/#charmhub-charmdev:ubuntu.com)
 
 [Traefik]: https://traefik.io/
 [COS Lite bundle]: https://charmhub.io/cos-lite
