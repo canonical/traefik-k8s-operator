@@ -1,0 +1,21 @@
+# Version of the artifact schema
+version_schema: 2
+# The key holding the change(s)
+changes:
+  - title: Fixed charm reporting active when LoadBalancer has no external IP
+    author: swetha1654
+    type: bugfix
+    description: |
+      Fixed an issue where the charm incorrectly reported active/idle status
+      when the Kubernetes LoadBalancer Service had no external IP assigned,
+      as long as external_hostname was configured. The charm now checks the
+      actual LoadBalancer status unconditionally and reports waiting until an
+      external address is obtained.
+    urls:
+      pr:
+        - https://github.com/canonical/traefik-k8s-operator/pull/760
+      related_doc:
+      related_issue:
+        - https://github.com/canonical/traefik-k8s-operator/issues/759
+    visibility: public
+    highlight: false

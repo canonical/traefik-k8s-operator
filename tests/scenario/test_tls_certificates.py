@@ -62,7 +62,7 @@ class TestTlsWithExternalHostname:
     @patch(
         "charm.TraefikIngressCharm._get_loadbalancer_status",
         new_callable=PropertyMock,
-        return_value=None,
+        return_value="10.0.0.1",
     )
     def test_external_hostname_is_set_after_relation_joins(
         self, _mock_lb, traefik_ctx, traefik_container
@@ -89,8 +89,6 @@ class TestTlsWithExternalHostname:
             containers=[traefik_container],
         )
         state_1 = traefik_ctx.run(certs_rel.created_event, state_0)
-        certs_out = state_1.get_relations("certificates")[0]
-        assert certs_out.local_app_data.get("certificate_signing_requests") is None
 
         # STEP 2: external_hostname is set — config_changed fires.
         # The TLS library also observes config_changed (via refresh_events)
@@ -260,16 +258,17 @@ class TestLeaderPublishesCerts:
             private_keys = json.loads(raw_keys)
             assert private_keys["testhostname"] == MOCK_KEY
 
-    def test_leader_clears_databag_when_tls_disabled(
+    def test_leader_clears_databag_but_preserves_secret_when_tls_disabled(
         self, traefik_ctx, traefik_container
     ):
-        """When TLS is disabled, leader clears peer databag and secret content."""
+        """When TLS is disabled, leader clears peer databag but keeps the tls-key secret."""
         existing_public_certs = json.dumps(
             {"old-host": {"chain": "old-chain", "ca": "old-ca"}}
         )
+        existing_private_keys = json.dumps({"old-host": "old-key"})
         existing_secret = Secret(
             id="secret:tls-keys",
-            contents={0: {"private-keys": json.dumps({"old-host": "old-key"})}},
+            contents={0: {"private-keys": existing_private_keys}},
             label=TLS_KEY_LABEL,
             owner="app",
         )
@@ -293,11 +292,11 @@ class TestLeaderPublishesCerts:
         peer_out = out.get_relations("peers")[0]
         assert "tls_certs" not in peer_out.local_app_data
 
-        # Secret should be removed
+        # The tls-key secret must still exist with its original contents
         tls_secrets = [s for s in out.secrets if s.label == TLS_KEY_LABEL]
-        if tls_secrets:
-            # The scenario mock may keep the object with empty contents
-            assert tls_secrets[0].contents == {}
+        assert tls_secrets, "tls-key secret should not be removed"
+        latest = tls_secrets[0].contents[max(tls_secrets[0].contents)]
+        assert json.loads(latest["private-keys"]) == {"old-host": "old-key"}
 
 
 @patch("charm.TraefikIngressCharm._ingressed_address", PropertyMock(return_value="10.0.0.1"))

@@ -44,6 +44,7 @@ logger = logging.getLogger(__name__)
 ca_key: Optional[PrivateKey] = None
 ca_cert: Optional[Certificate] = None
 ca_cert_path: Optional[Path] = None
+signed_certificates: List[str] = []
 
 
 def all_settled(status: jubilant.Status) -> bool:
@@ -222,13 +223,20 @@ def provide_certificate(
     juju: jubilant.Juju,
     outstanding_csrs: List[dict],
 ) -> None:
+    """Sign each outstanding CSR and provide the certificate via the action.
+
+    Populates the module-level ``signed_certificates`` list with the PEM strings.
+    """
+    global signed_certificates
     assert ca_key is not None and ca_cert is not None, (
         "CA not initialised; call generate_ca()/bring_up_certified_traefik() first"
     )
     ca_pem = str(ca_cert)
+    signed_certificates = []
     for request in outstanding_csrs:
         csr_pem = request["csr"]
         certificate_pem = sign_csr(ca_key, ca_cert, csr_pem)
+        signed_certificates.append(certificate_pem)
         juju.run(
             f"{MANUAL_TLS_APP_NAME}/leader",
             "provide-certificate",
@@ -240,6 +248,42 @@ def provide_certificate(
         )
         logger.info(
             "Provided certificate for relation %s / %s",
+            request.get("relation_id"),
+            request.get("unit_name") or request.get("application_name"),
+        )
+
+
+def provide_existing_certificate(
+    juju: jubilant.Juju,
+    outstanding_csrs: List[dict],
+) -> None:
+    """Provide the previously signed certificate for each outstanding CSR.
+
+    Uses the module-level ``signed_certificates`` (populated by
+    ``provide_certificate``) to re-provide an old certificate for new CSRs
+    generated with the same private key.
+    """
+    assert signed_certificates, (
+        "No signed certificates available; call provide_certificate() first"
+    )
+    certificate_pem = signed_certificates[0]
+    assert ca_cert is not None, (
+        "CA not initialised; call generate_ca()/bring_up_certified_traefik() first"
+    )
+    ca_pem = str(ca_cert)
+    for request in outstanding_csrs:
+        csr_pem = request["csr"]
+        juju.run(
+            f"{MANUAL_TLS_APP_NAME}/leader",
+            "provide-certificate",
+            {
+                "certificate": base64.b64encode(certificate_pem.encode()).decode(),
+                "ca-certificate": base64.b64encode(ca_pem.encode()).decode(),
+                "certificate-signing-request": base64.b64encode(csr_pem.encode()).decode(),
+            },
+        )
+        logger.info(
+            "Provided existing certificate for relation %s / %s",
             request.get("relation_id"),
             request.get("unit_name") or request.get("application_name"),
         )
