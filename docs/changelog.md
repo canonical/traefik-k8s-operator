@@ -26,6 +26,7 @@ Each revision is versioned by the date of the revision.
 
 ## 2026-07-22
 
+- Updated the Grafana dashboard to the official Traefik Kubernetes dashboard using Traefik v2 metric names (e.g. `traefik_service_requests_total`).
 - Added a basic deployment tutorial.
 
 ## 2026-07-10
