@@ -17,6 +17,7 @@ Each revision is versioned by the date of the revision.
   - Added `sphinx-llm` extension for LLM documentation support
   - Updated `canonical-sphinx` to 0.6.0
   - Fixed broken Rockcraft documentation link
+- Updated the documentation home page to the mature home page pattern, improved the how-to index organization, and reclassified the local-CA TLS page as a how-to guide.
 
 ## 2026-08-17
 
