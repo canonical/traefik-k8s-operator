@@ -198,6 +198,7 @@ templates_path = ["_templates"]
 
 redirects = {
     "how-to/force-https-redirect": "/",
+    "tutorial/tls-termination-using-a-local-ca": "../how-to/tls-termination-using-a-local-ca/",
 }
 
 
