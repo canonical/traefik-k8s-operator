@@ -10,6 +10,13 @@ Each revision is versioned by the date of the revision.
 
 ## 2026-08-19
 
+- Updated Sphinx Stack from 1.4.1 to 2.0 with the following changes:
+  - Migrated from `.sphinx/` to `_dev/` directory structure
+  - Migrated virtual environment from `.sphinx/venv` to `.venv`
+  - Added `sphinx-rerediraffe` extension for improved redirects
+  - Added `sphinx-llm` extension for LLM documentation support
+  - Updated `canonical-sphinx` to 0.6.0
+  - Fixed broken Rockcraft documentation link
 - Updated the documentation home page to the mature home page pattern, improved the how-to index organization, and reclassified the local-CA TLS page as a how-to guide.
 
 ## 2026-08-17
