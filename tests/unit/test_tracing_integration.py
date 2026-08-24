@@ -1,7 +1,6 @@
 # Copyright 2026 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-import os
 from unittest.mock import patch
 
 import opentelemetry
@@ -47,14 +46,11 @@ def workload_tracing_relation():
     return workload_tracing
 
 
-@pytest.mark.skip(
-    reason=(
-        "Intermittent failure, and it takes a long time to fail. "
-        "See https://github.com/canonical/traefik-k8s-operator/issues/519"
-    )
-)
-def test_charm_trace_collection(traefik_ctx, traefik_container, caplog, charm_tracing_relation):
+def test_charm_trace_collection(
+    traefik_ctx, traefik_container, caplog, charm_tracing_relation, monkeypatch, tmp_path
+):
     # GIVEN the presence of a tracing relation
+    monkeypatch.chdir(tmp_path)
 
     state_in = State(relations=[charm_tracing_relation], containers=[traefik_container])
 
@@ -63,7 +59,7 @@ def test_charm_trace_collection(traefik_ctx, traefik_container, caplog, charm_tr
         "opentelemetry.exporter.otlp.proto.http.trace_exporter.OTLPSpanExporter.export"
     ) as f:
         f.return_value = opentelemetry.sdk.trace.export.SpanExportResult.SUCCESS
-        os.environ[CHARM_TRACING_ENABLED] = "1"
+        monkeypatch.setenv(CHARM_TRACING_ENABLED, "1")
         # WHEN traefik receives <any event>
         traefik_ctx.run(charm_tracing_relation.changed_event, state_in)
 
