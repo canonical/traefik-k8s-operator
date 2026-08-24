@@ -37,6 +37,23 @@ def test_start_traefik_no_hostname(traefik_ctx, *_):
     )
 
 
+@patch("charm.TraefikIngressCharm._get_loadbalancer_status", PropertyMock(return_value=None))
+@patch("traefik.Traefik.is_ready", PropertyMock(return_value=True))
+@patch("charm.TraefikIngressCharm._static_config_changed", PropertyMock(return_value=False))
+def test_start_loadbalancer_pending(traefik_ctx, *_):
+    """When the LB has no external IP, charm should be in waiting state."""
+    state = State(
+        config={"routing_mode": "path", "external_hostname": "foo.bar"},
+        containers=[Container(name="traefik", can_connect=True)],
+    )
+
+    out = traefik_ctx.run("start", state)
+
+    assert out.unit_status == WaitingStatus(
+        "Load balancer service has not yet obtained an external address."
+    )
+
+
 @patch("charm.TraefikIngressCharm._ingressed_address", PropertyMock(return_value="1.1.1.1"))
 def test_start_traefik_subdomain_without_hostname(traefik_ctx, *_):
     # GIVEN external_hostname is not set but routing_mode is set to subdomain

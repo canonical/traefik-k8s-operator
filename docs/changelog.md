@@ -8,6 +8,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 Each revision is versioned by the date of the revision.
 
+## 2026-08-19
+
+- Updated Sphinx Stack from 1.4.1 to 2.0 with the following changes:
+  - Migrated from `.sphinx/` to `_dev/` directory structure
+  - Migrated virtual environment from `.sphinx/venv` to `.venv`
+  - Added `sphinx-rerediraffe` extension for improved redirects
+  - Added `sphinx-llm` extension for LLM documentation support
+  - Updated `canonical-sphinx` to 0.6.0
+  - Fixed broken Rockcraft documentation link
+- Updated the documentation home page to the mature home page pattern, improved the how-to index organization, and reclassified the local-CA TLS page as a how-to guide.
+
+## 2026-08-17
+
+- Fixed charm incorrectly reporting active status when the LoadBalancer Service has no external IP, even with `external_hostname` configured. The charm now reports waiting status until the LB obtains an address.
+
+## 2026-08-14
+
+- Preserved the TLS private key when the `certificates` relation is removed so re-adding the relation reuses the existing key instead of requesting a new certificate.
+
 ## 2026-08-12
 
 - Migrated repository CI workflows from observability-owned reusable workflows to operator-workflows, and removed the unused Tiobe scan workflow.

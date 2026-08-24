@@ -1,0 +1,4 @@
+# Redirects file for sphinx-rerediraffe
+# Format: source destination
+# Example: old-page.html new-page.html
+how-to/force-https-redirect.html index.html

@@ -1,16 +1,15 @@
 ---
 myst:
   html_meta:
-    "description lang=en": "The Traefik charm tutorial that walks a user through TLS termination using a local root-ca."
+    "description lang=en": "Configure TLS termination for the Traefik charm using a local root CA."
 ---
 
-(tutorial_tls_termination_using_a_local_ca)=
+(how_to_tls_termination_using_a_local_ca)=
 
-# TLS termination using a local CA
+# How to configure TLS termination using a local CA
 
-## Introduction
-
-By the end of this tutorial you will have several apps deployed, that you could `curl` using an ingress HTTPS URL. For simplicity, in this tutorial we will rely on a self-signed certificate issued by a stand-in local CA.
+This guide shows how to configure TLS termination for Traefik using a self-signed certificate
+issued by a stand-in local certificate authority.
 
 ```{mermaid}
 flowchart LR
@@ -27,16 +26,16 @@ curl -.-|via external_hostname| trfk
 ```
 
 ```{note}
-This tutorial assumes you have a Juju controller bootstrapped on a MicroK8s cloud that is ready to use. A typical setup using [snaps](https://snapcraft.io/) can be found in the {ref}`Juju docs <juju:set-things-up>`. Follow the instructions there to install Juju and MicroK8s.
+This guide assumes you have a Juju controller bootstrapped on a `k8s` cloud that is ready to use. A typical setup using [snaps](https://snapcraft.io/) can be found in the {ref}`Juju docs <juju:set-things-up>`. Follow the instructions there to install Juju and K8s.
 ```
 
-## Configure MicroK8s
+## Configure K8s
 
-Follow the instructions under the "[Configure MicroK8s](https://discourse.charmhub.io/t/getting-started-on-microk8s/5199)" section to set up MicroK8s with metallb.
+Follow the [Getting started](https://documentation.ubuntu.com/canonical-kubernetes/latest/snap/tutorial/getting-started/) guide to install and bootstrap `k8s`, then configure the [default load balancer](https://documentation.ubuntu.com/canonical-kubernetes/latest/snap/howto/networking/default-loadbalancer/).
 
 ## Deploy the apps
 
-Now, we will deploy Traefik, self-signed-certificates (to function as a root CA), and Alertmanager, Prometheus, and Grafana (apps that take an ingress relation).
+Deploy Traefik, self-signed-certificates to function as a root CA, and Alertmanager, Prometheus, and Grafana, which use Traefik ingress.
 
 First, create a new model:
 
@@ -117,7 +116,7 @@ proxied-endpoints: '{
 }'
 ```
 
-Now let's obtain Traefik's IP:
+Now obtain Traefik's IP:
 
 ```bash
 TRAEFIK_IP=$(\
@@ -126,7 +125,7 @@ TRAEFIK_IP=$(\
 )
 ```
 
-Now, use the ingress URL with the application's API HTTP endpoint:
+Use the ingress URL with the application's HTTP API endpoint:
 
 ```{terminal}
 curl --resolve "demo.local:80:$TRAEFIK_IP" \
@@ -181,4 +180,3 @@ This should return:
 
 OK
 ```
-

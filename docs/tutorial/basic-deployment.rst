@@ -297,6 +297,6 @@ Next steps
 You achieved a basic deployment of the Traefik charm. If you want to go farther in your
 deployment or learn more about the charm, check out these pages:
 
-* Follow the advanced tutorial involving TLS termination using a local certificate authority in :ref:`tutorial_tls_termination_using_a_local_ca`.
+* Follow the guide for TLS termination using a local certificate authority in :ref:`how_to_tls_termination_using_a_local_ca`.
 * Set up basic access authorization by :ref:`enabling BasicAuth <how_to_enable_basicauth>`.
 * Learn more about the ingress relations offered by the charm in :ref:`reference_ingress_integrations`.
