@@ -38,7 +38,7 @@ dev = [
     "sh",
     "pyright==1.1.318",
     "ops-scenario~=6.0",
-    "opcli@git+https://github.com/canonical/charm-ci.git@v0.0.1-alpha.10 ; python_version >= '3.12'",
+    "opcli ; python_version >= '3.12'",
     "pytest-interface-tester>0.3",
     "types-pyyaml>=6.0.12.20241230",
     "mypy>=1.14.1",
@@ -53,6 +53,8 @@ override-dependencies = [
 ]
 
 [tool.uv.sources]
+# opcli is published only from the charm-ci git repository, not PyPI.
+opcli = { git = "https://github.com/canonical/charm-ci.git", tag = "v1.0.0" }
 lightkube-extensions = { git = "https://github.com/canonical/lightkube-extensions.git", rev = "37b32d699dffe9e1f796d5d8e431fd57849c248e" }
 
 # Testing tools configuration
