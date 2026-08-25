@@ -5,14 +5,14 @@ from unittest.mock import patch
 
 import pytest
 import yaml
-from opentelemetry import trace as otel_trace
-from opentelemetry.sdk.trace.export import SpanExportResult
-from opentelemetry.util._once import Once
 from charms.tempo_coordinator_k8s.v0.charm_tracing import (
     CHARM_TRACING_ENABLED,
     charm_tracing_disabled,
 )
 from charms.tempo_coordinator_k8s.v0.tracing import ProtocolType, Receiver, TracingProviderAppData
+from opentelemetry import trace as otel_trace
+from opentelemetry.sdk.trace.export import SpanExportResult
+from opentelemetry.util._once import Once
 from scenario import Relation, State
 
 from traefik import STATIC_CONFIG_PATH
