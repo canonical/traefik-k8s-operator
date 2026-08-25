@@ -1,0 +1,14 @@
+version_schema: 2
+
+changes:
+- title: Fixed typing of relation parameter in TraefikRouteRequirer
+  author: copilot
+  type: bugfix
+  description: Made the `relation` parameter in `TraefikRouteRequirer.__init__` `Optional[Relation]` with a default of `None`, matching how the rest of the code already handles it.
+  urls:
+    pr:
+      - ""
+    related_issue:
+      - "https://github.com/canonical/traefik-k8s-operator/issues/448"
+  visibility: public
+  highlight: false

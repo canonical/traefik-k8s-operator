@@ -121,7 +121,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 7
+LIBPATCH = 8
 
 log = logging.getLogger(__name__)
 
@@ -338,7 +338,7 @@ class TraefikRouteRequirer(Object):
     def __init__(
         self,
         charm: CharmBase,
-        relation: Relation,
+        relation: Optional[Relation] = None,
         relation_name: str = "traefik-route",
         raw: Optional[bool] = False,
     ):
@@ -346,7 +346,7 @@ class TraefikRouteRequirer(Object):
 
         Args:
             charm: Requirer charm.
-            relation: traefik-route relation.
+            relation: traefik-route relation. Defaults to None.
             relation_name: Name of the relation. Defaults to "traefik-route".
             raw: Whether or not to enable raw mode. Defaults to False.
         """
@@ -435,6 +435,9 @@ class TraefikRouteRequirer(Object):
         """
         if not self._charm.unit.is_leader():
             raise UnauthorizedError()
+
+        if not self._relation:
+            return
 
         app_databag = self._relation.data[self._charm.app]
 
