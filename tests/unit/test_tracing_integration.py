@@ -3,9 +3,11 @@
 
 from unittest.mock import patch
 
-import opentelemetry
 import pytest
 import yaml
+from opentelemetry import trace as otel_trace
+from opentelemetry.sdk.trace.export import SpanExportResult
+from opentelemetry.util._once import Once
 from charms.tempo_coordinator_k8s.v0.charm_tracing import (
     CHARM_TRACING_ENABLED,
     charm_tracing_disabled,
@@ -51,6 +53,8 @@ def test_charm_trace_collection(
 ):
     # GIVEN the presence of a tracing relation
     monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(otel_trace, "_TRACER_PROVIDER", None)
+    monkeypatch.setattr(otel_trace, "_TRACER_PROVIDER_SET_ONCE", Once())
 
     state_in = State(relations=[charm_tracing_relation], containers=[traefik_container])
 
@@ -58,13 +62,14 @@ def test_charm_trace_collection(
     with patch(
         "opentelemetry.exporter.otlp.proto.http.trace_exporter.OTLPSpanExporter.export"
     ) as f:
-        f.return_value = opentelemetry.sdk.trace.export.SpanExportResult.SUCCESS
+        f.return_value = SpanExportResult.SUCCESS
         monkeypatch.setenv(CHARM_TRACING_ENABLED, "1")
         # WHEN traefik receives <any event>
         traefik_ctx.run(charm_tracing_relation.changed_event, state_in)
 
     # assert "Setting up span exporter to endpoint: foo.com:81" in caplog.text
     # assert "Starting root trace with id=" in caplog.text
+    assert f.call_args_list
     span = f.call_args_list[0].args[0][0]
     assert span.resource.attributes["service.name"] == "traefik-k8s-charm"
     assert span.resource.attributes["compose_service"] == "traefik-k8s-charm"
