@@ -2,4 +2,4 @@
 # Format: source destination
 # Example: old-page.html new-page.html
 how-to/force-https-redirect.html index.html
-reference/ingress-integration.html how-to/integrate.html
+reference/ingress-integration.html how-to/integrate/index.html
