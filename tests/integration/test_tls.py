@@ -7,7 +7,6 @@
 from pathlib import Path
 
 import jubilant
-import pytest
 import requests
 import yaml
 
@@ -15,6 +14,7 @@ from tests.integration.dns_adapter import DNSResolverHTTPSAdapter
 from tests.integration.helpers import (
     all_settled,
     get_k8s_service_address,
+    pull_ssc_ca_certificate,
     remove_application,
 )
 
@@ -24,8 +24,6 @@ ALERTMANAGER_APP = "alertmanager"
 GRAFANA_APP = "grafana"
 ROOT_CA_APP = "root-ca"
 MOCK_HOSTNAME = "juju.local"
-_ARTIFACT_DIR = Path("tests/integration/.artifacts")
-_CERT_PATH = _ARTIFACT_DIR / "test-tls-local.cert"
 
 _METADATA = yaml.safe_load(Path("./metadata.yaml").read_text(encoding="utf-8"))
 _TRAEFIK_RESOURCES = {
@@ -47,39 +45,40 @@ def test_build_and_deploy(juju: jubilant.Juju, traefik_charm):
 
 
 def test_ingressed_endpoints_reachable_after_metallb_enabled(juju: jubilant.Juju):
-    traefik_ip = get_k8s_service_address(juju.model, f"{TRAEFIK_APP}-lb")
+    model_name = juju.model
+    assert model_name is not None
+    traefik_ip = get_k8s_service_address(model_name, f"{TRAEFIK_APP}-lb")
     assert traefik_ip, "Expected a traefik load balancer address"
-    for endpoint in _endpoints(juju.model, "http", traefik_ip):
+    for endpoint in _endpoints(model_name, "http", traefik_ip):
         response = requests.get(endpoint, timeout=30)
         response.raise_for_status()
 
 
-@pytest.mark.xfail(
-    reason=(
-        "Failing due to #491. Remove this after #509 is implemented. "
-        "See also: https://github.com/canonical/traefik-k8s-operator/issues/521"
-    )
-)
-def test_tls_termination(juju: jubilant.Juju):
+def test_tls_termination(juju: jubilant.Juju, tmp_path: Path):
+    model_name = juju.model
+    assert model_name is not None
     juju.config(TRAEFIK_APP, {"external_hostname": MOCK_HOSTNAME})
-    juju.deploy("ch:self-signed-certificates", ROOT_CA_APP, channel="1/stable")
+    juju.deploy("ch:self-signed-certificates", ROOT_CA_APP, channel="1/stable", trust=True)
     juju.config(ROOT_CA_APP, {"ca-common-name": "demo.ca.local"})
     juju.integrate(f"{ROOT_CA_APP}:certificates", TRAEFIK_APP)
-    juju.wait(all_settled, timeout=300)
+    juju.wait(all_settled, timeout=600, delay=2, successes=5)
 
-    cert_path = _pull_server_cert(juju)
-    traefik_ip = get_k8s_service_address(juju.model, f"{TRAEFIK_APP}-lb")
+    cert_path = pull_ssc_ca_certificate(juju, tmp_path, ssc_app=ROOT_CA_APP)
+    traefik_ip = get_k8s_service_address(model_name, f"{TRAEFIK_APP}-lb")
     assert traefik_ip, "Expected a traefik load balancer address"
     _assert_https_endpoints(juju, cert_path, traefik_ip)
 
 
-@pytest.mark.xfail(reason="Flaky test; cannot reproduce failure locally.")
-def test_tls_termination_after_charm_upgrade(juju: jubilant.Juju, traefik_charm):
+def test_tls_termination_after_charm_upgrade(
+    juju: jubilant.Juju, traefik_charm, tmp_path: Path
+):
+    model_name = juju.model
+    assert model_name is not None
     juju.refresh(TRAEFIK_APP, path=traefik_charm, resources=_TRAEFIK_RESOURCES)
-    juju.wait(all_settled, timeout=600)
+    juju.wait(all_settled, timeout=600, delay=2, successes=5)
 
-    cert_path = _CERT_PATH if _CERT_PATH.exists() else _pull_server_cert(juju)
-    traefik_ip = get_k8s_service_address(juju.model, f"{TRAEFIK_APP}-lb")
+    cert_path = pull_ssc_ca_certificate(juju, tmp_path, ssc_app=ROOT_CA_APP)
+    traefik_ip = get_k8s_service_address(model_name, f"{TRAEFIK_APP}-lb")
     assert traefik_ip, "Expected a traefik load balancer address"
     _assert_https_endpoints(juju, cert_path, traefik_ip)
 
@@ -103,21 +102,12 @@ def _endpoints(model: str, scheme: str, netloc: str) -> list[str]:
     ]
 
 
-def _pull_server_cert(juju: jubilant.Juju) -> Path:
-    _ARTIFACT_DIR.mkdir(exist_ok=True)
-    cert = juju.ssh(
-        f"{TRAEFIK_APP}/0",
-        "cat /opt/traefik/juju/server.cert",
-        container="traefik",
-    )
-    _CERT_PATH.write_text(cert, encoding="utf-8")
-    return _CERT_PATH
-
-
 def _assert_https_endpoints(juju: jubilant.Juju, cert_path: Path, traefik_ip: str) -> None:
+    model_name = juju.model
+    assert model_name is not None
     session = requests.Session()
     session.mount("https://", DNSResolverHTTPSAdapter(MOCK_HOSTNAME, traefik_ip))
     session.verify = str(cert_path)
-    for endpoint in _endpoints(juju.model, "https", MOCK_HOSTNAME):
+    for endpoint in _endpoints(model_name, "https", MOCK_HOSTNAME):
         response = session.get(endpoint, timeout=30)
         response.raise_for_status()
