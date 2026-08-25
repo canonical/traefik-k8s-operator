@@ -8,6 +8,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 Each revision is versioned by the date of the revision.
 
+## 2026-08-25
+
+- Stabilized the `test_charm_trace_collection` unit test by isolating it from the shared charm tracing buffer file.
+- Updated the TLS integration test to verify HTTPS with the self-signed provider's CA certificate and stronger post-integration waits.
+
 ## 2026-08-19
 
 - Updated Sphinx Stack from 1.4.1 to 2.0 with the following changes:
