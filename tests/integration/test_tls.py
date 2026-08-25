@@ -54,12 +54,6 @@ def test_ingressed_endpoints_reachable_after_metallb_enabled(juju: jubilant.Juju
         response.raise_for_status()
 
 
-@pytest.mark.xfail(
-    reason=(
-        "Failing due to #491. Remove this after #509 is implemented. "
-        "See also: https://github.com/canonical/traefik-k8s-operator/issues/521"
-    )
-)
 def test_tls_termination(juju: jubilant.Juju):
     juju.config(TRAEFIK_APP, {"external_hostname": MOCK_HOSTNAME})
     juju.deploy("ch:self-signed-certificates", ROOT_CA_APP, channel="1/stable")
@@ -73,7 +67,6 @@ def test_tls_termination(juju: jubilant.Juju):
     _assert_https_endpoints(juju, cert_path, traefik_ip)
 
 
-@pytest.mark.xfail(reason="Flaky test; cannot reproduce failure locally.")
 def test_tls_termination_after_charm_upgrade(juju: jubilant.Juju, traefik_charm):
     juju.refresh(TRAEFIK_APP, path=traefik_charm, resources=_TRAEFIK_RESOURCES)
     juju.wait(all_settled, timeout=600)
