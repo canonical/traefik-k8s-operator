@@ -14,7 +14,7 @@ changes:
       TLS are configured independently in the Traefik charm.
     urls:
       pr:
-        - ""
+        - https://github.com/canonical/traefik-k8s-operator/pull/765
       related_issue:
         - "https://github.com/canonical/traefik-k8s-operator/issues/600"
         - "https://github.com/canonical/traefik-k8s-operator/issues/564"
