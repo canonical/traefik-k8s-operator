@@ -28,6 +28,33 @@ tailor the exact steps and commands to your setup.
 - Traefik's service type is `LoadBalancer`.
 - An external IP address is assigned to Traefik.
 
+## Traefik was deployed without `--trust`
+
+Traefik manages its own `LoadBalancer` Kubernetes service, which requires elevated
+(cluster-scoped) Kubernetes permissions. If Traefik is deployed without the `--trust` flag (or
+`juju trust` is not run afterwards), the charm cannot create or update this service. Juju's
+`ApiError`/`Forbidden` exception is currently uncaught, so the charm crashes and the unit goes
+into `error` status rather than a clean blocked/waiting status.
+
+Check with:
+
+```bash
+juju status
+```
+
+If the Traefik unit shows `error` and `juju debug-log` shows a `lightkube.core.exceptions.ApiError`
+mentioning `services is forbidden` or `cannot [...] resource "services"`, this is the cause.
+
+Fix it by granting trust and resolving the error:
+
+```bash
+juju trust <traefik> --scope=cluster
+juju resolve <traefik>/0
+```
+
+If you deployed Traefik as part of a bundle, redeploy with `--trust` passed to the bundle deploy,
+or run `juju trust` immediately after deployment before the first `error` hook fires.
+
 ## The metallb addon isn't enabled
 
 Check with:
