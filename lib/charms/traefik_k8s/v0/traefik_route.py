@@ -74,6 +74,23 @@ class TraefikRouteCharm(CharmBase):
         )
 ```
 
+In this (default, `raw=False`) mode, for every HTTP/TCP router you declare, Traefik will
+automatically generate a matching `<router-name>-tls` router that serves the same rule/service
+over its `websecure` entrypoint, with `tls: {}` (or a `tls.domains` block derived from Traefik's
+own `external_hostname`, if one is configured). **Do not declare your own `-tls`-suffixed router
+or set a `tls` key on your router** - Traefik will add it for you and your own TLS
+configuration/middlewares would either conflict or be silently dropped when Traefik regenerates
+the router (see [issue #335](https://github.com/canonical/traefik-k8s-operator/issues/335)).
+
+For HTTP/HTTPS traffic, do not declare custom entrypoints. Traefik's own `web` (HTTP) and
+`websecure` (HTTPS) entrypoints are used automatically: the router you submit is attached to
+`web`, and the automatically generated `-tls` twin is attached to `websecure`.
+
+If your charm may be related to Traefik more than once, or from more than one unit/application,
+make sure your router/service names are unique across relations (e.g. by including the app name
+or relation id in the name) to avoid collisions when Traefik merges everyone's dynamic
+configuration together.
+
 Example usage with raw flag enabled (full control over TLS configuration):
 
 ```python
@@ -94,15 +111,25 @@ class TraefikRouteCharm(CharmBase):
                 'tcp': {
                     'routers': {
                         'secure-route': {
-                            'rule': 'Host(`secure.example.com`)',
+                            'rule': 'HostSNI(`secure.example.com`)',
                             'service': 'my-service',
-                            'tls': {'certResolver': 'myresolver'}
+                            'tls': {}
                         }
                     }
                 }
             }
         )
 ```
+
+In `raw=True` mode, Traefik will not add or modify any TLS router/config for you: you are
+responsible for declaring your own `web`/`websecure` (or raw TCP/UDP) entrypoints and TLS
+sections. Because the Traefik charm never connects to a certificate provider capable of
+automated certificate generation (e.g. ACME), the `tls` section of a router should be either
+omitted entirely (for plain HTTP), or exactly `tls: {}` (for HTTPS termination using the
+certificate Traefik itself was configured with, via the `certificates` relation or the
+`tls-cert`/`tls-key`/`tls-ca` config options). Do **not** set `certResolver` or `domains` under
+`tls`: those keys are only meaningful when Traefik is responsible for automatically requesting
+certificates for you, which is not supported here.
 """
 
 import logging
@@ -121,7 +148,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 7
+LIBPATCH = 8
 
 log = logging.getLogger(__name__)
 

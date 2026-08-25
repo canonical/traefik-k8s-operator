@@ -36,7 +36,7 @@ Ingress is a purely in-model concern. Traefik will happily cross-model relate wi
 * - **Get started**
   - {ref}`Guided tutorial <tutorial_basic_deployment>`
 * - **Deployment**
-  - {ref}`Configure TLS termination using a local CA <how_to_tls_termination_using_a_local_ca>`
+  - {ref}`Configure TLS termination using a local CA <how_to_tls_termination_using_a_local_ca>` | {ref}`How TLS works in the Traefik charm <explanation_tls>`
 * - **Operations**
   - {ref}`Troubleshoot reachability <how_to_troubleshoot_reachability>` | {ref}`Troubleshoot Gateway Address Unavailable <how_to_troubleshoot_gateway_address_unavailable>` | {ref}`Upgrade <how_to_upgrade>`
 * - **Ingress and interfaces**

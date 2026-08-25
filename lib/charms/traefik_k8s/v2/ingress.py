@@ -86,7 +86,7 @@ LIBAPI = 2
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 21
+LIBPATCH = 22
 
 PYDEPS = ["pydantic"]
 
@@ -732,6 +732,11 @@ class IngressPerAppRequirer(_IngressPerAppBase):
                 application; if unspecified, the default Kubernetes service name will be used.
             ip: Alternative addressing method other than host to be used by the ingress provider;
                 if unspecified, the binding address from the Juju network API will be used.
+            port: The port of the service to be ingressed. Required (and must be a keyword arg)
+                if `host` or `ip` is set, since the constructor publishes the ingress request
+                as soon as the relation is available; if none of `host`/`ip`/`port` are provided
+                at init time, call `provide_ingress_requirements(port=..., ...)` later instead
+                once the values are known (see the "Request Args" note below).
             healthcheck_params: Optional dictionary containing health check
                 configuration parameters conforming to the IngressHealthCheck schema.
                 The dictionary must include:
@@ -748,13 +753,19 @@ class IngressPerAppRequirer(_IngressPerAppBase):
                         (defaults to "5s" if omitted).
                 If provided, "path" is required while "interval" and "timeout" will use Traefik's
                     defaults when not specified.
-            strip_prefix: Configure Traefik to strip the path prefix.
-            redirect_https: Redirect incoming requests to HTTPS.
+            strip_prefix: Configure Traefik to strip the path prefix (defaults to False).
+            redirect_https: Redirect incoming requests to HTTPS (defaults to False).
             scheme: Either a callable that returns the scheme to use when constructing the ingress
-                URL, or a string if the scheme is known and stable at charm initialization.
+                URL, or a string if the scheme is known and stable at charm initialization
+                (defaults to always returning "http").
 
-        Request Args:
-            port: the port of the service
+        Note:
+            Calling `provide_ingress_requirements(host=..., ip=..., port=..., scheme=...)` at any
+            later point (e.g. from a config-changed handler) overwrites the values initially
+            passed to this constructor - it is not a second, independent request. Use whichever
+            mechanism suits your charm: pass `host`/`ip`/`port` here if they are known and static
+            at init time, or call `provide_ingress_requirements` later if they are only known
+            once the workload is configured.
         """
         super().__init__(charm, relation_name)
         self.charm: CharmBase = charm

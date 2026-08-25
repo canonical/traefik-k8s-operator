@@ -12,5 +12,6 @@ The pages in this section provide additional context and deeper understanding of
 
 ```{toctree}
 :maxdepth: 1
+tls.md
 security.md
 ```

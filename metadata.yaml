@@ -59,8 +59,9 @@ provides:
   traefik-route:
     interface: traefik_route
     description: |
-      Provides endpoint for a traefik-route charm to sit between Traefik and a
-      charm in need of ingress, configuring the relation on a per-unit basis.
+      Accepts raw Traefik dynamic/static configuration from a requiring charm (such as
+      traefik-route-k8s, or any charm implementing the TraefikRouteRequirer API), one
+      configuration per relation, and merges it into this Traefik instance's own config.
   grafana-dashboard:
     description: |
       Forwards the built-in grafana dashboard(s) for monitoring traefik.

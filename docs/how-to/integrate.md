@@ -31,21 +31,23 @@ You can immediately pass to it the host and port of the server you want ingress 
 or you can defer that decision to a later moment by using the `IngressPerAppRequirer.provide_ingress_requirements` API.
 
 ```python
-from charms.traefik_k8s.v2.ingress import IngressPerAppRequirer, IngressReadyEvent
+from charms.traefik_k8s.v2.ingress import IngressPerAppRequirer, IngressPerAppReadyEvent
 
 ... # your charm's __init__(self, ...):
         self.ingress = IngressPerAppRequirer(self, host="foo.bar", port=80)
-        self.framework.observe(self.ingress.ready, self._on_ingress_ready)
-        self.framework.observe(self.ingress.revoked, self._on_ingress_revoked)
+        self.framework.observe(self.ingress.on.ready, self._on_ingress_ready)
+        self.framework.observe(self.ingress.on.revoked, self._on_ingress_revoked)
 
     def _on_ingress_ready(self, event: IngressPerAppReadyEvent):
         self.unit.status = ops.ActiveStatus(f"I have ingress at {event.url}!")
 
     def _on_ingress_revoked(self, _):
         self.unit.status = ops.WaitingStatus(f"I have lost my ingress URL!")
+```
 
-    def _foo(self):
-        self.ingress.provide_ingress_requirements(host="foo.com", port=42)
+```{note}
+The events are namespaced under `IngressPerAppRequirer.on` (i.e. `self.ingress.on.ready` /
+`self.ingress.on.revoked`), not directly on the requirer object.
 ```
 
 Once you have added the `ingress` library the charm would need to be re-packed with `charmcraft pack`.
@@ -53,6 +55,27 @@ Once you have added the `ingress` library the charm would need to be re-packed w
 `IngressPerAppRequirer` will take care of communicating over the `ingress` relation with
 `traefik-k8s` and notifying the charm whenever Traefik replies with an ingress URL or
 that URL is revoked for some reason (e.g. the cloud admin removed the relation).
+
+### Updating the ingress request later on
+
+The `host` and `port` passed to the `IngressPerAppRequirer` constructor are only the *initial*
+request, used to publish ingress data as soon as the relation is available. If your charm needs
+to change what is being ingressed after init (for example, because the workload's port is only
+known once it's configured), call `provide_ingress_requirements` again with the new values at any
+later point (e.g. from a config-changed or pebble-ready handler):
+
+```python
+    def _on_config_changed(self, _):
+        # This replaces the (host, port) originally passed to the constructor, it does not
+        # add a second, independent ingress request.
+        self.ingress.provide_ingress_requirements(host="foo.com", port=42)
+```
+
+Each call to `provide_ingress_requirements` overwrites the previous request in the relation
+databag; there is only ever a single, current `(host, port)` pair per unit/application, not one
+per call. Use whichever of the two APIs (constructor args, or `provide_ingress_requirements`)
+matches when the host/port become known in your charm - most charms only need one or the other,
+not both.
 
 ## Get the proxied endpoint exposed by Traefik
 

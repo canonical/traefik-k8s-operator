@@ -36,3 +36,24 @@ This charm is ideal for use cases where you need the full expressive power of
 [Traefik's routing configuration](https://doc.traefik.io/traefik/routing/overview/),
 or if you want to use a single Traefik instance to provide domain-name-based
 URL routing to some charms, but path-based URL routing to others.
+
+Over the `traefik-route` relation, the requiring charm submits raw Traefik dynamic (and
+optionally static) configuration, which Traefik merges into its own configuration. A few things
+to keep in mind when using this interface (see the
+[`traefik_route` library docstring](https://charmhub.io/traefik-k8s/libraries/traefik_route) for
+full usage examples):
+
+- By default, Traefik automatically generates a TLS-enabled twin of every router you declare and
+  attaches it to its own `websecure` entrypoint (your router is attached to `web`); you should
+  not declare your own `-tls`-suffixed routers or `tls` blocks unless you opt out of this via the
+  library's `raw=True` mode.
+- Traefik never connects to a certificate authority capable of automatically generating
+  certificates (e.g. via ACME), so a `tls` block - whether yours (in `raw` mode) or
+  auto-generated - should never contain `certResolver` or `domains` keys; those only apply when
+  Traefik is doing automatic certificate issuance for you.
+- If more than one instance of your charm (or more than one application) can relate to the same
+  Traefik over `traefik-route`, ensure your router/service names are unique across relations to
+  avoid collisions when Traefik merges everyone's configuration together.
+
+See {ref}`How TLS works in the Traefik charm <explanation_tls>` for more on how upstream and
+downstream TLS are configured in general.
