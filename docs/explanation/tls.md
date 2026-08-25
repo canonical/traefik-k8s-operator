@@ -40,9 +40,8 @@ certificate available to them in order to validate the certificate Traefik prese
 ## Downstream TLS: Traefik to the ingressed application
 
 Downstream TLS is configured **per application**, independently of upstream TLS. Each requirer
-charm sets the `scheme` field on its `ingress`/`ingress-per-app` relation data (the
-`IngressPerAppRequirer(..., scheme="https")` constructor argument, or the `scheme` argument to
-`provide_ingress_requirements`). Allowed values are `http`, `https`, and `h2c`.
+charm sets the `scheme` field on its `ingress`/`ingress-per-app` relation data argument, or the
+`scheme` argument to `provide_ingress_requirements`. Allowed values are `http`, `https`, and `h2c`.
 
 - If `scheme=http` (the default), Traefik forwards the request to the application in plaintext.
 - If `scheme=https`, Traefik validates the application's own certificate and encrypts traffic

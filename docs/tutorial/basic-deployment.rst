@@ -130,21 +130,6 @@ We must also use the ``--trust`` flag to provide Traefik with elevated permissio
 interact with the Kubernetes environment (Traefik uses these permissions to manage its own
 ``LoadBalancer`` Kubernetes service).
 
-.. warning::
-
-    If you deploy without ``--trust``, Traefik will not have permission to manage its
-    ``LoadBalancer`` service and the unit will go into ``error`` status (Juju will report a
-    ``Forbidden`` Kubernetes API error in ``juju debug-log``). To recover, grant trust after the
-    fact and resolve the error:
-
-    .. code-block:: bash
-
-        juju trust traefik-k8s --scope=cluster
-        juju resolve traefik-k8s/0
-
-    See :ref:`Troubleshoot "Gateway Address Unavailable" <how_to_troubleshoot_gateway_address_unavailable>`
-    for more details.
-
 The charm may need a couple of minutes to finish deploying. Monitor the status
 of the deployment with ``juju status``.
 Once the deployment has finished, the output of ``juju status`` should look similar to:
@@ -315,4 +300,4 @@ deployment or learn more about the charm, check out these pages:
 
 * Follow the guide for TLS termination using a local certificate authority in :ref:`how_to_tls_termination_using_a_local_ca`.
 * Set up basic access authorization by :ref:`enabling BasicAuth <how_to_enable_basicauth>`.
-* Learn more about the ingress relations offered by the charm in :ref:`reference_ingress_integrations`.
+* Learn more about the ingress relations offered by the charm in :ref:`how_to_integrate`.

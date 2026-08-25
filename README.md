@@ -25,11 +25,6 @@ microk8s enable metallb 192.168.0.10-192.168.0.100 # You likely want change thes
 juju deploy ./traefik-k8s_ubuntu-20.04-amd64.charm traefik-ingress --trust --resource traefik-image=ghcr.io/canonical/traefik:2.10.4
 ```
 
-The `--trust` flag is required: Traefik manages its own `LoadBalancer` Kubernetes service, which
-needs cluster-scoped permissions. Deploying without `--trust` will make the unit go into `error`
-status; run `juju trust traefik-ingress --scope=cluster` and `juju resolve traefik-ingress/0` to
-recover.
-
 ## Configurations
 
 * `external_hostname` allows you to specify a host for the URL that Traefik will assume is its externally-visible URL, and that will be used to generate the URLs passed to the proxied applications. Note that this has to be a 'bare' hostname, i.e. no `http` prefix and no `:port` suffix. Neither are configurable at the moment.

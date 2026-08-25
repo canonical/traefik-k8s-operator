@@ -83,8 +83,10 @@ configuration/middlewares would either conflict or be silently dropped when Trae
 the router (see [issue #335](https://github.com/canonical/traefik-k8s-operator/issues/335)).
 
 For HTTP/HTTPS traffic, do not declare custom entrypoints. Traefik's own `web` (HTTP) and
-`websecure` (HTTPS) entrypoints are used automatically: the router you submit is attached to
-`web`, and the automatically generated `-tls` twin is attached to `websecure`.
+`websecure` (HTTPS) entrypoints already exist; attach your router to `web` (or omit
+`entryPoints` for HTTP, since `web` is Traefik's default). Traefik will not rewrite your
+router's `entryPoints` for you - the automatically generated `-tls` twin defaults to
+`websecure` independently of what entrypoint your own router uses.
 
 If your charm may be related to Traefik more than once, or from more than one unit/application,
 make sure your router/service names are unique across relations (e.g. by including the app name

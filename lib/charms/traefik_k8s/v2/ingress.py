@@ -758,14 +758,6 @@ class IngressPerAppRequirer(_IngressPerAppBase):
             scheme: Either a callable that returns the scheme to use when constructing the ingress
                 URL, or a string if the scheme is known and stable at charm initialization
                 (defaults to always returning "http").
-
-        Note:
-            Calling `provide_ingress_requirements(host=..., ip=..., port=..., scheme=...)` at any
-            later point (e.g. from a config-changed handler) overwrites the values initially
-            passed to this constructor - it is not a second, independent request. Use whichever
-            mechanism suits your charm: pass `host`/`ip`/`port` here if they are known and static
-            at init time, or call `provide_ingress_requirements` later if they are only known
-            once the workload is configured.
         """
         super().__init__(charm, relation_name)
         self.charm: CharmBase = charm

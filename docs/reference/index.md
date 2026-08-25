@@ -13,6 +13,5 @@ The pages in this section contain technical information for topics related to th
 ```{toctree}
 charm-architecture
 cryptographic-documentation-for-cos-lite-charms
-ingress-integration
 ../changelog.md
 ```

@@ -10,30 +10,7 @@ Each revision is versioned by the date of the revision.
 
 ## 2026-08-25
 
-- Fixed several documentation issues:
-  - Corrected the `IngressPerAppRequirer` example in the "How to integrate your charm to
-    Traefik" guide, which referenced non-existent `self.ingress.ready`/`self.ingress.revoked`
-    attributes instead of `self.ingress.on.ready`/`self.ingress.on.revoked`
-    (fixes [#600](https://github.com/canonical/traefik-k8s-operator/issues/600)).
-  - Clarified that `provide_ingress_requirements` overwrites the ingress request originally
-    passed to the `IngressPerAppRequirer` constructor rather than issuing a second, independent
-    request (fixes [#564](https://github.com/canonical/traefik-k8s-operator/issues/564)).
-  - Fixed inconsistent/missing docstrings in the `ingress` (v2) and `ingress_per_unit` (v1) charm
-    libraries, including a `listen_to="both"` vs `"all"` mismatch and an undocumented `port`
-    constructor argument, and documented that deploying Traefik without `--trust` puts the unit
-    into `error` status (fixes [#640](https://github.com/canonical/traefik-k8s-operator/issues/640)).
-  - Rewrote the `traefik_route` (v0) charm library docstring: fixed an example that used an
-    invalid `certResolver`/`tls` configuration and the wrong TCP router rule
-    (`Host` instead of `HostSNI`), and documented the `web`/`websecure` entrypoint convention,
-    route name collisions across relations, and why `certResolver`/`domains` must never be set
-    (fixes [#511](https://github.com/canonical/traefik-k8s-operator/issues/511)).
-  - Corrected the `traefik-route` relation description in `metadata.yaml`, which incorrectly
-    described the relation as being configured "on a per-unit basis"
-    (fixes [#511](https://github.com/canonical/traefik-k8s-operator/issues/511)).
-  - Added a new explanation page, "How TLS works in the Traefik charm", documenting the
-    independent upstream (client-to-Traefik) and downstream (Traefik-to-application) TLS
-    configuration domains, and linked it from the ingress integration reference and the docs
-    home page (fixes [#512](https://github.com/canonical/traefik-k8s-operator/issues/512)).
+- Fixed several documentation issues.
 - Stabilized the `test_charm_trace_collection` unit test by isolating it from the shared charm tracing buffer file.
 - Updated the TLS integration test to verify HTTPS with the self-signed provider's CA certificate and stronger post-integration waits.
 

@@ -52,9 +52,6 @@ juju trust <traefik> --scope=cluster
 juju resolve <traefik>/0
 ```
 
-If you deployed Traefik as part of a bundle, redeploy with `--trust` passed to the bundle deploy,
-or run `juju trust` immediately after deployment before the first `error` hook fires.
-
 ## The metallb addon isn't enabled
 
 Check with:
