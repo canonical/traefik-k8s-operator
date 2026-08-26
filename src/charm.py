@@ -13,11 +13,11 @@ import json
 import logging
 import re
 import socket
-import time
 from typing import Any, Dict, List, Optional, Union, cast
 from urllib.parse import urlparse
 
 import pydantic
+import tenacity
 import yaml
 from charms.certificate_transfer_interface.v1.certificate_transfer import (
     CertificatesAvailableEvent as CertificateTransferAvailableEvent,
@@ -702,6 +702,10 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
 
     @functools.cached_property
     def _traefik_loadbalancer_ip(self) -> Optional[str]:
+        return self._fetch_loadbalancer_ip()
+
+    def _fetch_loadbalancer_ip(self) -> Optional[str]:
+        """Fetch the LoadBalancer IP from the Kubernetes API (non-cached)."""
         try:
             traefik_service = self.lightkube_client.get(
                 Service, name=self._lb_name, namespace=self.model.name
@@ -1084,20 +1088,29 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
 
     def _on_get_loadbalancer_ip(self, event: ActionEvent) -> None:
         """Handle the get-loadbalancer-ip action."""
-        timeout = 300  # 5 minutes
+        timeout = event.params.get("timeout", 300)
         interval = 10
-        deadline = time.time() + timeout
 
-        while time.time() < deadline:
-            # Clear cached property so we get a fresh value each iteration.
-            self.__dict__.pop("_get_loadbalancer_status", None)
-            ip = self._get_loadbalancer_status
-            if ip:
-                event.set_results({"loadbalancer-ip": ip})
-                return
-            time.sleep(interval)
+        @tenacity.retry(
+            stop=tenacity.stop_after_delay(timeout),
+            wait=tenacity.wait_fixed(interval),
+            retry=tenacity.retry_if_result(lambda result: result is None),
+            before_sleep=lambda _: logger.info(
+                "LoadBalancer IP not available yet, sleeping for %s seconds.", interval
+            ),
+        )
+        def _get_ip() -> Optional[str]:
+            return self._fetch_loadbalancer_ip()
 
-        event.fail("LoadBalancer IP not available after 5 minutes.")
+        try:
+            ip = _get_ip()
+        except tenacity.RetryError:
+            ip = None
+
+        if ip:
+            event.set_results({"loadbalancer-ip": ip})
+        else:
+            event.fail(f"LoadBalancer IP not available after {timeout} seconds.")
 
     def _get_proxied_endpoints(
         self, use_gateway_address: bool = True

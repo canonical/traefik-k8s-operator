@@ -15,4 +15,9 @@ show-external-endpoints:
 get-loadbalancer-ip:
   description: |
     Returns the external LoadBalancer IP address assigned to the Traefik service.
-    Waits up to 5 minutes for the IP to become available.
+    Waits for the IP to become available up to the specified timeout.
+  params:
+    timeout:
+      description: Maximum time in seconds to wait for the IP to become available.
+      type: integer
+      default: 300

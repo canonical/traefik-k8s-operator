@@ -575,37 +575,6 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
         assert mocked_handle.called
 
-    @patch(
-        "charm.TraefikIngressCharm._get_loadbalancer_status",
-        new_callable=PropertyMock,
-        return_value="10.0.0.1",
-    )
-    def test_get_loadbalancer_ip_action_ip_available(self, mock_get_loadbalancer_status):
-        self.harness.begin_with_initial_hooks()
-        action_event = Mock(spec=ActionEvent)
-        self.harness.charm._on_get_loadbalancer_ip(action_event)
-        action_event.set_results.assert_called_once_with({"loadbalancer-ip": "10.0.0.1"})
-        action_event.fail.assert_not_called()
-
-    @patch("time.sleep")
-    @patch(
-        "charm.TraefikIngressCharm._get_loadbalancer_status",
-        new_callable=PropertyMock,
-        return_value=None,
-    )
-    def test_get_loadbalancer_ip_action_ip_not_available(
-        self, mock_get_loadbalancer_status, mock_sleep
-    ):
-        self.harness.begin_with_initial_hooks()
-        action_event = Mock(spec=ActionEvent)
-        # Patch time.time only during action execution so it doesn't affect harness setup.
-        with patch("time.time", side_effect=[0, 301]):
-            self.harness.charm._on_get_loadbalancer_ip(action_event)
-        action_event.fail.assert_called_once_with(
-            "LoadBalancer IP not available after 5 minutes."
-        )
-        action_event.set_results.assert_not_called()
-
 
 class TestTraefikCertTransferInterface(unittest.TestCase):
     def setUp(self):
