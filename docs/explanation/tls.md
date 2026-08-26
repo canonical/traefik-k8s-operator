@@ -9,15 +9,15 @@ myst:
 # How TLS works in the Traefik charm
 
 TLS in the Traefik charm is split into two independent segments: **upstream** traffic (between
-an external client and Traefik) and **downstream** traffic (between Traefik and the ingressed
-application). They are configured differently, are not required to be either both on or both
-off, and use different certificates.
+an external client and Traefik) and **downstream** traffic (between Traefik and the application
+requiring ingress). They are configured differently, are not required to be either both on or
+both off, and use different certificates.
 
 ```{mermaid}
 flowchart LR
 
 client((client)) -->|"upstream (external)"| trfk[Traefik]
-trfk -->|"downstream (cluster-internal)"| app[Ingressed application]
+trfk -->|"downstream (cluster-internal)"| app[App requiring ingress]
 ```
 
 ## Upstream TLS: client to Traefik
@@ -37,13 +37,14 @@ You can provide Traefik with a certificate in one of two ways:
 Once upstream TLS is enabled, clients that call `https://<external_hostname>/...` need the CA
 certificate available to them in order to validate the certificate Traefik presents.
 
-## Downstream TLS: Traefik to the ingressed application
+## Downstream TLS: Traefik to the app requiring ingress
 
 Downstream TLS is configured **per application**, independently of upstream TLS. Each requirer
 charm sets the `scheme` field on its `ingress`/`ingress-per-app` relation data argument, or the
 `scheme` argument to `provide_ingress_requirements`. Allowed values are `http`, `https`, and `h2c`.
 
-- If `scheme=http` (the default), Traefik forwards the request to the application in plaintext.
+- If `scheme=http` (the default), Traefik forwards the request to the application in plain
+  text.
 - If `scheme=https`, Traefik validates the application's own certificate and encrypts traffic
   between itself and the application. For this to work, Traefik needs a CA certificate that lets
   it validate the application's certificate; this is typically supplied via the
@@ -67,7 +68,7 @@ If both segments have TLS enabled, a request flows like this:
 
 Because the two segments are configured independently, it is entirely possible (and common) to
 run with upstream TLS enabled and downstream TLS disabled (external clients get HTTPS, but
-in-cluster traffic to the application is plaintext), or vice-versa.
+in-cluster traffic to the application is plain text), or vice-versa.
 
 ```{note}
 This TLS model is shared by other Juju ingress providers as well (for example `istio-ingress-k8s`),

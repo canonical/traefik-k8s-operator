@@ -88,11 +88,6 @@ For HTTP/HTTPS traffic, do not declare custom entrypoints. Traefik's own `web` (
 router's `entryPoints` for you - the automatically generated `-tls` twin defaults to
 `websecure` independently of what entrypoint your own router uses.
 
-If your charm may be related to Traefik more than once, or from more than one unit/application,
-make sure your router/service names are unique across relations (e.g. by including the app name
-or relation id in the name) to avoid collisions when Traefik merges everyone's dynamic
-configuration together.
-
 Example usage with raw flag enabled (full control over TLS configuration):
 
 ```python
@@ -122,16 +117,6 @@ class TraefikRouteCharm(CharmBase):
             }
         )
 ```
-
-In `raw=True` mode, Traefik will not add or modify any TLS router/config for you: you are
-responsible for declaring your own `web`/`websecure` (or raw TCP/UDP) entrypoints and TLS
-sections. Because the Traefik charm never connects to a certificate provider capable of
-automated certificate generation (e.g. ACME), the `tls` section of a router should be either
-omitted entirely (for plain HTTP), or exactly `tls: {}` (for HTTPS termination using the
-certificate Traefik itself was configured with, via the `certificates` relation or the
-`tls-cert`/`tls-key`/`tls-ca` config options). Do **not** set `certResolver` or `domains` under
-`tls`: those keys are only meaningful when Traefik is responsible for automatically requesting
-certificates for you, which is not supported here.
 """
 
 import logging
@@ -150,7 +135,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 8
+LIBPATCH = 9
 
 log = logging.getLogger(__name__)
 

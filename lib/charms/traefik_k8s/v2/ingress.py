@@ -732,7 +732,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
                 application; if unspecified, the default Kubernetes service name will be used.
             ip: Alternative addressing method other than host to be used by the ingress provider;
                 if unspecified, the binding address from the Juju network API will be used.
-            port: The port of the service to be ingressed. Required (and must be a keyword arg)
+            port: The port of the service requiring ingress. Required (and must be a keyword arg)
                 if `host` or `ip` is set, since the constructor publishes the ingress request
                 as soon as the relation is available; if none of `host`/`ip`/`port` are provided
                 at init time, call `provide_ingress_requirements(port=..., ...)` later instead

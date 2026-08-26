@@ -86,9 +86,9 @@ the request as if it had been made against `/` instead of `/model_name-app_name/
 
 The `host` and `port` passed to the `IngressPerAppRequirer` constructor are only the *initial*
 request, used to publish ingress data as soon as the relation is available. If your charm needs
-to change what is being ingressed after init (for example, because the workload's port is only
-known once it's configured), call `provide_ingress_requirements` with the values at any
-later point:
+to change what ingress is being requested for after init (for example, because the workload's
+port is only known once it's configured), call `provide_ingress_requirements` with the values at
+any later point:
 
 ```python
     def _on_config_changed(self, _):
@@ -96,12 +96,11 @@ later point:
 ```
 
 Each call to `provide_ingress_requirements` overwrites the previous request in the relation
-databag; there is only ever a single, current `(host, port)` pair per unit/application, not one
-per call.
+databag; there is only ever a single, current `(host, port)` pair per unit/application.
 
 ```{note}
-Use whichever of the two APIs (constructor args, or `provide_ingress_requirements`) matches when
-the host/port become known in your charm. Most charms only need one or the other, not both.
+Use whichever of the two APIs: constructor arguments, or `provide_ingress_requirements`.
+Most charms only need one or the other, not both.
 ```
 
 ## Get the proxied endpoint exposed by Traefik
@@ -126,11 +125,6 @@ The [Traefik route charm](https://charmhub.io/traefik-route-k8s) is a proxy char
 between Traefik and a charm in need of ingress, and is used to provide low-level access to
 Traefik configuration, as well as to allow configuration for each relation.
 
-This charm is ideal for use cases where you need the full expressive power of
-[Traefik's routing configuration](https://doc.traefik.io/traefik/routing/overview/),
-or if you want to use a single Traefik instance to provide domain-name-based
-URL routing to some charms, but path-based URL routing to others.
-
 Over the `traefik-route` relation, the requiring charm submits raw Traefik dynamic (and
 optionally static) configuration, which Traefik merges into its own configuration. A few things
 to keep in mind when using this interface (see the
@@ -141,14 +135,11 @@ full usage examples):
   attaches it to its own `websecure` entrypoint; attach your own router to the `web` entrypoint.
   You should not declare your own `-tls`-suffixed routers or `tls` blocks unless you opt out of
   this via the library's `raw=True` mode.
-- Traefik never connects to a certificate authority capable of automatically generating
-  certificates (e.g. via ACME). A `tls` block - whether yours (in `raw` mode) or
-  auto-generated - should never contain a `certResolver` key; that only applies when Traefik is
-  doing automatic certificate issuance for you.
+- Traefik in this charm does not request certificates from an ACME server by itself. It only
+  uses certificates that are given to it by the charm. Because of that, your router `tls`
+  settings should not include `certResolver`, since that option is only for setups where Traefik
+  is directly obtaining certificates for you.
 - If more than one instance of your charm (or more than one application) can relate to the same
   Traefik over `traefik-route`, ensure your router/service names are unique across relations to
   avoid collisions when Traefik merges everyone's configuration together.
-
-See {ref}`How TLS works in the Traefik charm <explanation_tls>` for more on how upstream and
-downstream TLS are configured in general.
 
