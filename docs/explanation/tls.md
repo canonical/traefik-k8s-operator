@@ -29,7 +29,7 @@ for upstream TLS.
 You can provide Traefik with a certificate in one of two ways:
 
 - Relate a certificate provider charm (such as `self-signed-certificates`) over the
-  `certificates` relation. See {ref}`how_to_tls_termination_using_a_local_ca` for a worked
+  `certificates` relation. See {ref}`how_to_tls_termination_using_a_local_ca` for a working
   example.
 - Set the `tls-cert`, `tls-key`, and `tls-ca` charm config options directly. All three must be
   set together; the charm blocks if only some of them are provided.
