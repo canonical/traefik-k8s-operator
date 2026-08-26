@@ -7,7 +7,7 @@ changes:
   description: Made the `relation` parameter in `TraefikRouteRequirer.__init__` `Optional[Relation]` with a default of `None`, matching how the rest of the code already handles it.
   urls:
     pr:
-      - ""
+      - "https://github.com/canonical/traefik-k8s-operator/pull/766"
     related_issue:
       - "https://github.com/canonical/traefik-k8s-operator/issues/448"
   visibility: public
