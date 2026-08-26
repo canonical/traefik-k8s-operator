@@ -11,3 +11,8 @@ show-external-endpoints:
     Returns a list of endpoints, 
     including both the endpoints proxied by this Traefik proxy and Traefik's own endpoint.
     This action uses the address of the upstream ingress if one exists.
+
+get-loadbalancer-ip:
+  description: |
+    Returns the external LoadBalancer IP address assigned to the Traefik service.
+    Waits up to 5 minutes for the IP to become available.

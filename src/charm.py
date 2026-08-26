@@ -13,6 +13,7 @@ import json
 import logging
 import re
 import socket
+import time
 from typing import Any, Dict, List, Optional, Union, cast
 from urllib.parse import urlparse
 
@@ -355,6 +356,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         # Action handlers
         observe(self.on.show_proxied_endpoints_action, self._on_show_proxied_endpoints)  # type: ignore
         observe(self.on.show_external_endpoints_action, self._on_show_external_endpoints)  # type: ignore
+        observe(self.on.get_loadbalancer_ip_action, self._on_get_loadbalancer_ip)  # type: ignore
 
         # Hook hollistic method
         observe(self.on.traefik_pebble_ready, self.cleanup_tls_configuration)
@@ -1079,6 +1081,23 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
                 )
             }
         )
+
+    def _on_get_loadbalancer_ip(self, event: ActionEvent) -> None:
+        """Handle the get-loadbalancer-ip action."""
+        timeout = 300  # 5 minutes
+        interval = 10
+        deadline = time.time() + timeout
+
+        while time.time() < deadline:
+            # Clear cached property so we get a fresh value each iteration.
+            self.__dict__.pop("_get_loadbalancer_status", None)
+            ip = self._get_loadbalancer_status
+            if ip:
+                event.set_results({"loadbalancer-ip": ip})
+                return
+            time.sleep(interval)
+
+        event.fail("LoadBalancer IP not available after 5 minutes.")
 
     def _get_proxied_endpoints(
         self, use_gateway_address: bool = True
