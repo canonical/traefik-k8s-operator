@@ -83,7 +83,7 @@ LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 24
+LIBPATCH = 25
 
 log = logging.getLogger(__name__)
 
@@ -731,7 +731,12 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
                   itself.
                 "both": this unit will receive both event types (which means it
                   will be notified *twice* of changes to this unit's ingress!).
-            strip_prefix: remove prefixes from the URL path (defaults to False).
+            strip_prefix: Configure Traefik to strip the path prefix given to the requirer's
+                backend when forwarding a request (defaults to False). This only affects what
+                path the requirer's workload sees; it does not change the ingress URL(s)
+                returned to clients, which always include the model/app/unit path prefix in
+                "path" routing mode. See the "How to integrate your charm to Traefik" how-to
+                guide for details.
             redirect_https: redirect incoming requests to HTTPS (defaults to False).
             scheme: callable returning the scheme (e.g. "http" or "https") to use when
                 constructing the ingress url; defaults to always returning "http".
