@@ -1088,7 +1088,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
 
     def _on_get_loadbalancer_ip(self, event: ActionEvent) -> None:
         """Handle the get-loadbalancer-ip action."""
-        timeout = event.params.get("timeout", 300)
+        timeout = int(event.params.get("timeout", 300))
         interval = 10
 
         @tenacity.retry(

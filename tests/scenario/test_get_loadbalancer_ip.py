@@ -32,7 +32,7 @@ def test_get_loadbalancer_ip_unavailable(traefik_ctx, traefik_container):
         return_value=None,
     ):
         out = traefik_ctx.run_action(
-            Action("get-loadbalancer-ip", params={"timeout": 1}),
+            Action("get-loadbalancer-ip", params={"timeout": 0}),
             state,
         )
 

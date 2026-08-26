@@ -4,7 +4,7 @@ changes:
 - title: Added `get-loadbalancer-ip` Juju action
   author: copilot
   type: minor
-  description: Added a `get-loadbalancer-ip` Juju action that returns the external LoadBalancer IP address assigned to the Traefik service, waiting up to 5 minutes for the IP to become available.
+  description: Added a `get-loadbalancer-ip` Juju action that returns the external LoadBalancer IP address assigned to the Traefik service, waiting up to a configurable timeout (default 300 seconds) for the IP to become available.
   urls:
     pr:
       - "https://github.com/canonical/traefik-k8s-operator/pull/767"
