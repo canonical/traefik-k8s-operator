@@ -72,8 +72,6 @@ later point:
 
 ```python
     def _on_config_changed(self, _):
-        # This replaces the (host, port) originally passed to the constructor, it does not
-        # add a second, independent ingress request.
         self.ingress.provide_ingress_requirements(host="foo.com", port=42)
 ```
 
