@@ -116,7 +116,6 @@ These are the URLs at which your workloads are externally accessible.
 
 ## Use `traefik-route` for raw Traefik configuration
 
-
 Over the `traefik-route` relation, the requiring charm submits raw Traefik dynamic (and
 optionally static) configuration, which Traefik merges into its own configuration. A few things
 to keep in mind when using this interface (see the
