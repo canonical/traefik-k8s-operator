@@ -74,20 +74,6 @@ class TraefikRouteCharm(CharmBase):
         )
 ```
 
-In this (default, `raw=False`) mode, for every HTTP/TCP router you declare, Traefik will
-automatically generate a matching `<router-name>-tls` router that serves the same rule/service
-over its `websecure` entrypoint, with `tls: {}` (or a `tls.domains` block derived from Traefik's
-own `external_hostname`, if one is configured). **Do not declare your own `-tls`-suffixed router
-or set a `tls` key on your router** - Traefik will add it for you and your own TLS
-configuration/middlewares would either conflict or be silently dropped when Traefik regenerates
-the router (see [issue #335](https://github.com/canonical/traefik-k8s-operator/issues/335)).
-
-For HTTP/HTTPS traffic, do not declare custom entrypoints. Traefik's own `web` (HTTP) and
-`websecure` (HTTPS) entrypoints already exist; attach your router to `web` (or omit
-`entryPoints` for HTTP, since `web` is Traefik's default). Traefik will not rewrite your
-router's `entryPoints` for you - the automatically generated `-tls` twin defaults to
-`websecure` independently of what entrypoint your own router uses.
-
 Example usage with raw flag enabled (full control over TLS configuration):
 
 ```python

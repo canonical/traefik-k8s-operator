@@ -74,12 +74,7 @@ What `strip_prefix=True` actually does is add a Traefik `stripPrefix` middleware
 the prefix only from the request Traefik forwards on to your workload, so your application sees
 the request as if it had been made against `/` instead of `/model_name-app_name/...`.
 
-- If your workload is already configured to serve under the `/model_name-app_name` prefix (for
-  example via a `--root-path`/base-path style option), leave `strip_prefix` at its default of
-  `False`.
-- If your workload only knows how to serve requests at its own root path, set
-  `strip_prefix=True` so Traefik strips the prefix before forwarding.
-- `strip_prefix` only has an effect in `path` routing mode. In `subdomain` routing mode there is
+`strip_prefix` only has an effect in `path` routing mode. In `subdomain` routing mode there is
   no path prefix to strip, so the option is a no-op.
 
 ### Updating the ingress request later on
@@ -121,9 +116,6 @@ These are the URLs at which your workloads are externally accessible.
 
 ## Use `traefik-route` for raw Traefik configuration
 
-The [Traefik route charm](https://charmhub.io/traefik-route-k8s) is a proxy charm that sits
-between Traefik and a charm in need of ingress, and is used to provide low-level access to
-Traefik configuration, as well as to allow configuration for each relation.
 
 Over the `traefik-route` relation, the requiring charm submits raw Traefik dynamic (and
 optionally static) configuration, which Traefik merges into its own configuration. A few things
