@@ -104,8 +104,8 @@ class TraefikRouteCharm(CharmBase):
         )
 ```
 
-For further details on how the library works, see the `traefik-route` section of the ingress library reference
-on the Traefik RTD documentation.
+For further details on how the library works, see the `traefik-route` section of the ingress
+library reference on the Traefik RTD documentation.
 """
 
 import logging
