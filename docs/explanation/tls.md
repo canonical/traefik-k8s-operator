@@ -28,10 +28,10 @@ for upstream TLS.
 
 You can provide Traefik with a certificate in one of two ways:
 
-- Relate a certificate provider charm (such as `self-signed-certificates`) over the
+- Integrate a certificate provider charm (such as `self-signed-certificates`) over the
   `certificates` relation. See {ref}`how_to_tls_termination_using_a_local_ca` for a working
   example.
-- Set the `tls-cert`, `tls-key`, and `tls-ca` charm config options directly. All three must be
+- Set the `tls-cert`, `tls-key`, and `tls-ca` charm configuration options directly. All three must be
   set together; the charm blocks if only some of them are provided.
 
 Once upstream TLS is enabled, clients that call `https://<external_hostname>/...` need the CA
@@ -46,7 +46,7 @@ charm sets the `scheme` field on its `ingress`/`ingress-per-app` relation data a
 - If `scheme=http` (the default), Traefik forwards the request to the application in plain
   text.
 - If `scheme=https`, Traefik validates the application's own certificate and encrypts traffic
-  between itself and the application. For this to work, Traefik needs a CA certificate that lets
+  between itself and the application. For this validation to work, Traefik needs a CA certificate that lets
   it validate the application's certificate; this is typically supplied via the
   `receive-ca-cert` relation (the `certificate_transfer` interface) from the same certificate
   provider used by the application, or from the `certificates` relation if the same authority
@@ -66,7 +66,7 @@ If both segments have TLS enabled, a request flows like this:
 7. Traefik verifies that certificate (using a CA cert it received separately), encrypts the
    request, and sends it to the application.
 
-Because the two segments are configured independently, it is entirely possible (and common) to
+Because the two segments are configured independently, it is entirely possible to
 run with upstream TLS enabled and downstream TLS disabled (external clients get HTTPS, but
 in-cluster traffic to the application is plain text), or vice-versa.
 

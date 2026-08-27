@@ -103,6 +103,60 @@ class TraefikRouteCharm(CharmBase):
             }
         )
 ```
+
+Example usage with raw flag enabled (full control over TLS configuration):
+
+```python
+# ...
+from charms.traefik_k8s.v0.traefik_route import TraefikRouteRequirer
+
+class TraefikRouteCharm(CharmBase):
+  def __init__(self, *args):
+    # ...
+    traefik_route = TraefikRouteRequirer(
+        self, self.model.relations.get("traefik-route"),
+        "traefik-route",
+        raw=True  # Traefik will not modify TLS settings on all routes
+    )
+    if self.traefik_route.is_ready():
+        self.traefik_route.submit_to_traefik(
+            config={
+                'tcp': {
+                    'routers': {
+                        'secure-route': {
+                            'rule': 'HostSNI(`secure.example.com`)',
+                            'service': 'my-service',
+                            'tls': {}
+                        }
+                    }
+                }
+            }
+        )
+```
+
+## Things to keep in mind
+
+**Automatic TLS twin router (default `raw=False` mode)**
+
+By default, Traefik automatically generates a TLS-enabled twin of every HTTP router you declare
+(named `<router>-tls`) and attaches it to the `websecure` entrypoint. Do not declare your own
+`-tls`-suffixed routers or `tls` blocks in your submitted config unless you opt out of this
+behaviour by setting `raw=True`. Attach your own HTTP router to the `web` entrypoint; Traefik
+will not rewrite your router's `entryPoints` for you.
+
+**Certificate resolvers**
+
+This charm does not request certificates from an ACME server. It only uses certificates that
+are supplied to it via the `certificates` relation or the `tls-*` config options. Do not set
+`certResolver` in your router's `tls` block; that option is only valid when Traefik itself is
+obtaining certificates via ACME.
+
+**Unique router and service names**
+
+If more than one application can relate to the same Traefik instance over `traefik-route`,
+ensure your router and service names are unique across relations. Traefik merges all submitted
+configurations together, so a name collision will cause one relation's config to silently
+overwrite another's.
 """
 
 import logging
@@ -121,7 +175,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 9
+LIBPATCH = 10
 
 log = logging.getLogger(__name__)
 

@@ -23,7 +23,6 @@ tailor the exact steps and commands to your setup.
 
 ## Requirements
 
-- You have ran `juju trust <traefik> --scope=cluster`
 - The [metallb MicroK8s addon](https://canonical.com/microk8s/docs/addon-metallb) is enabled.
 - Traefik's service type is `LoadBalancer`.
 - An external IP address is assigned to Traefik.
