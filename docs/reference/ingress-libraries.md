@@ -52,4 +52,4 @@ obtaining certificates via ACME.
 If more than one application can relate to the same Traefik instance over `traefik-route`,
 ensure your router and service names are unique across relations. Traefik merges all submitted
 configurations together, so a name collision will cause one relation's config to silently
-overwrite another's.
+overwrite another.
