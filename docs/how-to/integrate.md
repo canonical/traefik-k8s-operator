@@ -114,15 +114,3 @@ optionally static) configuration, which Traefik merges into its own configuratio
 contains full usage examples, and {ref}`reference_ingress_libraries` covers the key behaviours
 to keep in mind when using this interface.
 
-When using this interface, keep the following in mind:
-
-- Attach your HTTP router to the `web` entrypoint. Traefik will not rewrite your router's
-  `entryPoints` for you.
-
-```{warning}
-If more than one application can relate to the same Traefik instance over `traefik-route`,
-ensure your router and service names are unique across relations. Traefik merges all submitted
-configurations together, so a name collision will cause one relation's config to silently
-overwrite another's.
-```
-
