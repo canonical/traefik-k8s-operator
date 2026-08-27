@@ -104,10 +104,8 @@ class TraefikRouteCharm(CharmBase):
         )
 ```
 
-For further details on how the library works (TLS twin routers, certificate resolvers, unique
-name requirements), see the
-[`traefik-route` section of the ingress library reference](https://charmhub.io/traefik-k8s/docs/ingress-libraries)
-on the Traefik charm documentation.
+For further details on how the library works, see the `traefik-route` section of the ingress library reference
+on the Traefik RTD documentation.
 """
 
 import logging
