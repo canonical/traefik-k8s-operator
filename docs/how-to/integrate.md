@@ -111,7 +111,8 @@ These are the URLs at which your workloads are externally accessible.
 Over the `traefik-route` relation, the requiring charm submits raw Traefik dynamic (and
 optionally static) configuration, which Traefik merges into its own configuration. The
 [`traefik_route` library page on Charmhub](https://charmhub.io/traefik-k8s/libraries/traefik_route)
-contains full usage examples and further details on the library's behavior.
+contains full usage examples, and {ref}`reference_ingress_libraries` covers the key behaviours
+to keep in mind when using this interface.
 
 When using this interface, keep the following in mind:
 
