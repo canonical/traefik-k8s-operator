@@ -18,6 +18,6 @@ get-loadbalancer-ip:
     Waits for the IP to become available up to the specified timeout.
   params:
     timeout:
-      description: Maximum time in seconds to wait for the IP to become available.
+      description: Maximum time in seconds to wait for the IP to become available. Default is 300 seconds (5 minutes)
       type: integer
       default: 300
