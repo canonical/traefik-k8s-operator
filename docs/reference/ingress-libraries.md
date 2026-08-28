@@ -1,14 +1,14 @@
 ---
 myst:
   html_meta:
-    "description lang=en": "Reference material for the ingress charm libraries provided by Traefik."
+    "description lang=en": "Reference material for the ingress libraries provided by the Traefik charm."
 ---
 
 (reference_ingress_libraries)=
 
 # Ingress library reference
 
-This page covers selected parameters and behaviour of the ingress charm libraries provided by
+This page covers selected parameters and behavior of the ingress charm libraries provided by
 Traefik. For full API documentation, visit the Charmhub library pages:
 
 - [`ingress`](https://charmhub.io/traefik-k8s/libraries/ingress)
@@ -19,18 +19,22 @@ Traefik. For full API documentation, visit the Charmhub library pages:
 
 `IngressPerAppRequirer` (and `IngressPerUnitRequirer`) accept a `strip_prefix: bool = False`
 constructor argument. In `path` routing mode (the default), Traefik always generates a
-model/app-unique path prefix for your application (e.g. `/model_name-app_name`), and the
-ingress URL handed back to clients always includes that prefix — `strip_prefix` does **not**
+unique model/app path prefix for your application (e.g. `/model_name-app_name`), and the
+ingress URL handed back to clients always includes that prefix. Setting `strip_prefix` does **not**
 change the externally-visible URL.
 
 What `strip_prefix=True` actually does is add a Traefik `stripPrefix` middleware that removes
 the prefix only from the request Traefik forwards on to your workload, so your application sees
-the request as if it had been made against `/` instead of `/model_name-app_name/...`.
+the request as if it had been made against `/...` instead of `/model_name-app_name/...`.
 
 `strip_prefix` only has an effect in `path` routing mode. In `subdomain` routing mode there is
 no path prefix to strip, so the option is a no-op.
 
-## The `traefik-route` interface: things to keep in mind
+## The `traefik-route` interface
+
+The `traefik-route` interface allows users to provide Traefik configuration directly. However, when `raw = False` is set, 
+the Traefik charm does some preprocessing of the Traefik configuration provided by the user before applying the configuration. 
+Here are some things to keep in mind if you are using the `traefik-route` library:
 
 ### Automatic TLS twin router (default `raw=False` mode)
 
@@ -43,13 +47,13 @@ will not rewrite your router's `entryPoints` for you.
 ### Certificate resolvers
 
 This charm does not request certificates from an ACME server. It only uses certificates that
-are supplied to it via the `certificates` relation or the `tls-*` config options. Do not set
+are supplied to it via the `certificates` relation or the `tls-*` configuration options. Do not set
 `certResolver` in your router's `tls` block; that option is only valid when Traefik itself is
 obtaining certificates via ACME.
 
 ### Unique router and service names
 
-If more than one application can relate to the same Traefik instance over `traefik-route`,
+If more than one application can integrate to the same Traefik instance over `traefik-route`,
 ensure your router and service names are unique across relations. Traefik merges all submitted
-configurations together, so a name collision will cause one relation's config to silently
+configurations together, so a name collision will cause one relation's configuration to silently
 overwrite another.

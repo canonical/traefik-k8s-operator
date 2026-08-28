@@ -64,6 +64,9 @@ that URL is revoked for some reason (e.g. the cloud admin removed the relation).
 
 ### The `strip_prefix` parameter
 
+Add the `strip_prefix` constructor argument to the `IngressPerAppRequirer` /  `IngressPerUnitRequirer`
+object to strip the model path prefix from the request Traefik forwards on to your workload.
+
 For details on the `strip_prefix` parameter and when to use it, see
 {ref}`reference_ingress_libraries`.
 
@@ -84,10 +87,10 @@ Each call to `provide_ingress_requirements` overwrites the previous request in t
 databag; there is only ever a single, current `(host, port)` pair per unit/application.
 
 ```{note}
-Use one of the two APIs: constructor arguments, or `provide_ingress_requirements`.
+Use only one of the two APIs: either constructor arguments, or `provide_ingress_requirements`.
 Using both can lead to inconsistency: if some hooks call `provide_ingress_requirements` and
 others do not, hooks that skip the call will leave the previous values in the relation databag,
-which may not reflect the charm's current state. Most charms only need one or the other.
+which may not reflect the charm's current state.
 ```
 
 ## Get the proxied endpoint exposed by Traefik
@@ -111,6 +114,6 @@ These are the URLs at which your workloads are externally accessible.
 Over the `traefik-route` relation, the requiring charm submits raw Traefik dynamic (and
 optionally static) configuration, which Traefik merges into its own configuration. The
 [`traefik_route` library page on Charmhub](https://charmhub.io/traefik-k8s/libraries/traefik_route)
-contains full usage examples, and {ref}`reference_ingress_libraries` covers the key behaviours
+contains full usage examples, and {ref}`reference_ingress_libraries` covers the key behaviors
 to keep in mind when using this interface.
 

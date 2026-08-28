@@ -41,8 +41,9 @@ Check with:
 juju status
 ```
 
-If the Traefik unit shows `error` and `juju debug-log` shows a `lightkube.core.exceptions.ApiError`
-mentioning `services is forbidden` or `cannot [...] resource "services"`, this is the cause.
+Confirm that Traefik was deployed without `trust` by checking for an `error` message in
+the Traefik unit and checking if `juju debug-log` shows a `lightkube.core.exceptions.ApiError`
+mentioning `services is forbidden` or `cannot [...] resource "services"`.
 
 Fix it by granting trust and resolving the error:
 

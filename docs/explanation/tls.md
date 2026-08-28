@@ -58,7 +58,7 @@ If both segments have TLS enabled, a request flows like this:
 
 1. A client calls `https://traefik.gateway/some-route`.
 2. Traefik replies with its own certificate (issued via the `certificates` relation, or via the
-   `tls-*` config options).
+   `tls-*` configuration options).
 3. The client verifies the certificate, encrypts the request, and sends it to Traefik.
 4. Traefik decrypts the request.
 5. Traefik calls `https://some-internal-svc-serving-the-route`.
