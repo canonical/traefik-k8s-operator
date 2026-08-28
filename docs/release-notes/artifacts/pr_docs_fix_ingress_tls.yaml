@@ -1,0 +1,25 @@
+# Version of the artifact schema
+version_schema: 2
+changes:
+  - title: Fixed several documentation issues across ingress libraries and TLS guidance
+    author: swetha1654
+    type: bugfix
+    description: |
+      Fixed a broken code example in the "How to integrate your charm to Traefik" guide,
+      clarified how `provide_ingress_requirements` interacts with the `IngressPerAppRequirer`
+      constructor arguments, corrected inconsistent/missing docstrings in the `ingress` and
+      `ingress_per_unit` charm libraries, rewrote the `traefik_route` library docstring to
+      remove an invalid TLS example, corrected the `traefik-route` relation description in
+      `metadata.yaml`, and added a new explanation page documenting how upstream and downstream
+      TLS are configured independently in the Traefik charm.
+    urls:
+      pr:
+        - https://github.com/canonical/traefik-k8s-operator/pull/765
+      related_issue:
+        - "https://github.com/canonical/traefik-k8s-operator/issues/600"
+        - "https://github.com/canonical/traefik-k8s-operator/issues/564"
+        - "https://github.com/canonical/traefik-k8s-operator/issues/640"
+        - "https://github.com/canonical/traefik-k8s-operator/issues/511"
+        - "https://github.com/canonical/traefik-k8s-operator/issues/512"
+    visibility: public
+    highlight: false

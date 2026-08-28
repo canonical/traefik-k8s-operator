@@ -14,6 +14,7 @@ Each revision is versioned by the date of the revision.
 
 ## 2026-08-25
 
+- Fixed several documentation issues.
 - Fixed typing issue in `TraefikRouteRequirer.__init__`: `relation` parameter is now `Optional[Relation]` with a default of `None`.
 - Stabilized the `test_charm_trace_collection` unit test by isolating it from the shared charm tracing buffer file.
 - Updated the TLS integration test to verify HTTPS with the self-signed provider's CA certificate and stronger post-integration waits.

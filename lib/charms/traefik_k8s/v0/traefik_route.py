@@ -94,15 +94,18 @@ class TraefikRouteCharm(CharmBase):
                 'tcp': {
                     'routers': {
                         'secure-route': {
-                            'rule': 'Host(`secure.example.com`)',
+                            'rule': 'HostSNI(`secure.example.com`)',
                             'service': 'my-service',
-                            'tls': {'certResolver': 'myresolver'}
+                            'tls': {}
                         }
                     }
                 }
             }
         )
 ```
+
+For further details on how the library works, see the `traefik-route` section of the ingress
+library reference on the Traefik RTD documentation.
 """
 
 import logging
@@ -121,7 +124,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 8
+LIBPATCH = 10
 
 log = logging.getLogger(__name__)
 
