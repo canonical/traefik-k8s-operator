@@ -11,8 +11,9 @@ myst:
 The pages in this section contain technical information for topics related to the Traefik charm.
 
 ```{toctree}
+:maxdepth: 1
 charm-architecture
 cryptographic-documentation-for-cos-lite-charms
-ingress-integration
+ingress-libraries
 ../changelog.md
 ```

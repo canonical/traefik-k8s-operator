@@ -86,7 +86,7 @@ LIBAPI = 2
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 21
+LIBPATCH = 23
 
 PYDEPS = ["pydantic"]
 
@@ -732,6 +732,7 @@ class IngressPerAppRequirer(_IngressPerAppBase):
                 application; if unspecified, the default Kubernetes service name will be used.
             ip: Alternative addressing method other than host to be used by the ingress provider;
                 if unspecified, the binding address from the Juju network API will be used.
+            port: The port of the service requiring ingress.
             healthcheck_params: Optional dictionary containing health check
                 configuration parameters conforming to the IngressHealthCheck schema.
                 The dictionary must include:
@@ -748,13 +749,15 @@ class IngressPerAppRequirer(_IngressPerAppBase):
                         (defaults to "5s" if omitted).
                 If provided, "path" is required while "interval" and "timeout" will use Traefik's
                     defaults when not specified.
-            strip_prefix: Configure Traefik to strip the path prefix.
-            redirect_https: Redirect incoming requests to HTTPS.
+            strip_prefix: Configure Traefik to strip the path prefix given to the requirer's
+                backend when forwarding a request (defaults to False). This only affects what
+                path the requirer's workload sees; it does not change the ingress URL returned
+                to clients, which always includes the model/app path prefix in "path" routing
+                mode. See the "How to integrate your charm to Traefik" how-to guide for details.
+            redirect_https: Redirect incoming requests to HTTPS (defaults to False).
             scheme: Either a callable that returns the scheme to use when constructing the ingress
-                URL, or a string if the scheme is known and stable at charm initialization.
-
-        Request Args:
-            port: the port of the service
+                URL, or a string if the scheme is known and stable at charm initialization
+                (defaults to always returning "http").
         """
         super().__init__(charm, relation_name)
         self.charm: CharmBase = charm
