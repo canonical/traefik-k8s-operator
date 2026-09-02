@@ -31,11 +31,15 @@ dev = [
     "pytest-subtests",
     "coverage[toml]",
     "ipdb",
-    "pytest==8.3.5",
-    "pytest-asyncio==0.21.2",
+    # Markered because requires-python spans the ubuntu@20.04 (py3.8) charm platform, which
+    # never installs the dev extra but is still covered by uv's universal resolution.
+    "pytest==8.4.2 ; python_version >= '3.9'",
+    "pytest-asyncio==0.26.0 ; python_version >= '3.9'",
     "jubilant",
     "pytest-jubilant",
     "sh",
+    # Held back: 1.1.411 flags pre-existing issues in lib/charms/traefik_k8s that need
+    # code fixes plus LIBPATCH bumps.
     "pyright==1.1.318",
     "ops-scenario~=6.0",
     "opcli ; python_version >= '3.12'",
