@@ -2,6 +2,8 @@ addon
 Alertmanager
 BasicAuth
 bcrypt
+databag
+docstring
 hardcoded
 middleware
 proxied

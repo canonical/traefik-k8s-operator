@@ -68,6 +68,15 @@
         "minor",
         "patch"
       ]
+    },
+    {
+      "groupName": "charm-ci",
+      "description": "Keep the opcli git dependency (pyproject.toml/uv.lock) and the canonical/charm-ci reusable workflow refs (.github/workflows) in lockstep, since they must always point at the same charm-ci release.",
+      "matchPackageNames": [
+        "opcli",
+        "canonical/charm-ci",
+        "*charm-ci*"
+      ]
     }
   ],
   "schedule": [

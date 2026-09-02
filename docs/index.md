@@ -40,9 +40,9 @@ Ingress is a purely in-model concern. Traefik will happily cross-model relate wi
 * - **Operations**
   - {ref}`Troubleshoot reachability <how_to_troubleshoot_reachability>` | {ref}`Troubleshoot Gateway Address Unavailable <how_to_troubleshoot_gateway_address_unavailable>` | {ref}`Upgrade <how_to_upgrade>`
 * - **Ingress and interfaces**
-  - {ref}`Integrate your charm with Traefik <how_to_integrate>` | {ref}`Ingress-related relations <reference_ingress_integrations>`
+  - {ref}`Integrate your charm with Traefik <how_to_integrate>`
 * - **Design**
-  - {ref}`Charm architecture <reference_charm_architecture>`
+  - {ref}`Charm architecture <reference_charm_architecture>` | {ref}`How TLS works in the Traefik charm <explanation_tls>`
 * - **Security**
   - {ref}`Overview <explanation_security>` | {ref}`Enable BasicAuth <how_to_enable_basicauth>` | {ref}`Cryptographic documentation <reference_cryptographic_documentation_for_cos_lite_charms>`
 ```

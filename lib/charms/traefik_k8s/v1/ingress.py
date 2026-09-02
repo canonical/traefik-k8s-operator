@@ -35,7 +35,7 @@ LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 21
+LIBPATCH = 22
 
 DEFAULT_RELATION_NAME = "ingress"
 RELATION_INTERFACE = "ingress"
@@ -416,7 +416,11 @@ class IngressPerAppRequirer(_IngressPerAppBase):
                 relation must be of interface type `ingress` and have "limit: 1")
             host: Hostname to be used by the ingress provider to address the requiring
                 application; if unspecified, the default Kubernetes service name will be used.
-            strip_prefix: configure Traefik to strip the path prefix.
+            strip_prefix: configure Traefik to strip the path prefix given to the requirer's
+                backend when forwarding a request (defaults to `False`). This only affects what
+                path the requirer's workload sees; it does not change the ingress URL returned
+                to clients, which always includes the model/app path prefix in `path` routing
+                mode. See the "How to integrate your charm to Traefik" how-to guide for details.
             redirect_https: redirect incoming requests to the HTTPS.
 
         Request Args:

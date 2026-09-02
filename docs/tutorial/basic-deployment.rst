@@ -127,7 +127,8 @@ Let's begin by deploying the Traefik charm:
 
 By default the latest stable release of the charm will be deployed.
 We must also use the ``--trust`` flag to provide Traefik with elevated permissions to
-interact with the Kubernetes environment.
+interact with the Kubernetes environment (Traefik uses these permissions to manage its own
+``LoadBalancer`` Kubernetes service).
 
 The charm may need a couple of minutes to finish deploying. Monitor the status
 of the deployment with ``juju status``.
@@ -299,4 +300,4 @@ deployment or learn more about the charm, check out these pages:
 
 * Follow the guide for TLS termination using a local certificate authority in :ref:`how_to_tls_termination_using_a_local_ca`.
 * Set up basic access authorization by :ref:`enabling BasicAuth <how_to_enable_basicauth>`.
-* Learn more about the ingress relations offered by the charm in :ref:`reference_ingress_integrations`.
+* Learn more about the ingress relations offered by the charm in :ref:`how_to_integrate`.

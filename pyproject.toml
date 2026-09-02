@@ -16,11 +16,12 @@ dependencies = [
     "lightkube-models>=1.22.0.4",
     "lightkube-extensions",
     "ops>=2.10.0",
-    "importlib-metadata==9.0.0",
+    "importlib-metadata==9.0.1",
     "opentelemetry-exporter-otlp-proto-http>=1.33",
     "opentelemetry-api>=1.33",
     "pydantic>=2.10",
     "cosl",
+    "tenacity==8.5.0",
 ]
 
 [project.optional-dependencies]
@@ -30,15 +31,18 @@ dev = [
     "pytest-subtests",
     "coverage[toml]",
     "ipdb",
-    "pytest==8.3.5",
-    "pytest-asyncio==0.21.2",
+    # Markered because requires-python spans the ubuntu@20.04 (py3.8) charm platform, which
+    # never installs the dev extra but is still covered by uv's universal resolution.
+    "pytest==8.4.2 ; python_version >= '3.9'",
+    "pytest-asyncio==0.26.0 ; python_version >= '3.9'",
     "jubilant",
     "pytest-jubilant",
-    "tenacity==8.5.0",
     "sh",
+    # Held back: 1.1.411 flags pre-existing issues in lib/charms/traefik_k8s that need
+    # code fixes plus LIBPATCH bumps.
     "pyright==1.1.318",
     "ops-scenario~=6.0",
-    "opcli@git+https://github.com/canonical/charm-ci.git@v0.0.1-alpha.10 ; python_version >= '3.12'",
+    "opcli ; python_version >= '3.12'",
     "pytest-interface-tester>0.3",
     "types-pyyaml>=6.0.12.20241230",
     "mypy>=1.14.1",
@@ -53,6 +57,8 @@ override-dependencies = [
 ]
 
 [tool.uv.sources]
+# opcli is published only from the charm-ci git repository, not PyPI.
+opcli = { git = "https://github.com/canonical/charm-ci.git", tag = "v1.0.1" }
 lightkube-extensions = { git = "https://github.com/canonical/lightkube-extensions.git", rev = "37b32d699dffe9e1f796d5d8e431fd57849c248e" }
 
 # Testing tools configuration
