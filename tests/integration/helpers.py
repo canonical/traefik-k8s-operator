@@ -54,16 +54,7 @@ def all_settled(status: jubilant.Status) -> bool:
 
 def any_error(status: jubilant.Status, *apps: str) -> bool:
     """Return True when any app/unit is in workload error or any unit agent is lost."""
-    if jubilant.any_error(status, *apps):
-        return True
-    for app in apps or tuple(status.apps):
-        app_info = status.apps.get(app)
-        if app_info is None:
-            continue
-        for unit_info in status.get_units(app).values():
-            if unit_info.juju_status.current == "lost":
-                return True
-    return False
+    return jubilant.any_error(status, *apps):
 
 
 def assert_can_connect(ip: str, port: int) -> None:
