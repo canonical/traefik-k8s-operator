@@ -86,6 +86,8 @@ def test_remove_relation(juju: jubilant.Juju):
             and jubilant.all_agents_idle(status)
         ),
         timeout=300,
+        delay=5,
+        successes=5,
     )
     data = rpc(juju, f"{IPA_TESTER_APP}/0", "get_relation_data")
     assert not data["url"], "Expected ingress URL to be cleared after relation removal"

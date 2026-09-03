@@ -127,6 +127,8 @@ def test_remove_relation(juju: jubilant.Juju):
             and jubilant.all_agents_idle(status)
         ),
         timeout=300,
+        delay=5,
+        successes=5,
     )
 
 

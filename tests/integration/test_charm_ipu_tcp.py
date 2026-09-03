@@ -92,6 +92,8 @@ def test_remove_relation(juju: jubilant.Juju):
         lambda status: jubilant.all_active(status, TRAEFIK_APP)
         and jubilant.all_agents_idle(status),
         timeout=300,
+        delay=5,
+        successes=5,
     )
 
 
