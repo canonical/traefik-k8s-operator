@@ -517,7 +517,7 @@ def bring_up_certified_traefik(juju: jubilant.Juju, tmp_path: Path) -> str:
 
     juju.wait(jubilant.all_agents_idle, timeout=900, delay=5, successes=5)
     sign_csrs_and_provide_cert(juju)
-    juju.wait(all_settled, timeout=900)
+    juju.wait(all_settled, timeout=900, delay=5, successes=5)
 
     return verify_https_on_all_units(juju)
 
@@ -530,7 +530,7 @@ def bring_up_self_signed_traefik(
     juju.wait(all_settled, timeout=900, delay=5, successes=5)
     juju.integrate(f"{ssc_app}:certificates", f"{TRAEFIK_APP_NAME}:certificates")
 
-    juju.wait(all_settled, delay=5, timeout=900)
+    juju.wait(all_settled, delay=5, timeout=900, successes=5)
     pull_ssc_ca_certificate(juju, tmp_path, ssc_app=ssc_app)
 
     return verify_https_on_all_units(juju)
@@ -539,6 +539,6 @@ def bring_up_self_signed_traefik(
 def bring_up_traefik_without_certificate_provider(juju: jubilant.Juju) -> str:
     """Integrate alertmanager only and verify plain HTTP on all traefik units."""
     juju.integrate(f"{ALERTMANAGER_APP_NAME}:ingress", TRAEFIK_APP_NAME)
-    juju.wait(all_settled, delay=5, timeout=900)
+    juju.wait(all_settled, delay=5, timeout=900, successes=5)
     return verify_http_on_all_units(juju)
 

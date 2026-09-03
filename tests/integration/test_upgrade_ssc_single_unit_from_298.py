@@ -40,7 +40,7 @@ def test_upgrade_ssc_single_unit_from_298(
     unit_name = next(iter(juju.status().apps[TRAEFIK_APP_NAME].units))
 
     juju.refresh(TRAEFIK_APP_NAME, path=traefik_charm, resources=TRAEFIK_RESOURCES)
-    juju.wait(all_settled, delay=5, timeout=900)
+    juju.wait(all_settled, delay=5, timeout=900, successes=5)
     assert_traefik_revision(juju, 0)
 
     verify_https_on_unit(juju, unit_name, url)

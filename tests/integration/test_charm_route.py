@@ -43,7 +43,7 @@ def test_deployment(juju: jubilant.Juju, traefik_charm):
         config={"src-overwrite": route_src_overwrite()},
         trust=True,
     )
-    juju.wait(all_settled, timeout=1000)
+    juju.wait(all_settled, timeout=1000, delay=5, successes=5)
 
 
 def test_relate(juju: jubilant.Juju):
@@ -51,7 +51,7 @@ def test_relate(juju: jubilant.Juju):
         f"{ROUTE_TESTER_APP}:require-traefik-route",
         f"{TRAEFIK_APP}:traefik-route",
     )
-    juju.wait(all_settled, timeout=600, delay=3, successes=5)
+    juju.wait(all_settled, delay=5, successes=5)
 
 
 def test_dynamic_config_created(juju: jubilant.Juju):
@@ -103,6 +103,8 @@ def test_scale_and_get_external_host(juju: jubilant.Juju):
             len(status.apps[ROUTE_TESTER_APP].units) == 2 and all_settled(status)
         ),
         timeout=1000,
+        delay=5,
+        successes=5,
     )
 
     external_host_0 = rpc(juju, f"{ROUTE_TESTER_APP}/0", "get_external_host")

@@ -44,7 +44,7 @@ def test_deployment(juju: jubilant.Juju, traefik_charm):
         },
         trust=True,
     )
-    juju.wait(all_settled, timeout=1000)
+    juju.wait(all_settled, timeout=1000, delay=5, successes=5)
 
 
 def test_relate(juju: jubilant.Juju):
@@ -52,7 +52,7 @@ def test_relate(juju: jubilant.Juju):
         f"{TCP_TESTER_APP}:require-ingress-per-unit",
         f"{TRAEFIK_APP}:ingress-per-unit",
     )
-    juju.wait(all_settled, timeout=600, delay=3, successes=5)
+    juju.wait(all_settled, delay=5, successes=5)
 
 
 def test_relation_data_shape(juju: jubilant.Juju):

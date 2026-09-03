@@ -68,19 +68,19 @@ def test_upgrade_mtls_from_280_via_298(
     # Intermediate hop: 280 -> 298. The intermediate revision raises a fresh
     # CSR, so sign until every unit is serving again, then confirm HTTPS works.
     juju.refresh(TRAEFIK_APP_NAME, channel=SOURCE_CHANNEL, revision=INTERMEDIATE_REVISION)
-    juju.wait(jubilant.all_agents_idle, timeout=900)
+    juju.wait(jubilant.all_agents_idle, timeout=900, delay=5, successes=5)
 
     # Sign CSRs; the resulting cert PEMs are stored in the module-level
     # ``signed_certificates`` global for re-use after the relation is re-created.
     sign_csrs_and_provide_cert(juju, MANUAL_TLS_APP_NAME)
-    juju.wait(all_settled, timeout=900)
+    juju.wait(all_settled, timeout=900, delay=5, successes=5)
     assert_traefik_revision(juju, INTERMEDIATE_REVISION)
 
     verify_https_on_all_units(juju, expected_url=url)
 
     # Final hop: 298 -> charm under test.
     juju.refresh(TRAEFIK_APP_NAME, path=traefik_charm, resources=TRAEFIK_RESOURCES)
-    juju.wait(all_settled, delay=5, timeout=900)
+    juju.wait(all_settled, delay=5, timeout=900, successes=5)
     assert_traefik_revision(juju, 0)
 
     # The migrated key must still match the certificate on every unit ...

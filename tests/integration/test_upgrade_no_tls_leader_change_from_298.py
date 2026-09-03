@@ -56,6 +56,6 @@ def test_upgrade_no_tls_leader_change_from_298(
     verify_http_on_all_units(juju, alertmanager_url)
 
     juju.refresh(TRAEFIK_APP_NAME, path=traefik_charm, resources=TRAEFIK_RESOURCES)
-    juju.wait(all_settled, timeout=900, delay=5)
+    juju.wait(all_settled, timeout=900, delay=5, successes=5)
     assert_traefik_revision(juju, 0)
     verify_http_on_all_units(juju, alertmanager_url)

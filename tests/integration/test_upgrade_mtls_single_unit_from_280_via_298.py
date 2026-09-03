@@ -56,16 +56,16 @@ def test_upgrade_mtls_single_unit_from_280_via_298(
     unit_name = next(iter(juju.status().apps[TRAEFIK_APP_NAME].units))
 
     juju.refresh(TRAEFIK_APP_NAME, channel=SOURCE_CHANNEL, revision=INTERMEDIATE_REVISION)
-    juju.wait(jubilant.all_agents_idle, timeout=900)
+    juju.wait(jubilant.all_agents_idle, timeout=900, delay=5, successes=5)
 
     sign_csrs_and_provide_cert(juju, MANUAL_TLS_APP_NAME)
-    juju.wait(all_settled, timeout=900)
+    juju.wait(all_settled, timeout=900, delay=5, successes=5)
     assert_traefik_revision(juju, INTERMEDIATE_REVISION)
 
     verify_https_on_unit(juju, unit_name, url)
 
     juju.refresh(TRAEFIK_APP_NAME, path=traefik_charm, resources=TRAEFIK_RESOURCES)
-    juju.wait(all_settled, delay=5, timeout=900)
+    juju.wait(all_settled, delay=5, timeout=900, successes=5)
     assert_traefik_revision(juju, 0)
 
     verify_https_on_unit(juju, unit_name, url)

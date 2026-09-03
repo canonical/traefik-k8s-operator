@@ -51,7 +51,7 @@ def test_upgrade_no_tls_from_revision_298(
     url = bring_up_traefik_without_certificate_provider(juju)
 
     juju.refresh(TRAEFIK_APP_NAME, path=traefik_charm, resources=TRAEFIK_RESOURCES)
-    juju.wait(all_settled, delay=5, timeout=900)
+    juju.wait(all_settled, delay=5, timeout=900, successes=5)
     assert_traefik_revision(juju, 0)
 
     verify_http_on_all_units(juju, expected_url=url)
