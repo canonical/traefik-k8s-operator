@@ -12,7 +12,7 @@ import requests
 import yaml
 from tenacity import retry, stop_after_attempt, wait_exponential
 
-from tests.integration.helpers import all_settled
+from tests.integration.helpers import all_settled, any_error
 
 TRAEFIK_APP = "traefik"
 TEMPO_APP = "tempo"
@@ -41,6 +41,7 @@ def test_workload_tracing_is_present(juju: jubilant.Juju, traefik_charm):
     juju.deploy(traefik_charm, TRAEFIK_APP, resources=_TRAEFIK_RESOURCES, trust=True)
     juju.wait(
         lambda status: jubilant.all_active(status, TRAEFIK_APP),
+        error=any_error,
         timeout=300,
         delay=5,
         successes=5,
@@ -48,7 +49,7 @@ def test_workload_tracing_is_present(juju: jubilant.Juju, traefik_charm):
 
     juju.integrate(f"{TRAEFIK_APP}:workload-tracing", f"{TEMPO_APP}:tracing")
     juju.integrate(f"{TEMPO_APP}:ingress", f"{TRAEFIK_APP}:traefik-route")
-    juju.wait(all_settled, timeout=1000, delay=5, successes=5)
+    juju.wait(all_settled, error=any_error, timeout=1000, delay=5, successes=5)
 
     tempo_host = juju.status().apps[TEMPO_APP].address
     assert _get_traces_patiently(tempo_host)
@@ -78,7 +79,7 @@ def _deploy_tempo_cluster(juju: jubilant.Juju) -> None:
 
     # s3-integrator's unit agent must be up (installed) before we can run an action
     # against it below.
-    juju.wait(jubilant.all_agents_idle, delay=5, successes=5)
+    juju.wait(jubilant.all_agents_idle, error=any_error, delay=5, successes=5)
 
     # microceph's RGW runs on the spread runner host (set up by s3-installation.sh) and
     # is reachable from the single-node k8s cluster via the host's own IP address.
@@ -95,7 +96,7 @@ def _deploy_tempo_cluster(juju: jubilant.Juju) -> None:
         "sync-s3-credentials",
         params={"access-key": S3_ACCESS_KEY, "secret-key": S3_SECRET_KEY},
     )
-    juju.wait(all_settled, timeout=2000, delay=5, successes=5)
+    juju.wait(all_settled, error=any_error, timeout=2000, delay=5, successes=5)
 
 
 @retry(stop=stop_after_attempt(15), wait=wait_exponential(multiplier=1, min=4, max=10))

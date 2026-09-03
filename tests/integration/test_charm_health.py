@@ -17,7 +17,13 @@ from tests.integration.any_charm_helpers import (
     PYTHON_PACKAGES,
     health_src_overwrite,
 )
-from tests.integration.helpers import all_settled, get_k8s_service_address, remove_application, rpc
+from tests.integration.helpers import (
+    all_settled,
+    any_error,
+    get_k8s_service_address,
+    remove_application,
+    rpc,
+)
 
 TRAEFIK_APP = "traefik-k8s"
 HEALTH_TESTER_APP = "health-tester"
@@ -41,12 +47,12 @@ def test_deployment(juju: jubilant.Juju, traefik_charm):
         num_units=3,
         trust=True,
     )
-    juju.wait(all_settled, timeout=1000, delay=5, successes=5)
+    juju.wait(all_settled, error=any_error, timeout=1000, delay=5, successes=5)
 
 
 def test_relate(juju: jubilant.Juju):
     juju.integrate(f"{HEALTH_TESTER_APP}:require-ingress", f"{TRAEFIK_APP}:ingress")
-    juju.wait(all_settled, delay=5, successes=5)
+    juju.wait(all_settled, error=any_error, delay=5, successes=5)
 
 
 def test_health(juju: jubilant.Juju):
@@ -55,7 +61,7 @@ def test_health(juju: jubilant.Juju):
     health_address = f"http://{traefik_address}/{juju.model}-{HEALTH_TESTER_APP}/health"
 
     rpc(juju, f"{HEALTH_TESTER_APP}/2", "set_health", is_healthy=False)
-    juju.wait(all_settled, delay=5, successes=5)
+    juju.wait(all_settled, error=any_error, delay=5, successes=5)
     for _ in range(10):
         status, content = _fetch_health(health_address)
         assert status == 200
@@ -65,7 +71,7 @@ def test_health(juju: jubilant.Juju):
         ]
 
     rpc(juju, f"{HEALTH_TESTER_APP}/1", "set_health", is_healthy=False)
-    juju.wait(all_settled, delay=5, successes=5)
+    juju.wait(all_settled, error=any_error, delay=5, successes=5)
     for _ in range(10):
         status, content = _fetch_health(health_address)
         assert status == 200

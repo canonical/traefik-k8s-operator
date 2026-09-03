@@ -18,6 +18,7 @@ from tests.integration.any_charm_helpers import (
 )
 from tests.integration.helpers import (
     all_settled,
+    any_error,
     assert_can_connect,
     get_k8s_service_address,
     remove_application,
@@ -44,12 +45,12 @@ def test_deployment(juju: jubilant.Juju, traefik_charm):
             "python-packages": PYTHON_PACKAGES,
         },
     )
-    juju.wait(all_settled, delay=5, successes=5)
+    juju.wait(all_settled, error=any_error, delay=5, successes=5)
 
 
 def test_relate(juju: jubilant.Juju):
     juju.integrate(f"{IPA_TESTER_APP}:require-ingress", f"{TRAEFIK_APP}:ingress")
-    juju.wait(all_settled, delay=5, successes=5)
+    juju.wait(all_settled, error=any_error, delay=5, successes=5)
 
 
 def test_ipa_charm_has_ingress(juju: jubilant.Juju):
@@ -85,6 +86,7 @@ def test_remove_relation(juju: jubilant.Juju):
             jubilant.all_active(status, TRAEFIK_APP, IPA_TESTER_APP)
             and jubilant.all_agents_idle(status)
         ),
+        error=any_error,
         timeout=300,
         delay=5,
         successes=5,

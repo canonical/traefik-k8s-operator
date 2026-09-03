@@ -17,7 +17,7 @@ from tests.integration.any_charm_helpers import (
     PYTHON_PACKAGES,
     ingress_requirer_mock_src_overwrite,
 )
-from tests.integration.helpers import all_settled, fetch_with_retry
+from tests.integration.helpers import all_settled, any_error, fetch_with_retry
 
 TRAEFIK = "traefik-k8s"
 UPSTREAM_INGRESS = f"{TRAEFIK}-upstream"
@@ -34,7 +34,7 @@ _TRAEFIK_RESOURCES = {
 
 def test_deployment(juju: jubilant.Juju, traefik_charm):
     juju.deploy(traefik_charm, TRAEFIK, resources=_TRAEFIK_RESOURCES, trust=True)
-    juju.wait(all_settled, timeout=1000, delay=5, successes=5)
+    juju.wait(all_settled, error=any_error, timeout=1000, delay=5, successes=5)
 
 
 def test_deploy_dependencies(juju: jubilant.Juju, traefik_charm):
@@ -49,7 +49,7 @@ def test_deploy_dependencies(juju: jubilant.Juju, traefik_charm):
         resources=_TRAEFIK_RESOURCES,
         trust=True,
     )
-    juju.wait(all_settled, timeout=1000, delay=5, successes=5)
+    juju.wait(all_settled, error=any_error, timeout=1000, delay=5, successes=5)
 
 
 def test_deploy_testers(juju: jubilant.Juju):
@@ -78,14 +78,14 @@ def test_deploy_testers(juju: jubilant.Juju):
         config=config,
         trust=True,
     )
-    juju.wait(all_settled, timeout=1000, delay=5, successes=5)
+    juju.wait(all_settled, error=any_error, timeout=1000, delay=5, successes=5)
 
 
 def test_relate_testers(juju: jubilant.Juju):
     juju.integrate(f"{TRAEFIK}:ingress", f"{IPA_TESTER}:require-ingress")
     juju.integrate(f"{TRAEFIK}:ingress-per-unit", f"{IPU_TESTER}:require-ingress-per-unit")
     juju.integrate(f"{TRAEFIK}:traefik-route", f"{ROUTE_TESTER}:require-traefik-route")
-    juju.wait(all_settled, delay=5, successes=5)
+    juju.wait(all_settled, error=any_error, delay=5, successes=5)
 
 
 def test_ipa_ingressed_no_upstream_ingress(juju: jubilant.Juju):
@@ -102,7 +102,7 @@ def test_traefik_route_ingressed_no_upstream_ingress(juju: jubilant.Juju):
 
 def test_add_upstream_ingress(juju: jubilant.Juju):
     juju.integrate(f"{TRAEFIK}:upstream-ingress", f"{UPSTREAM_INGRESS}:ingress")
-    juju.wait(all_settled, timeout=300)
+    juju.wait(all_settled, error=any_error, timeout=300)
 
 
 def test_ipa_ingressed_through_upstream_ingress(juju: jubilant.Juju):
@@ -131,16 +131,24 @@ def test_traefik_with_upstream_ingress_blocked_if_in_subdomain_mode(juju: jubila
         "Expected Traefik to be active before triggering subdomain-mode block"
     )
     juju.config(TRAEFIK, {"routing_mode": "subdomain"})
-    juju.wait(lambda status: status.apps[TRAEFIK].app_status.current == "blocked", timeout=300)
+    juju.wait(
+        lambda status: status.apps[TRAEFIK].app_status.current == "blocked",
+        error=any_error,
+        timeout=300,
+    )
 
     juju.config(TRAEFIK, {"routing_mode": "path"})
-    juju.wait(lambda status: status.apps[TRAEFIK].app_status.current == "active", timeout=300)
+    juju.wait(
+        lambda status: status.apps[TRAEFIK].app_status.current == "active",
+        error=any_error,
+        timeout=300,
+    )
 
 
 def test_add_tls_to_all_ingresses(juju: jubilant.Juju):
     juju.integrate(f"{TRAEFIK}:certificates", CERTIFICATE_PROVIDER)
     juju.integrate(f"{UPSTREAM_INGRESS}:certificates", CERTIFICATE_PROVIDER)
-    juju.wait(all_settled, timeout=300)
+    juju.wait(all_settled, error=any_error, timeout=300)
 
 
 def test_ipa_ingressed_through_upstream_ingress_with_tls(juju: jubilant.Juju):

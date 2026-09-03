@@ -28,6 +28,7 @@ from constants import (
 )
 from helpers import (
     all_settled,
+    any_error,
     assert_traefik_revision,
     bring_up_certified_traefik,
     get_outstanding_csrs,
@@ -53,12 +54,12 @@ def test_upgrade_mtls_from_revision_298(
         num_units=NUM_TRAEFIK_UNITS,
         trust=True,
     )
-    juju.wait(jubilant.all_agents_idle, timeout=900, delay=5, successes=5)
+    juju.wait(jubilant.all_agents_idle, error=any_error, timeout=900, delay=5, successes=5)
     url = bring_up_certified_traefik(juju, tmp_path)
 
     # Upgrade to the charm under test.
     juju.refresh(TRAEFIK_APP_NAME, path=traefik_charm, resources=TRAEFIK_RESOURCES)
-    juju.wait(all_settled, delay=5, timeout=900, successes=5)
+    juju.wait(all_settled, error=any_error, delay=5, timeout=900, successes=5)
     assert_traefik_revision(juju, 0)
 
     # The migrated key must still match the certificate on every unit ...

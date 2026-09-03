@@ -17,7 +17,7 @@ from tests.integration.any_charm_helpers import (
     PYTHON_PACKAGES,
     ipa_src_overwrite,
 )
-from tests.integration.helpers import all_settled, rpc
+from tests.integration.helpers import all_settled, any_error, rpc
 
 TRAEFIK_APP = "traefik"
 IPA_TESTER_APP = "ipa-tester"
@@ -43,31 +43,31 @@ def test_deployment(juju: jubilant.Juju, traefik_charm):
             "python-packages": PYTHON_PACKAGES,
         },
     )
-    juju.wait(all_settled, timeout=1000, delay=5, successes=5)
+    juju.wait(all_settled, error=any_error, timeout=1000, delay=5, successes=5)
 
 
 def test_relate(juju: jubilant.Juju):
     juju.integrate(f"{IPA_TESTER_APP}:require-ingress", f"{TRAEFIK_APP}:ingress")
-    juju.wait(all_settled, delay=5, successes=5)
+    juju.wait(all_settled, error=any_error, delay=5, successes=5)
 
 
 def test_ipa_charm_ingress_noauth(juju: jubilant.Juju):
     juju.config(TRAEFIK_APP, {"basic_auth_user": ""})
-    juju.wait(all_settled, delay=5, successes=5)
+    juju.wait(all_settled, error=any_error, delay=5, successes=5)
     _assert_status(_get_tester_url(juju), SUCCESS_STATUS)
 
 
 def test_ipa_charm_ingress_auth(juju: jubilant.Juju):
     tester_url = _get_tester_url(juju)
     juju.config(TRAEFIK_APP, {"basic_auth_user": TEST_AUTH_USER})
-    juju.wait(all_settled, delay=5, successes=5)
+    juju.wait(all_settled, error=any_error, delay=5, successes=5)
     _assert_status(tester_url, 401)
     _assert_status(tester_url, SUCCESS_STATUS, auth=(USERNAME, PASSWORD))
 
 
 def test_ipa_charm_ingress_auth_disable(juju: jubilant.Juju):
     juju.config(TRAEFIK_APP, {"basic_auth_user": ""})
-    juju.wait(all_settled, delay=5, successes=5)
+    juju.wait(all_settled, error=any_error, delay=5, successes=5)
     _assert_status(_get_tester_url(juju), SUCCESS_STATUS)
 
 

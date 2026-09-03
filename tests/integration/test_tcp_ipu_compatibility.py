@@ -20,6 +20,7 @@ from tests.integration.any_charm_helpers import (
 )
 from tests.integration.helpers import (
     all_settled,
+    any_error,
     assert_can_connect,
     get_k8s_service_address,
     remove_application,
@@ -58,7 +59,7 @@ def test_deployment(juju: jubilant.Juju, traefik_charm):
             "python-packages": PYTHON_PACKAGES,
         },
     )
-    juju.wait(all_settled, timeout=1000, delay=5, successes=5)
+    juju.wait(all_settled, error=any_error, timeout=1000, delay=5, successes=5)
 
 
 def test_relate(juju: jubilant.Juju):
@@ -70,7 +71,7 @@ def test_relate(juju: jubilant.Juju):
         f"{IPU_TESTER_APP}:require-ingress-per-unit",
         f"{TRAEFIK_APP}:ingress-per-unit",
     )
-    juju.wait(all_settled, timeout=1000, delay=5, successes=5)
+    juju.wait(all_settled, error=any_error, timeout=1000, delay=5, successes=5)
 
 
 def test_tcp_ipu_compatibility(juju: jubilant.Juju):

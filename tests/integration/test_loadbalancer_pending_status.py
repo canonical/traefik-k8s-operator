@@ -5,7 +5,7 @@
 
 import jubilant
 
-from tests.integration.helpers import all_settled
+from tests.integration.helpers import all_settled, any_error
 
 # An IP outside the MetalLB pool (10.43.45.0/28) so the LB stays pending.
 UNREACHABLE_IP = "192.168.255.255"
@@ -20,6 +20,7 @@ def test_waiting_when_lb_pending(juju: jubilant.Juju, traefik_app):
 
     juju.wait(
         lambda status: jubilant.all_waiting(status, traefik_app),
+        error=any_error,
         timeout=300,
         delay=5,
     )
@@ -36,7 +37,7 @@ def test_recovery_after_annotations_cleared(juju: jubilant.Juju, traefik_app):
     """Charm recovers to active once the LB gets an IP again."""
     # Clear the bad annotations so MetalLB assigns an IP from its pool.
     juju.config(traefik_app, {"loadbalancer_annotations": ""})
-    juju.wait(all_settled, delay=5, successes=5)
+    juju.wait(all_settled, error=any_error, delay=5, successes=5)
 
     status = juju.status()
     app_status = status.apps[traefik_app].app_status

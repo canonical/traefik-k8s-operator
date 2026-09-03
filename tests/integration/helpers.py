@@ -52,6 +52,20 @@ def all_settled(status: jubilant.Status) -> bool:
     return jubilant.all_active(status) and jubilant.all_agents_idle(status)
 
 
+def any_error(status: jubilant.Status, *apps: str) -> bool:
+    """Return True when any app/unit is in workload error or any unit agent is lost."""
+    if jubilant.any_error(status, *apps):
+        return True
+    for app in apps or tuple(status.apps):
+        app_info = status.apps.get(app)
+        if app_info is None:
+            continue
+        for unit_info in status.get_units(app).values():
+            if unit_info.juju_status.current == "lost":
+                return True
+    return False
+
+
 def assert_can_connect(ip: str, port: int) -> None:
     """Assert that a TCP connection can be established to ip:port."""
     target = (ip, int(port))
@@ -113,6 +127,7 @@ def remove_application(
     )
     juju.wait(
         lambda status: all(app_name not in status.apps for app_name in existing_apps),
+        error=any_error,
         timeout=timeout,
     )
 
@@ -458,6 +473,8 @@ def force_leader_change(juju: jubilant.Juju, app: str = TRAEFIK_APP_NAME) -> str
         return len(leaders) == 1 and leaders[0] != old_leader
 
     try:
+        # No error= here: the old leader's agent is deliberately stopped above, so it
+        # may legitimately report "lost"/error while we wait for a new leader to be elected.
         juju.wait(_reelected, timeout=120, delay=5)
     except TimeoutError as exc:
         raise AssertionError(
@@ -512,12 +529,12 @@ def bring_up_certified_traefik(juju: jubilant.Juju, tmp_path: Path) -> str:
     generate_ca(tmp_path)
 
     juju.integrate(f"{ALERTMANAGER_APP_NAME}:ingress", TRAEFIK_APP_NAME)
-    juju.wait(all_settled, timeout=900, delay=5, successes=5)
+    juju.wait(all_settled, error=any_error, timeout=900, delay=5, successes=5)
     juju.integrate(f"{MANUAL_TLS_APP_NAME}:certificates", f"{TRAEFIK_APP_NAME}:certificates")
 
-    juju.wait(jubilant.all_agents_idle, timeout=900, delay=5, successes=5)
+    juju.wait(jubilant.all_agents_idle, error=any_error, timeout=900, delay=5, successes=5)
     sign_csrs_and_provide_cert(juju)
-    juju.wait(all_settled, timeout=900, delay=5, successes=5)
+    juju.wait(all_settled, error=any_error, timeout=900, delay=5, successes=5)
 
     return verify_https_on_all_units(juju)
 
@@ -527,10 +544,10 @@ def bring_up_self_signed_traefik(
 ) -> str:
     """Integrate self-signed-certificates + alertmanager and verify HTTPS on traefik."""
     juju.integrate(f"{ALERTMANAGER_APP_NAME}:ingress", TRAEFIK_APP_NAME)
-    juju.wait(all_settled, timeout=900, delay=5, successes=5)
+    juju.wait(all_settled, error=any_error, timeout=900, delay=5, successes=5)
     juju.integrate(f"{ssc_app}:certificates", f"{TRAEFIK_APP_NAME}:certificates")
 
-    juju.wait(all_settled, delay=5, timeout=900, successes=5)
+    juju.wait(all_settled, error=any_error, delay=5, timeout=900, successes=5)
     pull_ssc_ca_certificate(juju, tmp_path, ssc_app=ssc_app)
 
     return verify_https_on_all_units(juju)
@@ -539,6 +556,6 @@ def bring_up_self_signed_traefik(
 def bring_up_traefik_without_certificate_provider(juju: jubilant.Juju) -> str:
     """Integrate alertmanager only and verify plain HTTP on all traefik units."""
     juju.integrate(f"{ALERTMANAGER_APP_NAME}:ingress", TRAEFIK_APP_NAME)
-    juju.wait(all_settled, delay=5, timeout=900, successes=5)
+    juju.wait(all_settled, error=any_error, delay=5, timeout=900, successes=5)
     return verify_http_on_all_units(juju)
 

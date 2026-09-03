@@ -33,6 +33,7 @@ from constants import (
 )
 from helpers import (
     all_settled,
+    any_error,
     assert_traefik_revision,
     bring_up_certified_traefik,
     force_leader_change,
@@ -59,13 +60,13 @@ def test_leader_change_breaks_tls_then_upgrade_blocks_and_requests_certificate(
         num_units=NUM_TRAEFIK_UNITS,
         trust=True,
     )
-    juju.wait(jubilant.all_agents_idle, timeout=900, delay=5, successes=5)
+    juju.wait(jubilant.all_agents_idle, error=any_error, timeout=900, delay=5, successes=5)
     alertmanager_url = bring_up_certified_traefik(juju, tmp_path)
 
     # newly elected leader is expected to break.
     new_leader = force_leader_change(juju, TRAEFIK_APP_NAME)
 
-    juju.wait(all_settled, timeout=300, delay=5, successes=5)
+    juju.wait(all_settled, error=any_error, timeout=300, delay=5, successes=5)
 
     # All units except the new leader should still serve valid HTTPS (their per-unit
     # private keys are intact). The new leader lost the old leader's key on rev 298.
@@ -77,7 +78,7 @@ def test_leader_change_breaks_tls_then_upgrade_blocks_and_requests_certificate(
     for unit_name in working_units:
         verify_https_on_unit(juju, unit_name, alertmanager_url)
 
-    juju.wait(lambda _: len(get_outstanding_csrs(juju)) == 1, timeout=300)
+    juju.wait(lambda _: len(get_outstanding_csrs(juju)) == 1, error=any_error, timeout=300)
 
     # The new leader lost the old leader's key, so its served certificate is no
     # longer trusted (or the endpoint is down) -- HTTPS must fail here.
@@ -93,7 +94,7 @@ def test_leader_change_breaks_tls_then_upgrade_blocks_and_requests_certificate(
 
     # Upgrade to the charm under test.
     juju.refresh(TRAEFIK_APP_NAME, path=traefik_charm, resources=TRAEFIK_RESOURCES)
-    juju.wait(jubilant.all_agents_idle, timeout=900, delay=5, successes=5)
+    juju.wait(jubilant.all_agents_idle, error=any_error, timeout=900, delay=5, successes=5)
     assert_traefik_revision(juju, 0)
 
     status = juju.status()
