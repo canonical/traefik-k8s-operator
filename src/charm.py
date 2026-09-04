@@ -13,7 +13,7 @@ import json
 import logging
 import re
 import socket
-from typing import Any, Dict, List, Optional, Union, cast
+from typing import Any, Dict, List, Optional, Tuple, Union, cast
 from urllib.parse import urlparse
 
 import pydantic
@@ -880,7 +880,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         self.certs.sync()
 
     @staticmethod
-    def _csr_key(csr: CertificateRequestAttributes) -> tuple[Any, ...]:
+    def _csr_key(csr: CertificateRequestAttributes) -> Tuple[Any, ...]:
         """Return a comparable key for certificate request change detection."""
         return (
             csr.common_name,
