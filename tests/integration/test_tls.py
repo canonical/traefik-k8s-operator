@@ -4,6 +4,7 @@
 
 """Integration tests for TLS termination using jubilant."""
 
+import ssl
 from pathlib import Path
 
 import jubilant
@@ -69,6 +70,37 @@ def test_tls_termination(juju: jubilant.Juju, tmp_path: Path):
     _assert_https_endpoints(juju, cert_path, traefik_ip)
 
 
+def test_tls_termination_with_custom_csr_subject_attributes_without_cn(
+    juju: jubilant.Juju, tmp_path: Path
+):
+    model_name = juju.model
+    assert model_name is not None
+    traefik_ip = get_k8s_service_address(model_name, f"{TRAEFIK_APP}-lb")
+    assert traefik_ip, "Expected a traefik load balancer address"
+
+    old_certificate = _get_served_certificate(traefik_ip)
+
+    juju.config(
+        TRAEFIK_APP,
+        {
+            "custom-csr-subject-attributes": (
+                "C=DE, ST=Hesse, L=Frankfurt, O=Canonical, OU=Engineering, "
+                "emailAddress=ops@example.com"
+            )
+        },
+    )
+    juju.wait(all_settled, timeout=600, delay=2, successes=5)
+
+    cert_path = pull_ssc_ca_certificate(juju, tmp_path, ssc_app=ROOT_CA_APP)
+    new_certificate = _get_served_certificate(traefik_ip)
+
+    assert new_certificate != old_certificate, (
+        "Expected a new certificate to be served after updating "
+        "custom-csr-subject-attributes"
+    )
+    _assert_https_endpoints(juju, cert_path, traefik_ip)
+
+
 def test_tls_termination_after_charm_upgrade(
     juju: jubilant.Juju, traefik_charm, tmp_path: Path
 ):
@@ -111,3 +143,7 @@ def _assert_https_endpoints(juju: jubilant.Juju, cert_path: Path, traefik_ip: st
     for endpoint in _endpoints(model_name, "https", MOCK_HOSTNAME):
         response = session.get(endpoint, timeout=30)
         response.raise_for_status()
+
+
+def _get_served_certificate(traefik_ip: str) -> str:
+    return ssl.get_server_certificate((traefik_ip, 443))

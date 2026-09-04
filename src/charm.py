@@ -2159,13 +2159,15 @@ def parse_custom_csr_subject_attributes(attributes: Optional[str]) -> Optional[D
 
     parsed_attributes: Dict[str, str] = {}
     supported_keys = ", ".join(sorted(CUSTOM_CSR_SUBJECT_ATTRIBUTE_ALIASES))
+    error = False
 
     for pair in normalized_attributes.split(","):
         if not pair.strip():
             logger.error(
                 "Invalid format for 'custom-csr-subject-attributes'. Empty attribute found."
             )
-            return None
+            error = True
+            continue
 
         key_value = pair.split("=")
         if len(key_value) != 2:
@@ -2173,7 +2175,8 @@ def parse_custom_csr_subject_attributes(attributes: Optional[str]) -> Optional[D
                 "Invalid format for 'custom-csr-subject-attributes'. "
                 "Expected format: key1=value1,key2=value2."
             )
-            return None
+            error = True
+            continue
 
         key = key_value[0].strip()
         value = key_value[1].strip()
@@ -2182,7 +2185,8 @@ def parse_custom_csr_subject_attributes(attributes: Optional[str]) -> Optional[D
                 "Invalid format for 'custom-csr-subject-attributes'. "
                 "Each attribute must have a non-empty key and value."
             )
-            return None
+            error = True
+            continue
 
         mapped_key = CUSTOM_CSR_SUBJECT_ATTRIBUTE_ALIASES.get(key)
         if not mapped_key:
@@ -2191,7 +2195,8 @@ def parse_custom_csr_subject_attributes(attributes: Optional[str]) -> Optional[D
                 key,
                 supported_keys,
             )
-            return None
+            error = True
+            continue
 
         if mapped_key in parsed_attributes:
             logger.error(
@@ -2199,11 +2204,12 @@ def parse_custom_csr_subject_attributes(attributes: Optional[str]) -> Optional[D
                 "'custom-csr-subject-attributes'.",
                 key,
             )
-            return None
+            error = True
+            continue
 
         parsed_attributes[mapped_key] = value
 
-    return parsed_attributes
+    return None if error else parsed_attributes
 
 
 def is_qualified_name(value: str) -> bool:
