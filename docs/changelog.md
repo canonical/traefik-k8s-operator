@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 Each revision is versioned by the date of the revision.
 
+## 2026-09-02
+
+- Added `custom-csr-subject-attributes` config to include configurable CSR subject fields such as `C`, `ST`, `L`, `O`, `OU`, `CN`, and `emailAddress` in certificate requests.
+
 ## 2026-08-26
 
 - Added `get-loadbalancer-ip` Juju action to expose the external LoadBalancer address.
