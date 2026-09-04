@@ -7,7 +7,7 @@
 import jubilant
 from conftest import TRAEFIK_APP_NAME, TRAEFIK_RESOURCES
 from constants import MOCK_HOSTNAME, NUM_TRAEFIK_UNITS
-from helpers import all_settled, any_error, pull_ssc_ca_certificate, verify_https_on_all_units
+from helpers import all_settled, pull_ssc_ca_certificate, verify_https_on_all_units
 
 
 def test_https_on_all_units(
@@ -26,7 +26,7 @@ def test_https_on_all_units(
     juju.integrate(f"{ssc_app}:certificates", TRAEFIK_APP_NAME)
     juju.integrate(f"{alertmanager_app}:ingress", TRAEFIK_APP_NAME)
 
-    juju.wait(all_settled, error=any_error, delay=5, successes=5)
+    juju.wait(all_settled, error=jubilant.any_error, delay=5, successes=5)
 
     # Pull the CA certificate from the SSC charm for HTTPS verification.
     pull_ssc_ca_certificate(juju, tmp_path, ssc_app=ssc_app)

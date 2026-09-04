@@ -14,7 +14,7 @@ import jubilant
 import pytest
 import yaml
 
-from tests.integration.helpers import all_settled, any_error
+from tests.integration.helpers import all_settled
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +31,7 @@ def deploy_catalogue(juju):
         channel="1/edge",
         trust=True,
     )
-    juju.wait(all_settled, error=any_error, delay=5, successes=5)
+    juju.wait(all_settled, error=jubilant.any_error, delay=5, successes=5)
     return CATALOGUE_APP_NAME
 
 
@@ -49,7 +49,7 @@ def test_dynamic_configs_present(juju, traefik_app, alertmanager_app, deploy_cat
     """After integrating 2 apps, verify dynamic config files exist in the container."""
     juju.integrate(f"{CATALOGUE_APP_NAME}:ingress", traefik_app)
     juju.integrate(f"{alertmanager_app}:ingress", traefik_app)
-    juju.wait(all_settled, error=any_error, delay=5, successes=5)
+    juju.wait(all_settled, error=jubilant.any_error, delay=5, successes=5)
     files = _list_dynamic_configs(juju, traefik_app)
     logger.info("Dynamic config files in container: %s", files)
 
@@ -148,7 +148,7 @@ def test_dynamic_config_removed_after_relation_removed(
                 for r in status.apps[alertmanager_app].relations.get("ingress", [])
             )
         ),
-        error=any_error,
+        error=jubilant.any_error,
         timeout=300,
     )
 
