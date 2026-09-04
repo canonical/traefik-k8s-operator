@@ -28,7 +28,7 @@ def test_upgrade(juju: jubilant.Juju, traefik_charm, pytestconfig):
         config={"external_hostname": "traefik-demo.local"},
         trust=True,
     )
-    juju.wait(jubilant.all_agents_idle, timeout=900, delay=5, successes=5)
+    juju.wait(jubilant.all_agents_idle, error=jubilant.any_error, timeout=900, delay=5, successes=5)
 
     juju.deploy(
         "ch:self-signed-certificates",
@@ -44,15 +44,15 @@ def test_upgrade(juju: jubilant.Juju, traefik_charm, pytestconfig):
         trust=True,
     )
 
-    juju.wait(jubilant.all_active, timeout=900)
+    juju.wait(jubilant.all_active, error=jubilant.any_error, timeout=900, delay=5, successes=5)
 
     juju.integrate(f"{SSC_APP_NAME}:certificates", TRAEFIK_APP_NAME)
     juju.integrate(f"{INGRESS_REQUIRER_APP_NAME}:ingress", TRAEFIK_APP_NAME)
-    juju.wait(all_settled, delay=5, timeout=900)
+    juju.wait(all_settled, error=jubilant.any_error, delay=5, timeout=900, successes=5)
 
     juju.refresh(
         TRAEFIK_APP_NAME,
         path=traefik_charm,
     )
-    juju.wait(all_settled, delay=5, timeout=900)
+    juju.wait(all_settled, error=jubilant.any_error, delay=5, timeout=900, successes=5)
     assert_traefik_revision(juju, 0)

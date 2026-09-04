@@ -44,12 +44,12 @@ def test_deployment(juju: jubilant.Juju, traefik_charm):
             "python-packages": PYTHON_PACKAGES,
         },
     )
-    juju.wait(all_settled, timeout=600)
+    juju.wait(all_settled, error=jubilant.any_error, delay=5, successes=5)
 
 
 def test_relate(juju: jubilant.Juju):
     juju.integrate(f"{IPA_TESTER_APP}:require-ingress", f"{TRAEFIK_APP}:ingress")
-    juju.wait(all_settled, timeout=600)
+    juju.wait(all_settled, error=jubilant.any_error, delay=5, successes=5)
 
 
 def test_ipa_charm_has_ingress(juju: jubilant.Juju):
@@ -85,7 +85,10 @@ def test_remove_relation(juju: jubilant.Juju):
             jubilant.all_active(status, TRAEFIK_APP, IPA_TESTER_APP)
             and jubilant.all_agents_idle(status)
         ),
+        error=jubilant.any_error,
         timeout=300,
+        delay=5,
+        successes=5,
     )
     data = rpc(juju, f"{IPA_TESTER_APP}/0", "get_relation_data")
     assert not data["url"], "Expected ingress URL to be cleared after relation removal"

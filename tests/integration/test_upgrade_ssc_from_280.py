@@ -45,11 +45,11 @@ def test_upgrade_ssc_from_revision_280(
         num_units=NUM_TRAEFIK_UNITS,
         trust=True,
     )
-    juju.wait(jubilant.all_agents_idle, timeout=900, delay=5, successes=5)
+    juju.wait(jubilant.all_agents_idle, error=jubilant.any_error, timeout=900, delay=5, successes=5)
     url = bring_up_self_signed_traefik(juju, tmp_path)
 
     juju.refresh(TRAEFIK_APP_NAME, path=traefik_charm, resources=TRAEFIK_RESOURCES)
-    juju.wait(all_settled, delay=5, timeout=900)
+    juju.wait(all_settled, error=jubilant.any_error, delay=5, timeout=900, successes=5)
     assert_traefik_revision(juju, 0)
 
     verify_https_on_all_units(juju, expected_url=url)
