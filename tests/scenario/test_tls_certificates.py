@@ -168,6 +168,98 @@ def test_get_certs(traefik_ctx, traefik_container, mock_provider_certificate):
         )
 
 
+def test_custom_csr_subject_attributes_are_added_to_certificate_requests(
+    traefik_ctx, traefik_container
+):
+    """Verify configured CSR subject attributes are propagated to certificate requests."""
+    ingress_rel = Relation(
+        endpoint="ingress",
+        remote_app_name="server",
+        remote_app_data=INGRESS_APP_DATA,
+        remote_units_data={0: INGRESS_UNIT_DATA},
+    )
+
+    state = State(
+        leader=True,
+        config={
+            "external_hostname": "testhostname",
+            "custom-csr-subject-attributes": (
+                "C=DE, ST=Hesse, L=Frankfurt, O=Canonical, OU=Engineering, "
+                "CN=csr.example.com, emailAddress=ops@example.com"
+            ),
+        },
+        relations=[ingress_rel],
+        containers=[traefik_container],
+    )
+
+    with traefik_ctx.manager(ingress_rel.changed_event, state) as mgr:
+        csr = mgr.charm._get_cert_requests()[0]
+
+    assert csr.common_name == "csr.example.com"
+    assert csr.country_name == "DE"
+    assert csr.state_or_province_name == "Hesse"
+    assert csr.locality_name == "Frankfurt"
+    assert csr.organization == "Canonical"
+    assert csr.organizational_unit == "Engineering"
+    assert csr.email_address == "ops@example.com"
+
+
+def test_external_hostname_is_used_when_custom_subject_has_no_common_name(
+    traefik_ctx, traefik_container
+):
+    """Verify the external hostname remains the CSR common name when CN is not configured."""
+    ingress_rel = Relation(
+        endpoint="ingress",
+        remote_app_name="server",
+        remote_app_data=INGRESS_APP_DATA,
+        remote_units_data={0: INGRESS_UNIT_DATA},
+    )
+
+    state = State(
+        leader=True,
+        config={
+            "external_hostname": "testhostname",
+            "custom-csr-subject-attributes": (
+                "C=DE, ST=Hesse, L=Frankfurt, O=Canonical, OU=Engineering, "
+                "emailAddress=ops@example.com"
+            ),
+        },
+        relations=[ingress_rel],
+        containers=[traefik_container],
+    )
+
+    with traefik_ctx.manager(ingress_rel.changed_event, state) as mgr:
+        csr = mgr.charm._get_cert_requests()[0]
+
+    assert csr.common_name == "testhostname"
+    assert csr.country_name == "DE"
+    assert csr.state_or_province_name == "Hesse"
+    assert csr.locality_name == "Frankfurt"
+    assert csr.organization == "Canonical"
+    assert csr.organizational_unit == "Engineering"
+    assert csr.email_address == "ops@example.com"
+
+
+def test_invalid_custom_csr_subject_attributes_put_charm_in_blocked_status(
+    traefik_ctx, traefik_container
+):
+    """Verify invalid CSR subject config puts the charm into blocked status."""
+    state = State(
+        leader=True,
+        config={
+            "external_hostname": "testhostname",
+            "custom-csr-subject-attributes": "foo=bar",
+        },
+        containers=[traefik_container],
+    )
+
+    out = traefik_ctx.run("config_changed", state)
+
+    assert out.unit_status == BlockedStatus(
+        'invalid "custom-csr-subject-attributes" value; see logs.'
+    )
+
+
 @pytest.mark.parametrize("tls_enabled", [(True,), (False)])
 def test_cleanup_tls_configuration(tls_enabled: bool):
     container_mock = MagicMock(spec=Container)

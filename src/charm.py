@@ -13,7 +13,7 @@ import json
 import logging
 import re
 import socket
-from typing import Any, Dict, List, Optional, Union, cast
+from typing import Any, Dict, List, Optional, Tuple, Union, cast
 from urllib.parse import urlparse
 
 import pydantic
@@ -141,6 +141,15 @@ PEER_RELATION_NAME = "peers"
 TLS_KEY_LABEL = "tls-key"
 PRIVATE_KEY_FIELD = "private-key"
 CSR_DATABAG_KEY = "certificate_signing_requests"
+CUSTOM_CSR_SUBJECT_ATTRIBUTE_ALIASES = {
+    "C": "country_name",
+    "CN": "common_name",
+    "emailAddress": "email_address",
+    "L": "locality_name",
+    "O": "organization",
+    "OU": "organizational_unit",
+    "ST": "state_or_province_name",
+}
 
 
 class _IngressRelationType(enum.Enum):
@@ -526,6 +535,13 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             for endpoint in self._get_proxied_endpoints(use_gateway_address=True).values()
             if "url" in endpoint and urlparse(endpoint["url"]).scheme
         }
+        custom_subject_attributes = self._custom_csr_subject_attributes
+        if custom_subject_attributes is None:
+            logger.warning(
+                "CSR subject config is invalid; proceeding with default CSR attributes."
+            )
+            custom_subject_attributes = {}
+
         csrs: List[CertificateRequestAttributes] = []
         for addr in addrs:
             # Additional validation - addr should not be None or empty
@@ -566,11 +582,21 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
                     "Skipping certificate request for address %s - no valid common name", addr
                 )
                 continue
+            configured_common_name = custom_subject_attributes.get("common_name")
+            common_name = configured_common_name or common_name
             csrs.append(
                 CertificateRequestAttributes(
                     common_name=common_name,
                     sans_dns=frozenset(sans_dns),
                     sans_ip=frozenset(sans_ip),
+                    email_address=custom_subject_attributes.get("email_address"),
+                    organization=custom_subject_attributes.get("organization"),
+                    organizational_unit=custom_subject_attributes.get("organizational_unit"),
+                    country_name=custom_subject_attributes.get("country_name"),
+                    state_or_province_name=custom_subject_attributes.get(
+                        "state_or_province_name"
+                    ),
+                    locality_name=custom_subject_attributes.get("locality_name"),
                 )
             )
 
@@ -637,6 +663,14 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         """
         lb_annotations = cast(Optional[str], self.config.get("loadbalancer_annotations", None))
         return parse_annotations(lb_annotations)
+
+    @functools.cached_property
+    def _custom_csr_subject_attributes(self) -> Optional[Dict[str, str]]:
+        """Parse configured CSR subject attributes."""
+        configured_attributes = cast(
+            Optional[str], self.config.get("custom-csr-subject-attributes", None)
+        )
+        return parse_custom_csr_subject_attributes(configured_attributes)
 
     @property
     def lightkube_client(self) -> Client:
@@ -827,29 +861,38 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         return True
 
     def _refresh_certs_if_needed(self) -> None:
-        """Recompute cert requests and only trigger TLS refresh if hostnames changed."""
+        """Recompute cert requests and refresh TLS data when the requested identities change."""
         new_csrs = self._get_valid_csrs()
-        new_valid = sorted(new_csrs, key=lambda c: c.common_name)
-        old_valid = sorted(self.csrs, key=lambda c: c.common_name)
+        new_keys = {self._csr_key(csr) for csr in new_csrs}
+        old_keys = {self._csr_key(csr) for csr in self.csrs}
 
-        # Compare by common_name + sans sets
-        def _csr_key(c: CertificateRequestAttributes) -> tuple:
-            return (c.common_name, frozenset(c.sans_dns or ()), frozenset(c.sans_ip or ()))
+        if new_keys == old_keys:
+            logger.debug("Certificate requests unchanged (%d); skipping cert refresh.", len(old_keys))
+            return
 
-        new_keys = {_csr_key(c) for c in new_valid}
-        old_keys = {_csr_key(c) for c in old_valid}
+        logger.info(
+            "Certificate requests changed (old=%d, new=%d). Refreshing certs.",
+            len(old_keys),
+            len(new_keys),
+        )
+        self.csrs = new_csrs
+        self.certs.certificate_requests = new_csrs
+        self.certs.sync()
 
-        if new_keys != old_keys:
-            logger.info(
-                "Certificate hostnames changed (old=%d, new=%d). Refreshing certs.",
-                len(old_keys),
-                len(new_keys),
-            )
-            self.csrs = new_valid
-            self.certs.certificate_requests = self.csrs
-            self.certs.sync()
-        else:
-            logger.debug("Certificate hostnames unchanged (%d); skipping cert refresh.", len(old_keys))
+    @staticmethod
+    def _csr_key(csr: CertificateRequestAttributes) -> Tuple[Any, ...]:
+        """Return a comparable key for certificate request change detection."""
+        return (
+            csr.common_name,
+            tuple(sorted(csr.sans_dns or [])),
+            tuple(sorted(csr.sans_ip or [])),
+            csr.email_address,
+            csr.organization,
+            csr.organizational_unit,
+            csr.country_name,
+            csr.state_or_province_name,
+            csr.locality_name,
+        )
 
     def _on_peer_relation_changed(self, _: EventBase) -> None:
         """Handle peer relation changed.
@@ -1374,6 +1417,12 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             self._wipe_ingress_for_all_relations()
             self.unit.status = BlockedStatus(
                 'routing_mode must be set to "path" when charm has an upstream ingress'
+            )
+            return
+
+        if self._custom_csr_subject_attributes is None:
+            self.unit.status = BlockedStatus(
+                'invalid "custom-csr-subject-attributes" value; see logs.'
             )
             return
 
@@ -2093,6 +2142,74 @@ def parse_annotations(annotations: Optional[str]) -> Optional[Dict[str, str]]:
             return None
 
     return parsed_annotations
+
+
+def parse_custom_csr_subject_attributes(attributes: Optional[str]) -> Optional[Dict[str, str]]:
+    """Parse configurable CSR subject attributes.
+
+    The config accepts a comma-separated list of X.500-style key-value pairs.
+    Only the subset supported by CertificateRequestAttributes is accepted.
+    """
+    if not attributes:
+        return {}
+
+    normalized_attributes = attributes.strip().rstrip(",")
+    if not normalized_attributes:
+        return {}
+
+    parsed_attributes: Dict[str, str] = {}
+    supported_keys = ", ".join(sorted(CUSTOM_CSR_SUBJECT_ATTRIBUTE_ALIASES))
+    error = False
+
+    for pair in normalized_attributes.split(","):
+        if not pair.strip():
+            logger.error(
+                "Invalid format for 'custom-csr-subject-attributes'. Empty attribute found."
+            )
+            error = True
+            continue
+
+        key_value = pair.split("=")
+        if len(key_value) != 2:
+            logger.error(
+                "Invalid format for 'custom-csr-subject-attributes'. "
+                "Expected format: key1=value1,key2=value2."
+            )
+            error = True
+            continue
+
+        key = key_value[0].strip()
+        value = key_value[1].strip()
+        if not key or not value:
+            logger.error(
+                "Invalid format for 'custom-csr-subject-attributes'. "
+                "Each attribute must have a non-empty key and value."
+            )
+            error = True
+            continue
+
+        mapped_key = CUSTOM_CSR_SUBJECT_ATTRIBUTE_ALIASES.get(key)
+        if not mapped_key:
+            logger.error(
+                "Unsupported CSR subject attribute key '%s'. Supported keys are: %s.",
+                key,
+                supported_keys,
+            )
+            error = True
+            continue
+
+        if mapped_key in parsed_attributes:
+            logger.error(
+                "Duplicate CSR subject attribute '%s' is not allowed in "
+                "'custom-csr-subject-attributes'.",
+                key,
+            )
+            error = True
+            continue
+
+        parsed_attributes[mapped_key] = value
+
+    return None if error else parsed_attributes
 
 
 def is_qualified_name(value: str) -> bool:

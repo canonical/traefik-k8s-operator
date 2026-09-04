@@ -31,6 +31,16 @@ options:
       Once this config option is set, the username/password pair will be required to authenticate 
       http requests on all routes proxied by this traefik app.
     type: string
+  custom-csr-subject-attributes:
+    description: |
+      Optional CSR subject attributes to include when requesting certificates from the
+      `certificates` relation. The value must be a comma-separated list of X.500-style
+      key-value pairs such as `C=DE, ST=Hesse, L=Berlin, O=Canonical, OU=Engineering`.
+
+      Supported keys are `CN`, `C`, `ST`, `L`, `O`, `OU` and `emailAddress`.
+      `CN` overrides the CSR common name that Traefik would otherwise derive from
+      `external_hostname` or the ingress address.
+    type: string
   external_hostname:
     description: |
       The DNS name to be used by Traefik when providing its host to other applications.  If unspecified, the address

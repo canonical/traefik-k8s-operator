@@ -1,0 +1,16 @@
+# Version of the artifact schema
+version_schema: 2
+changes:
+  - title: Added configurable CSR subject attributes
+    author: swetha1654
+    type: minor
+    description: |
+      The charm now accepts `custom-csr-subject-attributes` to populate
+      additional CSR subject fields in certificate requests.
+    urls:
+      pr:
+        - https://github.com/canonical/traefik-k8s-operator/pull/773
+      related_issue:
+        - https://github.com/canonical/traefik-k8s-operator/issues/667
+    visibility: public
+    highlight: false
