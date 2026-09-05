@@ -40,7 +40,7 @@ dev = [
     "sh",
     # Held back: 1.1.411 flags pre-existing issues in lib/charms/traefik_k8s that need
     # code fixes plus LIBPATCH bumps.
-    "pyright==1.1.318",
+    "pyright==1.1.411",
     "ops-scenario~=6.0",
     "opcli ; python_version >= '3.12'",
     "pytest-interface-tester>0.3",
