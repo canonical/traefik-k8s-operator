@@ -26,7 +26,7 @@ def test_https_on_all_units(
     juju.integrate(f"{ssc_app}:certificates", TRAEFIK_APP_NAME)
     juju.integrate(f"{alertmanager_app}:ingress", TRAEFIK_APP_NAME)
 
-    juju.wait(all_settled, timeout=600, delay=5, successes=5)
+    juju.wait(all_settled, error=jubilant.any_error, delay=5, successes=5)
 
     # Pull the CA certificate from the SSC charm for HTTPS verification.
     pull_ssc_ca_certificate(juju, tmp_path, ssc_app=ssc_app)
