@@ -582,8 +582,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
                     "Skipping certificate request for address %s - no valid common name", addr
                 )
                 continue
-            configured_common_name = custom_subject_attributes.get("common_name")
-            common_name = configured_common_name or common_name
+            common_name = custom_subject_attributes.get("common_name", common_name)
             csrs.append(
                 CertificateRequestAttributes(
                     common_name=common_name,
