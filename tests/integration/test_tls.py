@@ -83,7 +83,7 @@ def test_tls_termination_with_custom_csr_subject_attributes_without_cn(
     juju.config(
         TRAEFIK_APP,
         {
-            "custom-csr-subject-attributes": (
+            "csr-subject-atttributes": (
                 "C=DE, ST=Hesse, L=Frankfurt, O=Canonical, OU=Engineering, "
                 "emailAddress=ops@example.com"
             )
@@ -96,7 +96,7 @@ def test_tls_termination_with_custom_csr_subject_attributes_without_cn(
 
     assert new_certificate != old_certificate, (
         "Expected a new certificate to be served after updating "
-        "custom-csr-subject-attributes"
+        "csr-subject-atttributes"
     )
     _assert_https_endpoints(juju, cert_path, traefik_ip)
 

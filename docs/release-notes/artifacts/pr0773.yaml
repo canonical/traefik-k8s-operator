@@ -5,7 +5,7 @@ changes:
     author: swetha1654
     type: minor
     description: |
-      The charm now accepts `custom-csr-subject-attributes` to populate
+      The charm now accepts `csr-subject-atttributes` to populate
       additional CSR subject fields in certificate requests.
     urls:
       pr:

@@ -10,7 +10,7 @@ Each revision is versioned by the date of the revision.
 
 ## 2026-09-02
 
-- Added `custom-csr-subject-attributes` config to include configurable CSR subject fields such as `C`, `ST`, `L`, `O`, `OU`, `CN`, and `emailAddress` in certificate requests.
+- Added `csr-subject-atttributes` config to include configurable CSR subject fields such as `C`, `ST`, `L`, `O`, `OU`, `CN`, and `emailAddress` in certificate requests.
 
 ## 2026-08-26
 

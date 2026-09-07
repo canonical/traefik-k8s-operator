@@ -667,7 +667,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
     def _custom_csr_subject_attributes(self) -> Optional[Dict[str, str]]:
         """Parse configured CSR subject attributes."""
         configured_attributes = cast(
-            Optional[str], self.config.get("custom-csr-subject-attributes", None)
+            Optional[str], self.config.get("csr-subject-atttributes", None)
         )
         return parse_custom_csr_subject_attributes(configured_attributes)
 
@@ -870,9 +870,9 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             return
 
         logger.info(
-            "Certificate requests changed (old=%d, new=%d). Refreshing certs.",
-            len(old_keys),
-            len(new_keys),
+            "Certificate requests changed (old=%s, new=%s). Refreshing certs.",
+            old_keys,
+            new_keys,
         )
         self.csrs = new_csrs
         self.certs.certificate_requests = new_csrs
@@ -1421,7 +1421,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
 
         if self._custom_csr_subject_attributes is None:
             self.unit.status = BlockedStatus(
-                'invalid "custom-csr-subject-attributes" value; see logs.'
+                'invalid "csr-subject-atttributes" value; see logs.'
             )
             return
 
@@ -2163,7 +2163,7 @@ def parse_custom_csr_subject_attributes(attributes: Optional[str]) -> Optional[D
     for pair in normalized_attributes.split(","):
         if not pair.strip():
             logger.error(
-                "Invalid format for 'custom-csr-subject-attributes'. Empty attribute found."
+                "Invalid format for 'csr-subject-atttributes'. Empty attribute found."
             )
             error = True
             continue
@@ -2171,7 +2171,7 @@ def parse_custom_csr_subject_attributes(attributes: Optional[str]) -> Optional[D
         key_value = pair.split("=")
         if len(key_value) != 2:
             logger.error(
-                "Invalid format for 'custom-csr-subject-attributes'. "
+                "Invalid format for 'csr-subject-atttributes'. "
                 "Expected format: key1=value1,key2=value2."
             )
             error = True
@@ -2181,7 +2181,7 @@ def parse_custom_csr_subject_attributes(attributes: Optional[str]) -> Optional[D
         value = key_value[1].strip()
         if not key or not value:
             logger.error(
-                "Invalid format for 'custom-csr-subject-attributes'. "
+                "Invalid format for 'csr-subject-atttributes'. "
                 "Each attribute must have a non-empty key and value."
             )
             error = True
@@ -2200,7 +2200,7 @@ def parse_custom_csr_subject_attributes(attributes: Optional[str]) -> Optional[D
         if mapped_key in parsed_attributes:
             logger.error(
                 "Duplicate CSR subject attribute '%s' is not allowed in "
-                "'custom-csr-subject-attributes'.",
+                "'csr-subject-atttributes'.",
                 key,
             )
             error = True
