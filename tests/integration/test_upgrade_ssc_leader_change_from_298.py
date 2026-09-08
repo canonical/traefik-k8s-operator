@@ -7,7 +7,7 @@
 Scenario:
 
 1. Deploy traefik-k8s (3 units) at revision 298 and integrate it with
-   ``self-signed-certificates`` and ``alertmanager``; verify HTTPS works.
+    ``self-signed-certificates`` and an ingress tester; verify HTTPS works.
 2. Force a leadership change; the old leader is restored afterwards.
 3. Trigger hook execution on the new leader and wait for all units to settle
    so the self-signed provider can issue replacement material.
@@ -37,7 +37,7 @@ SOURCE_REVISION = 298
 
 @pytest.mark.setup
 def test_upgrade_ssc_leader_change_from_298(
-    juju: jubilant.Juju, traefik_charm, ssc_app, alertmanager_app, tmp_path
+    juju: jubilant.Juju, traefik_charm, ssc_app, ingress_app, tmp_path
 ):
     """Self-signed certs remain trusted on surviving units across leader change and upgrade."""
     juju.deploy(
@@ -50,14 +50,14 @@ def test_upgrade_ssc_leader_change_from_298(
         trust=True,
     )
     juju.wait(jubilant.all_agents_idle, error=jubilant.any_error, timeout=900, delay=5, successes=5)
-    alertmanager_url = bring_up_self_signed_traefik(juju, tmp_path)
+    ingress_url = bring_up_self_signed_traefik(juju, tmp_path)
 
     force_leader_change(juju, TRAEFIK_APP_NAME)
 
     juju.wait(all_settled, error=jubilant.any_error, timeout=900, delay=5, successes=5)
-    verify_https_on_all_units(juju, alertmanager_url)
+    verify_https_on_all_units(juju, ingress_url)
 
     juju.refresh(TRAEFIK_APP_NAME, path=traefik_charm, resources=TRAEFIK_RESOURCES)
     juju.wait(all_settled, error=jubilant.any_error, timeout=900, delay=5, successes=5)
     assert_traefik_revision(juju, 0)
-    verify_https_on_all_units(juju, alertmanager_url)
+    verify_https_on_all_units(juju, ingress_url)

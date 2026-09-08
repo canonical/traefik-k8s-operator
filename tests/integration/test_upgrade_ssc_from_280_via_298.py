@@ -7,7 +7,7 @@
 Scenario:
 
 1. Deploy traefik-k8s (3 units) at revision 280 and integrate it with
-   ``self-signed-certificates`` and ``alertmanager``.
+    ``self-signed-certificates`` and an ingress tester.
 2. Verify the ingress URL is reachable over HTTPS through every traefik unit.
 3. Refresh traefik to revision 298 (intermediate hop) and re-verify HTTPS.
 4. Refresh traefik to the locally built charm.
@@ -35,7 +35,7 @@ INTERMEDIATE_REVISION = 298
 
 @pytest.mark.setup
 def test_upgrade_ssc_from_280_via_298(
-    juju: jubilant.Juju, traefik_charm, ssc_app, alertmanager_app, tmp_path
+    juju: jubilant.Juju, traefik_charm, ssc_app, ingress_app, tmp_path
 ):
     """Traefik keeps serving HTTPS across a 280 -> 298 -> current path with self-signed certs."""
     juju.deploy(

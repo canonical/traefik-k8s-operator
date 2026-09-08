@@ -7,7 +7,7 @@
 Scenario:
 
 1. Deploy traefik-k8s (3 units) at revision 298 and integrate only with
-   ``alertmanager``.
+    an ingress tester.
 2. Verify HTTP ingress URL reachability on all units and no blocked/error state.
 3. Force a leadership change; the old leader is restored afterwards.
 4. Verify all units stay active/idle and keep serving the same HTTP URL.
@@ -35,7 +35,7 @@ SOURCE_REVISION = 298
 
 @pytest.mark.setup
 def test_upgrade_no_tls_leader_change_from_298(
-    juju: jubilant.Juju, traefik_charm, alertmanager_app
+    juju: jubilant.Juju, traefik_charm, ingress_app
 ):
     """Surviving units remain healthy and serve HTTP across leader change and upgrade."""
     juju.deploy(
@@ -48,14 +48,14 @@ def test_upgrade_no_tls_leader_change_from_298(
         trust=True,
     )
     juju.wait(jubilant.all_agents_idle, error=jubilant.any_error, timeout=900, delay=5, successes=5)
-    alertmanager_url = bring_up_traefik_without_certificate_provider(juju)
+    ingress_url = bring_up_traefik_without_certificate_provider(juju)
 
     force_leader_change(juju, TRAEFIK_APP_NAME)
 
     juju.wait(all_settled, error=jubilant.any_error, timeout=900, delay=5, successes=5)
-    verify_http_on_all_units(juju, alertmanager_url)
+    verify_http_on_all_units(juju, ingress_url)
 
     juju.refresh(TRAEFIK_APP_NAME, path=traefik_charm, resources=TRAEFIK_RESOURCES)
     juju.wait(all_settled, error=jubilant.any_error, timeout=900, delay=5, successes=5)
     assert_traefik_revision(juju, 0)
-    verify_http_on_all_units(juju, alertmanager_url)
+    verify_http_on_all_units(juju, ingress_url)

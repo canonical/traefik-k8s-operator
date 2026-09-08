@@ -11,7 +11,7 @@ from helpers import all_settled, pull_ssc_ca_certificate, verify_https_on_all_un
 
 
 def test_https_on_all_units(
-    juju: jubilant.Juju, traefik_charm, ssc_app, alertmanager_app, tmp_path
+    juju: jubilant.Juju, traefik_charm, ssc_app, ingress_app, tmp_path
 ):
     """HTTPS endpoints are accessible through every traefik unit IP."""
     juju.deploy(
@@ -24,7 +24,7 @@ def test_https_on_all_units(
     )
 
     juju.integrate(f"{ssc_app}:certificates", TRAEFIK_APP_NAME)
-    juju.integrate(f"{alertmanager_app}:ingress", TRAEFIK_APP_NAME)
+    juju.integrate(f"{ingress_app}:require-ingress", TRAEFIK_APP_NAME)
 
     juju.wait(all_settled, error=jubilant.any_error, delay=5, successes=5)
 

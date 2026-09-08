@@ -7,7 +7,7 @@
 Scenario:
 
 1. Deploy traefik-k8s (1 unit) at revision 280 and integrate it with
-   ``manual-tls-certificates`` and ``alertmanager``.
+    ``manual-tls-certificates`` and an ingress tester.
 2. Sign every outstanding CSR and provide the certificate back to traefik.
 3. Verify the ingress URL is reachable over HTTPS through the single traefik unit.
 4. Refresh traefik to revision 298 (intermediate hop), re-signing any CSR that
@@ -40,7 +40,7 @@ INTERMEDIATE_REVISION = 298
 
 @pytest.mark.setup
 def test_upgrade_mtls_single_unit_from_280_via_298(
-    juju: jubilant.Juju, traefik_charm, mtls_app, alertmanager_app, tmp_path
+    juju: jubilant.Juju, traefik_charm, mtls_app, ingress_app, tmp_path
 ):
     """A single traefik unit keeps serving the same certificate across 280 -> 298 -> current."""
     juju.deploy(
