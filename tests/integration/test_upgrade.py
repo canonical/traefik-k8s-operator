@@ -6,11 +6,17 @@
 
 import jubilant
 
+from tests.integration.any_charm_helpers import (
+    ANY_CHARM_CHANNEL,
+    ANY_CHARM_K8S,
+    PYTHON_PACKAGES,
+    health_src_overwrite,
+)
 from tests.integration.helpers import all_settled, assert_traefik_revision
 
 TRAEFIK_APP_NAME = "traefik"
 SSC_APP_NAME = "ssc"
-INGRESS_REQUIRER_APP_NAME = "alertmanager"
+INGRESS_REQUIRER_APP_NAME = "ingress"
 
 TRAEFIK_SOURCE_CHANNEL = "latest/edge"
 
@@ -38,16 +44,20 @@ def test_upgrade(juju: jubilant.Juju, traefik_charm, pytestconfig):
     )
 
     juju.deploy(
-        "ch:alertmanager-k8s",
+        f"ch:{ANY_CHARM_K8S}",
         INGRESS_REQUIRER_APP_NAME,
-        channel="2/edge",
+        channel=ANY_CHARM_CHANNEL,
+        config={
+            "src-overwrite": health_src_overwrite(),
+            "python-packages": PYTHON_PACKAGES,
+        },
         trust=True,
     )
 
     juju.wait(jubilant.all_active, error=jubilant.any_error, timeout=900, delay=5, successes=5)
 
     juju.integrate(f"{SSC_APP_NAME}:certificates", TRAEFIK_APP_NAME)
-    juju.integrate(f"{INGRESS_REQUIRER_APP_NAME}:ingress", TRAEFIK_APP_NAME)
+    juju.integrate(f"{INGRESS_REQUIRER_APP_NAME}:require-ingress", TRAEFIK_APP_NAME)
     juju.wait(all_settled, error=jubilant.any_error, delay=5, timeout=900, successes=5)
 
     juju.refresh(

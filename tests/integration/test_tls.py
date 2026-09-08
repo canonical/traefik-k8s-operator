@@ -11,6 +11,12 @@ import jubilant
 import requests
 import yaml
 
+from tests.integration.any_charm_helpers import (
+    ANY_CHARM_CHANNEL,
+    ANY_CHARM_K8S,
+    PYTHON_PACKAGES,
+    health_src_overwrite,
+)
 from tests.integration.dns_adapter import DNSResolverHTTPSAdapter
 from tests.integration.helpers import (
     all_settled,
@@ -21,7 +27,7 @@ from tests.integration.helpers import (
 
 TRAEFIK_APP = "traefik"
 PROMETHEUS_APP = "prometheus"
-ALERTMANAGER_APP = "alertmanager"
+INGRESS_APP = "ingress"
 GRAFANA_APP = "grafana"
 ROOT_CA_APP = "root-ca"
 MOCK_HOSTNAME = "juju.local"
@@ -35,12 +41,21 @@ _TRAEFIK_RESOURCES = {
 def test_build_and_deploy(juju: jubilant.Juju, traefik_charm):
     juju.deploy(traefik_charm, TRAEFIK_APP, resources=_TRAEFIK_RESOURCES, trust=True)
     juju.deploy("ch:prometheus-k8s", PROMETHEUS_APP, channel="1/stable", trust=True)
-    juju.deploy("ch:alertmanager-k8s", ALERTMANAGER_APP, channel="1/stable", trust=True)
+    juju.deploy(
+        f"ch:{ANY_CHARM_K8S}",
+        INGRESS_APP,
+        channel=ANY_CHARM_CHANNEL,
+        config={
+            "src-overwrite": health_src_overwrite(),
+            "python-packages": PYTHON_PACKAGES,
+        },
+        trust=True,
+    )
     juju.deploy("ch:grafana-k8s", GRAFANA_APP, channel="1/stable", trust=True)
     juju.wait(jubilant.all_active, error=jubilant.any_error, delay=5, successes=5)
 
     juju.integrate(f"{PROMETHEUS_APP}:ingress", TRAEFIK_APP)
-    juju.integrate(f"{ALERTMANAGER_APP}:ingress", TRAEFIK_APP)
+    juju.integrate(f"{INGRESS_APP}:require-ingress", TRAEFIK_APP)
     juju.integrate(f"{GRAFANA_APP}:ingress", TRAEFIK_APP)
     juju.wait(all_settled, error=jubilant.any_error, delay=5, successes=5)
 
@@ -129,7 +144,7 @@ def test_cleanup(juju: jubilant.Juju):
 def _endpoints(model: str, scheme: str, netloc: str) -> list[str]:
     return [
         f"{scheme}://{netloc}/{model}-{PROMETHEUS_APP}-0",
-        f"{scheme}://{netloc}/{model}-{ALERTMANAGER_APP}",
+        f"{scheme}://{netloc}/{model}-{INGRESS_APP}/health",
         f"{scheme}://{netloc}/{model}-{GRAFANA_APP}",
     ]
 
