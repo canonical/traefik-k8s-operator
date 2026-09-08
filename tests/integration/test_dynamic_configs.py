@@ -22,17 +22,6 @@ CATALOGUE_APP_NAME = "catalogue"
 DYNAMIC_CONFIG_DIR = "/opt/traefik/juju"
 
 
-def test_dynamic_configs_for_app_matches_filename_suffix() -> None:
-    files = [
-        "juju_ingress_ingress_3_catalogue.yaml",
-        "juju_ingress_ingress_4_ingress.yaml",
-    ]
-
-    assert _dynamic_configs_for_app(files, "ingress") == [
-        "juju_ingress_ingress_4_ingress.yaml"
-    ]
-
-
 @pytest.fixture(scope="module")
 def deploy_catalogue(juju):
     """Deploy catalogue."""
@@ -56,11 +45,6 @@ def _list_dynamic_configs(juju, traefik_app):
     return [f for f in output.strip().split("\n") if f.endswith(".yaml")]
 
 
-def _dynamic_configs_for_app(files: list[str], app_name: str) -> list[str]:
-    """Return dynamic config files belonging to an application."""
-    return [filename for filename in files if filename.endswith(f"_{app_name}.yaml")]
-
-
 def test_dynamic_configs_present(juju, traefik_app, ingress_app, deploy_catalogue):
     """After integrating 2 apps, verify dynamic config files exist in the container."""
     juju.integrate(f"{CATALOGUE_APP_NAME}:ingress", traefik_app)
@@ -70,8 +54,8 @@ def test_dynamic_configs_present(juju, traefik_app, ingress_app, deploy_catalogu
     logger.info("Dynamic config files in container: %s", files)
 
     # Each integrated app should have a config file matching juju_ingress_ingress_*_{app}.yaml
-    ingress_configs = _dynamic_configs_for_app(files, ingress_app)
-    catalogue_configs = _dynamic_configs_for_app(files, CATALOGUE_APP_NAME)
+    ingress_configs = [f for f in files if f.endswith(f"_{ingress_app}.yaml")]
+    catalogue_configs = [f for f in files if f.endswith(f"_{CATALOGUE_APP_NAME}.yaml")]
 
     assert len(ingress_configs) == 1, (
         f"Expected exactly 1 config for {ingress_app}, "
@@ -94,7 +78,7 @@ def test_dynamic_config_content_valid(juju, traefik_app, ingress_app, deploy_cat
     files = _list_dynamic_configs(juju, traefik_app)
 
     for app_name in (ingress_app, CATALOGUE_APP_NAME):
-        config_file = next(iter(_dynamic_configs_for_app(files, app_name)))
+        config_file = next(f for f in files if f.endswith(f"_{app_name}.yaml"))
         output = juju.ssh(
             f"{traefik_app}/0",
             f"cat {DYNAMIC_CONFIG_DIR}/{config_file}",
@@ -132,7 +116,9 @@ def test_staging_artifacts_cleaned_up(juju, traefik_app, ingress_app, deploy_cat
         "test -d /tmp/_juju_ingress_staging && echo EXISTS || echo GONE",
         container="traefik",
     )
-    assert "GONE" in output, "Staging directory /tmp/_juju_ingress_staging was not cleaned up"
+    assert "GONE" in output, (
+        "Staging directory /tmp/_juju_ingress_staging was not cleaned up"
+    )
 
 
 def test_dynamic_config_removed_after_relation_removed(
@@ -141,7 +127,7 @@ def test_dynamic_config_removed_after_relation_removed(
     """After removing a relation, the corresponding config file should be cleaned up."""
     # Verify file exists before removal
     files_before = _list_dynamic_configs(juju, traefik_app)
-    ingress_configs = _dynamic_configs_for_app(files_before, ingress_app)
+    ingress_configs = [f for f in files_before if f.endswith(f"_{ingress_app}.yaml")]
     assert len(ingress_configs) == 1
 
     # Remove the ingress tester relation
@@ -170,14 +156,18 @@ def test_dynamic_config_removed_after_relation_removed(
 
     # Verify the ingress tester config file is gone
     files_after = _list_dynamic_configs(juju, traefik_app)
-    ingress_configs_after = _dynamic_configs_for_app(files_after, ingress_app)
+    ingress_configs_after = [
+        f for f in files_after if f.endswith(f"_{ingress_app}.yaml")
+    ]
     assert len(ingress_configs_after) == 0, (
         f"Expected ingress tester config to be removed after relation broken, "
         f"but found: {ingress_configs_after}"
     )
 
     # Catalogue config should still be present
-    catalogue_configs_after = _dynamic_configs_for_app(files_after, CATALOGUE_APP_NAME)
+    catalogue_configs_after = [
+        f for f in files_after if f.endswith(f"_{CATALOGUE_APP_NAME}.yaml")
+    ]
     assert len(catalogue_configs_after) == 1, (
         f"Catalogue config should still exist, but found: {catalogue_configs_after}"
     )
