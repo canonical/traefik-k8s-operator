@@ -12,11 +12,11 @@ from tests.integration.any_charm_helpers import (
     PYTHON_PACKAGES,
     health_src_overwrite,
 )
+from tests.integration.constants import INGRESS_REQUIRER_APP_NAME
 from tests.integration.helpers import all_settled, assert_traefik_revision
 
 TRAEFIK_APP_NAME = "traefik"
 SSC_APP_NAME = "ssc"
-INGRESS_REQUIRER_APP_NAME = "ingress"
 
 TRAEFIK_SOURCE_CHANNEL = "latest/edge"
 

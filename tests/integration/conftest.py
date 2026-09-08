@@ -14,7 +14,7 @@ from tests.integration.any_charm_helpers import (
     health_src_overwrite,
 )
 from tests.integration.constants import (
-    INGRESS_APP_NAME,
+    INGRESS_REQUIRER_APP_NAME,
     MANUAL_TLS_APP_NAME,
     MANUAL_TLS_CHANNEL,
     SSC_APP_NAME,
@@ -87,7 +87,7 @@ def ingress_fixture(juju):
     """Deploy the any-charm HTTP ingress tester."""
     juju.deploy(
         f"ch:{ANY_CHARM_K8S}",
-        INGRESS_APP_NAME,
+        INGRESS_REQUIRER_APP_NAME,
         channel=ANY_CHARM_CHANNEL,
         config={
             "src-overwrite": health_src_overwrite(),
@@ -96,12 +96,12 @@ def ingress_fixture(juju):
         trust=True,
     )
     juju.wait(
-        lambda status: jubilant.all_active(status, INGRESS_APP_NAME),
+        lambda status: jubilant.all_active(status, INGRESS_REQUIRER_APP_NAME),
         error=jubilant.any_error,
         delay=5,
         successes=5,
     )
-    return INGRESS_APP_NAME
+    return INGRESS_REQUIRER_APP_NAME
 
 
 @pytest.fixture(scope="module", name="mtls_app")

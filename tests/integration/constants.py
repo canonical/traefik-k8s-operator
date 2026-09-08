@@ -3,7 +3,7 @@
 
 """Shared constants for traefik integration tests."""
 
-INGRESS_APP_NAME = "ingress"
+INGRESS_REQUIRER_APP_NAME = "ingress"
 TRAEFIK_APP_NAME = "traefik"
 MANUAL_TLS_APP_NAME = "manual-tls-certificates"
 MANUAL_TLS_CHANNEL = "1/stable"

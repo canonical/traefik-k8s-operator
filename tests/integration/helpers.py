@@ -23,7 +23,7 @@ from charms.tls_certificates_interface.v4.tls_certificates import (
     PrivateKey,
 )
 from constants import (
-    INGRESS_APP_NAME,
+    INGRESS_REQUIRER_APP_NAME,
     MANUAL_TLS_APP_NAME,
     MOCK_HOSTNAME,
     SSC_APP_NAME,
@@ -336,7 +336,7 @@ def _ingress_url(juju: jubilant.Juju) -> str:
     # show-proxied-endpoints only returns the full endpoint map on the leader.
     result = juju.run(f"{TRAEFIK_APP_NAME}/leader", "show-proxied-endpoints")
     endpoints = json.loads(result.results["proxied-endpoints"])
-    url = endpoints[INGRESS_APP_NAME]["url"]
+    url = endpoints[INGRESS_REQUIRER_APP_NAME]["url"]
     return f"{url.rstrip('/')}/health"
 
 
@@ -516,7 +516,7 @@ def bring_up_certified_traefik(juju: jubilant.Juju, tmp_path: Path) -> str:
     """
     generate_ca(tmp_path)
 
-    juju.integrate(f"{INGRESS_APP_NAME}:require-ingress", TRAEFIK_APP_NAME)
+    juju.integrate(f"{INGRESS_REQUIRER_APP_NAME}:require-ingress", TRAEFIK_APP_NAME)
     juju.wait(all_settled, error=jubilant.any_error, timeout=900, delay=5, successes=5)
     juju.integrate(f"{MANUAL_TLS_APP_NAME}:certificates", f"{TRAEFIK_APP_NAME}:certificates")
 
@@ -531,7 +531,7 @@ def bring_up_self_signed_traefik(
     juju: jubilant.Juju, tmp_path: Path, ssc_app: str = SSC_APP_NAME
 ) -> str:
     """Integrate self-signed-certificates + the ingress tester and verify HTTPS."""
-    juju.integrate(f"{INGRESS_APP_NAME}:require-ingress", TRAEFIK_APP_NAME)
+    juju.integrate(f"{INGRESS_REQUIRER_APP_NAME}:require-ingress", TRAEFIK_APP_NAME)
     juju.wait(all_settled, error=jubilant.any_error, timeout=900, delay=5, successes=5)
     juju.integrate(f"{ssc_app}:certificates", f"{TRAEFIK_APP_NAME}:certificates")
 
@@ -543,6 +543,6 @@ def bring_up_self_signed_traefik(
 
 def bring_up_traefik_without_certificate_provider(juju: jubilant.Juju) -> str:
     """Integrate the ingress tester and verify plain HTTP on all traefik units."""
-    juju.integrate(f"{INGRESS_APP_NAME}:require-ingress", TRAEFIK_APP_NAME)
+    juju.integrate(f"{INGRESS_REQUIRER_APP_NAME}:require-ingress", TRAEFIK_APP_NAME)
     juju.wait(all_settled, error=jubilant.any_error, delay=5, timeout=900, successes=5)
     return verify_http_on_all_units(juju)
