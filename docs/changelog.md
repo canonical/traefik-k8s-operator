@@ -10,7 +10,7 @@ Each revision is versioned by the date of the revision.
 
 ## 2026-09-08
 
-- Replaced the flaky Alertmanager charm in integration tests with an any-charm HTTP ingress tester.
+- Replaced the Alertmanager-k8s charm in integration tests with an any-charm ingress requirer.
 
 ## 2026-09-02
 

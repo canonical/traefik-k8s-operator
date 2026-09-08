@@ -2,8 +2,8 @@ version_schema: 2
 
 changes:
 - title: Replaced Alertmanager in integration tests
-  author: copilot
-  type: bugfix
+  author: f-atwi
+  type: minor
   description: Replaced the flaky Alertmanager test dependency with an any-charm HTTP ingress tester.
   visibility: internal
   highlight: false
