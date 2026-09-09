@@ -30,17 +30,22 @@ def _remove_stale_otel_sdk_packages():
         return
 
     import logging
+    import re
     import shutil
     from collections import defaultdict
 
-    from importlib_metadata import distributions
+    from importlib.metadata import distributions
+
+    def _normalize_name(name: str) -> str:
+        """Normalize package name to underscore format (matching importlib_metadata behavior)."""
+        return re.sub(r"[-_.]+", "_", name).lower()
 
     otel_logger = logging.getLogger("charm_tracing_otel_patcher")
     otel_logger.debug("Applying _remove_stale_otel_sdk_packages patch on charm upgrade")
     # group by name all distributions starting with "opentelemetry_"
     otel_distributions = defaultdict(list)
     for distribution in distributions():
-        name = distribution._normalized_name  # type: ignore
+        name = _normalize_name(distribution.name)
         if name.startswith("opentelemetry_"):
             otel_distributions[name].append(distribution)
 
@@ -56,7 +61,9 @@ def _remove_stale_otel_sdk_packages():
         )
         for distribution in distributions_:
             if not distribution.files:  # Not None or empty list
-                path = distribution._path  # type: ignore
+                path = getattr(distribution, "_path", None)
+                if path is None:
+                    continue
                 otel_logger.info("Removing empty distribution of %s at %s.", name, path)
                 shutil.rmtree(path)
 
@@ -143,7 +150,7 @@ LIBAPI = 0
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
 
-LIBPATCH = 12
+LIBPATCH = 14
 
 PYDEPS = ["opentelemetry-exporter-otlp-proto-http==1.21.0"]
 
