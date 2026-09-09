@@ -336,8 +336,7 @@ def _ingress_url(juju: jubilant.Juju) -> str:
     # show-proxied-endpoints only returns the full endpoint map on the leader.
     result = juju.run(f"{TRAEFIK_APP_NAME}/leader", "show-proxied-endpoints")
     endpoints = json.loads(result.results["proxied-endpoints"])
-    url = endpoints[INGRESS_REQUIRER_APP_NAME]["url"]
-    return f"{url.rstrip('/')}/health"
+    return endpoints[INGRESS_REQUIRER_APP_NAME]["url"]
 
 
 @retry(
@@ -380,7 +379,7 @@ def verify_https_on_all_units(
     Returns the ingress URL that was verified so callers can assert it is
     unchanged across an upgrade.
     """
-    ingress_url = _ingress_url(juju)
+    ingress_url = f"{_ingress_url(juju).rstrip('/')}/health"
     if expected_url is not None:
         assert ingress_url == expected_url, (
             f"Proxied URL changed across upgrade: {expected_url!r} -> {ingress_url!r}"
@@ -409,7 +408,7 @@ def verify_http_on_all_units(
     Returns the ingress URL that was verified so callers can assert it is
     unchanged across an upgrade.
     """
-    ingress_url = _ingress_url(juju)
+    ingress_url = f"{_ingress_url(juju).rstrip('/')}/health"
     assert ingress_url.startswith("http://"), (
         f"expected plain HTTP proxied URL without a certificate provider, got {ingress_url!r}"
     )
@@ -510,7 +509,7 @@ def bring_up_certified_traefik(juju: jubilant.Juju, tmp_path: Path) -> str:
     """Integrate the mTLS + ingress stack, sign traefik's CSRs and verify HTTPS.
 
     Creates the throwaway CA (populating the module-level CA globals) and assumes
-    traefik, manual-tls-certificates and the ingress tester have all been deployed (the
+    traefik, manual-tls-certificates and the ingress requirer have all been deployed (the
     latter two via the ``mtls_app`` / ``ingress_app`` fixtures). Returns the ingress URL
     so the caller can assert it is unchanged after upgrading.
     """
@@ -530,7 +529,7 @@ def bring_up_certified_traefik(juju: jubilant.Juju, tmp_path: Path) -> str:
 def bring_up_self_signed_traefik(
     juju: jubilant.Juju, tmp_path: Path, ssc_app: str = SSC_APP_NAME
 ) -> str:
-    """Integrate self-signed-certificates + the ingress tester and verify HTTPS."""
+    """Integrate self-signed-certificates + the ingress requirer and verify HTTPS."""
     juju.integrate(f"{INGRESS_REQUIRER_APP_NAME}:require-ingress", TRAEFIK_APP_NAME)
     juju.wait(all_settled, error=jubilant.any_error, timeout=900, delay=5, successes=5)
     juju.integrate(f"{ssc_app}:certificates", f"{TRAEFIK_APP_NAME}:certificates")
@@ -542,7 +541,7 @@ def bring_up_self_signed_traefik(
 
 
 def bring_up_traefik_without_certificate_provider(juju: jubilant.Juju) -> str:
-    """Integrate the ingress tester and verify plain HTTP on all traefik units."""
+    """Integrate the ingress requirer and verify plain HTTP on all traefik units."""
     juju.integrate(f"{INGRESS_REQUIRER_APP_NAME}:require-ingress", TRAEFIK_APP_NAME)
     juju.wait(all_settled, error=jubilant.any_error, delay=5, timeout=900, successes=5)
     return verify_http_on_all_units(juju)

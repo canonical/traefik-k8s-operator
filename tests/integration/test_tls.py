@@ -6,6 +6,7 @@
 
 import ssl
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import jubilant
 import requests
@@ -19,6 +20,7 @@ from tests.integration.any_charm_helpers import (
 )
 from tests.integration.dns_adapter import DNSResolverHTTPSAdapter
 from tests.integration.helpers import (
+    _ingress_url,
     all_settled,
     get_k8s_service_address,
     pull_ssc_ca_certificate,
@@ -65,7 +67,7 @@ def test_ingressed_endpoints_reachable_after_metallb_enabled(juju: jubilant.Juju
     assert model_name is not None
     traefik_ip = get_k8s_service_address(model_name, f"{TRAEFIK_APP}-lb")
     assert traefik_ip, "Expected a traefik load balancer address"
-    for endpoint in _endpoints(model_name, "http", traefik_ip):
+    for endpoint in _endpoints(juju, model_name, "http", traefik_ip):
         response = requests.get(endpoint, timeout=30)
         response.raise_for_status()
 
@@ -141,10 +143,13 @@ def test_cleanup(juju: jubilant.Juju):
     remove_application(juju, TRAEFIK_APP, timeout=60, force=False)
 
 
-def _endpoints(model: str, scheme: str, netloc: str) -> list[str]:
+def _endpoints(
+    juju: jubilant.Juju, model: str, scheme: str, netloc: str
+) -> list[str]:
+    ingress_path = f"{urlsplit(_ingress_url(juju)).path.rstrip('/')}/health"
     return [
         f"{scheme}://{netloc}/{model}-{PROMETHEUS_APP}-0",
-        f"{scheme}://{netloc}/{model}-{INGRESS_APP}/health",
+        f"{scheme}://{netloc}{ingress_path}",
         f"{scheme}://{netloc}/{model}-{GRAFANA_APP}",
     ]
 
@@ -155,7 +160,7 @@ def _assert_https_endpoints(juju: jubilant.Juju, cert_path: Path, traefik_ip: st
     session = requests.Session()
     session.mount("https://", DNSResolverHTTPSAdapter(MOCK_HOSTNAME, traefik_ip))
     session.verify = str(cert_path)
-    for endpoint in _endpoints(model_name, "https", MOCK_HOSTNAME):
+    for endpoint in _endpoints(juju, model_name, "https", MOCK_HOSTNAME):
         response = session.get(endpoint, timeout=30)
         response.raise_for_status()
 
