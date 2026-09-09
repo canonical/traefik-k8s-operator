@@ -1,0 +1,68 @@
+#!/usr/bin/env python3
+# Copyright 2026 Canonical Ltd.
+# See LICENSE file for licensing details.
+
+"""Test upgrades."""
+
+import jubilant
+
+from tests.integration.any_charm_helpers import (
+    ANY_CHARM_CHANNEL,
+    ANY_CHARM_K8S,
+    PYTHON_PACKAGES,
+    health_src_overwrite,
+)
+from tests.integration.constants import INGRESS_REQUIRER_APP_NAME
+from tests.integration.helpers import all_settled, assert_traefik_revision
+
+TRAEFIK_APP_NAME = "traefik"
+SSC_APP_NAME = "ssc"
+
+TRAEFIK_SOURCE_CHANNEL = "latest/edge"
+
+
+def test_upgrade(juju: jubilant.Juju, traefik_charm, pytestconfig):
+    """
+    Refresh traefik from the latest revision on charmhub to the current
+    local charm, and verify all charms are active and idle.
+    """
+    juju.deploy(
+        "ch:traefik-k8s",
+        TRAEFIK_APP_NAME,
+        channel=TRAEFIK_SOURCE_CHANNEL,
+        base=pytestconfig.getoption("--base"),
+        config={"external_hostname": "traefik-demo.local"},
+        trust=True,
+    )
+    juju.wait(jubilant.all_agents_idle, error=jubilant.any_error, timeout=900, delay=5, successes=5)
+
+    juju.deploy(
+        "ch:self-signed-certificates",
+        SSC_APP_NAME,
+        channel="1/stable",
+        trust=True,
+    )
+
+    juju.deploy(
+        f"ch:{ANY_CHARM_K8S}",
+        INGRESS_REQUIRER_APP_NAME,
+        channel=ANY_CHARM_CHANNEL,
+        config={
+            "src-overwrite": health_src_overwrite(),
+            "python-packages": PYTHON_PACKAGES,
+        },
+        trust=True,
+    )
+
+    juju.wait(jubilant.all_active, error=jubilant.any_error, timeout=900, delay=5, successes=5)
+
+    juju.integrate(f"{SSC_APP_NAME}:certificates", TRAEFIK_APP_NAME)
+    juju.integrate(f"{INGRESS_REQUIRER_APP_NAME}:require-ingress", TRAEFIK_APP_NAME)
+    juju.wait(all_settled, error=jubilant.any_error, delay=5, timeout=900, successes=5)
+
+    juju.refresh(
+        TRAEFIK_APP_NAME,
+        path=traefik_charm,
+    )
+    juju.wait(all_settled, error=jubilant.any_error, delay=5, timeout=900, successes=5)
+    assert_traefik_revision(juju, 0)

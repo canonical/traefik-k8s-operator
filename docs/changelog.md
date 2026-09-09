@@ -10,7 +10,7 @@ Each revision is versioned by the date of the revision.
 
 ## 2026-09-09
 
-- Removed the redundant `test_upgrade.py` integration test (fully superseded by `test_upgrade_ssc_from_298.py`) and deduplicated the boilerplate shared by the revision-pinned upgrade integration tests into shared helper functions.
+- Deduplicated the boilerplate shared by the revision-pinned upgrade integration tests into shared helper functions.
 
 ## 2026-09-08
 
