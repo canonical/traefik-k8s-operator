@@ -2,6 +2,19 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **Post-execution amendment (2026-09-09):** Task 1 (removing `test_upgrade.py`) was
+> reverted after the final whole-branch review surfaced that the file was not a pure
+> duplicate: it was the only integration test exercising an upgrade from the unpinned
+> `latest/edge` Charmhub channel, and (via `spread.yaml`'s `auto-discover`) the only
+> one run on the default base (`ubuntu@26.04`) rather than a pinned revision forced
+> onto `ubuntu@20.04`. `test_upgrade.py` and its two `spread.yaml` entries were
+> restored to their original state. What actually shipped from this plan is Tasks
+> 2–8 only: the shared-helper deduplication of the revision-pinned upgrade test
+> pairs, with zero test coverage or CI job matrix change (re-verified: a
+> `pytest --collect-only` diff against the pre-branch baseline shows zero test node
+> ID differences). The task text below is left unmodified as the historical record
+> of what was originally planned and executed before this amendment.
+
 **Goal:** Remove the one integration test proven redundant by audit (`test_upgrade.py`), and eliminate the duplicated boilerplate across the `test_upgrade_{no_tls,ssc,mtls}_from_{280,298}.py` / `*_single_unit_from_{280,298}.py` file pairs by extracting each pair's identical body into a single shared, revision-parametrized helper function — without changing which test files exist, which test scenarios run, or the CI job matrix.
 
 **Architecture:** All new shared logic lives in `tests/integration/helpers.py` (already the home of the `bring_up_*`/`verify_*` composite-flow helpers these tests already call). Each of the 10 existing "from revision N" test files becomes a thin wrapper: it keeps its own filename (required — `spread.yaml` references these files by path for CI's `BASE`/`MODULE` overrides), its own test function name and docstring (for readability/log clarity), and its own `SOURCE_REVISION` constant, but delegates the actual deploy → verify → refresh → verify body to one new shared helper per family.
