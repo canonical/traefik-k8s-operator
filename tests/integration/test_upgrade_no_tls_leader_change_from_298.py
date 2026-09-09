@@ -7,7 +7,7 @@
 Scenario:
 
 1. Deploy traefik-k8s (3 units) at revision 298 and integrate only with
-    an ingress tester.
+    an ingress requirer.
 2. Verify HTTP ingress URL reachability on all units and no blocked/error state.
 3. Force a leadership change; the old leader is restored afterwards.
 4. Verify all units stay active/idle and keep serving the same HTTP URL.

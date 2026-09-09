@@ -84,7 +84,7 @@ def deploy_traefik(juju, traefik_charm):
 
 @pytest.fixture(scope="module", name="ingress_app")
 def ingress_fixture(juju):
-    """Deploy the any-charm HTTP ingress tester."""
+    """Deploy the any-charm HTTP ingress requirer."""
     juju.deploy(
         f"ch:{ANY_CHARM_K8S}",
         INGRESS_REQUIRER_APP_NAME,

@@ -7,7 +7,7 @@
 Scenario:
 
 1. Deploy traefik-k8s (3 units) at revision 280 and integrate it with
-    ``manual-tls-certificates`` and an ingress tester.
+    ``manual-tls-certificates`` and an ingress requirer.
 2. Sign every outstanding CSR and provide the certificate back to traefik.
 3. Verify the ingress URL is reachable over HTTPS through every traefik unit.
 4. Refresh traefik to the locally built charm.

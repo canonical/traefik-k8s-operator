@@ -7,7 +7,7 @@
 Scenario:
 
 1. Deploy traefik-k8s (3 units) at revision 280 and integrate it with
-    ``self-signed-certificates`` and an ingress tester.
+    ``self-signed-certificates`` and an ingress requirer.
 2. Verify the ingress URL is reachable over HTTPS through every traefik unit.
 3. Refresh traefik to the locally built charm.
 4. Verify the same CA still serves the same URL on every unit.

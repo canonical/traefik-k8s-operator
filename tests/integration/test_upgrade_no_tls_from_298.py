@@ -7,7 +7,7 @@
 Scenario:
 
 1. Deploy traefik-k8s (3 units) at revision 298 and integrate only with
-    an ingress tester (no certificate provider relation).
+    an ingress requirer (no certificate provider relation).
 2. Verify the ingress URL is reachable over HTTP through every traefik unit
    while no unit enters blocked/error.
 3. Refresh traefik to the locally built charm.

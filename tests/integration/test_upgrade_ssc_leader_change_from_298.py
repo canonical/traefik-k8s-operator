@@ -7,7 +7,7 @@
 Scenario:
 
 1. Deploy traefik-k8s (3 units) at revision 298 and integrate it with
-    ``self-signed-certificates`` and an ingress tester; verify HTTPS works.
+    ``self-signed-certificates`` and an ingress requirer; verify HTTPS works.
 2. Force a leadership change; the old leader is restored afterwards.
 3. Trigger hook execution on the new leader and wait for all units to settle
    so the self-signed provider can issue replacement material.

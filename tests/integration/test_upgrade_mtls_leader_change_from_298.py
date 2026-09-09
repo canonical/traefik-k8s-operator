@@ -7,7 +7,7 @@
 Scenario:
 
 1. Deploy traefik-k8s (3 units) at revision 298 and integrate it with
-    ``manual-tls-certificates`` and an ingress tester; sign the CSRs and confirm
+    ``manual-tls-certificates`` and an ingress requirer; sign the CSRs and confirm
    HTTPS works on every unit.
 2. Force a leadership change; the old leader is restored afterwards.
    On revision 298 the TLS private key is not app-scoped, so the newly elected
