@@ -3,7 +3,7 @@ changes:
   - title: Replaced Alertmanager in integration tests
     author: f-atwi
     type: minor
-    description: Replaced some external charm test dependencies with an anycharm as ingress requirer.
+    description: Replaced some external charm test dependencies with an any-charm as ingress requirer.
     visibility: internal
     highlight: false
     urls:

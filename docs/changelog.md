@@ -10,7 +10,7 @@ Each revision is versioned by the date of the revision.
 
 ## 2026-09-08
 
-- Replaced some external charms in integration tests with an anycharm as ingress requirer.
+- Replaced some external charms in integration tests with an any-charm as ingress requirer.
 
 ## 2026-09-02
 
