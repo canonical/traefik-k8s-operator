@@ -7,7 +7,7 @@
 Scenario:
 
 1. Deploy traefik-k8s (3 units) at revision 298 and integrate it with
-   ``manual-tls-certificates`` and ``alertmanager``; sign the CSRs and confirm
+    ``manual-tls-certificates`` and an ingress requirer; sign the CSRs and confirm
    HTTPS works on every unit.
 2. Force a leadership change; the old leader is restored afterwards.
    On revision 298 the TLS private key is not app-scoped, so the newly elected
@@ -47,7 +47,7 @@ SOURCE_REVISION = 298
 
 @pytest.mark.setup
 def test_leader_change_breaks_tls_then_upgrade_blocks_and_requests_certificate(
-    juju: jubilant.Juju, traefik_charm, mtls_app, alertmanager_app, tmp_path
+    juju: jubilant.Juju, traefik_charm, mtls_app, ingress_app, tmp_path
 ):
     """A leadership change breaks TLS on rev 298; upgrade blocks and requests a cert."""
     juju.deploy(
@@ -60,7 +60,7 @@ def test_leader_change_breaks_tls_then_upgrade_blocks_and_requests_certificate(
         trust=True,
     )
     juju.wait(jubilant.all_agents_idle, error=jubilant.any_error, timeout=900, delay=5, successes=5)
-    alertmanager_url = bring_up_certified_traefik(juju, tmp_path)
+    ingress_url = bring_up_certified_traefik(juju, tmp_path)
 
     # newly elected leader is expected to break.
     new_leader = force_leader_change(juju, TRAEFIK_APP_NAME)
@@ -75,14 +75,14 @@ def test_leader_change_breaks_tls_then_upgrade_blocks_and_requests_certificate(
         if name != new_leader
     ]
     for unit_name in working_units:
-        verify_https_on_unit(juju, unit_name, alertmanager_url)
+        verify_https_on_unit(juju, unit_name, ingress_url)
 
     juju.wait(lambda _: len(get_outstanding_csrs(juju)) == 1, error=jubilant.any_error, timeout=300)
 
     # The new leader lost the old leader's key, so its served certificate is no
     # longer trusted (or the endpoint is down) -- HTTPS must fail here.
     try:
-        verify_https_on_unit(juju, new_leader, alertmanager_url)
+        verify_https_on_unit(juju, new_leader, ingress_url)
     except (requests.exceptions.SSLError, requests.exceptions.ConnectionError):
         pass  # expected: cert no longer trusted / endpoint down
     else:

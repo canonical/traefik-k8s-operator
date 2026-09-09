@@ -7,7 +7,7 @@
 Scenario:
 
 1. Deploy traefik-k8s (3 units) at revision 280 and integrate only with
-   ``alertmanager`` (no certificate provider relation).
+    an ingress requirer (no certificate provider relation).
 2. Verify the ingress URL is reachable over HTTP through every traefik unit
    and all units are active / idle.
 3. Refresh traefik to the locally built charm.
@@ -35,7 +35,7 @@ SOURCE_REVISION = 280
 
 @pytest.mark.setup
 def test_upgrade_no_tls_from_revision_280(
-    juju: jubilant.Juju, traefik_charm, alertmanager_app
+    juju: jubilant.Juju, traefik_charm, ingress_app
 ):
     """Traefik stays healthy and serves HTTP after upgrading from rev 280."""
     juju.deploy(

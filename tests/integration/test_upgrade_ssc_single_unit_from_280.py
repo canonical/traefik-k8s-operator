@@ -24,7 +24,7 @@ SOURCE_REVISION = 280
 
 @pytest.mark.setup
 def test_upgrade_ssc_single_unit_from_280(
-    juju: jubilant.Juju, traefik_charm, ssc_app, alertmanager_app, tmp_path
+    juju: jubilant.Juju, traefik_charm, ssc_app, ingress_app, tmp_path
 ):
     """A single traefik unit keeps serving HTTPS after upgrading from rev 280."""
     juju.deploy(

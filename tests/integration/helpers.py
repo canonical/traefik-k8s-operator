@@ -23,7 +23,7 @@ from charms.tls_certificates_interface.v4.tls_certificates import (
     PrivateKey,
 )
 from constants import (
-    ALERTMANAGER_APP_NAME,
+    INGRESS_REQUIRER_APP_NAME,
     MANUAL_TLS_APP_NAME,
     MOCK_HOSTNAME,
     SSC_APP_NAME,
@@ -332,11 +332,11 @@ def pull_ssc_ca_certificate(
 
 
 # --- Verification -----------------------------------------------------------
-def _alertmanager_url(juju: jubilant.Juju) -> str:
+def _ingress_url(juju: jubilant.Juju) -> str:
     # show-proxied-endpoints only returns the full endpoint map on the leader.
     result = juju.run(f"{TRAEFIK_APP_NAME}/leader", "show-proxied-endpoints")
     endpoints = json.loads(result.results["proxied-endpoints"])
-    return endpoints[ALERTMANAGER_APP_NAME]["url"]
+    return endpoints[INGRESS_REQUIRER_APP_NAME]["url"]
 
 
 @retry(
@@ -376,13 +376,13 @@ def verify_https_on_all_units(
 ) -> str:
     """Assert HTTPS is reachable through every traefik unit with the CA cert.
 
-    Returns the alertmanager URL that was verified so callers can assert it is
+    Returns the ingress URL that was verified so callers can assert it is
     unchanged across an upgrade.
     """
-    alertmanager_url = _alertmanager_url(juju)
+    ingress_url = f"{_ingress_url(juju).rstrip('/')}/health"
     if expected_url is not None:
-        assert alertmanager_url == expected_url, (
-            f"Proxied URL changed across upgrade: {expected_url!r} -> {alertmanager_url!r}"
+        assert ingress_url == expected_url, (
+            f"Proxied URL changed across upgrade: {expected_url!r} -> {ingress_url!r}"
         )
 
     status = juju.status()
@@ -390,13 +390,13 @@ def verify_https_on_all_units(
 
     for unit_name, unit_status in units.items():
         unit_ip = unit_status.address
-        logger.info("Verifying HTTPS on %s (%s) -> %s", unit_name, unit_ip, alertmanager_url)
+        logger.info("Verifying HTTPS on %s (%s) -> %s", unit_name, unit_ip, ingress_url)
         session = requests.Session()
         session.mount("https://", DNSResolverHTTPSAdapter(MOCK_HOSTNAME, unit_ip))
         session.verify = str(ca_cert_path)
-        _get_with_retry(session, alertmanager_url)
+        _get_with_retry(session, ingress_url)
 
-    return alertmanager_url
+    return ingress_url
 
 
 def verify_http_on_all_units(
@@ -405,16 +405,16 @@ def verify_http_on_all_units(
 ) -> str:
     """Assert HTTP is reachable through every traefik unit.
 
-    Returns the alertmanager URL that was verified so callers can assert it is
+    Returns the ingress URL that was verified so callers can assert it is
     unchanged across an upgrade.
     """
-    alertmanager_url = _alertmanager_url(juju)
-    assert alertmanager_url.startswith("http://"), (
-        f"expected plain HTTP proxied URL without a certificate provider, got {alertmanager_url!r}"
+    ingress_url = f"{_ingress_url(juju).rstrip('/')}/health"
+    assert ingress_url.startswith("http://"), (
+        f"expected plain HTTP proxied URL without a certificate provider, got {ingress_url!r}"
     )
     if expected_url is not None:
-        assert alertmanager_url == expected_url, (
-            f"Proxied URL changed across upgrade: {expected_url!r} -> {alertmanager_url!r}"
+        assert ingress_url == expected_url, (
+            f"Proxied URL changed across upgrade: {expected_url!r} -> {ingress_url!r}"
         )
 
     status = juju.status()
@@ -422,12 +422,12 @@ def verify_http_on_all_units(
 
     for unit_name, unit_status in units.items():
         unit_ip = unit_status.address
-        logger.info("Verifying HTTP on %s (%s) -> %s", unit_name, unit_ip, alertmanager_url)
+        logger.info("Verifying HTTP on %s (%s) -> %s", unit_name, unit_ip, ingress_url)
         session = requests.Session()
         session.headers["Host"] = MOCK_HOSTNAME
-        _get_with_retry(session, _url_for_unit(alertmanager_url, unit_ip))
+        _get_with_retry(session, _url_for_unit(ingress_url, unit_ip))
 
-    return alertmanager_url
+    return ingress_url
 
 
 def leader_unit_name(juju: jubilant.Juju, app: str = TRAEFIK_APP_NAME) -> str:
@@ -481,41 +481,41 @@ def force_leader_change(juju: jubilant.Juju, app: str = TRAEFIK_APP_NAME) -> str
     return new_leader
 
 
-def verify_https_on_unit(juju: jubilant.Juju, unit_name: str, alertmanager_url: str) -> None:
+def verify_https_on_unit(juju: jubilant.Juju, unit_name: str, ingress_url: str) -> None:
     """Assert HTTPS returns 200 with the CA cert on a specific traefik unit."""
     unit_ip = _unit_address(juju, unit_name)
-    logger.info("Verifying HTTPS on %s (%s) -> %s", unit_name, unit_ip, alertmanager_url)
+    logger.info("Verifying HTTPS on %s (%s) -> %s", unit_name, unit_ip, ingress_url)
     session = requests.Session()
     session.mount("https://", DNSResolverHTTPSAdapter(MOCK_HOSTNAME, unit_ip))
     session.verify = str(ca_cert_path)
-    response = session.get(alertmanager_url, timeout=30)
+    response = session.get(ingress_url, timeout=30)
     response.raise_for_status()
 
 
-def verify_http_on_unit(juju: jubilant.Juju, unit_name: str, alertmanager_url: str) -> None:
+def verify_http_on_unit(juju: jubilant.Juju, unit_name: str, ingress_url: str) -> None:
     """Assert HTTP returns 200 on a specific traefik unit."""
-    assert alertmanager_url.startswith("http://"), (
-        f"expected plain HTTP proxied URL without a certificate provider, got {alertmanager_url!r}"
+    assert ingress_url.startswith("http://"), (
+        f"expected plain HTTP proxied URL without a certificate provider, got {ingress_url!r}"
     )
     unit_ip = _unit_address(juju, unit_name)
-    logger.info("Verifying HTTP on %s (%s) -> %s", unit_name, unit_ip, alertmanager_url)
+    logger.info("Verifying HTTP on %s (%s) -> %s", unit_name, unit_ip, ingress_url)
     session = requests.Session()
     session.headers["Host"] = MOCK_HOSTNAME
-    _get_with_retry(session, _url_for_unit(alertmanager_url, unit_ip))
+    _get_with_retry(session, _url_for_unit(ingress_url, unit_ip))
 
 
 # --- Composite flows --------------------------------------------------------
 def bring_up_certified_traefik(juju: jubilant.Juju, tmp_path: Path) -> str:
-    """Integrate the mTLS + alertmanager stack, sign traefik's CSRs and verify HTTPS.
+    """Integrate the mTLS + ingress stack, sign traefik's CSRs and verify HTTPS.
 
     Creates the throwaway CA (populating the module-level CA globals) and assumes
-    traefik, manual-tls-certificates and alertmanager have all been deployed (the
-    latter two via the ``mtls_app`` / ``alertmanager_app`` fixtures). Returns
-    the alertmanager URL so the caller can assert it is unchanged after upgrading.
+    traefik, manual-tls-certificates and the ingress requirer have all been deployed (the
+    latter two via the ``mtls_app`` / ``ingress_app`` fixtures). Returns the ingress URL
+    so the caller can assert it is unchanged after upgrading.
     """
     generate_ca(tmp_path)
 
-    juju.integrate(f"{ALERTMANAGER_APP_NAME}:ingress", TRAEFIK_APP_NAME)
+    juju.integrate(f"{INGRESS_REQUIRER_APP_NAME}:require-ingress", TRAEFIK_APP_NAME)
     juju.wait(all_settled, error=jubilant.any_error, timeout=900, delay=5, successes=5)
     juju.integrate(f"{MANUAL_TLS_APP_NAME}:certificates", f"{TRAEFIK_APP_NAME}:certificates")
 
@@ -529,8 +529,8 @@ def bring_up_certified_traefik(juju: jubilant.Juju, tmp_path: Path) -> str:
 def bring_up_self_signed_traefik(
     juju: jubilant.Juju, tmp_path: Path, ssc_app: str = SSC_APP_NAME
 ) -> str:
-    """Integrate self-signed-certificates + alertmanager and verify HTTPS on traefik."""
-    juju.integrate(f"{ALERTMANAGER_APP_NAME}:ingress", TRAEFIK_APP_NAME)
+    """Integrate self-signed-certificates + the ingress requirer and verify HTTPS."""
+    juju.integrate(f"{INGRESS_REQUIRER_APP_NAME}:require-ingress", TRAEFIK_APP_NAME)
     juju.wait(all_settled, error=jubilant.any_error, timeout=900, delay=5, successes=5)
     juju.integrate(f"{ssc_app}:certificates", f"{TRAEFIK_APP_NAME}:certificates")
 
@@ -541,7 +541,7 @@ def bring_up_self_signed_traefik(
 
 
 def bring_up_traefik_without_certificate_provider(juju: jubilant.Juju) -> str:
-    """Integrate alertmanager only and verify plain HTTP on all traefik units."""
-    juju.integrate(f"{ALERTMANAGER_APP_NAME}:ingress", TRAEFIK_APP_NAME)
+    """Integrate the ingress requirer and verify plain HTTP on all traefik units."""
+    juju.integrate(f"{INGRESS_REQUIRER_APP_NAME}:require-ingress", TRAEFIK_APP_NAME)
     juju.wait(all_settled, error=jubilant.any_error, delay=5, timeout=900, successes=5)
     return verify_http_on_all_units(juju)

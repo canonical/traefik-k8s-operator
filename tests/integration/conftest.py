@@ -7,8 +7,14 @@ import jubilant
 import pytest
 import yaml
 
+from tests.integration.any_charm_helpers import (
+    ANY_CHARM_CHANNEL,
+    ANY_CHARM_K8S,
+    PYTHON_PACKAGES,
+    health_src_overwrite,
+)
 from tests.integration.constants import (
-    ALERTMANAGER_APP_NAME,
+    INGRESS_REQUIRER_APP_NAME,
     MANUAL_TLS_APP_NAME,
     MANUAL_TLS_CHANNEL,
     SSC_APP_NAME,
@@ -76,22 +82,26 @@ def deploy_traefik(juju, traefik_charm):
     return TRAEFIK_APP_NAME
 
 
-@pytest.fixture(scope="module", name="alertmanager_app")
-def alertmanager_fixture(juju):
-    """Deploy alertmanager-k8s."""
+@pytest.fixture(scope="module", name="ingress_app")
+def ingress_fixture(juju):
+    """Deploy the any-charm HTTP ingress requirer."""
     juju.deploy(
-        "ch:alertmanager-k8s",
-        ALERTMANAGER_APP_NAME,
-        channel="2/edge",
+        f"ch:{ANY_CHARM_K8S}",
+        INGRESS_REQUIRER_APP_NAME,
+        channel=ANY_CHARM_CHANNEL,
+        config={
+            "src-overwrite": health_src_overwrite(),
+            "python-packages": PYTHON_PACKAGES,
+        },
         trust=True,
     )
     juju.wait(
-        lambda status: jubilant.all_active(status, ALERTMANAGER_APP_NAME),
+        lambda status: jubilant.all_active(status, INGRESS_REQUIRER_APP_NAME),
         error=jubilant.any_error,
         delay=5,
         successes=5,
     )
-    return ALERTMANAGER_APP_NAME
+    return INGRESS_REQUIRER_APP_NAME
 
 
 @pytest.fixture(scope="module", name="mtls_app")

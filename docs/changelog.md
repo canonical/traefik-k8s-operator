@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 Each revision is versioned by the date of the revision.
 
+## 2026-09-08
+
+- Replaced some external charms in integration tests with an any-charm as ingress requirer.
+
 ## 2026-09-02
 
 - Added `csr-subject-atttributes` config to include configurable CSR subject fields such as `C`, `ST`, `L`, `O`, `OU`, `CN`, and `emailAddress` in certificate requests.

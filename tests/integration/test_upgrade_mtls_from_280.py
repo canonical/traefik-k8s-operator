@@ -7,7 +7,7 @@
 Scenario:
 
 1. Deploy traefik-k8s (3 units) at revision 280 and integrate it with
-   ``manual-tls-certificates`` and ``alertmanager``.
+    ``manual-tls-certificates`` and an ingress requirer.
 2. Sign every outstanding CSR and provide the certificate back to traefik.
 3. Verify the ingress URL is reachable over HTTPS through every traefik unit.
 4. Refresh traefik to the locally built charm.
@@ -41,7 +41,7 @@ SOURCE_REVISION = 280
 
 @pytest.mark.setup
 def test_upgrade_mtls_from_revision_280(
-    juju: jubilant.Juju, traefik_charm, mtls_app, alertmanager_app, tmp_path
+    juju: jubilant.Juju, traefik_charm, mtls_app, ingress_app, tmp_path
 ):
     """Traefik keeps serving the same certificate after upgrading from rev 280."""
     juju.deploy(

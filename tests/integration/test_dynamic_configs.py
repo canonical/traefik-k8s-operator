@@ -14,25 +14,35 @@ import jubilant
 import pytest
 import yaml
 
+from tests.integration.any_charm_helpers import (
+    ANY_CHARM_CHANNEL,
+    ANY_CHARM_K8S,
+    PYTHON_PACKAGES,
+    health_src_overwrite,
+)
 from tests.integration.helpers import all_settled
 
 logger = logging.getLogger(__name__)
 
-CATALOGUE_APP_NAME = "catalogue"
+SECONDARY_INGRESS_APP_NAME = "secondary-ingress"
 DYNAMIC_CONFIG_DIR = "/opt/traefik/juju"
 
 
 @pytest.fixture(scope="module")
-def deploy_catalogue(juju):
-    """Deploy catalogue."""
+def secondary_ingress_app(juju):
+    """Deploy a second ingress requirer."""
     juju.deploy(
-        "ch:catalogue-k8s",
-        CATALOGUE_APP_NAME,
-        channel="1/edge",
+        f"ch:{ANY_CHARM_K8S}",
+        SECONDARY_INGRESS_APP_NAME,
+        channel=ANY_CHARM_CHANNEL,
+        config={
+            "src-overwrite": health_src_overwrite(),
+            "python-packages": PYTHON_PACKAGES,
+        },
         trust=True,
     )
     juju.wait(all_settled, error=jubilant.any_error, delay=5, successes=5)
-    return CATALOGUE_APP_NAME
+    return SECONDARY_INGRESS_APP_NAME
 
 
 def _list_dynamic_configs(juju, traefik_app):
@@ -45,40 +55,44 @@ def _list_dynamic_configs(juju, traefik_app):
     return [f for f in output.strip().split("\n") if f.endswith(".yaml")]
 
 
-def test_dynamic_configs_present(juju, traefik_app, alertmanager_app, deploy_catalogue):
+def test_dynamic_configs_present(juju, traefik_app, ingress_app, secondary_ingress_app):
     """After integrating 2 apps, verify dynamic config files exist in the container."""
-    juju.integrate(f"{CATALOGUE_APP_NAME}:ingress", traefik_app)
-    juju.integrate(f"{alertmanager_app}:ingress", traefik_app)
+    juju.integrate(f"{secondary_ingress_app}:require-ingress", traefik_app)
+    juju.integrate(f"{ingress_app}:require-ingress", traefik_app)
     juju.wait(all_settled, error=jubilant.any_error, delay=5, successes=5)
     files = _list_dynamic_configs(juju, traefik_app)
     logger.info("Dynamic config files in container: %s", files)
 
     # Each integrated app should have a config file matching juju_ingress_ingress_*_{app}.yaml
-    alertmanager_configs = [f for f in files if alertmanager_app in f]
-    catalogue_configs = [f for f in files if CATALOGUE_APP_NAME in f]
+    ingress_configs = [f for f in files if f.endswith(f"_{ingress_app}.yaml")]
+    secondary_ingress_configs = [
+        f for f in files if f.endswith(f"_{secondary_ingress_app}.yaml")
+    ]
 
-    assert len(alertmanager_configs) == 1, (
-        f"Expected exactly 1 config for {alertmanager_app}, "
-        f"found {alertmanager_configs} in {files}"
+    assert len(ingress_configs) == 1, (
+        f"Expected exactly 1 config for {ingress_app}, "
+        f"found {ingress_configs} in {files}"
     )
-    assert len(catalogue_configs) == 1, (
-        f"Expected exactly 1 config for {CATALOGUE_APP_NAME}, "
-        f"found {catalogue_configs} in {files}"
+    assert len(secondary_ingress_configs) == 1, (
+        f"Expected exactly 1 config for {secondary_ingress_app}, "
+        f"found {secondary_ingress_configs} in {files}"
     )
 
     # Verify naming convention: juju_ingress_{relation_name}_{relation_id}_{app_name}.yaml
-    for f in alertmanager_configs + catalogue_configs:
+    for f in ingress_configs + secondary_ingress_configs:
         assert f.startswith("juju_ingress_ingress_"), (
             f"Config file {f} doesn't follow expected naming convention"
         )
 
 
-def test_dynamic_config_content_valid(juju, traefik_app, alertmanager_app, deploy_catalogue):
+def test_dynamic_config_content_valid(
+    juju, traefik_app, ingress_app, secondary_ingress_app
+):
     """Verify that the dynamic config files contain valid traefik routing config."""
     files = _list_dynamic_configs(juju, traefik_app)
 
-    for app_name in (alertmanager_app, CATALOGUE_APP_NAME):
-        config_file = next(f for f in files if app_name in f)
+    for app_name in (ingress_app, secondary_ingress_app):
+        config_file = next(f for f in files if f.endswith(f"_{app_name}.yaml"))
         output = juju.ssh(
             f"{traefik_app}/0",
             f"cat {DYNAMIC_CONFIG_DIR}/{config_file}",
@@ -98,7 +112,9 @@ def test_dynamic_config_content_valid(juju, traefik_app, alertmanager_app, deplo
         assert len(http["services"]) >= 1, f"No services defined for {app_name}"
 
 
-def test_staging_artifacts_cleaned_up(juju, traefik_app, alertmanager_app, deploy_catalogue):
+def test_staging_artifacts_cleaned_up(
+    juju, traefik_app, ingress_app, secondary_ingress_app
+):
     """Verify that the tar archive and staging directory are removed after flush."""
     # The tar archive should not exist in the dynamic config dir
     output = juju.ssh(
@@ -116,24 +132,26 @@ def test_staging_artifacts_cleaned_up(juju, traefik_app, alertmanager_app, deplo
         "test -d /tmp/_juju_ingress_staging && echo EXISTS || echo GONE",
         container="traefik",
     )
-    assert "GONE" in output, "Staging directory /tmp/_juju_ingress_staging was not cleaned up"
+    assert "GONE" in output, (
+        "Staging directory /tmp/_juju_ingress_staging was not cleaned up"
+    )
 
 
 def test_dynamic_config_removed_after_relation_removed(
-    juju, traefik_app, alertmanager_app, deploy_catalogue
+    juju, traefik_app, ingress_app, secondary_ingress_app
 ):
     """After removing a relation, the corresponding config file should be cleaned up."""
     # Verify file exists before removal
     files_before = _list_dynamic_configs(juju, traefik_app)
-    alertmanager_configs = [f for f in files_before if alertmanager_app in f]
-    assert len(alertmanager_configs) == 1
+    ingress_configs = [f for f in files_before if f.endswith(f"_{ingress_app}.yaml")]
+    assert len(ingress_configs) == 1
 
-    # Remove the alertmanager relation
-    juju.remove_relation(f"{alertmanager_app}:ingress", traefik_app)
+    # Remove the ingress requirer relation
+    juju.remove_relation(f"{ingress_app}:require-ingress", traefik_app)
     # Wait until:
-    # 1. traefik and catalogue are active
+    # 1. traefik and the secondary ingress requirer are active
     # 2. all agents are idle (hooks have finished)
-    # 3. the alertmanager↔traefik ingress relation is gone from juju status
+    # 3. the requirer-to-traefik ingress relation is gone from juju status
     #
     # Condition (3) is key: immediately after remove_relation, all agents can
     # appear idle before Juju dispatches the relation-broken hooks. Waiting for
@@ -141,27 +159,32 @@ def test_dynamic_config_removed_after_relation_removed(
     # its ingress-relation-broken hook and deleted the config file.
     juju.wait(
         lambda status: (
-            jubilant.all_active(status, traefik_app, CATALOGUE_APP_NAME)
+            jubilant.all_active(status, traefik_app, secondary_ingress_app)
             and jubilant.all_agents_idle(status)
             and not any(
                 r.related_app == traefik_app
-                for r in status.apps[alertmanager_app].relations.get("ingress", [])
+                for r in status.apps[ingress_app].relations.get("require-ingress", [])
             )
         ),
         error=jubilant.any_error,
         timeout=300,
     )
 
-    # Verify the alertmanager config file is gone
+    # Verify the ingress requirer config file is gone
     files_after = _list_dynamic_configs(juju, traefik_app)
-    alertmanager_configs_after = [f for f in files_after if alertmanager_app in f]
-    assert len(alertmanager_configs_after) == 0, (
-        f"Expected alertmanager config to be removed after relation broken, "
-        f"but found: {alertmanager_configs_after}"
+    ingress_configs_after = [
+        f for f in files_after if f.endswith(f"_{ingress_app}.yaml")
+    ]
+    assert len(ingress_configs_after) == 0, (
+        f"Expected ingress requirer config to be removed after relation broken, "
+        f"but found: {ingress_configs_after}"
     )
 
-    # Catalogue config should still be present
-    catalogue_configs_after = [f for f in files_after if CATALOGUE_APP_NAME in f]
-    assert len(catalogue_configs_after) == 1, (
-        f"Catalogue config should still exist, but found: {catalogue_configs_after}"
+    # The secondary ingress config should still be present
+    secondary_ingress_configs_after = [
+        f for f in files_after if f.endswith(f"_{secondary_ingress_app}.yaml")
+    ]
+    assert len(secondary_ingress_configs_after) == 1, (
+        "Secondary ingress config should still exist, "
+        f"but found: {secondary_ingress_configs_after}"
     )
