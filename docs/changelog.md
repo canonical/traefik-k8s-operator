@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 Each revision is versioned by the date of the revision.
 
+## 2026-09-09
+
+- Removed the redundant `test_upgrade.py` integration test (fully superseded by `test_upgrade_ssc_from_298.py`) and deduplicated the boilerplate shared by the revision-pinned upgrade integration tests into shared helper functions.
+
 ## 2026-09-08
 
 - Replaced some external charms in integration tests with an any-charm as ingress requirer.

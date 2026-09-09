@@ -1,0 +1,18 @@
+version_schema: 2
+
+changes:
+  - title: Reduced duplication in the integration test suite
+    author: f-atwi
+    type: minor
+    description: |
+      Removed test_upgrade.py, an integration test fully superseded by the more
+      rigorous test_upgrade_ssc_from_298.py, and extracted the boilerplate shared
+      by the revision-pinned upgrade integration test pairs (no-tls, self-signed
+      certs, and manual-tls, each in multi-unit and single-unit variants) into
+      shared helper functions in tests/integration/helpers.py. No test coverage
+      or CI job matrix changed.
+    urls:
+      pr:
+        - ""
+    visibility: internal
+    highlight: false
