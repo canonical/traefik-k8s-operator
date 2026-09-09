@@ -15,43 +15,15 @@ Scenario:
    blocked/error.
 """
 
-import logging
-
 import jubilant
 import pytest
-from conftest import TRAEFIK_APP_NAME, TRAEFIK_RESOURCES
-from constants import MOCK_HOSTNAME, NUM_TRAEFIK_UNITS, SOURCE_CHANNEL, TRAEFIK_CHARM
-from helpers import (
-    all_settled,
-    assert_traefik_revision,
-    bring_up_traefik_without_certificate_provider,
-    verify_http_on_all_units,
-)
-
-logger = logging.getLogger(__name__)
+from conftest import TRAEFIK_RESOURCES
+from helpers import run_no_tls_upgrade_scenario
 
 SOURCE_REVISION = 280
 
 
 @pytest.mark.setup
-def test_upgrade_no_tls_from_revision_280(
-    juju: jubilant.Juju, traefik_charm, ingress_app
-):
+def test_upgrade_no_tls_from_revision_280(juju: jubilant.Juju, traefik_charm, ingress_app):
     """Traefik stays healthy and serves HTTP after upgrading from rev 280."""
-    juju.deploy(
-        TRAEFIK_CHARM,
-        TRAEFIK_APP_NAME,
-        channel=SOURCE_CHANNEL,
-        config={"external_hostname": MOCK_HOSTNAME},
-        revision=SOURCE_REVISION,
-        num_units=NUM_TRAEFIK_UNITS,
-        trust=True,
-    )
-    juju.wait(jubilant.all_agents_idle, error=jubilant.any_error, timeout=900, delay=5, successes=5)
-    url = bring_up_traefik_without_certificate_provider(juju)
-
-    juju.refresh(TRAEFIK_APP_NAME, path=traefik_charm, resources=TRAEFIK_RESOURCES)
-    juju.wait(all_settled, error=jubilant.any_error, delay=5, timeout=900, successes=5)
-    assert_traefik_revision(juju, 0)
-
-    verify_http_on_all_units(juju, expected_url=url)
+    run_no_tls_upgrade_scenario(juju, traefik_charm, TRAEFIK_RESOURCES, SOURCE_REVISION)
