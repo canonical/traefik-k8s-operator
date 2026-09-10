@@ -62,8 +62,9 @@ def test_upgrade_mtls_from_280_via_298(
         num_units=NUM_TRAEFIK_UNITS,
         trust=True,
     )
+    bring_up_certified_traefik(juju, tmp_path)
     juju.wait(jubilant.all_agents_idle, error=jubilant.any_error, timeout=900, delay=5, successes=5)
-    url = bring_up_certified_traefik(juju, tmp_path)
+    url = verify_https_through_all_traefik_units(juju)
 
     # Intermediate hop: 280 -> 298. The intermediate revision raises a fresh
     # CSR, so sign until every unit is serving again, then confirm HTTPS works.

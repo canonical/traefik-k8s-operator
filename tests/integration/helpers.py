@@ -48,9 +48,9 @@ ca_cert_path: Optional[Path] = None
 signed_certificates: List[str] = []
 
 
-def all_settled(status: jubilant.Status) -> bool:
+def all_settled(status: jubilant.Status, *apps: str) -> bool:
     """Return True when all apps are active and all agents are idle."""
-    return jubilant.all_active(status) and jubilant.all_agents_idle(status)
+    return jubilant.all_active(status, *apps) and jubilant.all_agents_idle(status)
 
 
 def assert_can_connect(ip: str, port: int) -> None:
@@ -519,45 +519,45 @@ def verify_https_through_unit(juju: jubilant.Juju, unit_name: str, ingress_url: 
 
 
 # --- Composite flows --------------------------------------------------------
-def bring_up_certified_traefik(juju: jubilant.Juju, tmp_path: Path) -> str:
-    """Integrate the mTLS + ingress stack, sign traefik's CSRs and verify HTTPS.
+def bring_up_certified_traefik(juju: jubilant.Juju, tmp_path: Path) -> None:
+    """Integrate the mTLS + ingress stack and sign traefik's CSRs.
 
     Creates the throwaway CA (populating the module-level CA globals) and assumes
     traefik, manual-tls-certificates and the ingress requirer have all been deployed (the
-    latter two via the ``mtls_app`` / ``ingress_app`` fixtures). Returns the ingress URL
-    so the caller can assert it is unchanged after upgrading.
+    latter two via the ``mtls_app`` / ``ingress_app`` fixtures).
     """
     generate_ca(tmp_path)
 
     juju.integrate(f"{INGRESS_REQUIRER_APP_NAME}:require-ingress", TRAEFIK_APP_NAME)
-    juju.wait(all_settled, error=jubilant.any_error, timeout=900, delay=5, successes=5)
     juju.integrate(f"{MANUAL_TLS_APP_NAME}:certificates", f"{TRAEFIK_APP_NAME}:certificates")
 
     juju.wait(
-        jubilant.all_agents_idle, error=jubilant.any_error, timeout=900, delay=5, successes=5
+        lambda status: all_settled(status, MANUAL_TLS_APP_NAME),
+        error=jubilant.any_error,
+        delay=5,
+        timeout=900,
+        successes=5,
     )
     sign_csrs_and_provide_cert(juju)
-    juju.wait(all_settled, error=jubilant.any_error, timeout=900, delay=5, successes=5)
-
-    return verify_https_through_all_traefik_units(juju)
 
 
 def bring_up_self_signed_traefik(
     juju: jubilant.Juju, tmp_path: Path, ssc_app: str = SSC_APP_NAME
-) -> str:
-    """Integrate self-signed-certificates + the ingress requirer and verify HTTPS."""
+) -> None:
+    """Integrate self-signed-certificates + the ingress requirer and pull the CA cert."""
     juju.integrate(f"{INGRESS_REQUIRER_APP_NAME}:require-ingress", TRAEFIK_APP_NAME)
-    juju.wait(all_settled, error=jubilant.any_error, timeout=900, delay=5, successes=5)
     juju.integrate(f"{ssc_app}:certificates", f"{TRAEFIK_APP_NAME}:certificates")
 
-    juju.wait(all_settled, error=jubilant.any_error, delay=5, timeout=900, successes=5)
+    juju.wait(
+        lambda status: all_settled(status, ssc_app),
+        error=jubilant.any_error,
+        delay=5,
+        timeout=900,
+        successes=5,
+    )
     pull_ssc_ca_certificate(juju, tmp_path, ssc_app=ssc_app)
 
-    return verify_https_through_all_traefik_units(juju)
 
-
-def bring_up_traefik_without_certificate_provider(juju: jubilant.Juju) -> str:
-    """Integrate the ingress requirer and verify plain HTTP on all traefik units."""
+def bring_up_traefik_without_certificate_provider(juju: jubilant.Juju) -> None:
+    """Integrate the ingress requirer."""
     juju.integrate(f"{INGRESS_REQUIRER_APP_NAME}:require-ingress", TRAEFIK_APP_NAME)
-    juju.wait(all_settled, error=jubilant.any_error, delay=5, timeout=900, successes=5)
-    return verify_http_through_all_traefik_units(juju)

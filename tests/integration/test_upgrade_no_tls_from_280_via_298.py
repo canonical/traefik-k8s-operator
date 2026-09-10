@@ -33,9 +33,7 @@ INTERMEDIATE_REVISION = 298
 
 
 @pytest.mark.setup
-def test_upgrade_no_tls_from_280_via_298(
-    juju: jubilant.Juju, traefik_charm, ingress_app
-):
+def test_upgrade_no_tls_from_280_via_298(juju: jubilant.Juju, traefik_charm, ingress_app):
     """Traefik stays healthy and serves HTTP across a 280 -> 298 -> current path."""
     juju.deploy(
         TRAEFIK_CHARM,
@@ -46,8 +44,9 @@ def test_upgrade_no_tls_from_280_via_298(
         num_units=NUM_TRAEFIK_UNITS,
         trust=True,
     )
-    juju.wait(jubilant.all_agents_idle, error=jubilant.any_error, timeout=900, delay=5, successes=5)
-    url = bring_up_traefik_without_certificate_provider(juju)
+    bring_up_traefik_without_certificate_provider(juju)
+    juju.wait(all_settled, error=jubilant.any_error, delay=5, timeout=900, successes=5)
+    url = verify_http_through_all_traefik_units(juju)
 
     juju.refresh(TRAEFIK_APP_NAME, channel=SOURCE_CHANNEL, revision=INTERMEDIATE_REVISION)
     juju.wait(all_settled, error=jubilant.any_error, delay=5, timeout=900, successes=5)

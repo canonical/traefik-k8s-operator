@@ -55,8 +55,9 @@ def run_no_tls_upgrade_scenario(
         num_units=NUM_TRAEFIK_UNITS,
         trust=True,
     )
-    juju.wait(jubilant.all_agents_idle, error=jubilant.any_error, timeout=900, delay=5, successes=5)
-    url = bring_up_traefik_without_certificate_provider(juju)
+    bring_up_traefik_without_certificate_provider(juju)
+    juju.wait(all_settled, error=jubilant.any_error, delay=5, timeout=900, successes=5)
+    url = verify_http_through_all_traefik_units(juju)
 
     juju.refresh(TRAEFIK_APP_NAME, path=traefik_charm, resources=traefik_resources)
     juju.wait(all_settled, error=jubilant.any_error, delay=5, timeout=900, successes=5)
@@ -86,8 +87,9 @@ def run_ssc_upgrade_scenario(
         num_units=NUM_TRAEFIK_UNITS,
         trust=True,
     )
-    juju.wait(jubilant.all_agents_idle, error=jubilant.any_error, timeout=900, delay=5, successes=5)
-    url = bring_up_self_signed_traefik(juju, tmp_path)
+    bring_up_self_signed_traefik(juju, tmp_path)
+    juju.wait(all_settled, error=jubilant.any_error, delay=5, timeout=900, successes=5)
+    url = verify_https_through_all_traefik_units(juju)
 
     juju.refresh(TRAEFIK_APP_NAME, path=traefik_charm, resources=traefik_resources)
     juju.wait(all_settled, error=jubilant.any_error, delay=5, timeout=900, successes=5)
@@ -116,8 +118,9 @@ def run_ssc_single_unit_upgrade_scenario(
         revision=source_revision,
         trust=True,
     )
-    juju.wait(jubilant.all_agents_idle, error=jubilant.any_error, timeout=900, delay=5, successes=5)
-    url = bring_up_self_signed_traefik(juju, tmp_path)
+    bring_up_self_signed_traefik(juju, tmp_path)
+    juju.wait(all_settled, error=jubilant.any_error, delay=5, timeout=900, successes=5)
+    url = verify_https_through_all_traefik_units(juju)
     unit_name = next(iter(juju.status().apps[TRAEFIK_APP_NAME].units))
 
     juju.refresh(TRAEFIK_APP_NAME, path=traefik_charm, resources=traefik_resources)
@@ -148,8 +151,9 @@ def run_mtls_upgrade_scenario(
         num_units=NUM_TRAEFIK_UNITS,
         trust=True,
     )
-    juju.wait(jubilant.all_agents_idle, error=jubilant.any_error, timeout=900, delay=5, successes=5)
-    url = bring_up_certified_traefik(juju, tmp_path)
+    bring_up_certified_traefik(juju, tmp_path)
+    juju.wait(all_settled, error=jubilant.any_error, delay=5, timeout=900, successes=5)
+    url = verify_https_through_all_traefik_units(juju)
 
     juju.refresh(TRAEFIK_APP_NAME, path=traefik_charm, resources=traefik_resources)
     juju.wait(all_settled, error=jubilant.any_error, delay=5, timeout=900, successes=5)
@@ -182,8 +186,9 @@ def run_mtls_single_unit_upgrade_scenario(
         revision=source_revision,
         trust=True,
     )
-    juju.wait(jubilant.all_agents_idle, error=jubilant.any_error, timeout=900, delay=5, successes=5)
-    url = bring_up_certified_traefik(juju, tmp_path)
+    bring_up_certified_traefik(juju, tmp_path)
+    juju.wait(all_settled, error=jubilant.any_error, delay=5, timeout=900, successes=5)
+    url = verify_https_through_all_traefik_units(juju)
     unit_name = next(iter(juju.status().apps[TRAEFIK_APP_NAME].units))
 
     juju.refresh(TRAEFIK_APP_NAME, path=traefik_charm, resources=traefik_resources)

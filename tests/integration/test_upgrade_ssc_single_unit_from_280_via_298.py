@@ -14,6 +14,7 @@ from helpers import (
     all_settled,
     assert_traefik_revision,
     bring_up_self_signed_traefik,
+    verify_https_through_all_traefik_units,
     verify_https_through_unit,
 )
 
@@ -36,8 +37,9 @@ def test_upgrade_ssc_single_unit_from_280_via_298(
         revision=SOURCE_REVISION,
         trust=True,
     )
-    juju.wait(jubilant.all_agents_idle, error=jubilant.any_error, timeout=900, delay=5, successes=5)
-    url = bring_up_self_signed_traefik(juju, tmp_path)
+    bring_up_self_signed_traefik(juju, tmp_path)
+    juju.wait(all_settled, error=jubilant.any_error, delay=5, timeout=900, successes=5)
+    url = verify_https_through_all_traefik_units(juju)
     unit_name = next(iter(juju.status().apps[TRAEFIK_APP_NAME].units))
 
     juju.refresh(TRAEFIK_APP_NAME, channel=SOURCE_CHANNEL, revision=INTERMEDIATE_REVISION)
