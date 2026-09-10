@@ -360,14 +360,14 @@ def pull_ssc_ca_certificate(
 
 
 # --- Verification -----------------------------------------------------------
-def proxied_ingress_url(juju: jubilant.Juju, traefik_app_name: str, endpoint_key: str) -> str:
+def proxied_url(juju: jubilant.Juju, traefik_app_name: str, endpoint_key: str) -> str:
     """Return endpoint_key's URL (no trailing slash), routed through traefik_app_name's gateway."""
     result = juju.run(f"{traefik_app_name}/leader", "show-proxied-endpoints")
     endpoints = json.loads(result.results["proxied-endpoints"])
     return endpoints[endpoint_key]["url"].rstrip("/")
 
 
-def external_ingress_url(juju: jubilant.Juju, traefik_app_name: str, endpoint_key: str) -> str:
+def external_url(juju: jubilant.Juju, traefik_app_name: str, endpoint_key: str) -> str:
     """Return endpoint_key's URL (no trailing slash), honoring any upstream-ingress chaining."""
     result = juju.run(f"{traefik_app_name}/leader", "show-external-endpoints")
     endpoints = json.loads(result.results["external-endpoints"])
@@ -395,7 +395,7 @@ def verify_https_through_all_traefik_units(
     Returns the ingress URL that was verified so callers can assert it is
     unchanged across an upgrade.
     """
-    base_url = proxied_ingress_url(juju, TRAEFIK_APP_NAME, INGRESS_REQUIRER_APP_NAME)
+    base_url = proxied_url(juju, TRAEFIK_APP_NAME, INGRESS_REQUIRER_APP_NAME)
     ingress_url = f"{base_url}/health"
     if expected_url is not None:
         assert ingress_url == expected_url, (
@@ -428,7 +428,7 @@ def verify_http_through_all_traefik_units(
     Returns the ingress URL that was verified so callers can assert it is
     unchanged across an upgrade.
     """
-    base_url = proxied_ingress_url(juju, TRAEFIK_APP_NAME, INGRESS_REQUIRER_APP_NAME)
+    base_url = proxied_url(juju, TRAEFIK_APP_NAME, INGRESS_REQUIRER_APP_NAME)
     ingress_url = f"{base_url}/health"
     assert ingress_url.startswith("http://"), (
         f"expected plain HTTP proxied URL without a certificate provider, got {ingress_url!r}"

@@ -21,7 +21,7 @@ from tests.integration.any_charm_helpers import (
 from tests.integration.helpers import (
     all_settled,
     get_k8s_service_address,
-    proxied_ingress_url,
+    proxied_url,
     pull_ssc_ca_certificate,
     remove_application,
 )
@@ -136,7 +136,7 @@ def test_cleanup(juju: jubilant.Juju):
 
 
 def _endpoint(juju: jubilant.Juju, scheme: str, netloc: str) -> str:
-    base_url = proxied_ingress_url(juju, TRAEFIK_APP, INGRESS_APP)
+    base_url = proxied_url(juju, TRAEFIK_APP, INGRESS_APP)
     ingress_path = f"{urlsplit(base_url).path}/health"
     return f"{scheme}://{netloc}{ingress_path}"
 
