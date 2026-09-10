@@ -21,9 +21,9 @@ Scenario:
 
 import logging
 
+import httpx2
 import jubilant
 import pytest
-import requests
 from conftest import TRAEFIK_APP_NAME, TRAEFIK_RESOURCES
 from constants import (
     MOCK_HOSTNAME,
@@ -83,7 +83,7 @@ def test_leader_change_breaks_tls_then_upgrade_blocks_and_requests_certificate(
     # longer trusted (or the endpoint is down) -- HTTPS must fail here.
     try:
         verify_https_on_unit(juju, new_leader, ingress_url)
-    except (requests.exceptions.SSLError, requests.exceptions.ConnectionError):
+    except (httpx2.ConnectError, httpx2.ConnectTimeout):
         pass  # expected: cert no longer trusted / endpoint down
     else:
         raise AssertionError(

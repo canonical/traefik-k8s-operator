@@ -7,8 +7,8 @@
 import json
 from pathlib import Path
 
+import httpx2
 import jubilant
-import requests
 import yaml
 
 from tests.integration.any_charm_helpers import (
@@ -179,5 +179,5 @@ def _traefik_url(juju: jubilant.Juju, app_name: str) -> str:
 
 
 def _assert_url_returns(url: str, expected: int) -> None:
-    response = requests.get(url, timeout=10, verify=False)
+    response = httpx2.get(url, timeout=10, verify=False)
     assert response.status_code == expected, f"Expected {expected} from {url}, got {response.status_code}"

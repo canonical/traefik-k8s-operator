@@ -6,8 +6,8 @@
 
 from pathlib import Path
 
+import httpx2
 import jubilant
-import requests
 import yaml
 from tenacity import retry, retry_if_exception_type, retry_if_result, stop_after_delay, wait_fixed
 
@@ -86,11 +86,11 @@ def _assert_status(
         wait=wait_fixed(2),
         retry=(
             retry_if_result(lambda r: r.status_code != expected_status)
-            | retry_if_exception_type(requests.exceptions.RequestException)
+            | retry_if_exception_type(httpx2.RequestError)
         ),
         reraise=True,
     )
-    def _fetch() -> requests.Response:
-        return requests.get(url, auth=auth, verify=False, timeout=10)
+    def _fetch() -> httpx2.Response:
+        return httpx2.get(url, auth=auth, verify=False, timeout=10)
 
     _fetch()
