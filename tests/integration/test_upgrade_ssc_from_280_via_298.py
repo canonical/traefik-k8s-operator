@@ -22,10 +22,10 @@ from conftest import TRAEFIK_APP_NAME, TRAEFIK_RESOURCES
 from constants import MOCK_HOSTNAME, NUM_TRAEFIK_UNITS, SOURCE_CHANNEL, TRAEFIK_CHARM
 from helpers import (
     all_settled,
+    assert_traefik_revision,
     bring_up_self_signed_traefik,
     verify_https_on_all_units,
 )
-from upgrade_tests_helper import assert_traefik_revision
 
 logger = logging.getLogger(__name__)
 

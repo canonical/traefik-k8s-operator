@@ -25,12 +25,12 @@ from conftest import MANUAL_TLS_APP_NAME, TRAEFIK_APP_NAME, TRAEFIK_RESOURCES
 from constants import MOCK_HOSTNAME, SOURCE_CHANNEL, TRAEFIK_CHARM
 from helpers import (
     all_settled,
+    assert_traefik_revision,
     bring_up_certified_traefik,
     get_outstanding_csrs,
     sign_csrs_and_provide_cert,
     verify_https_on_unit,
 )
-from upgrade_tests_helper import assert_traefik_revision
 
 logger = logging.getLogger(__name__)
 
