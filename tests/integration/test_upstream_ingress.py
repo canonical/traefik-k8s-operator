@@ -33,10 +33,7 @@ _TRAEFIK_RESOURCES = {
 
 def test_deployment(juju: jubilant.Juju, traefik_charm):
     juju.deploy(traefik_charm, TRAEFIK, resources=_TRAEFIK_RESOURCES, trust=True)
-    juju.wait(all_settled, error=jubilant.any_error, timeout=1000, delay=5, successes=5)
 
-
-def test_deploy_dependencies(juju: jubilant.Juju, traefik_charm):
     juju.deploy(
         "ch:self-signed-certificates",
         CERTIFICATE_PROVIDER,
@@ -48,10 +45,7 @@ def test_deploy_dependencies(juju: jubilant.Juju, traefik_charm):
         resources=_TRAEFIK_RESOURCES,
         trust=True,
     )
-    juju.wait(all_settled, error=jubilant.any_error, timeout=1000, delay=5, successes=5)
 
-
-def test_deploy_testers(juju: jubilant.Juju):
     config = {
         "src-overwrite": ingress_requirer_mock_src_overwrite(),
         "python-packages": PYTHON_PACKAGES,
@@ -77,10 +71,7 @@ def test_deploy_testers(juju: jubilant.Juju):
         config=config,
         trust=True,
     )
-    juju.wait(all_settled, error=jubilant.any_error, timeout=1000, delay=5, successes=5)
 
-
-def test_relate_testers(juju: jubilant.Juju):
     juju.integrate(f"{TRAEFIK}:ingress", f"{IPA_TESTER}:require-ingress")
     juju.integrate(f"{TRAEFIK}:ingress-per-unit", f"{IPU_TESTER}:require-ingress-per-unit")
     juju.integrate(f"{TRAEFIK}:traefik-route", f"{ROUTE_TESTER}:require-traefik-route")
