@@ -30,7 +30,6 @@ from helpers import (
     get_outstanding_csrs,
     sign_csrs_and_provide_cert,
     verify_https_through_all_traefik_units,
-    verify_https_through_unit,
 )
 
 logger = logging.getLogger(__name__)
@@ -55,7 +54,6 @@ def test_upgrade_mtls_single_unit_from_280_via_298(
     bring_up_certified_traefik(juju, tmp_path)
     juju.wait(jubilant.all_agents_idle, error=jubilant.any_error, timeout=900, delay=5, successes=5)
     url = verify_https_through_all_traefik_units(juju)
-    unit_name = next(iter(juju.status().apps[TRAEFIK_APP_NAME].units))
 
     juju.refresh(TRAEFIK_APP_NAME, channel=SOURCE_CHANNEL, revision=INTERMEDIATE_REVISION)
     juju.wait(jubilant.all_agents_idle, error=jubilant.any_error, timeout=900, delay=5, successes=5)
@@ -64,13 +62,13 @@ def test_upgrade_mtls_single_unit_from_280_via_298(
     juju.wait(all_settled, error=jubilant.any_error, timeout=900, delay=5, successes=5)
     assert_traefik_revision(juju, INTERMEDIATE_REVISION)
 
-    verify_https_through_unit(juju, unit_name, url)
+    verify_https_through_all_traefik_units(juju, expected_url=url)
 
     juju.refresh(TRAEFIK_APP_NAME, path=traefik_charm, resources=TRAEFIK_RESOURCES)
     juju.wait(all_settled, error=jubilant.any_error, delay=5, timeout=900, successes=5)
     assert_traefik_revision(juju, 0)
 
-    verify_https_through_unit(juju, unit_name, url)
+    verify_https_through_all_traefik_units(juju, expected_url=url)
     assert len(get_outstanding_csrs(juju)) == 0, (
         "manual-tls-certificates has outstanding requests after upgrade; "
         "the TLS private key was not reused during migration"
