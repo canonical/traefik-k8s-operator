@@ -49,9 +49,7 @@ IPU_TESTER_APP = "ipu-tester"
 TCP_TESTER_APP = "tcp-tester"
 
 _METADATA = yaml.safe_load(Path("./metadata.yaml").read_text(encoding="utf-8"))
-_TRAEFIK_RESOURCES = {
-    name: val["upstream-source"] for name, val in _METADATA["resources"].items()
-}
+_TRAEFIK_RESOURCES = {name: val["upstream-source"] for name, val in _METADATA["resources"].items()}
 
 
 def test_deployment(juju: jubilant.Juju, traefik_charm):
@@ -138,10 +136,7 @@ def test_remove_all_relations(juju: jubilant.Juju):
         f"{TRAEFIK_APP}:ingress-per-unit",
     )
     juju.wait(
-        lambda status: (
-            jubilant.all_active(status, TRAEFIK_APP, IPA_TESTER_APP, IPU_TESTER_APP)
-            and jubilant.all_agents_idle(status)
-        ),
+        lambda status: all_settled(status, TRAEFIK_APP, IPA_TESTER_APP, IPU_TESTER_APP),
         error=jubilant.any_error,
         timeout=300,
         delay=5,
