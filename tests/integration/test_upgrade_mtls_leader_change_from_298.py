@@ -33,12 +33,11 @@ from constants import (
 )
 from helpers import (
     all_settled,
-    assert_traefik_revision,
     bring_up_certified_traefik,
-    force_leader_change,
     get_outstanding_csrs,
     verify_https_on_unit,
 )
+from upgrade_tests_helper import assert_traefik_revision, force_leader_change
 
 logger = logging.getLogger(__name__)
 

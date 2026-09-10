@@ -18,7 +18,7 @@ Scenario:
 import jubilant
 import pytest
 from conftest import TRAEFIK_RESOURCES
-from helpers import run_mtls_upgrade_scenario
+from upgrade_tests_helper import run_mtls_upgrade_scenario
 
 SOURCE_REVISION = 280
 

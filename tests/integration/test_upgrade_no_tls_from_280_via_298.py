@@ -19,8 +19,8 @@ import jubilant
 import pytest
 from conftest import TRAEFIK_APP_NAME, TRAEFIK_RESOURCES
 from constants import MOCK_HOSTNAME, NUM_TRAEFIK_UNITS, SOURCE_CHANNEL, TRAEFIK_CHARM
-from helpers import (
-    all_settled,
+from helpers import all_settled
+from upgrade_tests_helper import (
     assert_traefik_revision,
     bring_up_traefik_without_certificate_provider,
     verify_http_on_all_units,

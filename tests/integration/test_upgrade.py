@@ -13,7 +13,8 @@ from tests.integration.any_charm_helpers import (
     health_src_overwrite,
 )
 from tests.integration.constants import INGRESS_REQUIRER_APP_NAME
-from tests.integration.helpers import all_settled, assert_traefik_revision
+from tests.integration.helpers import all_settled
+from tests.integration.upgrade_tests_helper import assert_traefik_revision
 
 TRAEFIK_APP_NAME = "traefik"
 SSC_APP_NAME = "ssc"
