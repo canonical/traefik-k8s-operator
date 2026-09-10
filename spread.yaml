@@ -36,8 +36,8 @@ integration-suites:
     pytest-arguments-template: '-x --log-format="%(asctime)s %(levelname)s %(message)s" --no-juju-teardown --juju-model testing --base {{ env.get("BASE", "ubuntu@26.04") }}'
     environment:
       # Base 20.04 tests
-      BASE/jubilant_test_ingress_relation_types_2004: ubuntu@20.04
-      MODULE/jubilant_test_ingress_relation_types_2004: tests/integration/test_ingress_relation_types.py
+      BASE/jubilant_test_ingress_relations_2004: ubuntu@20.04
+      MODULE/jubilant_test_ingress_relations_2004: tests/integration/test_ingress_relations.py
       BASE/jubilant_test_upgrade_2004: ubuntu@20.04
       MODULE/jubilant_test_upgrade_2004: tests/integration/test_upgrade.py
       # Manual-TLS upgrade tests: the source Charmhub revisions come up on
@@ -73,7 +73,7 @@ integration-suites:
     auto-discover: false
     pytest-arguments-template: '-x --log-format="%(asctime)s %(levelname)s %(message)s" --no-juju-teardown --juju-model testing'
     environment:
-      MODULE/jubilant_test_ingress_relation_types: tests/integration/test_ingress_relation_types.py
+      MODULE/jubilant_test_ingress_relations: tests/integration/test_ingress_relations.py
   tests/integration/juju4/:
     working-dir: ./
     summary: integration tests
