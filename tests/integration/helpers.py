@@ -157,32 +157,48 @@ def wait_for_tcp_echo(host: str, port: int, payload: bytes = b"Hello, world") ->
 
 def fetch_with_retry(
     url: str,
-    expected_status: int = 200,
+    expected_status: Optional[int] = None,
     *,
+    client: Optional[httpx2.Client] = None,
     auth: Optional[Tuple[str, str]] = None,
+    raise_for_status: bool = False,
+    timeout: float = 10,
     stop: stop_base = stop_after_delay(150),
     wait: wait_base = wait_fixed(5),
+    **kwargs: Any,
 ) -> httpx2.Response:
-    """Fetch a URL with retries until the expected status is returned.
+    """Fetch a URL with retries.
 
-    *stop* and *wait* let callers use their own retry cadence while sharing the
-    same request/retry-condition mechanics.
+    Always retries on request errors, plus on a status mismatch if *expected_status* is
+    given. Set *raise_for_status* to fail on a bad final response instead of retrying it
+    forever (don't combine with a non-2xx *expected_status*). Pass an existing *client* to
+    reuse its TLS/header/etc. config (needed e.g. for the ``extensions`` kwarg); otherwise
+    each attempt is a one-off request.
     """
+    retry_condition = retry_if_exception_type(httpx2.RequestError)
+    if expected_status is not None:
+        retry_condition = (
+            retry_if_result(lambda r: r.status_code != expected_status) | retry_condition
+        )
 
     @retry(
         stop=stop,
         wait=wait,
-        retry=(
-            retry_if_result(lambda r: r.status_code != expected_status)
-            | retry_if_exception_type(httpx2.RequestError)
-        ),
+        retry=retry_condition,
         reraise=True,
         before_sleep=before_sleep_log(logger, logging.DEBUG),
     )
     def _fetch() -> httpx2.Response:
-        return httpx2.get(url, auth=auth, verify=False, follow_redirects=True, timeout=10)
+        if client is not None:
+            return client.get(url, timeout=timeout, **kwargs)
+        return httpx2.get(
+            url, auth=auth, verify=False, follow_redirects=True, timeout=timeout, **kwargs
+        )
 
-    return _fetch()
+    response = _fetch()
+    if raise_for_status:
+        response.raise_for_status()
+    return response
 
 
 def assert_traefik_revision(juju: jubilant.Juju, expected_revision: int) -> None:
@@ -358,28 +374,6 @@ def external_ingress_url(juju: jubilant.Juju, traefik_app_name: str, endpoint_ke
     return endpoints[endpoint_key]["url"].rstrip("/")
 
 
-@retry(
-    # httpx2.ConnectError (e.g. connection refused) and httpx2.ConnectTimeout are
-    # siblings, not parent/child (unlike requests, where ConnectTimeout subclasses
-    # ConnectionError), so both must be listed explicitly here.
-    retry=retry_if_exception_type((httpx2.ConnectError, httpx2.ConnectTimeout)),
-    stop=stop_after_delay(120),
-    wait=wait_fixed(5),
-    before_sleep=before_sleep_log(logger, logging.INFO),
-    reraise=True,
-)
-def _get_with_retry(client: httpx2.Client, url: str, **kwargs: Any) -> None:
-    """GET *url* via *client*, retrying on connection errors for up to two minutes.
-
-    Juju can report a unit ``active/idle`` a beat before the traefik workload has
-    reloaded and started listening on :443 with the freshly-signed certificate, so
-    the first request to a just-upgraded unit may be refused. Retry that transient
-    window instead of failing the whole test.
-    """
-    response = client.get(url, timeout=30, **kwargs)
-    response.raise_for_status()
-
-
 def _url_for_unit(url: str, unit_ip: str) -> str:
     """Rewrite *url* to target *unit_ip* directly, preserving the path.
 
@@ -415,9 +409,10 @@ def verify_https_on_all_units(
         for unit_name, unit_status in units.items():
             unit_ip = unit_status.address
             logger.info("Verifying HTTPS on %s (%s) -> %s", unit_name, unit_ip, ingress_url)
-            _get_with_retry(
-                client,
+            fetch_with_retry(
                 _url_for_unit(ingress_url, unit_ip),
+                client=client,
+                raise_for_status=True,
                 extensions={"sni_hostname": MOCK_HOSTNAME},
             )
 
@@ -450,7 +445,11 @@ def verify_http_on_all_units(
         for unit_name, unit_status in units.items():
             unit_ip = unit_status.address
             logger.info("Verifying HTTP on %s (%s) -> %s", unit_name, unit_ip, ingress_url)
-            _get_with_retry(client, _url_for_unit(ingress_url, unit_ip))
+            fetch_with_retry(
+                _url_for_unit(ingress_url, unit_ip),
+                client=client,
+                raise_for_status=True,
+            )
 
     return ingress_url
 
@@ -527,7 +526,11 @@ def verify_http_on_unit(juju: jubilant.Juju, unit_name: str, ingress_url: str) -
     unit_ip = _unit_address(juju, unit_name)
     logger.info("Verifying HTTP on %s (%s) -> %s", unit_name, unit_ip, ingress_url)
     with httpx2.Client(headers={"Host": MOCK_HOSTNAME}) as client:
-        _get_with_retry(client, _url_for_unit(ingress_url, unit_ip))
+        fetch_with_retry(
+            _url_for_unit(ingress_url, unit_ip),
+            client=client,
+            raise_for_status=True,
+        )
 
 
 # --- Composite flows --------------------------------------------------------
