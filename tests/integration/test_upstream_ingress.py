@@ -4,7 +4,6 @@
 
 """Tests that Traefik works correctly when it has an upstream ingress."""
 
-import json
 from pathlib import Path
 
 import jubilant
@@ -16,7 +15,7 @@ from tests.integration.any_charm_helpers import (
     PYTHON_PACKAGES,
     ingress_requirer_mock_src_overwrite,
 )
-from tests.integration.helpers import all_settled, fetch_with_retry
+from tests.integration.helpers import all_settled, external_ingress_url, fetch_with_retry
 
 TRAEFIK = "traefik-k8s"
 UPSTREAM_INGRESS = f"{TRAEFIK}-upstream"
@@ -79,15 +78,16 @@ def test_deployment(juju: jubilant.Juju, traefik_charm):
 
 
 def test_ipa_ingressed_no_upstream_ingress(juju: jubilant.Juju):
-    fetch_with_retry(f"{_traefik_url(juju, TRAEFIK)}/{juju.model}-{IPA_TESTER}")
+    fetch_with_retry(external_ingress_url(juju, TRAEFIK, IPA_TESTER))
 
 
 def test_ipu_ingressed_no_upstream_ingress(juju: jubilant.Juju):
-    fetch_with_retry(f"{_traefik_url(juju, TRAEFIK)}/{juju.model}-{IPU_TESTER}-0")
+    fetch_with_retry(external_ingress_url(juju, TRAEFIK, f"{IPU_TESTER}/0"))
 
 
 def test_traefik_route_ingressed_no_upstream_ingress(juju: jubilant.Juju):
-    fetch_with_retry(f"{_traefik_url(juju, TRAEFIK)}/{juju.model}-{ROUTE_TESTER}-traefik-route")
+    traefik_url = external_ingress_url(juju, TRAEFIK, TRAEFIK)
+    fetch_with_retry(f"{traefik_url}/{juju.model}-{ROUTE_TESTER}-traefik-route")
 
 
 def test_add_upstream_ingress(juju: jubilant.Juju):
@@ -96,24 +96,16 @@ def test_add_upstream_ingress(juju: jubilant.Juju):
 
 
 def test_ipa_ingressed_through_upstream_ingress(juju: jubilant.Juju):
-    fetch_with_retry(
-        f"{_traefik_url(juju, UPSTREAM_INGRESS)}/{juju.model}-{TRAEFIK}/{juju.model}-{IPA_TESTER}"
-    )
+    fetch_with_retry(external_ingress_url(juju, TRAEFIK, IPA_TESTER))
 
 
 def test_ipu_ingressed_through_upstream_ingress(juju: jubilant.Juju):
-    fetch_with_retry(
-        f"{_traefik_url(juju, UPSTREAM_INGRESS)}/{juju.model}-{TRAEFIK}/{juju.model}-{IPU_TESTER}-0"
-    )
+    fetch_with_retry(external_ingress_url(juju, TRAEFIK, f"{IPU_TESTER}/0"))
 
 
 def test_traefik_route_ingressed_through_upstream_ingress(juju: jubilant.Juju):
-    fetch_with_retry(
-        (
-            f"{_traefik_url(juju, UPSTREAM_INGRESS)}/"
-            f"{juju.model}-{TRAEFIK}/{juju.model}-{ROUTE_TESTER}-traefik-route"
-        )
-    )
+    traefik_url = external_ingress_url(juju, TRAEFIK, TRAEFIK)
+    fetch_with_retry(f"{traefik_url}/{juju.model}-{ROUTE_TESTER}-traefik-route")
 
 
 def test_traefik_with_upstream_ingress_blocked_if_in_subdomain_mode(juju: jubilant.Juju):
@@ -142,27 +134,13 @@ def test_add_tls_to_all_ingresses(juju: jubilant.Juju):
 
 
 def test_ipa_ingressed_through_upstream_ingress_with_tls(juju: jubilant.Juju):
-    fetch_with_retry(
-        f"{_traefik_url(juju, UPSTREAM_INGRESS)}/{juju.model}-{TRAEFIK}/{juju.model}-{IPA_TESTER}"
-    )
+    fetch_with_retry(external_ingress_url(juju, TRAEFIK, IPA_TESTER))
 
 
 def test_ipu_ingressed_through_upstream_ingress_with_tls(juju: jubilant.Juju):
-    fetch_with_retry(
-        f"{_traefik_url(juju, UPSTREAM_INGRESS)}/{juju.model}-{TRAEFIK}/{juju.model}-{IPU_TESTER}-0"
-    )
+    fetch_with_retry(external_ingress_url(juju, TRAEFIK, f"{IPU_TESTER}/0"))
 
 
 def test_traefik_route_ingressed_through_upstream_ingress_with_tls(juju: jubilant.Juju):
-    fetch_with_retry(
-        (
-            f"{_traefik_url(juju, UPSTREAM_INGRESS)}/"
-            f"{juju.model}-{TRAEFIK}/{juju.model}-{ROUTE_TESTER}-traefik-route"
-        )
-    )
-
-
-def _traefik_url(juju: jubilant.Juju, app_name: str) -> str:
-    action = juju.run(f"{app_name}/0", "show-external-endpoints")
-    endpoints = json.loads(action.results["external-endpoints"])
-    return endpoints[app_name]["url"]
+    traefik_url = external_ingress_url(juju, TRAEFIK, TRAEFIK)
+    fetch_with_retry(f"{traefik_url}/{juju.model}-{ROUTE_TESTER}-traefik-route")
