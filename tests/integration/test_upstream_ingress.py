@@ -7,7 +7,6 @@
 import json
 from pathlib import Path
 
-import httpx2
 import jubilant
 import yaml
 
@@ -176,8 +175,3 @@ def _traefik_url(juju: jubilant.Juju, app_name: str) -> str:
     action = juju.run(f"{app_name}/0", "show-external-endpoints")
     endpoints = json.loads(action.results["external-endpoints"])
     return endpoints[app_name]["url"]
-
-
-def _assert_url_returns(url: str, expected: int) -> None:
-    response = httpx2.get(url, timeout=10, verify=False)
-    assert response.status_code == expected, f"Expected {expected} from {url}, got {response.status_code}"

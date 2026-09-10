@@ -11,7 +11,7 @@ import socket
 import subprocess
 import time
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Tuple
 from urllib.parse import urlsplit, urlunsplit
 
 import httpx2
@@ -37,6 +37,8 @@ from tenacity import (
     stop_after_delay,
     wait_fixed,
 )
+from tenacity.stop import stop_base
+from tenacity.wait import wait_base
 
 logger = logging.getLogger(__name__)
 
@@ -153,12 +155,23 @@ def wait_for_tcp_echo(host: str, port: int, payload: bytes = b"Hello, world") ->
     raise AssertionError(f"Timed out waiting for TCP echo on {host}:{port}")
 
 
-def fetch_with_retry(url: str, expected_status: int = 200) -> httpx2.Response:
-    """Fetch a URL with retries until the expected status is returned."""
+def fetch_with_retry(
+    url: str,
+    expected_status: int = 200,
+    *,
+    auth: Optional[Tuple[str, str]] = None,
+    stop: stop_base = stop_after_delay(150),
+    wait: wait_base = wait_fixed(5),
+) -> httpx2.Response:
+    """Fetch a URL with retries until the expected status is returned.
+
+    *stop* and *wait* let callers use their own retry cadence while sharing the
+    same request/retry-condition mechanics.
+    """
 
     @retry(
-        stop=stop_after_delay(150),
-        wait=wait_fixed(5),
+        stop=stop,
+        wait=wait,
         retry=(
             retry_if_result(lambda r: r.status_code != expected_status)
             | retry_if_exception_type(httpx2.RequestError)
@@ -167,7 +180,7 @@ def fetch_with_retry(url: str, expected_status: int = 200) -> httpx2.Response:
         before_sleep=before_sleep_log(logger, logging.DEBUG),
     )
     def _fetch() -> httpx2.Response:
-        return httpx2.get(url, verify=False, follow_redirects=True, timeout=10)
+        return httpx2.get(url, auth=auth, verify=False, follow_redirects=True, timeout=10)
 
     return _fetch()
 
