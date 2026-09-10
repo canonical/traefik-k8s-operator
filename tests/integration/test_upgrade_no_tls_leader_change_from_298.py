@@ -25,7 +25,7 @@ from helpers import (
     assert_traefik_revision,
     bring_up_traefik_without_certificate_provider,
     force_leader_change,
-    verify_http_on_all_units,
+    verify_http_through_all_traefik_units,
 )
 
 logger = logging.getLogger(__name__)
@@ -53,9 +53,9 @@ def test_upgrade_no_tls_leader_change_from_298(
     force_leader_change(juju, TRAEFIK_APP_NAME)
 
     juju.wait(all_settled, error=jubilant.any_error, timeout=900, delay=5, successes=5)
-    verify_http_on_all_units(juju, ingress_url)
+    verify_http_through_all_traefik_units(juju, ingress_url)
 
     juju.refresh(TRAEFIK_APP_NAME, path=traefik_charm, resources=TRAEFIK_RESOURCES)
     juju.wait(all_settled, error=jubilant.any_error, timeout=900, delay=5, successes=5)
     assert_traefik_revision(juju, 0)
-    verify_http_on_all_units(juju, ingress_url)
+    verify_http_through_all_traefik_units(juju, ingress_url)

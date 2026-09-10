@@ -29,8 +29,8 @@ from helpers import (
     bring_up_self_signed_traefik,
     bring_up_traefik_without_certificate_provider,
     get_outstanding_csrs,
-    verify_http_on_all_units,
-    verify_https_on_all_units,
+    verify_http_through_all_traefik_units,
+    verify_https_through_all_traefik_units,
     verify_https_on_unit,
 )
 
@@ -62,7 +62,7 @@ def run_no_tls_upgrade_scenario(
     juju.wait(all_settled, error=jubilant.any_error, delay=5, timeout=900, successes=5)
     assert_traefik_revision(juju, 0)
 
-    verify_http_on_all_units(juju, expected_url=url)
+    verify_http_through_all_traefik_units(juju, expected_url=url)
 
 
 def run_ssc_upgrade_scenario(
@@ -93,7 +93,7 @@ def run_ssc_upgrade_scenario(
     juju.wait(all_settled, error=jubilant.any_error, delay=5, timeout=900, successes=5)
     assert_traefik_revision(juju, 0)
 
-    verify_https_on_all_units(juju, expected_url=url)
+    verify_https_through_all_traefik_units(juju, expected_url=url)
 
 
 def run_ssc_single_unit_upgrade_scenario(
@@ -155,7 +155,7 @@ def run_mtls_upgrade_scenario(
     juju.wait(all_settled, error=jubilant.any_error, delay=5, timeout=900, successes=5)
     assert_traefik_revision(juju, 0)
 
-    verify_https_on_all_units(juju, expected_url=url)
+    verify_https_through_all_traefik_units(juju, expected_url=url)
     assert len(get_outstanding_csrs(juju)) == 0, (
         "manual-tls-certificates has outstanding requests after upgrade; "
         "the TLS private key was not reused during migration"

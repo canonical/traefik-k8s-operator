@@ -386,7 +386,7 @@ def _url_for_unit(url: str, unit_ip: str) -> str:
     return urlunsplit(parts._replace(netloc=netloc))
 
 
-def verify_https_on_all_units(
+def verify_https_through_all_traefik_units(
     juju: jubilant.Juju,
     expected_url: Optional[str] = None,
 ) -> str:
@@ -419,7 +419,7 @@ def verify_https_on_all_units(
     return ingress_url
 
 
-def verify_http_on_all_units(
+def verify_http_through_all_traefik_units(
     juju: jubilant.Juju,
     expected_url: Optional[str] = None,
 ) -> str:
@@ -552,7 +552,7 @@ def bring_up_certified_traefik(juju: jubilant.Juju, tmp_path: Path) -> str:
     sign_csrs_and_provide_cert(juju)
     juju.wait(all_settled, error=jubilant.any_error, timeout=900, delay=5, successes=5)
 
-    return verify_https_on_all_units(juju)
+    return verify_https_through_all_traefik_units(juju)
 
 
 def bring_up_self_signed_traefik(
@@ -566,11 +566,11 @@ def bring_up_self_signed_traefik(
     juju.wait(all_settled, error=jubilant.any_error, delay=5, timeout=900, successes=5)
     pull_ssc_ca_certificate(juju, tmp_path, ssc_app=ssc_app)
 
-    return verify_https_on_all_units(juju)
+    return verify_https_through_all_traefik_units(juju)
 
 
 def bring_up_traefik_without_certificate_provider(juju: jubilant.Juju) -> str:
     """Integrate the ingress requirer and verify plain HTTP on all traefik units."""
     juju.integrate(f"{INGRESS_REQUIRER_APP_NAME}:require-ingress", TRAEFIK_APP_NAME)
     juju.wait(all_settled, error=jubilant.any_error, delay=5, timeout=900, successes=5)
-    return verify_http_on_all_units(juju)
+    return verify_http_through_all_traefik_units(juju)

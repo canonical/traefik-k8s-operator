@@ -24,7 +24,7 @@ from helpers import (
     all_settled,
     assert_traefik_revision,
     bring_up_self_signed_traefik,
-    verify_https_on_all_units,
+    verify_https_through_all_traefik_units,
 )
 
 logger = logging.getLogger(__name__)
@@ -54,10 +54,10 @@ def test_upgrade_ssc_from_280_via_298(
     juju.wait(all_settled, error=jubilant.any_error, delay=5, timeout=900, successes=5)
     assert_traefik_revision(juju, INTERMEDIATE_REVISION)
 
-    verify_https_on_all_units(juju, expected_url=url)
+    verify_https_through_all_traefik_units(juju, expected_url=url)
 
     juju.refresh(TRAEFIK_APP_NAME, path=traefik_charm, resources=TRAEFIK_RESOURCES)
     juju.wait(all_settled, error=jubilant.any_error, delay=5, timeout=900, successes=5)
     assert_traefik_revision(juju, 0)
 
-    verify_https_on_all_units(juju, expected_url=url)
+    verify_https_through_all_traefik_units(juju, expected_url=url)
