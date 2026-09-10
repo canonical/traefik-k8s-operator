@@ -37,7 +37,7 @@ from helpers import (
     bring_up_certified_traefik,
     force_leader_change,
     get_outstanding_csrs,
-    verify_https_on_unit,
+    verify_https_through_unit,
 )
 
 logger = logging.getLogger(__name__)
@@ -75,14 +75,14 @@ def test_leader_change_breaks_tls_then_upgrade_blocks_and_requests_certificate(
         if name != new_leader
     ]
     for unit_name in working_units:
-        verify_https_on_unit(juju, unit_name, ingress_url)
+        verify_https_through_unit(juju, unit_name, ingress_url)
 
     juju.wait(lambda _: len(get_outstanding_csrs(juju)) == 1, error=jubilant.any_error, timeout=300)
 
     # The new leader lost the old leader's key, so its served certificate is no
     # longer trusted (or the endpoint is down) -- HTTPS must fail here.
     try:
-        verify_https_on_unit(juju, new_leader, ingress_url)
+        verify_https_through_unit(juju, new_leader, ingress_url)
     except (httpx2.ConnectError, httpx2.ConnectTimeout):
         pass  # expected: cert no longer trusted / endpoint down
     else:

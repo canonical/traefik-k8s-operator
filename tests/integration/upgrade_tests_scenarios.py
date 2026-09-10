@@ -31,7 +31,7 @@ from helpers import (
     get_outstanding_csrs,
     verify_http_through_all_traefik_units,
     verify_https_through_all_traefik_units,
-    verify_https_on_unit,
+    verify_https_through_unit,
 )
 
 
@@ -124,7 +124,7 @@ def run_ssc_single_unit_upgrade_scenario(
     juju.wait(all_settled, error=jubilant.any_error, delay=5, timeout=900, successes=5)
     assert_traefik_revision(juju, 0)
 
-    verify_https_on_unit(juju, unit_name, url)
+    verify_https_through_unit(juju, unit_name, url)
 
 
 def run_mtls_upgrade_scenario(
@@ -190,7 +190,7 @@ def run_mtls_single_unit_upgrade_scenario(
     juju.wait(all_settled, error=jubilant.any_error, delay=5, timeout=900, successes=5)
     assert_traefik_revision(juju, 0)
 
-    verify_https_on_unit(juju, unit_name, url)
+    verify_https_through_unit(juju, unit_name, url)
     assert len(get_outstanding_csrs(juju)) == 0, (
         "manual-tls-certificates has outstanding requests after upgrade; "
         "the TLS private key was not reused during migration"

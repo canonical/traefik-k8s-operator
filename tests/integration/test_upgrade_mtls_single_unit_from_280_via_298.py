@@ -29,7 +29,7 @@ from helpers import (
     bring_up_certified_traefik,
     get_outstanding_csrs,
     sign_csrs_and_provide_cert,
-    verify_https_on_unit,
+    verify_https_through_unit,
 )
 
 logger = logging.getLogger(__name__)
@@ -62,13 +62,13 @@ def test_upgrade_mtls_single_unit_from_280_via_298(
     juju.wait(all_settled, error=jubilant.any_error, timeout=900, delay=5, successes=5)
     assert_traefik_revision(juju, INTERMEDIATE_REVISION)
 
-    verify_https_on_unit(juju, unit_name, url)
+    verify_https_through_unit(juju, unit_name, url)
 
     juju.refresh(TRAEFIK_APP_NAME, path=traefik_charm, resources=TRAEFIK_RESOURCES)
     juju.wait(all_settled, error=jubilant.any_error, delay=5, timeout=900, successes=5)
     assert_traefik_revision(juju, 0)
 
-    verify_https_on_unit(juju, unit_name, url)
+    verify_https_through_unit(juju, unit_name, url)
     assert len(get_outstanding_csrs(juju)) == 0, (
         "manual-tls-certificates has outstanding requests after upgrade; "
         "the TLS private key was not reused during migration"

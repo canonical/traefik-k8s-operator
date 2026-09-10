@@ -505,7 +505,7 @@ def force_leader_change(juju: jubilant.Juju, app: str = TRAEFIK_APP_NAME) -> str
     return new_leader
 
 
-def verify_https_on_unit(juju: jubilant.Juju, unit_name: str, ingress_url: str) -> None:
+def verify_https_through_unit(juju: jubilant.Juju, unit_name: str, ingress_url: str) -> None:
     """Assert HTTPS returns 200 with the CA cert on a specific traefik unit."""
     unit_ip = _unit_address(juju, unit_name)
     logger.info("Verifying HTTPS on %s (%s) -> %s", unit_name, unit_ip, ingress_url)
@@ -516,21 +516,6 @@ def verify_https_on_unit(juju: jubilant.Juju, unit_name: str, ingress_url: str) 
             extensions={"sni_hostname": MOCK_HOSTNAME},
         )
     response.raise_for_status()
-
-
-def verify_http_on_unit(juju: jubilant.Juju, unit_name: str, ingress_url: str) -> None:
-    """Assert HTTP returns 200 on a specific traefik unit."""
-    assert ingress_url.startswith("http://"), (
-        f"expected plain HTTP proxied URL without a certificate provider, got {ingress_url!r}"
-    )
-    unit_ip = _unit_address(juju, unit_name)
-    logger.info("Verifying HTTP on %s (%s) -> %s", unit_name, unit_ip, ingress_url)
-    with httpx2.Client(headers={"Host": MOCK_HOSTNAME}) as client:
-        fetch_with_retry(
-            _url_for_unit(ingress_url, unit_ip),
-            client=client,
-            raise_for_status=True,
-        )
 
 
 # --- Composite flows --------------------------------------------------------
@@ -548,7 +533,9 @@ def bring_up_certified_traefik(juju: jubilant.Juju, tmp_path: Path) -> str:
     juju.wait(all_settled, error=jubilant.any_error, timeout=900, delay=5, successes=5)
     juju.integrate(f"{MANUAL_TLS_APP_NAME}:certificates", f"{TRAEFIK_APP_NAME}:certificates")
 
-    juju.wait(jubilant.all_agents_idle, error=jubilant.any_error, timeout=900, delay=5, successes=5)
+    juju.wait(
+        jubilant.all_agents_idle, error=jubilant.any_error, timeout=900, delay=5, successes=5
+    )
     sign_csrs_and_provide_cert(juju)
     juju.wait(all_settled, error=jubilant.any_error, timeout=900, delay=5, successes=5)
 
