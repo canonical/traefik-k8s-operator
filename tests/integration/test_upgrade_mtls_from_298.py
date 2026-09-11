@@ -18,7 +18,20 @@ Scenario:
 import jubilant
 import pytest
 from conftest import TRAEFIK_RESOURCES
-from upgrade_tests_scenarios import run_mtls_upgrade_scenario
+from constants import (
+    MOCK_HOSTNAME,
+    NUM_TRAEFIK_UNITS,
+    SOURCE_CHANNEL,
+    TRAEFIK_APP_NAME,
+    TRAEFIK_CHARM,
+)
+from helpers import (
+    all_settled,
+    assert_traefik_revision,
+    bring_up_certified_traefik,
+    get_outstanding_csrs,
+    verify_https_through_all_traefik_units,
+)
 
 SOURCE_REVISION = 298
 
@@ -28,4 +41,25 @@ def test_upgrade_mtls_from_revision_298(
     juju: jubilant.Juju, traefik_charm, mtls_app, ingress_app, tmp_path
 ):
     """Traefik keeps serving the same certificate after upgrading from rev 298."""
-    run_mtls_upgrade_scenario(juju, traefik_charm, TRAEFIK_RESOURCES, tmp_path, SOURCE_REVISION)
+    juju.deploy(
+        TRAEFIK_CHARM,
+        TRAEFIK_APP_NAME,
+        channel=SOURCE_CHANNEL,
+        config={"external_hostname": MOCK_HOSTNAME},
+        revision=SOURCE_REVISION,
+        num_units=NUM_TRAEFIK_UNITS,
+        trust=True,
+    )
+    bring_up_certified_traefik(juju, tmp_path)
+    juju.wait(all_settled, error=jubilant.any_error, delay=5, timeout=900, successes=5)
+    url = verify_https_through_all_traefik_units(juju)
+
+    juju.refresh(TRAEFIK_APP_NAME, path=traefik_charm, resources=TRAEFIK_RESOURCES)
+    juju.wait(all_settled, error=jubilant.any_error, delay=5, timeout=900, successes=5)
+    assert_traefik_revision(juju, 0)
+
+    verify_https_through_all_traefik_units(juju, expected_url=url)
+    assert len(get_outstanding_csrs(juju)) == 0, (
+        "manual-tls-certificates has outstanding requests after upgrade; "
+        "the TLS private key was not reused during migration"
+    )
