@@ -61,7 +61,6 @@ def test_deployment(juju: jubilant.Juju, traefik_charm):
     juju.wait(all_settled, error=jubilant.any_error, timeout=1000, delay=5, successes=5)
 
 
-@pytest.mark.xfail(reason="See https://github.com/canonical/traefik-k8s-operator/issues/522")
 def test_allowed_forward_auth_url_redirect(juju: jubilant.Juju) -> None:
     requirer_url = _reverse_proxy_app_url(juju, TRAEFIK_APP, IAP_REQUIRER_APP)
     fetch_with_retry(
