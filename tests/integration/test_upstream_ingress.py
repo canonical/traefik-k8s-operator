@@ -121,7 +121,7 @@ def test_traefik_with_upstream_ingress_blocked_if_in_subdomain_mode(juju: jubila
 
     juju.config(TRAEFIK, {"routing_mode": "path"})
     juju.wait(
-        lambda status: jubilant.all_blocked(status, TRAEFIK),
+        lambda status: jubilant.all_active(status, TRAEFIK),
         error=jubilant.any_error,
         timeout=300,
     )
