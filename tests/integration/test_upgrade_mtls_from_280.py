@@ -15,6 +15,8 @@ Scenario:
    that the manual-tls charm has no outstanding certificate requests.
 """
 
+import logging
+
 import jubilant
 import pytest
 from conftest import TRAEFIK_RESOURCES
@@ -32,6 +34,8 @@ from helpers import (
     get_outstanding_csrs,
     verify_https_through_all_traefik_units,
 )
+
+logger = logging.getLogger(__name__)
 
 SOURCE_REVISION = 280
 
@@ -54,11 +58,14 @@ def test_upgrade_mtls_from_revision_280(
     juju.wait(all_settled, error=jubilant.any_error, delay=5, timeout=900, successes=5)
     url = verify_https_through_all_traefik_units(juju)
 
+    # Upgrade to the charm under test.
     juju.refresh(TRAEFIK_APP_NAME, path=traefik_charm, resources=TRAEFIK_RESOURCES)
     juju.wait(all_settled, error=jubilant.any_error, delay=5, timeout=900, successes=5)
     assert_traefik_revision(juju, 0)
 
+    # The migrated key must still match the certificate on every unit ...
     verify_https_through_all_traefik_units(juju, expected_url=url)
+    # ... and no new certificate request should have been raised.
     assert len(get_outstanding_csrs(juju)) == 0, (
         "manual-tls-certificates has outstanding requests after upgrade; "
         "the TLS private key was not reused during migration"

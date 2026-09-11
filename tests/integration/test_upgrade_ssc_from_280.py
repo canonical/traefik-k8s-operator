@@ -13,6 +13,8 @@ Scenario:
 4. Verify the same CA still serves the same URL on every unit.
 """
 
+import logging
+
 import jubilant
 import pytest
 from conftest import TRAEFIK_RESOURCES
@@ -29,6 +31,8 @@ from helpers import (
     bring_up_self_signed_traefik,
     verify_https_through_all_traefik_units,
 )
+
+logger = logging.getLogger(__name__)
 
 SOURCE_REVISION = 280
 

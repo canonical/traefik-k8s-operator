@@ -15,6 +15,8 @@ Scenario:
    manual-tls charm has no outstanding certificate requests.
 """
 
+import logging
+
 import jubilant
 import pytest
 from conftest import TRAEFIK_RESOURCES
@@ -26,6 +28,8 @@ from helpers import (
     get_outstanding_csrs,
     verify_https_through_all_traefik_units,
 )
+
+logger = logging.getLogger(__name__)
 
 SOURCE_REVISION = 280
 

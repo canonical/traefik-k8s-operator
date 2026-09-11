@@ -4,6 +4,8 @@
 
 """Upgrade a single-unit traefik deployment with self-signed certificates from revision 298."""
 
+import logging
+
 import jubilant
 import pytest
 from conftest import TRAEFIK_RESOURCES
@@ -14,6 +16,8 @@ from helpers import (
     bring_up_self_signed_traefik,
     verify_https_through_all_traefik_units,
 )
+
+logger = logging.getLogger(__name__)
 
 SOURCE_REVISION = 298
 
