@@ -4,11 +4,9 @@
 
 """Tests that Traefik works correctly when it has an upstream ingress."""
 
-import json
 from pathlib import Path
 
 import jubilant
-import requests
 import yaml
 
 from tests.integration.any_charm_helpers import (
@@ -17,7 +15,7 @@ from tests.integration.any_charm_helpers import (
     PYTHON_PACKAGES,
     ingress_requirer_mock_src_overwrite,
 )
-from tests.integration.helpers import all_settled, fetch_with_retry
+from tests.integration.helpers import all_settled, external_url, fetch_with_retry
 
 TRAEFIK = "traefik-k8s"
 UPSTREAM_INGRESS = f"{TRAEFIK}-upstream"
@@ -34,10 +32,7 @@ _TRAEFIK_RESOURCES = {
 
 def test_deployment(juju: jubilant.Juju, traefik_charm):
     juju.deploy(traefik_charm, TRAEFIK, resources=_TRAEFIK_RESOURCES, trust=True)
-    juju.wait(all_settled, error=jubilant.any_error, timeout=1000, delay=5, successes=5)
 
-
-def test_deploy_dependencies(juju: jubilant.Juju, traefik_charm):
     juju.deploy(
         "ch:self-signed-certificates",
         CERTIFICATE_PROVIDER,
@@ -49,10 +44,7 @@ def test_deploy_dependencies(juju: jubilant.Juju, traefik_charm):
         resources=_TRAEFIK_RESOURCES,
         trust=True,
     )
-    juju.wait(all_settled, error=jubilant.any_error, timeout=1000, delay=5, successes=5)
 
-
-def test_deploy_testers(juju: jubilant.Juju):
     config = {
         "src-overwrite": ingress_requirer_mock_src_overwrite(),
         "python-packages": PYTHON_PACKAGES,
@@ -78,10 +70,7 @@ def test_deploy_testers(juju: jubilant.Juju):
         config=config,
         trust=True,
     )
-    juju.wait(all_settled, error=jubilant.any_error, timeout=1000, delay=5, successes=5)
 
-
-def test_relate_testers(juju: jubilant.Juju):
     juju.integrate(f"{TRAEFIK}:ingress", f"{IPA_TESTER}:require-ingress")
     juju.integrate(f"{TRAEFIK}:ingress-per-unit", f"{IPU_TESTER}:require-ingress-per-unit")
     juju.integrate(f"{TRAEFIK}:traefik-route", f"{ROUTE_TESTER}:require-traefik-route")
@@ -89,15 +78,16 @@ def test_relate_testers(juju: jubilant.Juju):
 
 
 def test_ipa_ingressed_no_upstream_ingress(juju: jubilant.Juju):
-    fetch_with_retry(f"{_traefik_url(juju, TRAEFIK)}/{juju.model}-{IPA_TESTER}")
+    fetch_with_retry(external_url(juju, TRAEFIK, IPA_TESTER), 200)
 
 
 def test_ipu_ingressed_no_upstream_ingress(juju: jubilant.Juju):
-    fetch_with_retry(f"{_traefik_url(juju, TRAEFIK)}/{juju.model}-{IPU_TESTER}-0")
+    fetch_with_retry(external_url(juju, TRAEFIK, f"{IPU_TESTER}/0"), 200)
 
 
 def test_traefik_route_ingressed_no_upstream_ingress(juju: jubilant.Juju):
-    fetch_with_retry(f"{_traefik_url(juju, TRAEFIK)}/{juju.model}-{ROUTE_TESTER}-traefik-route")
+    traefik_url = external_url(juju, TRAEFIK, TRAEFIK)
+    fetch_with_retry(f"{traefik_url}/{juju.model}-{ROUTE_TESTER}-traefik-route", 200)
 
 
 def test_add_upstream_ingress(juju: jubilant.Juju):
@@ -106,24 +96,16 @@ def test_add_upstream_ingress(juju: jubilant.Juju):
 
 
 def test_ipa_ingressed_through_upstream_ingress(juju: jubilant.Juju):
-    fetch_with_retry(
-        f"{_traefik_url(juju, UPSTREAM_INGRESS)}/{juju.model}-{TRAEFIK}/{juju.model}-{IPA_TESTER}"
-    )
+    fetch_with_retry(external_url(juju, TRAEFIK, IPA_TESTER), 200)
 
 
 def test_ipu_ingressed_through_upstream_ingress(juju: jubilant.Juju):
-    fetch_with_retry(
-        f"{_traefik_url(juju, UPSTREAM_INGRESS)}/{juju.model}-{TRAEFIK}/{juju.model}-{IPU_TESTER}-0"
-    )
+    fetch_with_retry(external_url(juju, TRAEFIK, f"{IPU_TESTER}/0"), 200)
 
 
 def test_traefik_route_ingressed_through_upstream_ingress(juju: jubilant.Juju):
-    fetch_with_retry(
-        (
-            f"{_traefik_url(juju, UPSTREAM_INGRESS)}/"
-            f"{juju.model}-{TRAEFIK}/{juju.model}-{ROUTE_TESTER}-traefik-route"
-        )
-    )
+    traefik_url = external_url(juju, TRAEFIK, TRAEFIK)
+    fetch_with_retry(f"{traefik_url}/{juju.model}-{ROUTE_TESTER}-traefik-route", 200)
 
 
 def test_traefik_with_upstream_ingress_blocked_if_in_subdomain_mode(juju: jubilant.Juju):
@@ -132,14 +114,14 @@ def test_traefik_with_upstream_ingress_blocked_if_in_subdomain_mode(juju: jubila
     )
     juju.config(TRAEFIK, {"routing_mode": "subdomain"})
     juju.wait(
-        lambda status: status.apps[TRAEFIK].app_status.current == "blocked",
+        lambda status: jubilant.all_blocked(status, TRAEFIK),
         error=jubilant.any_error,
         timeout=300,
     )
 
     juju.config(TRAEFIK, {"routing_mode": "path"})
     juju.wait(
-        lambda status: status.apps[TRAEFIK].app_status.current == "active",
+        lambda status: jubilant.all_active(status, TRAEFIK),
         error=jubilant.any_error,
         timeout=300,
     )
@@ -152,32 +134,13 @@ def test_add_tls_to_all_ingresses(juju: jubilant.Juju):
 
 
 def test_ipa_ingressed_through_upstream_ingress_with_tls(juju: jubilant.Juju):
-    fetch_with_retry(
-        f"{_traefik_url(juju, UPSTREAM_INGRESS)}/{juju.model}-{TRAEFIK}/{juju.model}-{IPA_TESTER}"
-    )
+    fetch_with_retry(external_url(juju, TRAEFIK, IPA_TESTER), 200)
 
 
 def test_ipu_ingressed_through_upstream_ingress_with_tls(juju: jubilant.Juju):
-    fetch_with_retry(
-        f"{_traefik_url(juju, UPSTREAM_INGRESS)}/{juju.model}-{TRAEFIK}/{juju.model}-{IPU_TESTER}-0"
-    )
+    fetch_with_retry(external_url(juju, TRAEFIK, f"{IPU_TESTER}/0"), 200)
 
 
 def test_traefik_route_ingressed_through_upstream_ingress_with_tls(juju: jubilant.Juju):
-    fetch_with_retry(
-        (
-            f"{_traefik_url(juju, UPSTREAM_INGRESS)}/"
-            f"{juju.model}-{TRAEFIK}/{juju.model}-{ROUTE_TESTER}-traefik-route"
-        )
-    )
-
-
-def _traefik_url(juju: jubilant.Juju, app_name: str) -> str:
-    action = juju.run(f"{app_name}/0", "show-external-endpoints")
-    endpoints = json.loads(action.results["external-endpoints"])
-    return endpoints[app_name]["url"]
-
-
-def _assert_url_returns(url: str, expected: int) -> None:
-    response = requests.get(url, timeout=10, verify=False)
-    assert response.status_code == expected, f"Expected {expected} from {url}, got {response.status_code}"
+    traefik_url = external_url(juju, TRAEFIK, TRAEFIK)
+    fetch_with_retry(f"{traefik_url}/{juju.model}-{ROUTE_TESTER}-traefik-route", 200)

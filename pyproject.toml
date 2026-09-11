@@ -38,6 +38,7 @@ dev = [
     "jubilant",
     "pytest-jubilant",
     "sh",
+    "httpx2 ; python_version >= '3.10'",
     # Held back: 1.1.411 flags pre-existing issues in lib/charms/traefik_k8s that need
     # code fixes plus LIBPATCH bumps.
     "pyright==1.1.318",

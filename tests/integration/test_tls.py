@@ -8,8 +8,8 @@ import ssl
 from pathlib import Path
 from urllib.parse import urlsplit
 
+import httpx2
 import jubilant
-import requests
 import yaml
 
 from tests.integration.any_charm_helpers import (
@@ -18,11 +18,10 @@ from tests.integration.any_charm_helpers import (
     PYTHON_PACKAGES,
     health_src_overwrite,
 )
-from tests.integration.dns_adapter import DNSResolverHTTPSAdapter
 from tests.integration.helpers import (
-    _ingress_url,
     all_settled,
     get_k8s_service_address,
+    proxied_url,
     pull_ssc_ca_certificate,
     remove_application,
 )
@@ -61,7 +60,7 @@ def test_ingressed_endpoint_reachable_after_metallb_enabled(juju: jubilant.Juju)
     assert model_name is not None
     traefik_ip = get_k8s_service_address(model_name, f"{TRAEFIK_APP}-lb")
     assert traefik_ip, "Expected a traefik load balancer address"
-    response = requests.get(_endpoint(juju, "http", traefik_ip), timeout=30)
+    response = httpx2.get(_endpoint(juju, "http", traefik_ip), timeout=30)
     response.raise_for_status()
 
 
@@ -137,15 +136,18 @@ def test_cleanup(juju: jubilant.Juju):
 
 
 def _endpoint(juju: jubilant.Juju, scheme: str, netloc: str) -> str:
-    ingress_path = f"{urlsplit(_ingress_url(juju)).path.rstrip('/')}/health"
+    base_url = proxied_url(juju, TRAEFIK_APP, INGRESS_APP)
+    ingress_path = f"{urlsplit(base_url).path}/health"
     return f"{scheme}://{netloc}{ingress_path}"
 
 
 def _assert_https_endpoint(juju: jubilant.Juju, cert_path: Path, traefik_ip: str) -> None:
-    session = requests.Session()
-    session.mount("https://", DNSResolverHTTPSAdapter(MOCK_HOSTNAME, traefik_ip))
-    session.verify = str(cert_path)
-    response = session.get(_endpoint(juju, "https", MOCK_HOSTNAME), timeout=30)
+    with httpx2.Client(verify=str(cert_path), headers={"Host": MOCK_HOSTNAME}) as client:
+        response = client.get(
+            _endpoint(juju, "https", traefik_ip),
+            timeout=30,
+            extensions={"sni_hostname": MOCK_HOSTNAME},
+        )
     response.raise_for_status()
 
 

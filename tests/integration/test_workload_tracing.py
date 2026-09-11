@@ -7,8 +7,8 @@
 import socket
 from pathlib import Path
 
+import httpx2
 import jubilant
-import requests
 import yaml
 from tenacity import retry, stop_after_attempt, wait_exponential
 
@@ -101,7 +101,7 @@ def _deploy_tempo_cluster(juju: jubilant.Juju) -> None:
 
 @retry(stop=stop_after_attempt(15), wait=wait_exponential(multiplier=1, min=4, max=10))
 def _get_traces_patiently(tempo_host: str, service_name: str = TRAEFIK_APP) -> list[dict]:
-    response = requests.get(
+    response = httpx2.get(
         f"http://{tempo_host}:3200/api/search?tags=service.name={service_name}",
         verify=False,
         timeout=30,

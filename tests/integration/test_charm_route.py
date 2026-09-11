@@ -29,9 +29,7 @@ DYNAMIC_CONFIG_DIR = "/opt/traefik/juju"
 STATIC_CONFIG_PATH = "/etc/traefik/traefik.yaml"
 
 _METADATA = yaml.safe_load(Path("./metadata.yaml").read_text(encoding="utf-8"))
-_TRAEFIK_RESOURCES = {
-    name: val["upstream-source"] for name, val in _METADATA["resources"].items()
-}
+_TRAEFIK_RESOURCES = {name: val["upstream-source"] for name, val in _METADATA["resources"].items()}
 
 
 def test_deployment(juju: jubilant.Juju, traefik_charm):
@@ -99,9 +97,7 @@ def test_added_entrypoint_reachable(juju: jubilant.Juju):
 def test_scale_and_get_external_host(juju: jubilant.Juju):
     juju.add_unit(ROUTE_TESTER_APP, num_units=1)
     juju.wait(
-        lambda status: (
-            len(status.apps[ROUTE_TESTER_APP].units) == 2 and all_settled(status)
-        ),
+        lambda status: len(status.apps[ROUTE_TESTER_APP].units) == 2 and all_settled(status),
         error=jubilant.any_error,
         timeout=1000,
         delay=5,
@@ -123,10 +119,7 @@ def test_remove_relation(juju: jubilant.Juju):
         f"{TRAEFIK_APP}:traefik-route",
     )
     juju.wait(
-        lambda status: (
-            jubilant.all_active(status, TRAEFIK_APP, ROUTE_TESTER_APP)
-            and jubilant.all_agents_idle(status)
-        ),
+        lambda status: all_settled(status, TRAEFIK_APP, ROUTE_TESTER_APP),
         error=jubilant.any_error,
         timeout=300,
         delay=5,

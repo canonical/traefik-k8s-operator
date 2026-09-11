@@ -7,9 +7,9 @@
 import json
 from pathlib import Path
 
+import httpx2
 import jubilant
 import pytest
-import requests
 import yaml
 from lightkube import Client
 from lightkube.resources.core_v1 import ConfigMap
@@ -23,6 +23,7 @@ from tests.integration.any_charm_helpers import (
 )
 from tests.integration.helpers import (
     all_settled,
+    fetch_with_retry,
     get_k8s_service_address,
     remove_application,
 )
@@ -61,21 +62,24 @@ def test_deployment(juju: jubilant.Juju, traefik_charm):
 
 
 @pytest.mark.xfail(reason="See https://github.com/canonical/traefik-k8s-operator/issues/522")
-@retry(
-    wait=wait_exponential(multiplier=3, min=1, max=30),
-    stop=stop_after_attempt(30),
-    reraise=True,
-)
 def test_allowed_forward_auth_url_redirect(juju: jubilant.Juju) -> None:
     requirer_url = _reverse_proxy_app_url(juju, TRAEFIK_APP, IAP_REQUIRER_APP)
-    response = requests.get(f"{requirer_url}anything/allowed", verify=False, timeout=30)
-    assert response.status_code == 200
+    fetch_with_retry(
+        f"{requirer_url}anything/allowed",
+        200,
+        stop=stop_after_attempt(30),
+        wait=wait_exponential(multiplier=3, min=1, max=30),
+    )
 
 
 def test_protected_forward_auth_url_redirect(juju: jubilant.Juju) -> None:
     requirer_url = _reverse_proxy_app_url(juju, TRAEFIK_APP, IAP_REQUIRER_APP)
-    response = requests.get(f"{requirer_url}anything/deny", verify=False, timeout=30)
-    assert response.status_code == 401
+    fetch_with_retry(
+        f"{requirer_url}anything/deny",
+        401,
+        stop=stop_after_attempt(30),
+        wait=wait_exponential(multiplier=3, min=1, max=30),
+    )
 
 
 def test_forward_auth_url_response_headers(
@@ -129,7 +133,7 @@ def _reverse_proxy_app_url(juju: jubilant.Juju, ingress_app_name: str, app_name:
     reraise=True,
 )
 def _assert_anonymous_response(url: str) -> None:
-    response = requests.get(url, verify=False, timeout=30)
+    response = httpx2.get(url, verify=False, timeout=30)
     assert response.status_code == 200
     headers = response.json().get("headers", {})
     assert headers["X-User"] == "anonymous"

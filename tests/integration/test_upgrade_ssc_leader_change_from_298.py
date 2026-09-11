@@ -27,7 +27,7 @@ from helpers import (
     assert_traefik_revision,
     bring_up_self_signed_traefik,
     force_leader_change,
-    verify_https_on_all_units,
+    verify_https_through_all_traefik_units,
 )
 
 logger = logging.getLogger(__name__)
@@ -49,15 +49,16 @@ def test_upgrade_ssc_leader_change_from_298(
         num_units=NUM_TRAEFIK_UNITS,
         trust=True,
     )
-    juju.wait(jubilant.all_agents_idle, error=jubilant.any_error, timeout=900, delay=5, successes=5)
-    ingress_url = bring_up_self_signed_traefik(juju, tmp_path)
+    bring_up_self_signed_traefik(juju, tmp_path)
+    juju.wait(all_settled, error=jubilant.any_error, delay=5, timeout=900, successes=5)
+    url = verify_https_through_all_traefik_units(juju)
 
     force_leader_change(juju, TRAEFIK_APP_NAME)
 
     juju.wait(all_settled, error=jubilant.any_error, timeout=900, delay=5, successes=5)
-    verify_https_on_all_units(juju, ingress_url)
+    verify_https_through_all_traefik_units(juju, url)
 
     juju.refresh(TRAEFIK_APP_NAME, path=traefik_charm, resources=TRAEFIK_RESOURCES)
     juju.wait(all_settled, error=jubilant.any_error, timeout=900, delay=5, successes=5)
     assert_traefik_revision(juju, 0)
-    verify_https_on_all_units(juju, ingress_url)
+    verify_https_through_all_traefik_units(juju, url)
