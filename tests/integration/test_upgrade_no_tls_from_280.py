@@ -44,19 +44,19 @@ def test_upgrade_no_tls_from_revision_280(
    juju: jubilant.Juju, traefik_charm, ingress_app
 ):
     """Traefik stays healthy and serves HTTP after upgrading from rev 280."""
-   juju.deploy(
-      TRAEFIK_CHARM,
-      TRAEFIK_APP_NAME,
-      channel=SOURCE_CHANNEL,
-      config={"external_hostname": MOCK_HOSTNAME},
-      revision=SOURCE_REVISION,
-      num_units=NUM_TRAEFIK_UNITS,
-      trust=True,
-   )
-   bring_up_traefik_without_certificate_provider(juju)
-   juju.wait(all_settled, error=jubilant.any_error, delay=5, timeout=900, successes=5)
-   url = verify_http_through_all_traefik_units(juju)
-   juju.refresh(TRAEFIK_APP_NAME, path=traefik_charm, resources=TRAEFIK_RESOURCES)
-   juju.wait(all_settled, error=jubilant.any_error, delay=5, timeout=900, successes=5)
-   assert_traefik_revision(juju, 0)
-   verify_http_through_all_traefik_units(juju, expected_url=url)
+    juju.deploy(
+        TRAEFIK_CHARM,
+        TRAEFIK_APP_NAME,
+        channel=SOURCE_CHANNEL,
+        config={"external_hostname": MOCK_HOSTNAME},
+        revision=SOURCE_REVISION,
+        num_units=NUM_TRAEFIK_UNITS,
+        trust=True,
+    )
+    bring_up_traefik_without_certificate_provider(juju)
+    juju.wait(all_settled, error=jubilant.any_error, delay=5, timeout=900, successes=5)
+    url = verify_http_through_all_traefik_units(juju)
+    juju.refresh(TRAEFIK_APP_NAME, path=traefik_charm, resources=TRAEFIK_RESOURCES)
+    juju.wait(all_settled, error=jubilant.any_error, delay=5, timeout=900, successes=5)
+    assert_traefik_revision(juju, 0)
+    verify_http_through_all_traefik_units(juju, expected_url=url)
