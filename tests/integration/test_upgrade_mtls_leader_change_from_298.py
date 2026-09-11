@@ -21,9 +21,9 @@ Scenario:
 
 import logging
 
+import httpx2
 import jubilant
 import pytest
-import requests
 from conftest import TRAEFIK_APP_NAME, TRAEFIK_RESOURCES
 from constants import (
     MOCK_HOSTNAME,
@@ -37,7 +37,8 @@ from helpers import (
     bring_up_certified_traefik,
     force_leader_change,
     get_outstanding_csrs,
-    verify_https_on_unit,
+    verify_https_through_all_traefik_units,
+    verify_https_through_unit,
 )
 
 logger = logging.getLogger(__name__)
@@ -59,8 +60,9 @@ def test_leader_change_breaks_tls_then_upgrade_blocks_and_requests_certificate(
         num_units=NUM_TRAEFIK_UNITS,
         trust=True,
     )
+    bring_up_certified_traefik(juju, tmp_path)
     juju.wait(jubilant.all_agents_idle, error=jubilant.any_error, timeout=900, delay=5, successes=5)
-    ingress_url = bring_up_certified_traefik(juju, tmp_path)
+    url = verify_https_through_all_traefik_units(juju)
 
     # newly elected leader is expected to break.
     new_leader = force_leader_change(juju, TRAEFIK_APP_NAME)
@@ -75,15 +77,15 @@ def test_leader_change_breaks_tls_then_upgrade_blocks_and_requests_certificate(
         if name != new_leader
     ]
     for unit_name in working_units:
-        verify_https_on_unit(juju, unit_name, ingress_url)
+        verify_https_through_unit(juju, unit_name, url)
 
     juju.wait(lambda _: len(get_outstanding_csrs(juju)) == 1, error=jubilant.any_error, timeout=300)
 
     # The new leader lost the old leader's key, so its served certificate is no
     # longer trusted (or the endpoint is down) -- HTTPS must fail here.
     try:
-        verify_https_on_unit(juju, new_leader, ingress_url)
-    except (requests.exceptions.SSLError, requests.exceptions.ConnectionError):
+        verify_https_through_unit(juju, new_leader, url)
+    except (httpx2.ConnectError, httpx2.ConnectTimeout):
         pass  # expected: cert no longer trusted / endpoint down
     else:
         raise AssertionError(

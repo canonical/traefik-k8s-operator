@@ -19,11 +19,12 @@ import logging
 
 import jubilant
 import pytest
-from conftest import TRAEFIK_APP_NAME, TRAEFIK_RESOURCES
+from conftest import TRAEFIK_RESOURCES
 from constants import (
     MOCK_HOSTNAME,
     NUM_TRAEFIK_UNITS,
     SOURCE_CHANNEL,
+    TRAEFIK_APP_NAME,
     TRAEFIK_CHARM,
 )
 from helpers import (
@@ -31,7 +32,7 @@ from helpers import (
     assert_traefik_revision,
     bring_up_certified_traefik,
     get_outstanding_csrs,
-    verify_https_on_all_units,
+    verify_https_through_all_traefik_units,
 )
 
 logger = logging.getLogger(__name__)
@@ -53,8 +54,9 @@ def test_upgrade_mtls_from_revision_280(
         num_units=NUM_TRAEFIK_UNITS,
         trust=True,
     )
-    juju.wait(jubilant.all_agents_idle, error=jubilant.any_error, timeout=900, delay=5, successes=5)
-    url = bring_up_certified_traefik(juju, tmp_path)
+    bring_up_certified_traefik(juju, tmp_path)
+    juju.wait(all_settled, error=jubilant.any_error, delay=5, timeout=900, successes=5)
+    url = verify_https_through_all_traefik_units(juju)
 
     # Upgrade to the charm under test.
     juju.refresh(TRAEFIK_APP_NAME, path=traefik_charm, resources=TRAEFIK_RESOURCES)
@@ -62,7 +64,7 @@ def test_upgrade_mtls_from_revision_280(
     assert_traefik_revision(juju, 0)
 
     # The migrated key must still match the certificate on every unit ...
-    verify_https_on_all_units(juju, expected_url=url)
+    verify_https_through_all_traefik_units(juju, expected_url=url)
     # ... and no new certificate request should have been raised.
     assert len(get_outstanding_csrs(juju)) == 0, (
         "manual-tls-certificates has outstanding requests after upgrade; "

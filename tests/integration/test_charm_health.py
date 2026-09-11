@@ -7,8 +7,8 @@
 from pathlib import Path
 from typing import Any
 
+import httpx2
 import jubilant
-import requests
 import yaml
 
 from tests.integration.any_charm_helpers import (
@@ -82,7 +82,7 @@ def test_cleanup(juju: jubilant.Juju):
 
 
 def _fetch_health(url: str) -> tuple[int, Any]:
-    response = requests.get(url, timeout=10)
+    response = httpx2.get(url, timeout=10)
     try:
         content = response.json()
     except ValueError:

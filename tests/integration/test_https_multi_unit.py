@@ -7,7 +7,7 @@
 import jubilant
 from conftest import TRAEFIK_APP_NAME, TRAEFIK_RESOURCES
 from constants import MOCK_HOSTNAME, NUM_TRAEFIK_UNITS
-from helpers import all_settled, pull_ssc_ca_certificate, verify_https_on_all_units
+from helpers import all_settled, pull_ssc_ca_certificate, verify_https_through_all_traefik_units
 
 
 def test_https_on_all_units(
@@ -36,4 +36,4 @@ def test_https_on_all_units(
         f"Expected {NUM_TRAEFIK_UNITS} traefik units, got {len(units)}"
     )
 
-    verify_https_on_all_units(juju)
+    verify_https_through_all_traefik_units(juju)

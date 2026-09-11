@@ -65,13 +65,10 @@ def test_dynamic_configs_present(juju, traefik_app, ingress_app, secondary_ingre
 
     # Each integrated app should have a config file matching juju_ingress_ingress_*_{app}.yaml
     ingress_configs = [f for f in files if f.endswith(f"_{ingress_app}.yaml")]
-    secondary_ingress_configs = [
-        f for f in files if f.endswith(f"_{secondary_ingress_app}.yaml")
-    ]
+    secondary_ingress_configs = [f for f in files if f.endswith(f"_{secondary_ingress_app}.yaml")]
 
     assert len(ingress_configs) == 1, (
-        f"Expected exactly 1 config for {ingress_app}, "
-        f"found {ingress_configs} in {files}"
+        f"Expected exactly 1 config for {ingress_app}, found {ingress_configs} in {files}"
     )
     assert len(secondary_ingress_configs) == 1, (
         f"Expected exactly 1 config for {secondary_ingress_app}, "
@@ -85,9 +82,7 @@ def test_dynamic_configs_present(juju, traefik_app, ingress_app, secondary_ingre
         )
 
 
-def test_dynamic_config_content_valid(
-    juju, traefik_app, ingress_app, secondary_ingress_app
-):
+def test_dynamic_config_content_valid(juju, traefik_app, ingress_app, secondary_ingress_app):
     """Verify that the dynamic config files contain valid traefik routing config."""
     files = _list_dynamic_configs(juju, traefik_app)
 
@@ -112,9 +107,7 @@ def test_dynamic_config_content_valid(
         assert len(http["services"]) >= 1, f"No services defined for {app_name}"
 
 
-def test_staging_artifacts_cleaned_up(
-    juju, traefik_app, ingress_app, secondary_ingress_app
-):
+def test_staging_artifacts_cleaned_up(juju, traefik_app, ingress_app, secondary_ingress_app):
     """Verify that the tar archive and staging directory are removed after flush."""
     # The tar archive should not exist in the dynamic config dir
     output = juju.ssh(
@@ -132,9 +125,7 @@ def test_staging_artifacts_cleaned_up(
         "test -d /tmp/_juju_ingress_staging && echo EXISTS || echo GONE",
         container="traefik",
     )
-    assert "GONE" in output, (
-        "Staging directory /tmp/_juju_ingress_staging was not cleaned up"
-    )
+    assert "GONE" in output, "Staging directory /tmp/_juju_ingress_staging was not cleaned up"
 
 
 def test_dynamic_config_removed_after_relation_removed(
@@ -159,8 +150,7 @@ def test_dynamic_config_removed_after_relation_removed(
     # its ingress-relation-broken hook and deleted the config file.
     juju.wait(
         lambda status: (
-            jubilant.all_active(status, traefik_app, secondary_ingress_app)
-            and jubilant.all_agents_idle(status)
+            all_settled(status, traefik_app, secondary_ingress_app)
             and not any(
                 r.related_app == traefik_app
                 for r in status.apps[ingress_app].relations.get("require-ingress", [])
@@ -172,9 +162,7 @@ def test_dynamic_config_removed_after_relation_removed(
 
     # Verify the ingress requirer config file is gone
     files_after = _list_dynamic_configs(juju, traefik_app)
-    ingress_configs_after = [
-        f for f in files_after if f.endswith(f"_{ingress_app}.yaml")
-    ]
+    ingress_configs_after = [f for f in files_after if f.endswith(f"_{ingress_app}.yaml")]
     assert len(ingress_configs_after) == 0, (
         f"Expected ingress requirer config to be removed after relation broken, "
         f"but found: {ingress_configs_after}"

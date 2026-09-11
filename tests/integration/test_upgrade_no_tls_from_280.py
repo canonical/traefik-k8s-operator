@@ -19,13 +19,19 @@ import logging
 
 import jubilant
 import pytest
-from conftest import TRAEFIK_APP_NAME, TRAEFIK_RESOURCES
-from constants import MOCK_HOSTNAME, NUM_TRAEFIK_UNITS, SOURCE_CHANNEL, TRAEFIK_CHARM
+from conftest import TRAEFIK_RESOURCES
+from constants import (
+    MOCK_HOSTNAME,
+    NUM_TRAEFIK_UNITS,
+    SOURCE_CHANNEL,
+    TRAEFIK_APP_NAME,
+    TRAEFIK_CHARM,
+)
 from helpers import (
     all_settled,
     assert_traefik_revision,
     bring_up_traefik_without_certificate_provider,
-    verify_http_on_all_units,
+    verify_http_through_all_traefik_units,
 )
 
 logger = logging.getLogger(__name__)
@@ -35,7 +41,7 @@ SOURCE_REVISION = 280
 
 @pytest.mark.setup
 def test_upgrade_no_tls_from_revision_280(
-    juju: jubilant.Juju, traefik_charm, ingress_app
+   juju: jubilant.Juju, traefik_charm, ingress_app
 ):
     """Traefik stays healthy and serves HTTP after upgrading from rev 280."""
     juju.deploy(
@@ -47,11 +53,10 @@ def test_upgrade_no_tls_from_revision_280(
         num_units=NUM_TRAEFIK_UNITS,
         trust=True,
     )
-    juju.wait(jubilant.all_agents_idle, error=jubilant.any_error, timeout=900, delay=5, successes=5)
-    url = bring_up_traefik_without_certificate_provider(juju)
-
+    bring_up_traefik_without_certificate_provider(juju)
+    juju.wait(all_settled, error=jubilant.any_error, delay=5, timeout=900, successes=5)
+    url = verify_http_through_all_traefik_units(juju)
     juju.refresh(TRAEFIK_APP_NAME, path=traefik_charm, resources=TRAEFIK_RESOURCES)
     juju.wait(all_settled, error=jubilant.any_error, delay=5, timeout=900, successes=5)
     assert_traefik_revision(juju, 0)
-
-    verify_http_on_all_units(juju, expected_url=url)
+    verify_http_through_all_traefik_units(juju, expected_url=url)

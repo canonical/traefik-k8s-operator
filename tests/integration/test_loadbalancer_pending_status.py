@@ -21,8 +21,8 @@ def test_waiting_when_lb_pending(juju: jubilant.Juju, traefik_app):
     juju.wait(
         lambda status: jubilant.all_waiting(status, traefik_app),
         error=jubilant.any_error,
-        timeout=300,
         delay=5,
+        successes=5,
     )
 
     status = juju.status()
