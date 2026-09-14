@@ -17,6 +17,7 @@ from tests.integration.any_charm_helpers import (
 )
 from tests.integration.helpers import (
     all_settled,
+    any_error_after,
     fetch_with_retry,
     get_k8s_service_address,
     remove_application,
@@ -41,7 +42,7 @@ def test_deployment(juju: jubilant.Juju, traefik_charm):
         config={"src-overwrite": route_src_overwrite()},
         trust=True,
     )
-    juju.wait(all_settled, error=jubilant.any_error, timeout=1000, delay=5, successes=5)
+    juju.wait(all_settled, error=any_error_after(failures=5), timeout=1000, delay=5, successes=5)
 
 
 def test_relate(juju: jubilant.Juju):
@@ -49,7 +50,7 @@ def test_relate(juju: jubilant.Juju):
         f"{ROUTE_TESTER_APP}:require-traefik-route",
         f"{TRAEFIK_APP}:traefik-route",
     )
-    juju.wait(all_settled, error=jubilant.any_error, delay=5, successes=5)
+    juju.wait(all_settled, error=any_error_after(failures=5), delay=5, successes=5)
 
 
 def test_dynamic_config_created(juju: jubilant.Juju):
@@ -98,7 +99,7 @@ def test_scale_and_get_external_host(juju: jubilant.Juju):
     juju.add_unit(ROUTE_TESTER_APP, num_units=1)
     juju.wait(
         lambda status: len(status.apps[ROUTE_TESTER_APP].units) == 2 and all_settled(status),
-        error=jubilant.any_error,
+        error=any_error_after(failures=5),
         timeout=1000,
         delay=5,
         successes=5,
@@ -120,7 +121,7 @@ def test_remove_relation(juju: jubilant.Juju):
     )
     juju.wait(
         lambda status: all_settled(status, TRAEFIK_APP, ROUTE_TESTER_APP),
-        error=jubilant.any_error,
+        error=any_error_after(failures=5),
         timeout=300,
         delay=5,
         successes=5,

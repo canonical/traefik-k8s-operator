@@ -27,6 +27,7 @@ from constants import (
 )
 from helpers import (
     all_settled,
+    any_error_after,
     assert_traefik_revision,
     bring_up_self_signed_traefik,
     verify_https_through_all_traefik_units,
@@ -52,11 +53,11 @@ def test_upgrade_ssc_from_revision_280(
         trust=True,
     )
     bring_up_self_signed_traefik(juju, tmp_path)
-    juju.wait(all_settled, error=jubilant.any_error, delay=5, timeout=900, successes=5)
+    juju.wait(all_settled, error=any_error_after(failures=5), delay=5, timeout=900, successes=5)
     url = verify_https_through_all_traefik_units(juju)
 
     juju.refresh(TRAEFIK_APP_NAME, path=traefik_charm, resources=TRAEFIK_RESOURCES)
-    juju.wait(all_settled, error=jubilant.any_error, delay=5, timeout=900, successes=5)
+    juju.wait(all_settled, error=any_error_after(failures=5), delay=5, timeout=900, successes=5)
     assert_traefik_revision(juju, 0)
 
     verify_https_through_all_traefik_units(juju, expected_url=url)

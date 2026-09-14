@@ -36,6 +36,7 @@ from tests.integration.any_charm_helpers import (
 )
 from tests.integration.helpers import (
     all_settled,
+    any_error_after,
     assert_can_connect,
     get_k8s_service_address,
     remove_application,
@@ -92,7 +93,7 @@ def test_deployment(juju: jubilant.Juju, traefik_charm):
         f"{TCP_TESTER_APP}:require-ingress-per-unit",
         f"{TRAEFIK_APP}:ingress-per-unit",
     )
-    juju.wait(all_settled, error=jubilant.any_error, timeout=1000, delay=5, successes=5)
+    juju.wait(all_settled, error=any_error_after(failures=5), timeout=1000, delay=5, successes=5)
 
 
 # --- Reachability (also proves the three relation types coexist) -------------
@@ -137,7 +138,7 @@ def test_remove_all_relations(juju: jubilant.Juju):
     )
     juju.wait(
         lambda status: all_settled(status, TRAEFIK_APP, IPA_TESTER_APP, IPU_TESTER_APP),
-        error=jubilant.any_error,
+        error=any_error_after(failures=5),
         timeout=300,
         delay=5,
         successes=5,

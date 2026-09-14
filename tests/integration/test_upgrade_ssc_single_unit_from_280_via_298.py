@@ -12,6 +12,7 @@ from conftest import TRAEFIK_APP_NAME, TRAEFIK_RESOURCES
 from constants import MOCK_HOSTNAME, SOURCE_CHANNEL, TRAEFIK_CHARM
 from helpers import (
     all_settled,
+    any_error_after,
     assert_traefik_revision,
     bring_up_self_signed_traefik,
     verify_https_through_all_traefik_units,
@@ -37,17 +38,17 @@ def test_upgrade_ssc_single_unit_from_280_via_298(
         trust=True,
     )
     bring_up_self_signed_traefik(juju, tmp_path)
-    juju.wait(all_settled, error=jubilant.any_error, delay=5, timeout=900, successes=5)
+    juju.wait(all_settled, error=any_error_after(failures=5), delay=5, timeout=900, successes=5)
     url = verify_https_through_all_traefik_units(juju)
 
     juju.refresh(TRAEFIK_APP_NAME, channel=SOURCE_CHANNEL, revision=INTERMEDIATE_REVISION)
-    juju.wait(all_settled, error=jubilant.any_error, delay=5, timeout=900, successes=5)
+    juju.wait(all_settled, error=any_error_after(failures=5), delay=5, timeout=900, successes=5)
     assert_traefik_revision(juju, INTERMEDIATE_REVISION)
 
     verify_https_through_all_traefik_units(juju, expected_url=url)
 
     juju.refresh(TRAEFIK_APP_NAME, path=traefik_charm, resources=TRAEFIK_RESOURCES)
-    juju.wait(all_settled, error=jubilant.any_error, delay=5, timeout=900, successes=5)
+    juju.wait(all_settled, error=any_error_after(failures=5), delay=5, timeout=900, successes=5)
     assert_traefik_revision(juju, 0)
 
     verify_https_through_all_traefik_units(juju, expected_url=url)

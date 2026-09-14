@@ -20,6 +20,7 @@ from tests.integration.any_charm_helpers import (
 )
 from tests.integration.helpers import (
     all_settled,
+    any_error_after,
     get_k8s_service_address,
     proxied_url,
     pull_ssc_ca_certificate,
@@ -49,10 +50,10 @@ def test_build_and_deploy(juju: jubilant.Juju, traefik_charm):
         },
         trust=True,
     )
-    juju.wait(jubilant.all_active, error=jubilant.any_error, delay=5, successes=5)
+    juju.wait(jubilant.all_active, error=any_error_after(failures=5), delay=5, successes=5)
 
     juju.integrate(f"{INGRESS_APP}:require-ingress", TRAEFIK_APP)
-    juju.wait(all_settled, error=jubilant.any_error, delay=5, successes=5)
+    juju.wait(all_settled, error=any_error_after(failures=5), delay=5, successes=5)
 
 
 def test_ingressed_endpoint_reachable_after_metallb_enabled(juju: jubilant.Juju):
@@ -71,7 +72,7 @@ def test_tls_termination(juju: jubilant.Juju, tmp_path: Path):
     juju.deploy("ch:self-signed-certificates", ROOT_CA_APP, channel="1/stable", trust=True)
     juju.config(ROOT_CA_APP, {"ca-common-name": "demo.ca.local"})
     juju.integrate(f"{ROOT_CA_APP}:certificates", TRAEFIK_APP)
-    juju.wait(all_settled, error=jubilant.any_error, delay=5, successes=5)
+    juju.wait(all_settled, error=any_error_after(failures=5), delay=5, successes=5)
 
     cert_path = pull_ssc_ca_certificate(juju, tmp_path, ssc_app=ROOT_CA_APP)
     traefik_ip = get_k8s_service_address(model_name, f"{TRAEFIK_APP}-lb")
@@ -116,7 +117,7 @@ def test_tls_termination_after_charm_upgrade(
     model_name = juju.model
     assert model_name is not None
     juju.refresh(TRAEFIK_APP, path=traefik_charm, resources=_TRAEFIK_RESOURCES)
-    juju.wait(all_settled, error=jubilant.any_error, delay=5, successes=5)
+    juju.wait(all_settled, error=any_error_after(failures=5), delay=5, successes=5)
 
     cert_path = pull_ssc_ca_certificate(juju, tmp_path, ssc_app=ROOT_CA_APP)
     traefik_ip = get_k8s_service_address(model_name, f"{TRAEFIK_APP}-lb")
@@ -128,7 +129,7 @@ def test_disintegrate(juju: jubilant.Juju):
     if ROOT_CA_APP not in juju.status().apps:
         return
     juju.remove_relation(f"{ROOT_CA_APP}:certificates", f"{TRAEFIK_APP}:certificates")
-    juju.wait(all_settled, error=jubilant.any_error, delay=5, successes=5)
+    juju.wait(all_settled, error=any_error_after(failures=5), delay=5, successes=5)
 
 
 def test_cleanup(juju: jubilant.Juju):

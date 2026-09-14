@@ -22,7 +22,7 @@ from tests.integration.constants import (
     SSC_CHARM,
     TRAEFIK_APP_NAME,
 )
-from tests.integration.helpers import all_settled
+from tests.integration.helpers import all_settled, any_error_after
 
 logger = logging.getLogger(__name__)
 
@@ -76,9 +76,9 @@ def deploy_traefik(juju, traefik_charm):
         resources=TRAEFIK_RESOURCES,
         trust=True,
     )
-    juju.wait(jubilant.all_agents_idle, error=jubilant.any_error, timeout=900, delay=5, successes=5)
+    juju.wait(jubilant.all_agents_idle, error=any_error_after(failures=5), timeout=900, delay=5, successes=5)
     juju.config(TRAEFIK_APP_NAME, {"external_hostname": "traefik-demo.local"})
-    juju.wait(all_settled, error=jubilant.any_error, delay=5, successes=5)
+    juju.wait(all_settled, error=any_error_after(failures=5), delay=5, successes=5)
     return TRAEFIK_APP_NAME
 
 
@@ -97,7 +97,7 @@ def ingress_fixture(juju):
     )
     juju.wait(
         lambda status: jubilant.all_active(status, INGRESS_REQUIRER_APP_NAME),
-        error=jubilant.any_error,
+        error=any_error_after(),
         delay=5,
         successes=5,
     )
@@ -110,7 +110,7 @@ def mtls_fixture(juju):
     juju.deploy(MANUAL_TLS_APP_NAME, MANUAL_TLS_APP_NAME, channel=MANUAL_TLS_CHANNEL)
     juju.wait(
         lambda status: jubilant.all_active(status, MANUAL_TLS_APP_NAME),
-        error=jubilant.any_error,
+        error=any_error_after(failures=5),
         delay=5,
         successes=5,
     )
@@ -123,7 +123,7 @@ def self_signed_certificates_fixture(juju):
     juju.deploy(SSC_CHARM, SSC_APP_NAME, channel=SSC_CHANNEL, trust=True)
     juju.wait(
         lambda status: jubilant.all_active(status, SSC_APP_NAME),
-        error=jubilant.any_error,
+        error=any_error_after(failures=5),
         delay=5,
         successes=5,
     )

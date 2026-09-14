@@ -11,7 +11,7 @@ import socket
 import subprocess
 import time
 from pathlib import Path
-from typing import Any, List, Optional, Tuple
+from typing import Any, Callable, List, Optional, Tuple
 from urllib.parse import urlsplit, urlunsplit
 
 import httpx2
@@ -51,6 +51,21 @@ signed_certificates: List[str] = []
 def all_settled(status: jubilant.Status, *apps: str) -> bool:
     """Return True when all apps are active and all agents are idle."""
     return jubilant.all_active(status, *apps) and jubilant.all_agents_idle(status)
+
+
+def any_error_after(*, failures: int = 3) -> Callable[[jubilant.Status], bool]:
+    """Return a predicate that reports consecutive Juju errors after a threshold."""
+    consecutive_failures = 0
+
+    def error(status: jubilant.Status) -> bool:
+        nonlocal consecutive_failures
+        if any_error_after(failures=5)(status):
+            consecutive_failures += 1
+        else:
+            consecutive_failures = 0
+        return consecutive_failures >= failures
+
+    return error
 
 
 def assert_can_connect(ip: str, port: int) -> None:
@@ -116,7 +131,7 @@ def remove_application(
     )
     juju.wait(
         lambda status: all(app_name not in status.apps for app_name in existing_apps),
-        error=jubilant.any_error,
+        error=any_error_after(failures=5),
         timeout=timeout,
     )
 
@@ -533,7 +548,7 @@ def bring_up_certified_traefik(juju: jubilant.Juju, tmp_path: Path) -> None:
 
     juju.wait(
         lambda status: all_settled(status, MANUAL_TLS_APP_NAME),
-        error=jubilant.any_error,
+        error=any_error_after(failures=5),
         delay=5,
         timeout=900,
         successes=5,
@@ -550,7 +565,7 @@ def bring_up_self_signed_traefik(
 
     juju.wait(
         lambda status: all_settled(status, ssc_app),
-        error=jubilant.any_error,
+        error=any_error_after(failures=5),
         delay=5,
         timeout=900,
         successes=5,

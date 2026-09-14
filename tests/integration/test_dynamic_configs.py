@@ -10,7 +10,6 @@ dynamic config YAML files exist in /opt/traefik/juju/ inside the traefik contain
 
 import logging
 
-import jubilant
 import pytest
 import yaml
 
@@ -20,7 +19,7 @@ from tests.integration.any_charm_helpers import (
     PYTHON_PACKAGES,
     health_src_overwrite,
 )
-from tests.integration.helpers import all_settled
+from tests.integration.helpers import all_settled, any_error_after
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +40,7 @@ def secondary_ingress_app(juju):
         },
         trust=True,
     )
-    juju.wait(all_settled, error=jubilant.any_error, delay=5, successes=5)
+    juju.wait(all_settled, error=any_error_after(failures=5), delay=5, successes=5)
     return SECONDARY_INGRESS_APP_NAME
 
 
@@ -59,7 +58,7 @@ def test_dynamic_configs_present(juju, traefik_app, ingress_app, secondary_ingre
     """After integrating 2 apps, verify dynamic config files exist in the container."""
     juju.integrate(f"{secondary_ingress_app}:require-ingress", traefik_app)
     juju.integrate(f"{ingress_app}:require-ingress", traefik_app)
-    juju.wait(all_settled, error=jubilant.any_error, delay=5, successes=5)
+    juju.wait(all_settled, error=any_error_after(failures=5), delay=5, successes=5)
     files = _list_dynamic_configs(juju, traefik_app)
     logger.info("Dynamic config files in container: %s", files)
 
@@ -156,7 +155,7 @@ def test_dynamic_config_removed_after_relation_removed(
                 for r in status.apps[ingress_app].relations.get("require-ingress", [])
             )
         ),
-        error=jubilant.any_error,
+        error=any_error_after(failures=5),
         timeout=300,
     )
 

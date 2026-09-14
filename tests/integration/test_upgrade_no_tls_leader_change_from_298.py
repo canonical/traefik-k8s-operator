@@ -22,6 +22,7 @@ from conftest import TRAEFIK_APP_NAME, TRAEFIK_RESOURCES
 from constants import MOCK_HOSTNAME, NUM_TRAEFIK_UNITS, SOURCE_CHANNEL, TRAEFIK_CHARM
 from helpers import (
     all_settled,
+    any_error_after,
     assert_traefik_revision,
     bring_up_traefik_without_certificate_provider,
     force_leader_change,
@@ -46,15 +47,15 @@ def test_upgrade_no_tls_leader_change_from_298(juju: jubilant.Juju, traefik_char
         trust=True,
     )
     bring_up_traefik_without_certificate_provider(juju)
-    juju.wait(all_settled, error=jubilant.any_error, delay=5, timeout=900, successes=5)
+    juju.wait(all_settled, error=any_error_after(failures=5), delay=5, timeout=900, successes=5)
     url = verify_http_through_all_traefik_units(juju)
 
     force_leader_change(juju, TRAEFIK_APP_NAME)
 
-    juju.wait(all_settled, error=jubilant.any_error, timeout=900, delay=5, successes=5)
+    juju.wait(all_settled, error=any_error_after(failures=5), timeout=900, delay=5, successes=5)
     verify_http_through_all_traefik_units(juju, url)
 
     juju.refresh(TRAEFIK_APP_NAME, path=traefik_charm, resources=TRAEFIK_RESOURCES)
-    juju.wait(all_settled, error=jubilant.any_error, timeout=900, delay=5, successes=5)
+    juju.wait(all_settled, error=any_error_after(failures=5), timeout=900, delay=5, successes=5)
     assert_traefik_revision(juju, 0)
     verify_http_through_all_traefik_units(juju, url)
