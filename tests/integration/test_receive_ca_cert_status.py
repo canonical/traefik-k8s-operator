@@ -18,6 +18,7 @@ SSC_NAME = "ssc-rca"
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 RESOURCES = {"traefik-image": METADATA["resources"]["traefik-image"]["upstream-source"]}
 
+
 def test_build_and_deploy(juju: jubilant.Juju, traefik_charm):
     juju.deploy(
         traefik_charm,
@@ -25,7 +26,6 @@ def test_build_and_deploy(juju: jubilant.Juju, traefik_charm):
         resources=RESOURCES,
         trust=True,
     )
-    juju.wait(jubilant.all_agents_idle, error=any_error_after(failures=5), timeout=900, delay=5, successes=5)
     juju.deploy(
         "ch:self-signed-certificates",
         SSC_NAME,
@@ -33,13 +33,11 @@ def test_build_and_deploy(juju: jubilant.Juju, traefik_charm):
         trust=True,
     )
 
+    juju.integrate(f"{SSC_NAME}:send-ca-cert", f"{APP_NAME}:receive-ca-cert")
     juju.wait(jubilant.all_active, error=any_error_after(failures=5), timeout=900, delay=5, successes=5)
 
 
 def test_status_is_not_stuck_restarting_after_receive_ca_cert_removal(juju: jubilant.Juju):
-    juju.integrate(f"{SSC_NAME}:send-ca-cert", f"{APP_NAME}:receive-ca-cert")
-    juju.wait(jubilant.all_active, error=any_error_after(failures=5), delay=5, successes=5)
-
     juju.remove_relation(f"{SSC_NAME}:send-ca-cert", f"{APP_NAME}:receive-ca-cert")
 
     deadline = time.monotonic() + 180
@@ -53,8 +51,8 @@ def test_status_is_not_stuck_restarting_after_receive_ca_cert_removal(juju: jubi
             break
         time.sleep(5)
 
-    assert not (
-        current == "maintenance" and message == "restarting traefik..."
-    ), "Traefik unit remained in maintenance/restarting after receive-ca-cert removal"
+    assert not (current == "maintenance" and message == "restarting traefik..."), (
+        "Traefik unit remained in maintenance/restarting after receive-ca-cert removal"
+    )
 
     juju.wait(jubilant.all_active, error=any_error_after(failures=5), delay=5, successes=5)

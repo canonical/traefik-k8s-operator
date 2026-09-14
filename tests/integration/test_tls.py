@@ -50,7 +50,6 @@ def test_build_and_deploy(juju: jubilant.Juju, traefik_charm):
         },
         trust=True,
     )
-    juju.wait(jubilant.all_active, error=any_error_after(failures=5), delay=5, successes=5)
 
     juju.integrate(f"{INGRESS_APP}:require-ingress", TRAEFIK_APP)
     juju.wait(all_settled, error=any_error_after(failures=5), delay=5, successes=5)

@@ -39,13 +39,6 @@ def test_workload_tracing_is_present(juju: jubilant.Juju, traefik_charm):
     _deploy_tempo_cluster(juju)
 
     juju.deploy(traefik_charm, TRAEFIK_APP, resources=_TRAEFIK_RESOURCES, trust=True)
-    juju.wait(
-        lambda status: jubilant.all_active(status, TRAEFIK_APP),
-        error=any_error_after(failures=5),
-        timeout=300,
-        delay=5,
-        successes=5,
-    )
 
     juju.integrate(f"{TRAEFIK_APP}:workload-tracing", f"{TEMPO_APP}:tracing")
     juju.integrate(f"{TEMPO_APP}:ingress", f"{TRAEFIK_APP}:traefik-route")

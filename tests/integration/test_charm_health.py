@@ -47,10 +47,6 @@ def test_deployment(juju: jubilant.Juju, traefik_charm):
         num_units=3,
         trust=True,
     )
-    juju.wait(all_settled, error=any_error_after(failures=5), timeout=1000, delay=5, successes=5)
-
-
-def test_relate(juju: jubilant.Juju):
     juju.integrate(f"{HEALTH_TESTER_APP}:require-ingress", f"{TRAEFIK_APP}:ingress")
     juju.wait(all_settled, error=any_error_after(failures=5), delay=5, successes=5)
 

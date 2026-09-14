@@ -34,7 +34,6 @@ def test_upgrade(juju: jubilant.Juju, traefik_charm, pytestconfig):
         config={"external_hostname": "traefik-demo.local"},
         trust=True,
     )
-    juju.wait(jubilant.all_agents_idle, error=any_error_after(failures=5), timeout=900, delay=5, successes=5)
 
     juju.deploy(
         "ch:self-signed-certificates",

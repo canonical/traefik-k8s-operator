@@ -42,10 +42,6 @@ def test_deployment(juju: jubilant.Juju, traefik_charm):
         config={"src-overwrite": route_src_overwrite()},
         trust=True,
     )
-    juju.wait(all_settled, error=any_error_after(failures=5), timeout=1000, delay=5, successes=5)
-
-
-def test_relate(juju: jubilant.Juju):
     juju.integrate(
         f"{ROUTE_TESTER_APP}:require-traefik-route",
         f"{TRAEFIK_APP}:traefik-route",
