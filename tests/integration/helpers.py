@@ -525,13 +525,19 @@ def bring_up_certified_traefik(juju: jubilant.Juju, tmp_path: Path) -> None:
     generate_ca(tmp_path)
 
     juju.integrate(f"{INGRESS_REQUIRER_APP_NAME}:require-ingress", TRAEFIK_APP_NAME)
-    juju.integrate(f"{MANUAL_TLS_APP_NAME}:certificates", f"{TRAEFIK_APP_NAME}:certificates")
-
     juju.wait(
-        lambda status: all_settled(status, MANUAL_TLS_APP_NAME),
+        all_settled,
         error=any_error_after(failures=5),
         delay=5,
         timeout=900,
+        successes=5,
+    )
+    juju.integrate(f"{MANUAL_TLS_APP_NAME}:certificates", f"{TRAEFIK_APP_NAME}:certificates")
+
+    juju.wait(
+        all_settled,
+        error=any_error_after(failures=5),
+        delay=5,
         successes=5,
     )
     sign_csrs_and_provide_cert(juju)
@@ -542,13 +548,19 @@ def bring_up_self_signed_traefik(
 ) -> None:
     """Integrate self-signed-certificates + the ingress requirer and pull the CA cert."""
     juju.integrate(f"{INGRESS_REQUIRER_APP_NAME}:require-ingress", TRAEFIK_APP_NAME)
-    juju.integrate(f"{ssc_app}:certificates", f"{TRAEFIK_APP_NAME}:certificates")
-
     juju.wait(
-        lambda status: all_settled(status, ssc_app),
+        all_settled,
         error=any_error_after(failures=5),
         delay=5,
         timeout=900,
+        successes=5,
+    )
+    juju.integrate(f"{ssc_app}:certificates", f"{TRAEFIK_APP_NAME}:certificates")
+
+    juju.wait(
+        all_settled,
+        error=any_error_after(failures=5),
+        delay=5,
         successes=5,
     )
     pull_ssc_ca_certificate(juju, tmp_path, ssc_app=ssc_app)
