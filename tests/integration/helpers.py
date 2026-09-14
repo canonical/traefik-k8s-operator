@@ -59,7 +59,7 @@ def any_error_after(*, failures: int = 3) -> Callable[[jubilant.Status], bool]:
 
     def error(status: jubilant.Status) -> bool:
         nonlocal consecutive_failures
-        if any_error_after(failures=5)(status):
+        if jubilant.any_error(status):
             consecutive_failures += 1
         else:
             consecutive_failures = 0
