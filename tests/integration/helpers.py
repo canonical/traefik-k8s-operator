@@ -23,7 +23,7 @@ from charms.tls_certificates_interface.v4.tls_certificates import (
     PrivateKey,
 )
 from constants import (
-    ALERTMANAGER_APP_NAME,
+    INGRESS_REQUIRER_APP_NAME,
     MANUAL_TLS_APP_NAME,
     MOCK_HOSTNAME,
     SSC_APP_NAME,
@@ -80,8 +80,10 @@ def get_k8s_service_address(model: str, service_name: str) -> Optional[str]:
         result = subprocess.run(
             [
                 "kubectl",
-                "-n", model,
-                "get", f"service/{service_name}",
+                "-n",
+                model,
+                "get",
+                f"service/{service_name}",
                 "-o=jsonpath={.status.loadBalancer.ingress[0].ip}",
             ],
             capture_output=True,
@@ -113,6 +115,7 @@ def remove_application(
     )
     juju.wait(
         lambda status: all(app_name not in status.apps for app_name in existing_apps),
+        error=jubilant.any_error,
         timeout=timeout,
     )
 
@@ -153,6 +156,7 @@ def wait_for_tcp_echo(host: str, port: int, payload: bytes = b"Hello, world") ->
 
 def fetch_with_retry(url: str, expected_status: int = 200) -> requests.Response:
     """Fetch a URL with retries until the expected status is returned."""
+
     @retry(
         stop=stop_after_delay(150),
         wait=wait_fixed(5),
@@ -208,9 +212,7 @@ def sign_csr(ca_key: PrivateKey, ca_cert: Certificate, csr_pem: str) -> str:
 
 
 # --- manual-tls-certificates actions ---------------------------------------
-def get_outstanding_csrs(
-    juju: jubilant.Juju, mtls_app: str = MANUAL_TLS_APP_NAME
-) -> List[dict]:
+def get_outstanding_csrs(juju: jubilant.Juju, mtls_app: str = MANUAL_TLS_APP_NAME) -> List[dict]:
     """Return the list of outstanding certificate requests on the mTLS charm."""
     task = juju.run(f"{mtls_app}/leader", "get-outstanding-certificate-requests")
     raw = task.results.get("result", [])
@@ -330,11 +332,11 @@ def pull_ssc_ca_certificate(
 
 
 # --- Verification -----------------------------------------------------------
-def _alertmanager_url(juju: jubilant.Juju) -> str:
+def _ingress_url(juju: jubilant.Juju) -> str:
     # show-proxied-endpoints only returns the full endpoint map on the leader.
     result = juju.run(f"{TRAEFIK_APP_NAME}/leader", "show-proxied-endpoints")
     endpoints = json.loads(result.results["proxied-endpoints"])
-    return endpoints[ALERTMANAGER_APP_NAME]["url"]
+    return endpoints[INGRESS_REQUIRER_APP_NAME]["url"]
 
 
 @retry(
@@ -374,13 +376,13 @@ def verify_https_on_all_units(
 ) -> str:
     """Assert HTTPS is reachable through every traefik unit with the CA cert.
 
-    Returns the alertmanager URL that was verified so callers can assert it is
+    Returns the ingress URL that was verified so callers can assert it is
     unchanged across an upgrade.
     """
-    alertmanager_url = _alertmanager_url(juju)
+    ingress_url = f"{_ingress_url(juju).rstrip('/')}/health"
     if expected_url is not None:
-        assert alertmanager_url == expected_url, (
-            f"Proxied URL changed across upgrade: {expected_url!r} -> {alertmanager_url!r}"
+        assert ingress_url == expected_url, (
+            f"Proxied URL changed across upgrade: {expected_url!r} -> {ingress_url!r}"
         )
 
     status = juju.status()
@@ -388,13 +390,13 @@ def verify_https_on_all_units(
 
     for unit_name, unit_status in units.items():
         unit_ip = unit_status.address
-        logger.info("Verifying HTTPS on %s (%s) -> %s", unit_name, unit_ip, alertmanager_url)
+        logger.info("Verifying HTTPS on %s (%s) -> %s", unit_name, unit_ip, ingress_url)
         session = requests.Session()
         session.mount("https://", DNSResolverHTTPSAdapter(MOCK_HOSTNAME, unit_ip))
         session.verify = str(ca_cert_path)
-        _get_with_retry(session, alertmanager_url)
+        _get_with_retry(session, ingress_url)
 
-    return alertmanager_url
+    return ingress_url
 
 
 def verify_http_on_all_units(
@@ -403,17 +405,16 @@ def verify_http_on_all_units(
 ) -> str:
     """Assert HTTP is reachable through every traefik unit.
 
-    Returns the alertmanager URL that was verified so callers can assert it is
+    Returns the ingress URL that was verified so callers can assert it is
     unchanged across an upgrade.
     """
-    alertmanager_url = _alertmanager_url(juju)
-    assert alertmanager_url.startswith("http://"), (
-        "expected plain HTTP proxied URL without a certificate provider, got "
-        f"{alertmanager_url!r}"
+    ingress_url = f"{_ingress_url(juju).rstrip('/')}/health"
+    assert ingress_url.startswith("http://"), (
+        f"expected plain HTTP proxied URL without a certificate provider, got {ingress_url!r}"
     )
     if expected_url is not None:
-        assert alertmanager_url == expected_url, (
-            f"Proxied URL changed across upgrade: {expected_url!r} -> {alertmanager_url!r}"
+        assert ingress_url == expected_url, (
+            f"Proxied URL changed across upgrade: {expected_url!r} -> {ingress_url!r}"
         )
 
     status = juju.status()
@@ -421,12 +422,12 @@ def verify_http_on_all_units(
 
     for unit_name, unit_status in units.items():
         unit_ip = unit_status.address
-        logger.info("Verifying HTTP on %s (%s) -> %s", unit_name, unit_ip, alertmanager_url)
+        logger.info("Verifying HTTP on %s (%s) -> %s", unit_name, unit_ip, ingress_url)
         session = requests.Session()
         session.headers["Host"] = MOCK_HOSTNAME
-        _get_with_retry(session, _url_for_unit(alertmanager_url, unit_ip))
+        _get_with_retry(session, _url_for_unit(ingress_url, unit_ip))
 
-    return alertmanager_url
+    return ingress_url
 
 
 def leader_unit_name(juju: jubilant.Juju, app: str = TRAEFIK_APP_NAME) -> str:
@@ -447,7 +448,9 @@ def _unit_address(juju: jubilant.Juju, unit_name: str, app: str = TRAEFIK_APP_NA
 def force_leader_change(juju: jubilant.Juju, app: str = TRAEFIK_APP_NAME) -> str:
     """Force a leadership change by stopping the current leader's unit agent."""
     old_leader = leader_unit_name(juju, app)
-    logger.info("Stopping the container-agent on leader %s to force a leadership change", old_leader)
+    logger.info(
+        "Stopping the container-agent on leader %s to force a leadership change", old_leader
+    )
     # stop-checks liveness prevents pebble from restarting the agent as unhealthy.
     juju.ssh(old_leader, "/charm/bin/pebble", "stop-checks", "liveness", container="charm")
     juju.ssh(old_leader, "/charm/bin/pebble", "stop", "container-agent", container="charm")
@@ -458,6 +461,8 @@ def force_leader_change(juju: jubilant.Juju, app: str = TRAEFIK_APP_NAME) -> str
         return len(leaders) == 1 and leaders[0] != old_leader
 
     try:
+        # No error= here: the old leader's agent is deliberately stopped above, so it
+        # may legitimately report "lost"/error while we wait for a new leader to be elected.
         juju.wait(_reelected, timeout=120, delay=5)
     except TimeoutError as exc:
         raise AssertionError(
@@ -476,48 +481,47 @@ def force_leader_change(juju: jubilant.Juju, app: str = TRAEFIK_APP_NAME) -> str
     return new_leader
 
 
-def verify_https_on_unit(juju: jubilant.Juju, unit_name: str, alertmanager_url: str) -> None:
+def verify_https_on_unit(juju: jubilant.Juju, unit_name: str, ingress_url: str) -> None:
     """Assert HTTPS returns 200 with the CA cert on a specific traefik unit."""
     unit_ip = _unit_address(juju, unit_name)
-    logger.info("Verifying HTTPS on %s (%s) -> %s", unit_name, unit_ip, alertmanager_url)
+    logger.info("Verifying HTTPS on %s (%s) -> %s", unit_name, unit_ip, ingress_url)
     session = requests.Session()
     session.mount("https://", DNSResolverHTTPSAdapter(MOCK_HOSTNAME, unit_ip))
     session.verify = str(ca_cert_path)
-    response = session.get(alertmanager_url, timeout=30)
+    response = session.get(ingress_url, timeout=30)
     response.raise_for_status()
 
 
-def verify_http_on_unit(juju: jubilant.Juju, unit_name: str, alertmanager_url: str) -> None:
+def verify_http_on_unit(juju: jubilant.Juju, unit_name: str, ingress_url: str) -> None:
     """Assert HTTP returns 200 on a specific traefik unit."""
-    assert alertmanager_url.startswith("http://"), (
-        "expected plain HTTP proxied URL without a certificate provider, got "
-        f"{alertmanager_url!r}"
+    assert ingress_url.startswith("http://"), (
+        f"expected plain HTTP proxied URL without a certificate provider, got {ingress_url!r}"
     )
     unit_ip = _unit_address(juju, unit_name)
-    logger.info("Verifying HTTP on %s (%s) -> %s", unit_name, unit_ip, alertmanager_url)
+    logger.info("Verifying HTTP on %s (%s) -> %s", unit_name, unit_ip, ingress_url)
     session = requests.Session()
     session.headers["Host"] = MOCK_HOSTNAME
-    _get_with_retry(session, _url_for_unit(alertmanager_url, unit_ip))
+    _get_with_retry(session, _url_for_unit(ingress_url, unit_ip))
 
 
 # --- Composite flows --------------------------------------------------------
 def bring_up_certified_traefik(juju: jubilant.Juju, tmp_path: Path) -> str:
-    """Integrate the mTLS + alertmanager stack, sign traefik's CSRs and verify HTTPS.
+    """Integrate the mTLS + ingress stack, sign traefik's CSRs and verify HTTPS.
 
     Creates the throwaway CA (populating the module-level CA globals) and assumes
-    traefik, manual-tls-certificates and alertmanager have all been deployed (the
-    latter two via the ``mtls_app`` / ``alertmanager_app`` fixtures). Returns
-    the alertmanager URL so the caller can assert it is unchanged after upgrading.
+    traefik, manual-tls-certificates and the ingress requirer have all been deployed (the
+    latter two via the ``mtls_app`` / ``ingress_app`` fixtures). Returns the ingress URL
+    so the caller can assert it is unchanged after upgrading.
     """
     generate_ca(tmp_path)
 
-    juju.integrate(f"{ALERTMANAGER_APP_NAME}:ingress", TRAEFIK_APP_NAME)
-    juju.wait(all_settled, timeout=900, delay=5, successes=5)
+    juju.integrate(f"{INGRESS_REQUIRER_APP_NAME}:require-ingress", TRAEFIK_APP_NAME)
+    juju.wait(all_settled, error=jubilant.any_error, timeout=900, delay=5, successes=5)
     juju.integrate(f"{MANUAL_TLS_APP_NAME}:certificates", f"{TRAEFIK_APP_NAME}:certificates")
 
-    juju.wait(jubilant.all_agents_idle, timeout=900, delay=5, successes=5)
+    juju.wait(jubilant.all_agents_idle, error=jubilant.any_error, timeout=900, delay=5, successes=5)
     sign_csrs_and_provide_cert(juju)
-    juju.wait(all_settled, timeout=900)
+    juju.wait(all_settled, error=jubilant.any_error, timeout=900, delay=5, successes=5)
 
     return verify_https_on_all_units(juju)
 
@@ -525,20 +529,19 @@ def bring_up_certified_traefik(juju: jubilant.Juju, tmp_path: Path) -> str:
 def bring_up_self_signed_traefik(
     juju: jubilant.Juju, tmp_path: Path, ssc_app: str = SSC_APP_NAME
 ) -> str:
-    """Integrate self-signed-certificates + alertmanager and verify HTTPS on traefik."""
-    juju.integrate(f"{ALERTMANAGER_APP_NAME}:ingress", TRAEFIK_APP_NAME)
-    juju.wait(all_settled, timeout=900, delay=5, successes=5)
+    """Integrate self-signed-certificates + the ingress requirer and verify HTTPS."""
+    juju.integrate(f"{INGRESS_REQUIRER_APP_NAME}:require-ingress", TRAEFIK_APP_NAME)
+    juju.wait(all_settled, error=jubilant.any_error, timeout=900, delay=5, successes=5)
     juju.integrate(f"{ssc_app}:certificates", f"{TRAEFIK_APP_NAME}:certificates")
 
-    juju.wait(all_settled, delay=5, timeout=900)
+    juju.wait(all_settled, error=jubilant.any_error, delay=5, timeout=900, successes=5)
     pull_ssc_ca_certificate(juju, tmp_path, ssc_app=ssc_app)
 
     return verify_https_on_all_units(juju)
 
 
 def bring_up_traefik_without_certificate_provider(juju: jubilant.Juju) -> str:
-    """Integrate alertmanager only and verify plain HTTP on all traefik units."""
-    juju.integrate(f"{ALERTMANAGER_APP_NAME}:ingress", TRAEFIK_APP_NAME)
-    juju.wait(all_settled, delay=5, timeout=900)
+    """Integrate the ingress requirer and verify plain HTTP on all traefik units."""
+    juju.integrate(f"{INGRESS_REQUIRER_APP_NAME}:require-ingress", TRAEFIK_APP_NAME)
+    juju.wait(all_settled, error=jubilant.any_error, delay=5, timeout=900, successes=5)
     return verify_http_on_all_units(juju)
-

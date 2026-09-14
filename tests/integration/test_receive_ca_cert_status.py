@@ -23,7 +23,7 @@ def test_build_and_deploy(juju: jubilant.Juju, traefik_charm):
         resources=RESOURCES,
         trust=True,
     )
-    juju.wait(jubilant.all_agents_idle, timeout=900, delay=5, successes=5)
+    juju.wait(jubilant.all_agents_idle, error=jubilant.any_error, timeout=900, delay=5, successes=5)
     juju.deploy(
         "ch:self-signed-certificates",
         SSC_NAME,
@@ -31,12 +31,12 @@ def test_build_and_deploy(juju: jubilant.Juju, traefik_charm):
         trust=True,
     )
 
-    juju.wait(jubilant.all_active, timeout=900)
+    juju.wait(jubilant.all_active, error=jubilant.any_error, timeout=900, delay=5, successes=5)
 
 
 def test_status_is_not_stuck_restarting_after_receive_ca_cert_removal(juju: jubilant.Juju):
     juju.integrate(f"{SSC_NAME}:send-ca-cert", f"{APP_NAME}:receive-ca-cert")
-    juju.wait(jubilant.all_active, timeout=600)
+    juju.wait(jubilant.all_active, error=jubilant.any_error, delay=5, successes=5)
 
     juju.remove_relation(f"{SSC_NAME}:send-ca-cert", f"{APP_NAME}:receive-ca-cert")
 
@@ -55,4 +55,4 @@ def test_status_is_not_stuck_restarting_after_receive_ca_cert_removal(juju: jubi
         current == "maintenance" and message == "restarting traefik..."
     ), "Traefik unit remained in maintenance/restarting after receive-ca-cert removal"
 
-    juju.wait(jubilant.all_active, timeout=600)
+    juju.wait(jubilant.all_active, error=jubilant.any_error, delay=5, successes=5)

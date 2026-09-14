@@ -7,7 +7,7 @@
 Scenario:
 
 1. Deploy traefik-k8s (3 units) at revision 280 and integrate only with
-   ``alertmanager`` (no certificate provider relation).
+    an ingress requirer (no certificate provider relation).
 2. Verify HTTP ingress URL reachability on all units and no blocked/error state.
 3. Refresh traefik to revision 298 and re-verify health + HTTP.
 4. Refresh traefik to the locally built charm and re-verify health + HTTP.
@@ -34,7 +34,7 @@ INTERMEDIATE_REVISION = 298
 
 @pytest.mark.setup
 def test_upgrade_no_tls_from_280_via_298(
-    juju: jubilant.Juju, traefik_charm, alertmanager_app
+    juju: jubilant.Juju, traefik_charm, ingress_app
 ):
     """Traefik stays healthy and serves HTTP across a 280 -> 298 -> current path."""
     juju.deploy(
@@ -46,15 +46,15 @@ def test_upgrade_no_tls_from_280_via_298(
         num_units=NUM_TRAEFIK_UNITS,
         trust=True,
     )
-    juju.wait(jubilant.all_agents_idle, timeout=900, delay=5, successes=5)
+    juju.wait(jubilant.all_agents_idle, error=jubilant.any_error, timeout=900, delay=5, successes=5)
     url = bring_up_traefik_without_certificate_provider(juju)
 
     juju.refresh(TRAEFIK_APP_NAME, channel=SOURCE_CHANNEL, revision=INTERMEDIATE_REVISION)
-    juju.wait(all_settled, delay=5, timeout=900)
+    juju.wait(all_settled, error=jubilant.any_error, delay=5, timeout=900, successes=5)
     assert_traefik_revision(juju, INTERMEDIATE_REVISION)
     verify_http_on_all_units(juju, expected_url=url)
 
     juju.refresh(TRAEFIK_APP_NAME, path=traefik_charm, resources=TRAEFIK_RESOURCES)
-    juju.wait(all_settled, delay=5, timeout=900)
+    juju.wait(all_settled, error=jubilant.any_error, delay=5, timeout=900, successes=5)
     assert_traefik_revision(juju, 0)
     verify_http_on_all_units(juju, expected_url=url)

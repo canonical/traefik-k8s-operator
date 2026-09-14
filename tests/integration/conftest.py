@@ -7,8 +7,14 @@ import jubilant
 import pytest
 import yaml
 
+from tests.integration.any_charm_helpers import (
+    ANY_CHARM_CHANNEL,
+    ANY_CHARM_K8S,
+    PYTHON_PACKAGES,
+    health_src_overwrite,
+)
 from tests.integration.constants import (
-    ALERTMANAGER_APP_NAME,
+    INGRESS_REQUIRER_APP_NAME,
     MANUAL_TLS_APP_NAME,
     MANUAL_TLS_CHANNEL,
     SSC_APP_NAME,
@@ -70,26 +76,32 @@ def deploy_traefik(juju, traefik_charm):
         resources=TRAEFIK_RESOURCES,
         trust=True,
     )
-    juju.wait(jubilant.all_agents_idle, timeout=900, delay=5, successes=5)
+    juju.wait(jubilant.all_agents_idle, error=jubilant.any_error, timeout=900, delay=5, successes=5)
     juju.config(TRAEFIK_APP_NAME, {"external_hostname": "traefik-demo.local"})
-    juju.wait(all_settled, delay=5, timeout=600)
+    juju.wait(all_settled, error=jubilant.any_error, delay=5, successes=5)
     return TRAEFIK_APP_NAME
 
 
-@pytest.fixture(scope="module", name="alertmanager_app")
-def alertmanager_fixture(juju):
-    """Deploy alertmanager-k8s."""
+@pytest.fixture(scope="module", name="ingress_app")
+def ingress_fixture(juju):
+    """Deploy the any-charm HTTP ingress requirer."""
     juju.deploy(
-        "ch:alertmanager-k8s",
-        ALERTMANAGER_APP_NAME,
-        channel="2/edge",
+        f"ch:{ANY_CHARM_K8S}",
+        INGRESS_REQUIRER_APP_NAME,
+        channel=ANY_CHARM_CHANNEL,
+        config={
+            "src-overwrite": health_src_overwrite(),
+            "python-packages": PYTHON_PACKAGES,
+        },
         trust=True,
     )
     juju.wait(
-        lambda status: jubilant.all_active(status, ALERTMANAGER_APP_NAME),
-        timeout=600,
+        lambda status: jubilant.all_active(status, INGRESS_REQUIRER_APP_NAME),
+        error=jubilant.any_error,
+        delay=5,
+        successes=5,
     )
-    return ALERTMANAGER_APP_NAME
+    return INGRESS_REQUIRER_APP_NAME
 
 
 @pytest.fixture(scope="module", name="mtls_app")
@@ -98,7 +110,9 @@ def mtls_fixture(juju):
     juju.deploy(MANUAL_TLS_APP_NAME, MANUAL_TLS_APP_NAME, channel=MANUAL_TLS_CHANNEL)
     juju.wait(
         lambda status: jubilant.all_active(status, MANUAL_TLS_APP_NAME),
-        timeout=600,
+        error=jubilant.any_error,
+        delay=5,
+        successes=5,
     )
     return MANUAL_TLS_APP_NAME
 
@@ -109,6 +123,8 @@ def self_signed_certificates_fixture(juju):
     juju.deploy(SSC_CHARM, SSC_APP_NAME, channel=SSC_CHANNEL, trust=True)
     juju.wait(
         lambda status: jubilant.all_active(status, SSC_APP_NAME),
-        timeout=600,
+        error=jubilant.any_error,
+        delay=5,
+        successes=5,
     )
     return SSC_APP_NAME

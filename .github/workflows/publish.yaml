@@ -7,7 +7,7 @@ on:
 
 jobs:
   publish:
-    uses: canonical/charm-ci/.github/workflows/publish-artifacts.yml@0eef5b8cbef3ee74907850f790cab64bcf0499e5 # v1.0.0
+    uses: canonical/charm-ci/.github/workflows/publish-artifacts.yml@58ae6614a3b143d4e57eff0fd1770e97d8c30fab # v1.0.1
     permissions:
       actions: read
       contents: write

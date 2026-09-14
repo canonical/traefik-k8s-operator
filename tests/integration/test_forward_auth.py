@@ -21,7 +21,11 @@ from tests.integration.any_charm_helpers import (
     PYTHON_PACKAGES,
     forward_auth_src_overwrite,
 )
-from tests.integration.helpers import all_settled, get_k8s_service_address, remove_application
+from tests.integration.helpers import (
+    all_settled,
+    get_k8s_service_address,
+    remove_application,
+)
 
 OATHKEEPER_APP = "oathkeeper"
 TRAEFIK_APP = "traefik-k8s"
@@ -53,7 +57,7 @@ def test_deployment(juju: jubilant.Juju, traefik_charm):
     juju.integrate(f"{IAP_REQUIRER_APP}:require-auth-proxy", OATHKEEPER_APP)
     juju.integrate(f"{TRAEFIK_APP}:experimental-forward-auth", OATHKEEPER_APP)
     juju.model_config({"update-status-hook-interval": "5m"})
-    juju.wait(all_settled, timeout=1000)
+    juju.wait(all_settled, error=jubilant.any_error, timeout=1000, delay=5, successes=5)
 
 
 @pytest.mark.xfail(reason="See https://github.com/canonical/traefik-k8s-operator/issues/522")
@@ -101,7 +105,7 @@ def test_forward_auth_url_response_headers(
 
 def test_remove_forward_auth_integration(juju: jubilant.Juju):
     juju.remove_relation(OATHKEEPER_APP, f"{TRAEFIK_APP}:experimental-forward-auth")
-    juju.wait(all_settled, timeout=600)
+    juju.wait(all_settled, error=jubilant.any_error, delay=5, successes=5)
 
 
 def test_cleanup(juju: jubilant.Juju):
