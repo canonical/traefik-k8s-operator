@@ -5,7 +5,6 @@
 """Integration tests for traefik-route using jubilant."""
 
 import socket
-from pathlib import Path
 
 import jubilant
 import yaml
@@ -15,6 +14,7 @@ from tests.integration.any_charm_helpers import (
     ANY_CHARM_K8S,
     route_src_overwrite,
 )
+from tests.integration.conftest import TRAEFIK_APP_NAME, TRAEFIK_RESOURCES
 from tests.integration.helpers import (
     all_settled,
     any_error_after,
@@ -24,17 +24,13 @@ from tests.integration.helpers import (
     rpc,
 )
 
-TRAEFIK_APP = "traefik"
 ROUTE_TESTER_APP = "route"
 DYNAMIC_CONFIG_DIR = "/opt/traefik/juju"
 STATIC_CONFIG_PATH = "/etc/traefik/traefik.yaml"
 
-_METADATA = yaml.safe_load(Path("./metadata.yaml").read_text(encoding="utf-8"))
-_TRAEFIK_RESOURCES = {name: val["upstream-source"] for name, val in _METADATA["resources"].items()}
-
 
 def test_deployment(juju: jubilant.Juju, traefik_charm):
-    juju.deploy(traefik_charm, TRAEFIK_APP, resources=_TRAEFIK_RESOURCES, trust=True)
+    juju.deploy(traefik_charm, TRAEFIK_APP_NAME, resources=TRAEFIK_RESOURCES, trust=True)
     juju.deploy(
         f"ch:{ANY_CHARM_K8S}",
         ROUTE_TESTER_APP,
@@ -44,7 +40,7 @@ def test_deployment(juju: jubilant.Juju, traefik_charm):
     )
     juju.integrate(
         f"{ROUTE_TESTER_APP}:require-traefik-route",
-        f"{TRAEFIK_APP}:traefik-route",
+        f"{TRAEFIK_APP_NAME}:traefik-route",
     )
     juju.wait(all_settled, error=any_error_after(failures=5), delay=5, successes=5)
 
@@ -52,7 +48,7 @@ def test_deployment(juju: jubilant.Juju, traefik_charm):
 def test_dynamic_config_created(juju: jubilant.Juju):
     config_path = _get_route_config_path(juju)
     contents = juju.ssh(
-        f"{TRAEFIK_APP}/0",
+        f"{TRAEFIK_APP_NAME}/0",
         f"cat {config_path}",
         container="traefik",
     )
@@ -62,7 +58,7 @@ def test_dynamic_config_created(juju: jubilant.Juju):
 
 def test_static_config_updated(juju: jubilant.Juju):
     contents = juju.ssh(
-        f"{TRAEFIK_APP}/0",
+        f"{TRAEFIK_APP_NAME}/0",
         f"cat {STATIC_CONFIG_PATH}",
         container="traefik",
     )
@@ -75,7 +71,7 @@ def test_static_config_updated(juju: jubilant.Juju):
 
 
 def test_added_entrypoint_reachable(juju: jubilant.Juju):
-    traefik_ip = get_loadbalancer_ip(juju, TRAEFIK_APP)
+    traefik_ip = get_loadbalancer_ip(juju, TRAEFIK_APP_NAME)
 
     payload = b"traefik-route-udp-echo"
     udp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -102,7 +98,7 @@ def test_scale_and_get_external_host(juju: jubilant.Juju):
 
     external_host_0 = rpc(juju, f"{ROUTE_TESTER_APP}/0", "get_external_host")
     external_host_1 = rpc(juju, f"{ROUTE_TESTER_APP}/1", "get_external_host")
-    traefik_ip = get_loadbalancer_ip(juju, TRAEFIK_APP)
+    traefik_ip = get_loadbalancer_ip(juju, TRAEFIK_APP_NAME)
 
     assert external_host_0 == external_host_1
     assert external_host_0
@@ -112,10 +108,10 @@ def test_scale_and_get_external_host(juju: jubilant.Juju):
 def test_remove_relation(juju: jubilant.Juju):
     juju.remove_relation(
         f"{ROUTE_TESTER_APP}:require-traefik-route",
-        f"{TRAEFIK_APP}:traefik-route",
+        f"{TRAEFIK_APP_NAME}:traefik-route",
     )
     juju.wait(
-        lambda status: all_settled(status, TRAEFIK_APP, ROUTE_TESTER_APP),
+        lambda status: all_settled(status, TRAEFIK_APP_NAME, ROUTE_TESTER_APP),
         error=any_error_after(failures=5),
         timeout=300,
         delay=5,
@@ -124,12 +120,12 @@ def test_remove_relation(juju: jubilant.Juju):
 
 
 def test_cleanup(juju: jubilant.Juju):
-    remove_application(juju, TRAEFIK_APP, timeout=60)
+    remove_application(juju, TRAEFIK_APP_NAME, timeout=60)
 
 
 def _get_route_config_path(juju: jubilant.Juju) -> str:
     output = juju.ssh(
-        f"{TRAEFIK_APP}/0",
+        f"{TRAEFIK_APP_NAME}/0",
         (
             "find /opt/traefik/juju -maxdepth 1 "
             "-name 'juju_ingress_traefik-route_*_route.yaml' -print"

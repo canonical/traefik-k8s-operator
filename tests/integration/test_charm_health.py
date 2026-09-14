@@ -4,12 +4,10 @@
 
 """Integration tests for ingress health checks using jubilant."""
 
-from pathlib import Path
 from typing import Any
 
 import httpx2
 import jubilant
-import yaml
 
 from tests.integration.any_charm_helpers import (
     ANY_CHARM_CHANNEL,
@@ -17,6 +15,7 @@ from tests.integration.any_charm_helpers import (
     PYTHON_PACKAGES,
     health_src_overwrite,
 )
+from tests.integration.conftest import TRAEFIK_APP_NAME, TRAEFIK_RESOURCES
 from tests.integration.helpers import (
     all_settled,
     any_error_after,
@@ -25,17 +24,11 @@ from tests.integration.helpers import (
     rpc,
 )
 
-TRAEFIK_APP = "traefik-k8s"
 HEALTH_TESTER_APP = "health-tester"
-
-_METADATA = yaml.safe_load(Path("./metadata.yaml").read_text(encoding="utf-8"))
-_TRAEFIK_RESOURCES = {
-    name: val["upstream-source"] for name, val in _METADATA["resources"].items()
-}
 
 
 def test_deployment(juju: jubilant.Juju, traefik_charm):
-    juju.deploy(traefik_charm, TRAEFIK_APP, resources=_TRAEFIK_RESOURCES, trust=True)
+    juju.deploy(traefik_charm, TRAEFIK_APP_NAME, resources=TRAEFIK_RESOURCES, trust=True)
     juju.deploy(
         f"ch:{ANY_CHARM_K8S}",
         HEALTH_TESTER_APP,
@@ -47,12 +40,12 @@ def test_deployment(juju: jubilant.Juju, traefik_charm):
         num_units=3,
         trust=True,
     )
-    juju.integrate(f"{HEALTH_TESTER_APP}:require-ingress", f"{TRAEFIK_APP}:ingress")
+    juju.integrate(f"{HEALTH_TESTER_APP}:require-ingress", f"{TRAEFIK_APP_NAME}:ingress")
     juju.wait(all_settled, error=any_error_after(failures=5), delay=5, successes=5)
 
 
 def test_health(juju: jubilant.Juju):
-    health_address = f"{proxied_url(juju, TRAEFIK_APP, HEALTH_TESTER_APP)}/health"
+    health_address = f"{proxied_url(juju, TRAEFIK_APP_NAME, HEALTH_TESTER_APP)}/health"
 
     rpc(juju, f"{HEALTH_TESTER_APP}/2", "set_health", is_healthy=False)
     juju.wait(all_settled, error=any_error_after(failures=5), delay=5, successes=5)
@@ -73,7 +66,7 @@ def test_health(juju: jubilant.Juju):
 
 
 def test_cleanup(juju: jubilant.Juju):
-    remove_application(juju, TRAEFIK_APP, timeout=60)
+    remove_application(juju, TRAEFIK_APP_NAME, timeout=60)
 
 
 def _fetch_health(url: str) -> tuple[int, Any]:

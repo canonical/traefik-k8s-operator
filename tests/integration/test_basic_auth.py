@@ -4,10 +4,8 @@
 
 """Integration tests for Traefik basic auth using jubilant."""
 
-from pathlib import Path
 
 import jubilant
-import yaml
 from tenacity import stop_after_delay, wait_fixed
 
 from tests.integration.any_charm_helpers import (
@@ -16,23 +14,18 @@ from tests.integration.any_charm_helpers import (
     PYTHON_PACKAGES,
     ipa_src_overwrite,
 )
+from tests.integration.conftest import TRAEFIK_APP_NAME, TRAEFIK_RESOURCES
 from tests.integration.helpers import all_settled, any_error_after, fetch_with_retry, rpc
 
-TRAEFIK_APP = "traefik"
 IPA_TESTER_APP = "ipa-tester"
 USERNAME = "admin"
 PASSWORD = "admin"
 SUCCESS_STATUS = 502
 TEST_AUTH_USER = r"admin:$2a$13$XOHdzKdVS4mPKT0LvOfXru4LqyLbwcEvFlssXGS3laC6d/i6cKrLS"
 
-_METADATA = yaml.safe_load(Path("./metadata.yaml").read_text(encoding="utf-8"))
-_TRAEFIK_RESOURCES = {
-    name: val["upstream-source"] for name, val in _METADATA["resources"].items()
-}
-
 
 def test_deployment(juju: jubilant.Juju, traefik_charm):
-    juju.deploy(traefik_charm, TRAEFIK_APP, resources=_TRAEFIK_RESOURCES, trust=True)
+    juju.deploy(traefik_charm, TRAEFIK_APP_NAME, resources=TRAEFIK_RESOURCES, trust=True)
     juju.deploy(
         f"ch:{ANY_CHARM}",
         IPA_TESTER_APP,
@@ -46,12 +39,12 @@ def test_deployment(juju: jubilant.Juju, traefik_charm):
 
 
 def test_relate(juju: jubilant.Juju):
-    juju.integrate(f"{IPA_TESTER_APP}:require-ingress", f"{TRAEFIK_APP}:ingress")
+    juju.integrate(f"{IPA_TESTER_APP}:require-ingress", f"{TRAEFIK_APP_NAME}:ingress")
     juju.wait(all_settled, error=any_error_after(failures=5), delay=5, successes=5)
 
 
 def test_ipa_charm_ingress_noauth(juju: jubilant.Juju):
-    juju.config(TRAEFIK_APP, {"basic_auth_user": ""})
+    juju.config(TRAEFIK_APP_NAME, {"basic_auth_user": ""})
     juju.wait(all_settled, error=any_error_after(failures=5), delay=5, successes=5)
     fetch_with_retry(
         _get_tester_url(juju), SUCCESS_STATUS, stop=stop_after_delay(60), wait=wait_fixed(2)
@@ -60,7 +53,7 @@ def test_ipa_charm_ingress_noauth(juju: jubilant.Juju):
 
 def test_ipa_charm_ingress_auth(juju: jubilant.Juju):
     tester_url = _get_tester_url(juju)
-    juju.config(TRAEFIK_APP, {"basic_auth_user": TEST_AUTH_USER})
+    juju.config(TRAEFIK_APP_NAME, {"basic_auth_user": TEST_AUTH_USER})
     juju.wait(all_settled, error=any_error_after(failures=5), delay=5, successes=5)
     fetch_with_retry(tester_url, 401, stop=stop_after_delay(60), wait=wait_fixed(2))
     fetch_with_retry(
@@ -73,7 +66,7 @@ def test_ipa_charm_ingress_auth(juju: jubilant.Juju):
 
 
 def test_ipa_charm_ingress_auth_disable(juju: jubilant.Juju):
-    juju.config(TRAEFIK_APP, {"basic_auth_user": ""})
+    juju.config(TRAEFIK_APP_NAME, {"basic_auth_user": ""})
     juju.wait(all_settled, error=any_error_after(failures=5), delay=5, successes=5)
     fetch_with_retry(
         _get_tester_url(juju), SUCCESS_STATUS, stop=stop_after_delay(60), wait=wait_fixed(2)
