@@ -40,14 +40,14 @@ def test_waiting_when_lb_pending(juju: jubilant.Juju, traefik_charm):
     ), f"Unexpected waiting message: {unit_status.message}"
 
 
-def test_recovery_after_annotations_cleared(juju: jubilant.Juju, traefik_app):
+def test_recovery_after_annotations_cleared(juju: jubilant.Juju):
     """Charm recovers to active once the LB gets an IP again."""
     # Clear the bad annotations so MetalLB assigns an IP from its pool.
-    juju.config(traefik_app, {"loadbalancer_annotations": ""})
+    juju.config(TRAEFIK_APP_NAME, {"loadbalancer_annotations": ""})
     juju.wait(all_settled, error=any_error_after(failures=5), delay=5, successes=5)
 
     status = juju.status()
-    app_status = status.apps[traefik_app].app_status
+    app_status = status.apps[TRAEFIK_APP_NAME].app_status
     assert app_status.current == "active", (
         f"Expected recovery to active, got {app_status.current}: {app_status.message}"
     )
