@@ -56,8 +56,8 @@ def test_build_and_deploy(juju: jubilant.Juju, traefik_charm):
 
 
 def test_ingressed_endpoint_reachable_after_metallb_enabled(juju: jubilant.Juju):
-    traefik_ip = get_loadbalancer_ip(juju, TRAEFIK_APP)
-    response = httpx2.get(_endpoint(juju, "http", traefik_ip), timeout=30)
+    endpoint = f"{proxied_url(juju, TRAEFIK_APP, INGRESS_APP)}/health"
+    response = httpx2.get(endpoint, timeout=30)
     response.raise_for_status()
 
 

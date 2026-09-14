@@ -25,7 +25,7 @@ from tests.integration.helpers import (
     all_settled,
     any_error_after,
     fetch_with_retry,
-    get_loadbalancer_ip,
+    proxied_url,
     remove_application,
 )
 
@@ -122,8 +122,7 @@ def lightkube_client(juju: jubilant.Juju) -> Client:
 
 
 def _reverse_proxy_app_url(juju: jubilant.Juju, ingress_app_name: str, app_name: str) -> str:
-    ip = get_loadbalancer_ip(juju, ingress_app_name)
-    return f"http://{ip}/{juju.model}-{app_name}/"
+    return f"{proxied_url(juju, ingress_app_name, app_name)}/"
 
 
 @retry(

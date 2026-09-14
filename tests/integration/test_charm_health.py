@@ -20,7 +20,7 @@ from tests.integration.any_charm_helpers import (
 from tests.integration.helpers import (
     all_settled,
     any_error_after,
-    get_loadbalancer_ip,
+    proxied_url,
     remove_application,
     rpc,
 )
@@ -52,8 +52,7 @@ def test_deployment(juju: jubilant.Juju, traefik_charm):
 
 
 def test_health(juju: jubilant.Juju):
-    traefik_ip = get_loadbalancer_ip(juju, TRAEFIK_APP)
-    health_address = f"http://{traefik_ip}/{juju.model}-{HEALTH_TESTER_APP}/health"
+    health_address = f"{proxied_url(juju, TRAEFIK_APP, HEALTH_TESTER_APP)}/health"
 
     rpc(juju, f"{HEALTH_TESTER_APP}/2", "set_health", is_healthy=False)
     juju.wait(all_settled, error=any_error_after(failures=5), delay=5, successes=5)
