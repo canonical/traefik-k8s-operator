@@ -25,7 +25,7 @@ from tests.integration.helpers import (
     all_settled,
     any_error_after,
     fetch_with_retry,
-    get_k8s_service_address,
+    get_loadbalancer_ip,
     remove_application,
 )
 
@@ -122,9 +122,8 @@ def lightkube_client(juju: jubilant.Juju) -> Client:
 
 
 def _reverse_proxy_app_url(juju: jubilant.Juju, ingress_app_name: str, app_name: str) -> str:
-    address = get_k8s_service_address(juju.model, f"{ingress_app_name}-lb")
-    assert address, "Expected a traefik load balancer address"
-    return f"http://{address}/{juju.model}-{app_name}/"
+    ip = get_loadbalancer_ip(juju, ingress_app_name)
+    return f"http://{ip}/{juju.model}-{app_name}/"
 
 
 @retry(

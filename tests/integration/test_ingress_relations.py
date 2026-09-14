@@ -38,7 +38,7 @@ from tests.integration.helpers import (
     all_settled,
     any_error_after,
     assert_can_connect,
-    get_k8s_service_address,
+    get_loadbalancer_ip,
     remove_application,
     rpc,
     wait_for_tcp_echo,
@@ -115,8 +115,7 @@ def test_ipu_has_ingress(juju: jubilant.Juju):
 
 
 def test_tcp_connection(juju: jubilant.Juju):
-    traefik_ip = get_k8s_service_address(juju.model, f"{TRAEFIK_APP}-lb")
-    assert traefik_ip, "Expected a traefik load balancer address"
+    traefik_ip = get_loadbalancer_ip(juju, TRAEFIK_APP)
 
     ingress = rpc(juju, f"{TCP_TESTER_APP}/0", "get_tcp_ingress_data")
     url = ingress["urls"].get(f"{TCP_TESTER_APP}/0")

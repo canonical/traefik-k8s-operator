@@ -8,7 +8,6 @@ import datetime
 import json
 import logging
 import socket
-import subprocess
 import time
 from pathlib import Path
 from typing import Any, Callable, List, Optional, Tuple
@@ -80,36 +79,6 @@ def assert_can_connect(ip: str, port: int) -> None:
         raise AssertionError(f"{ip}:{port} is down/unreachable") from exc
     finally:
         s.close()
-
-
-def get_k8s_service_address(model: str, service_name: str) -> Optional[str]:
-    """Get the address of a LoadBalancer Kubernetes service using kubectl.
-
-    Args:
-        model: Juju model name (used as the Kubernetes namespace).
-        service_name: The name of the Kubernetes service.
-
-    Returns:
-        The LoadBalancer IP as a string, or None if not found.
-    """
-    try:
-        result = subprocess.run(
-            [
-                "kubectl",
-                "-n",
-                model,
-                "get",
-                f"service/{service_name}",
-                "-o=jsonpath={.status.loadBalancer.ingress[0].ip}",
-            ],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        return result.stdout.strip() or None
-    except Exception as e:
-        logger.error("Error retrieving service address: %s", e, exc_info=True)
-        return None
 
 
 def remove_application(
@@ -375,6 +344,18 @@ def pull_ssc_ca_certificate(
 
 
 # --- Verification -----------------------------------------------------------
+def get_loadbalancer_ip(
+    juju: jubilant.Juju, traefik_app_name: str, timeout: int = 300
+) -> str:
+    """Return the external LoadBalancer IP for a Traefik application."""
+    result = juju.run(
+        f"{traefik_app_name}/leader", "get-loadbalancer-ip", params={"timeout": timeout}
+    )
+    ip = result.results["loadbalancer-ip"]
+    assert isinstance(ip, str) and ip, "Expected a non-empty loadbalancer IP"
+    return ip
+
+
 def proxied_url(juju: jubilant.Juju, traefik_app_name: str, endpoint_key: str) -> str:
     """Return endpoint_key's URL (no trailing slash), routed through traefik_app_name's gateway."""
     result = juju.run(f"{traefik_app_name}/leader", "show-proxied-endpoints")

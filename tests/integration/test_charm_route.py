@@ -19,7 +19,7 @@ from tests.integration.helpers import (
     all_settled,
     any_error_after,
     fetch_with_retry,
-    get_k8s_service_address,
+    get_loadbalancer_ip,
     remove_application,
     rpc,
 )
@@ -75,8 +75,7 @@ def test_static_config_updated(juju: jubilant.Juju):
 
 
 def test_added_entrypoint_reachable(juju: jubilant.Juju):
-    traefik_ip = get_k8s_service_address(juju.model, f"{TRAEFIK_APP}-lb")
-    assert traefik_ip, "Expected a traefik load balancer address"
+    traefik_ip = get_loadbalancer_ip(juju, TRAEFIK_APP)
 
     payload = b"traefik-route-udp-echo"
     udp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -103,7 +102,7 @@ def test_scale_and_get_external_host(juju: jubilant.Juju):
 
     external_host_0 = rpc(juju, f"{ROUTE_TESTER_APP}/0", "get_external_host")
     external_host_1 = rpc(juju, f"{ROUTE_TESTER_APP}/1", "get_external_host")
-    traefik_ip = get_k8s_service_address(juju.model, f"{TRAEFIK_APP}-lb")
+    traefik_ip = get_loadbalancer_ip(juju, TRAEFIK_APP)
 
     assert external_host_0 == external_host_1
     assert external_host_0
