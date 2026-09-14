@@ -27,9 +27,7 @@ from tests.integration.helpers import all_settled, any_error_after
 logger = logging.getLogger(__name__)
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
-TRAEFIK_RESOURCES = {
-    name: val["upstream-source"] for name, val in METADATA["resources"].items()
-}
+TRAEFIK_RESOURCES = {name: val["upstream-source"] for name, val in METADATA["resources"].items()}
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
@@ -39,7 +37,10 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         parser: Pytest parser.
     """
     parser.addoption(
-        "--base", action="store", default="ubuntu@26.04", help="Base to use for the integration test",
+        "--base",
+        action="store",
+        default="ubuntu@26.04",
+        help="Base to use for the integration test",
     )
 
 
@@ -75,9 +76,8 @@ def deploy_traefik(juju, traefik_charm):
         TRAEFIK_APP_NAME,
         resources=TRAEFIK_RESOURCES,
         trust=True,
+        config={"external_hostname": "traefik-demo.local"},
     )
-    juju.wait(jubilant.all_agents_idle, error=any_error_after(failures=5), timeout=900, delay=5, successes=5)
-    juju.config(TRAEFIK_APP_NAME, {"external_hostname": "traefik-demo.local"})
     juju.wait(all_settled, error=any_error_after(failures=5), delay=5, successes=5)
     return TRAEFIK_APP_NAME
 
