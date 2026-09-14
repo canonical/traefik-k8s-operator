@@ -5,12 +5,12 @@
 """Integration tests for experimental forward auth using jubilant."""
 
 import json
-from pathlib import Path
 
 import httpx2
 import jubilant
 import pytest
 import yaml
+from conftest import TRAEFIK_RESOURCES
 from lightkube import Client
 from lightkube.resources.core_v1 import ConfigMap
 from tenacity import retry, stop_after_attempt, wait_exponential
@@ -33,15 +33,15 @@ OATHKEEPER_APP = "oathkeeper"
 TRAEFIK_APP = "traefik-k8s"
 IAP_REQUIRER_APP = "iap-requirer"
 
-_METADATA = yaml.safe_load(Path("./metadata.yaml").read_text(encoding="utf-8"))
-_TRAEFIK_RESOURCES = {
-    name: val["upstream-source"] for name, val in _METADATA["resources"].items()
-}
-
 
 def test_deployment(juju: jubilant.Juju, traefik_charm):
-    juju.deploy(traefik_charm, TRAEFIK_APP, resources=_TRAEFIK_RESOURCES, trust=True)
-    juju.config(TRAEFIK_APP, {"enable_experimental_forward_auth": "True"})
+    juju.deploy(
+        traefik_charm,
+        TRAEFIK_APP,
+        resources=TRAEFIK_RESOURCES,
+        trust=True,
+        config={"enable_experimental_forward_auth": "True"},
+    )
 
     juju.deploy(OATHKEEPER_APP, channel="latest/edge", trust=True)
     juju.deploy(
@@ -82,9 +82,7 @@ def test_protected_forward_auth_url_redirect(juju: jubilant.Juju) -> None:
     )
 
 
-def test_forward_auth_url_response_headers(
-    juju: jubilant.Juju, lightkube_client: Client
-) -> None:
+def test_forward_auth_url_response_headers(juju: jubilant.Juju, lightkube_client: Client) -> None:
     requirer_url = _reverse_proxy_app_url(juju, TRAEFIK_APP, IAP_REQUIRER_APP)
     protected_url = f"{requirer_url}anything/anonymous"
 

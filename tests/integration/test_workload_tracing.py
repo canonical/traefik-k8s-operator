@@ -5,16 +5,15 @@
 """Integration test for Traefik workload tracing using jubilant."""
 
 import socket
-from pathlib import Path
 
 import httpx2
 import jubilant
-import yaml
 from tenacity import retry, stop_after_attempt, wait_exponential
 
+from tests.integration.conftest import TRAEFIK_RESOURCES
+from tests.integration.constants import TRAEFIK_APP_NAME
 from tests.integration.helpers import all_settled, any_error_after
 
-TRAEFIK_APP = "traefik"
 TEMPO_APP = "tempo"
 TEMPO_WORKER_APP = "tempo-worker"
 S3_INTEGRATOR_APP = "s3-integrator"
@@ -25,11 +24,6 @@ S3_SECRET_KEY = "this-is-very-secret"
 S3_BUCKET = "tests"
 S3_PORT = 7480
 
-_METADATA = yaml.safe_load(Path("./metadata.yaml").read_text(encoding="utf-8"))
-_TRAEFIK_RESOURCES = {
-    name: val["upstream-source"] for name, val in _METADATA["resources"].items()
-}
-
 
 def test_setup_env(juju: jubilant.Juju):
     juju.model_config({"logging-config": "<root>=WARNING; unit=DEBUG"})
@@ -38,10 +32,10 @@ def test_setup_env(juju: jubilant.Juju):
 def test_workload_tracing_is_present(juju: jubilant.Juju, traefik_charm):
     _deploy_tempo_cluster(juju)
 
-    juju.deploy(traefik_charm, TRAEFIK_APP, resources=_TRAEFIK_RESOURCES, trust=True)
+    juju.deploy(traefik_charm, TRAEFIK_APP_NAME, resources=TRAEFIK_RESOURCES, trust=True)
 
-    juju.integrate(f"{TRAEFIK_APP}:workload-tracing", f"{TEMPO_APP}:tracing")
-    juju.integrate(f"{TEMPO_APP}:ingress", f"{TRAEFIK_APP}:traefik-route")
+    juju.integrate(f"{TRAEFIK_APP_NAME}:workload-tracing", f"{TEMPO_APP}:tracing")
+    juju.integrate(f"{TEMPO_APP}:ingress", f"{TRAEFIK_APP_NAME}:traefik-route")
     juju.wait(all_settled, error=any_error_after(failures=5), timeout=1000, delay=5, successes=5)
 
     tempo_host = juju.status().apps[TEMPO_APP].address
@@ -93,7 +87,7 @@ def _deploy_tempo_cluster(juju: jubilant.Juju) -> None:
 
 
 @retry(stop=stop_after_attempt(15), wait=wait_exponential(multiplier=1, min=4, max=10))
-def _get_traces_patiently(tempo_host: str, service_name: str = TRAEFIK_APP) -> list[dict]:
+def _get_traces_patiently(tempo_host: str, service_name: str = TRAEFIK_APP_NAME) -> list[dict]:
     response = httpx2.get(
         f"http://{tempo_host}:3200/api/search?tags=service.name={service_name}",
         verify=False,

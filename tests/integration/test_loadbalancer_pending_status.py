@@ -4,6 +4,7 @@
 """Test the charm reports WaitingStatus when the LB Service has no external IP."""
 
 import jubilant
+from conftest import TRAEFIK_APP_NAME, TRAEFIK_RESOURCES
 
 from tests.integration.helpers import all_settled, any_error_after
 
@@ -11,26 +12,32 @@ from tests.integration.helpers import all_settled, any_error_after
 UNREACHABLE_IP = "192.168.255.255"
 
 
-def test_waiting_when_lb_pending(juju: jubilant.Juju, traefik_app):
+def test_waiting_when_lb_pending(juju: jubilant.Juju, traefik_charm):
     """When LB annotations request an unreachable IP, charm goes to waiting."""
-    juju.config(
-        traefik_app,
-        {"loadbalancer_annotations": f"metallb.io/loadBalancerIPs={UNREACHABLE_IP}"},
+    juju.deploy(
+        traefik_charm,
+        TRAEFIK_APP_NAME,
+        resources=TRAEFIK_RESOURCES,
+        trust=True,
+        config={
+            "external_hostname": "traefik-demo.local",
+            "loadbalancer_annotations": f"metallb.io/loadBalancerIPs={UNREACHABLE_IP}",
+        },
     )
 
     juju.wait(
-        lambda status: jubilant.all_waiting(status, traefik_app),
+        lambda status: jubilant.all_waiting(status, TRAEFIK_APP_NAME),
         error=any_error_after(failures=5),
         delay=5,
         successes=5,
     )
 
     status = juju.status()
-    unit_name = next(iter(status.apps[traefik_app].units))
-    unit_status = status.apps[traefik_app].units[unit_name].workload_status
-    assert unit_status.message == "Load balancer service has not yet obtained an external address.", (
-        f"Unexpected waiting message: {unit_status.message}"
-    )
+    unit_name = next(iter(status.apps[TRAEFIK_APP_NAME].units))
+    unit_status = status.apps[TRAEFIK_APP_NAME].units[unit_name].workload_status
+    assert (
+        unit_status.message == "Load balancer service has not yet obtained an external address."
+    ), f"Unexpected waiting message: {unit_status.message}"
 
 
 def test_recovery_after_annotations_cleared(juju: jubilant.Juju, traefik_app):
