@@ -53,8 +53,7 @@ def test_build_and_deploy(juju: jubilant.Juju, traefik_charm):
     juju.integrate(f"{INGRESS_REQUIRER_APP_NAME}:require-ingress", TRAEFIK_APP_NAME)
     juju.wait(all_settled, error=any_error_after(failures=5), delay=5, successes=5)
     endpoint = f"{proxied_url(juju, TRAEFIK_APP_NAME, INGRESS_REQUIRER_APP_NAME)}/health"
-    response = httpx2.get(endpoint, timeout=30)
-    response.raise_for_status()
+    fetch_with_retry(endpoint, expected_status=200, timeout=30)
 
 
 def test_tls_termination(juju: jubilant.Juju, tmp_path: Path):
@@ -126,10 +125,10 @@ def _assert_https_endpoint(juju: jubilant.Juju, cert_path: Path, traefik_ip: str
     with httpx2.Client(verify=str(cert_path), headers={"Host": MOCK_HOSTNAME}) as client:
         fetch_with_retry(
             _url_for_unit(ingress_url, traefik_ip),
+            expected_status=200,
             client=client,
             timeout=30,
             extensions={"sni_hostname": MOCK_HOSTNAME},
-            raise_for_status=True,
         )
 
 
