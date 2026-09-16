@@ -23,8 +23,10 @@ from tests.integration.conftest import (
     TRAEFIK_RESOURCES,
 )
 from tests.integration.helpers import (
+    _url_for_unit,
     all_settled,
     any_error_after,
+    fetch_with_retry,
     get_loadbalancer_ip,
     proxied_url,
     pull_ssc_ca_certificate,
@@ -114,20 +116,21 @@ def test_cleanup(juju: jubilant.Juju):
     remove_application(juju, TRAEFIK_APP_NAME, timeout=60, force=False)
 
 
-def _endpoint(juju: jubilant.Juju, scheme: str, netloc: str) -> str:
-    base_url = proxied_url(juju, TRAEFIK_APP_NAME, INGRESS_REQUIRER_APP_NAME)
-    ingress_path = f"{urlsplit(base_url).path}/health"
-    return f"{scheme}://{netloc}{ingress_path}"
-
-
 def _assert_https_endpoint(juju: jubilant.Juju, cert_path: Path, traefik_ip: str) -> None:
+    base_url = proxied_url(juju, TRAEFIK_APP_NAME, INGRESS_REQUIRER_APP_NAME)
+    ingress_url = f"{base_url}/health"
+    assert urlsplit(ingress_url).scheme == "https", (
+        f"expected HTTPS proxied URL after integrating certificates, got {ingress_url!r}"
+    )
+
     with httpx2.Client(verify=str(cert_path), headers={"Host": MOCK_HOSTNAME}) as client:
-        response = client.get(
-            _endpoint(juju, "https", traefik_ip),
+        fetch_with_retry(
+            _url_for_unit(ingress_url, traefik_ip),
+            client=client,
             timeout=30,
             extensions={"sni_hostname": MOCK_HOSTNAME},
+            raise_for_status=True,
         )
-    response.raise_for_status()
 
 
 def _get_served_certificate(traefik_ip: str) -> str:
