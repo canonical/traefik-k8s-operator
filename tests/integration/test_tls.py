@@ -50,9 +50,6 @@ def test_build_and_deploy(juju: jubilant.Juju, traefik_charm):
 
     juju.integrate(f"{INGRESS_REQUIRER_APP_NAME}:require-ingress", TRAEFIK_APP_NAME)
     juju.wait(all_settled, error=any_error_after(failures=5), delay=5, successes=5)
-
-
-def test_ingressed_endpoint_reachable_after_metallb_enabled(juju: jubilant.Juju):
     endpoint = f"{proxied_url(juju, TRAEFIK_APP_NAME, INGRESS_REQUIRER_APP_NAME)}/health"
     response = httpx2.get(endpoint, timeout=30)
     response.raise_for_status()
