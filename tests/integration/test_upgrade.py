@@ -7,9 +7,9 @@
 import jubilant
 
 from tests.integration.any_charm_helpers import (
+    ANY_CHARM,
     ANY_CHARM_CHANNEL,
-    ANY_CHARM_K8S,
-    PYTHON_PACKAGES,
+    HEALTH_PYTHON_PACKAGES,
     health_src_overwrite,
 )
 from tests.integration.constants import INGRESS_REQUIRER_APP_NAME
@@ -43,12 +43,12 @@ def test_upgrade(juju: jubilant.Juju, traefik_charm, pytestconfig):
     )
 
     juju.deploy(
-        f"ch:{ANY_CHARM_K8S}",
+        f"ch:{ANY_CHARM}",
         INGRESS_REQUIRER_APP_NAME,
         channel=ANY_CHARM_CHANNEL,
         config={
             "src-overwrite": health_src_overwrite(),
-            "python-packages": PYTHON_PACKAGES,
+            "python-packages": HEALTH_PYTHON_PACKAGES,
         },
         trust=True,
     )

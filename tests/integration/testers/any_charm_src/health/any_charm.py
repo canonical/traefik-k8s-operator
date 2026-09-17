@@ -3,27 +3,27 @@
 
 """any-charm src-overwrite for the health tester.
 
-Requests ingress with health-check params and runs a simple HTTP health endpoint
-via pebble. Exposes a `set_health` method callable via the `rpc` action.
+Requests ingress with health-check params and runs an Apache health endpoint.
+Exposes a `set_health` method callable via the `rpc` action.
 """
 
-import logging
+import json
 import pathlib
+import subprocess
 import sys
 
 import ops
 from any_charm_base import AnyCharmBase
+from charmlibs import apt
 from ops.framework import StoredState
-from ops.pebble import Layer
 
 _src = pathlib.Path(__file__).parent
 sys.path.insert(0, str(_src))
 
 from charms.traefik_k8s.v2.ingress import IngressPerAppRequirer  # noqa: E402
 
-logger = logging.getLogger(__name__)
-
-HEALTH_PORT = 8080
+HEALTH_PORT = 80
+HEALTH_PATH = pathlib.Path("/var/www/html/health")
 
 
 class AnyCharm(AnyCharmBase):
@@ -32,7 +32,7 @@ class AnyCharm(AnyCharmBase):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._stored.set_default(healthy=True)
-        self.unit.set_ports(HEALTH_PORT)
+        self.unit.open_port("tcp", HEALTH_PORT)
         self.ingress = IngressPerAppRequirer(
             self,
             port=HEALTH_PORT,
@@ -44,49 +44,39 @@ class AnyCharm(AnyCharmBase):
                 "interval": "5s",
             },
         )
-        self.framework.observe(self.on["any"].pebble_ready, self._on_pebble_ready)
+        self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(self.on.start, self._on_start)
 
-    def _on_start(self, event):
-        container = self.unit.get_container("any")
-        if not container.can_connect():
-            event.defer()
-            return
-        self._configure_health_service(container)
+    def _on_install(self, _event):
+        self._ensure_apache_installed()
+        self._write_health_response(bool(self._stored.healthy))
 
-    def _on_pebble_ready(self, event):
-        self._configure_health_service(event.workload)
+    def _on_start(self, _event):
+        self._ensure_apache_installed()
+        self._set_health(bool(self._stored.healthy))
 
-    def _configure_health_service(self, container):
-        if not container.exists("/usr/bin/python3"):
-            container.exec(["apt-get", "update", "-qq"]).wait()
-            container.exec(["apt-get", "install", "-y", "-qq", "python3"]).wait()
-        # Push the server script
-        server_script = (_src / "health_server.py").read_text()
-        container.push("/bin/health_server.py", server_script, make_dirs=True)
-        self._start_health_service(container, healthy=bool(self._stored.healthy))
+    @staticmethod
+    def _ensure_apache_installed():
+        if not pathlib.Path("/usr/sbin/apache2").exists():
+            apt.update()
+            apt.add_package("apache2")
 
-    def _start_health_service(self, container, healthy: bool):
+    def _write_health_response(self, healthy: bool):
         state = "up" if healthy else "down"
-        layer = Layer({
-            "summary": "health server layer",
-            "services": {
-                "health-server": {
-                    "override": "replace",
-                    "command": f"python3 /bin/health_server.py {state}",
-                    "startup": "enabled",
-                }
-            },
-        })
-        container.add_layer("health-server", layer, combine=True)
-        container.restart("health-server")
+        HEALTH_PATH.parent.mkdir(parents=True, exist_ok=True)
+        HEALTH_PATH.write_text(
+            json.dumps({"host": self.unit.name.replace("/", "-"), "status": state}),
+            encoding="utf-8",
+        )
+
+    def _set_health(self, healthy: bool):
+        self._write_health_response(healthy)
+        action = "start" if healthy else "stop"
+        subprocess.run(["service", "apache2", action], check=True)
         self.unit.status = ops.ActiveStatus(f"Health server running (healthy={healthy})")
 
     def set_health(self, is_healthy: bool) -> str:
         """Set the health status for this unit. Callable via rpc action."""
-        container = self.unit.get_container("any")
-        if not container.can_connect():
-            return "error: container not ready"
         self._stored.healthy = is_healthy
-        self._start_health_service(container, healthy=is_healthy)
+        self._set_health(is_healthy)
         return f"Health set to {is_healthy}"

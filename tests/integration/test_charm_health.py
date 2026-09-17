@@ -11,9 +11,9 @@ import jubilant
 from tenacity import retry, stop_after_delay, wait_fixed
 
 from tests.integration.any_charm_helpers import (
+    ANY_CHARM,
     ANY_CHARM_CHANNEL,
-    ANY_CHARM_K8S,
-    PYTHON_PACKAGES,
+    HEALTH_PYTHON_PACKAGES,
     health_src_overwrite,
 )
 from tests.integration.conftest import TRAEFIK_APP_NAME, TRAEFIK_RESOURCES
@@ -31,12 +31,12 @@ HEALTH_TESTER_APP = "health-tester"
 def test_deployment(juju: jubilant.Juju, traefik_charm):
     juju.deploy(traefik_charm, TRAEFIK_APP_NAME, resources=TRAEFIK_RESOURCES, trust=True)
     juju.deploy(
-        f"ch:{ANY_CHARM_K8S}",
+        f"ch:{ANY_CHARM}",
         HEALTH_TESTER_APP,
         channel=ANY_CHARM_CHANNEL,
         config={
             "src-overwrite": health_src_overwrite(),
-            "python-packages": PYTHON_PACKAGES,
+            "python-packages": HEALTH_PYTHON_PACKAGES,
         },
         num_units=3,
         trust=True,

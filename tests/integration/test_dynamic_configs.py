@@ -14,9 +14,9 @@ import pytest
 import yaml
 
 from tests.integration.any_charm_helpers import (
+    ANY_CHARM,
     ANY_CHARM_CHANNEL,
-    ANY_CHARM_K8S,
-    PYTHON_PACKAGES,
+    HEALTH_PYTHON_PACKAGES,
     health_src_overwrite,
 )
 from tests.integration.helpers import all_settled, any_error_after
@@ -31,12 +31,12 @@ DYNAMIC_CONFIG_DIR = "/opt/traefik/juju"
 def secondary_ingress_app(juju):
     """Deploy a second ingress requirer."""
     juju.deploy(
-        f"ch:{ANY_CHARM_K8S}",
+        f"ch:{ANY_CHARM}",
         SECONDARY_INGRESS_APP_NAME,
         channel=ANY_CHARM_CHANNEL,
         config={
             "src-overwrite": health_src_overwrite(),
-            "python-packages": PYTHON_PACKAGES,
+            "python-packages": HEALTH_PYTHON_PACKAGES,
         },
         trust=True,
     )

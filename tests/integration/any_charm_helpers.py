@@ -28,6 +28,7 @@ _OATHKEEPER_LIB = (
 
 # Python packages required by the traefik libs inside any-charm.
 PYTHON_PACKAGES = "pydantic>=2\njsonschema"
+HEALTH_PYTHON_PACKAGES = f"{PYTHON_PACKAGES}\ncharmlibs-apt"
 
 # any-charm channel to use
 ANY_CHARM_CHANNEL = "beta"
@@ -129,7 +130,7 @@ def health_src_overwrite() -> str:
         "charms/traefik_k8s/v2/ingress.py",
         LIB_ROOT / "traefik_k8s" / "v2" / "ingress.py",
     ))
-    files.update(_read_src_files("health", ["any_charm.py", "health_server.py"]))
+    files.update(_read_src_files("health", ["any_charm.py"]))
     return json.dumps(files)
 
 
