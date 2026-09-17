@@ -4,7 +4,7 @@
 """any-charm src-overwrite for a traefik-route requirer.
 
 Submits dynamic + static config to Traefik and runs a UDP echo server
-on port 9999 as an init service so that the static entrypoint test can reach it.
+on port 9999 so that the static entrypoint test can reach it.
 """
 
 import pathlib
@@ -15,6 +15,7 @@ import time
 
 import ops
 from any_charm_base import AnyCharmBase
+from charmlibs import apt
 
 _src = pathlib.Path(__file__).parent
 sys.path.insert(0, str(_src))
@@ -23,36 +24,6 @@ from charms.traefik_k8s.v0.traefik_route import TraefikRouteRequirer  # noqa: E4
 
 _UDP_PORT = 9999
 _SERVICE_NAME = "traefik-route-udp"
-_SERVICE_DIR = pathlib.Path("/var/lib/traefik-route")
-_SERVICE_SCRIPT = _SERVICE_DIR / "udp_echo_server.py"
-_INIT_SCRIPT = pathlib.Path(f"/etc/init.d/{_SERVICE_NAME}")
-_PID_FILE = f"/run/{_SERVICE_NAME}.pid"
-
-_INIT_SCRIPT_CONTENT = f"""#!/bin/sh
-set -e
-
-case "$1" in
-    start)
-        start-stop-daemon --start --quiet --background --make-pidfile \\
-            --pidfile {_PID_FILE} --startas /usr/bin/python3 -- {_SERVICE_SCRIPT}
-        ;;
-    stop)
-        start-stop-daemon --stop --quiet --retry TERM/5/KILL/5 --remove-pidfile \\
-            --pidfile {_PID_FILE}
-        ;;
-    restart)
-        "$0" stop
-        "$0" start
-        ;;
-    status)
-        start-stop-daemon --status --quiet --pidfile {_PID_FILE}
-        ;;
-    *)
-        echo "Usage: $0 {{start|stop|restart|status}}" >&2
-        exit 1
-        ;;
-esac
-"""
 
 
 class AnyCharm(AnyCharmBase):
@@ -78,19 +49,38 @@ class AnyCharm(AnyCharmBase):
         return f"{address}:{_UDP_PORT}"
 
     def _on_install(self, _event):
-        _SERVICE_DIR.mkdir(parents=True, exist_ok=True)
-        _SERVICE_SCRIPT.write_text(
-            (_src / "udp_echo_server.py").read_text(encoding="utf-8"),
-            encoding="utf-8",
-        )
-        _INIT_SCRIPT.write_text(_INIT_SCRIPT_CONTENT, encoding="utf-8")
-        _INIT_SCRIPT.chmod(0o755)
+        self._ensure_udp_echo_tools_installed()
 
     def _on_start(self, _event):
-        subprocess.run(["service", _SERVICE_NAME, "start"], check=True)
+        self._ensure_udp_echo_tools_installed()
+        if subprocess.run(
+            ["daemon", "--name", _SERVICE_NAME, "--running"], check=False
+        ).returncode:
+            subprocess.run(
+                [
+                    "daemon",
+                    "--name",
+                    _SERVICE_NAME,
+                    "--respawn",
+                    "--",
+                    "/usr/bin/socat",
+                    "-T",
+                    "1",
+                    f"UDP4-RECVFROM:{_UDP_PORT},reuseaddr,fork",
+                    "PIPE",
+                ],
+                check=True,
+            )
         self._wait_for_udp_echo()
         self._sync_config()
         self.unit.status = ops.ActiveStatus("ready")
+
+    @staticmethod
+    def _ensure_udp_echo_tools_installed():
+        if not all(pathlib.Path(path).exists() for path in ("/usr/bin/daemon", "/usr/bin/socat")):
+            apt.update()
+            apt.add_package("daemon")
+            apt.add_package("socat")
 
     @staticmethod
     def _wait_for_udp_echo():

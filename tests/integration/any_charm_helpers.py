@@ -29,6 +29,7 @@ _OATHKEEPER_LIB = (
 # Python packages required by the traefik libs inside any-charm.
 PYTHON_PACKAGES = "pydantic>=2\njsonschema"
 HEALTH_PYTHON_PACKAGES = f"{PYTHON_PACKAGES}\ncharmlibs-apt"
+ROUTE_PYTHON_PACKAGES = f"{PYTHON_PACKAGES}\ncharmlibs-apt"
 
 # any-charm channel to use
 ANY_CHARM_CHANNEL = "beta"
@@ -104,7 +105,7 @@ def route_src_overwrite() -> str:
         "charms/traefik_k8s/v0/traefik_route.py",
         LIB_ROOT / "traefik_k8s" / "v0" / "traefik_route.py",
     ))
-    files.update(_read_src_files("route", ["any_charm.py", "udp_echo_server.py"]))
+    files.update(_read_src_files("route", ["any_charm.py"]))
     return json.dumps(files)
 
 

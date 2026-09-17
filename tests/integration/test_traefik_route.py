@@ -13,6 +13,7 @@ from tenacity import retry, stop_after_delay, wait_fixed
 from tests.integration.any_charm_helpers import (
     ANY_CHARM,
     ANY_CHARM_CHANNEL,
+    ROUTE_PYTHON_PACKAGES,
     route_src_overwrite,
 )
 from tests.integration.conftest import TRAEFIK_APP_NAME, TRAEFIK_RESOURCES
@@ -36,7 +37,10 @@ def test_deployment(juju: jubilant.Juju, traefik_charm):
         f"ch:{ANY_CHARM}",
         ROUTE_TESTER_APP,
         channel=ANY_CHARM_CHANNEL,
-        config={"src-overwrite": route_src_overwrite()},
+        config={
+            "python-packages": ROUTE_PYTHON_PACKAGES,
+            "src-overwrite": route_src_overwrite(),
+        },
         trust=True,
     )
     juju.wait(
