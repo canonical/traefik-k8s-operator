@@ -55,6 +55,7 @@ def test_deployment(juju: jubilant.Juju, traefik_charm):
         trust=True,
     )
 
+    juju.wait(all_settled, error=any_error_after(failures=5), timeout=1000, delay=5, successes=5)
     juju.integrate(f"{IAP_REQUIRER_APP}:require-ingress", TRAEFIK_APP)
     juju.integrate(f"{IAP_REQUIRER_APP}:require-auth-proxy", OATHKEEPER_APP)
     juju.integrate(f"{TRAEFIK_APP}:experimental-forward-auth", OATHKEEPER_APP)

@@ -407,8 +407,8 @@ def verify_https_through_all_traefik_units(
             logger.info("Verifying HTTPS on %s (%s) -> %s", unit_name, unit_ip, ingress_url)
             fetch_with_retry(
                 _url_for_unit(ingress_url, unit_ip),
+                expected_status=200,
                 client=client,
-                raise_for_status=True,
                 extensions={"sni_hostname": MOCK_HOSTNAME},
             )
 
@@ -443,8 +443,8 @@ def verify_http_through_all_traefik_units(
             logger.info("Verifying HTTP on %s (%s) -> %s", unit_name, unit_ip, ingress_url)
             fetch_with_retry(
                 _url_for_unit(ingress_url, unit_ip),
+                expected_status=200,
                 client=client,
-                raise_for_status=True,
             )
 
     return ingress_url

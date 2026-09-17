@@ -28,6 +28,7 @@ def test_https_on_all_units(
         trust=True,
     )
 
+    juju.wait(all_settled, error=any_error_after(failures=5), delay=5, successes=5)
     juju.integrate(f"{ssc_app}:certificates", TRAEFIK_APP_NAME)
     juju.integrate(f"{ingress_app}:require-ingress", TRAEFIK_APP_NAME)
 

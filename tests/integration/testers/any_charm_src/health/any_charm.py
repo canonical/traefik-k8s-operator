@@ -13,6 +13,7 @@ import sys
 
 import ops
 from any_charm_base import AnyCharmBase
+from ops.framework import StoredState
 from ops.pebble import Layer
 
 _src = pathlib.Path(__file__).parent
@@ -26,8 +27,11 @@ HEALTH_PORT = 8080
 
 
 class AnyCharm(AnyCharmBase):
+    _stored = StoredState()
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self._stored.set_default(healthy=True)
         self.unit.set_ports(HEALTH_PORT)
         self.ingress = IngressPerAppRequirer(
             self,
@@ -40,7 +44,6 @@ class AnyCharm(AnyCharmBase):
                 "interval": "5s",
             },
         )
-        self._healthy = True
         self.framework.observe(self.on["any"].pebble_ready, self._on_pebble_ready)
 
     def _on_pebble_ready(self, event):
@@ -51,7 +54,7 @@ class AnyCharm(AnyCharmBase):
         # Push the server script
         server_script = (_src / "health_server.py").read_text()
         container.push("/bin/health_server.py", server_script, make_dirs=True)
-        self._start_health_service(container, healthy=True)
+        self._start_health_service(container, healthy=bool(self._stored.healthy))
 
     def _start_health_service(self, container, healthy: bool):
         state = "up" if healthy else "down"
@@ -74,5 +77,6 @@ class AnyCharm(AnyCharmBase):
         container = self.unit.get_container("any")
         if not container.can_connect():
             return "error: container not ready"
+        self._stored.healthy = is_healthy
         self._start_health_service(container, healthy=is_healthy)
         return f"Health set to {is_healthy}"

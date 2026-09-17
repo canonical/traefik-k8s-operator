@@ -27,7 +27,7 @@ _OATHKEEPER_LIB = (
 )
 
 # Python packages required by the traefik libs inside any-charm.
-PYTHON_PACKAGES = "pydantic>=2\ncryptography\njsonschema"
+PYTHON_PACKAGES = "pydantic>=2\njsonschema"
 
 # any-charm channel to use
 ANY_CHARM_CHANNEL = "beta"

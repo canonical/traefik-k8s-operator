@@ -79,6 +79,7 @@ def test_deployment(juju: jubilant.Juju, traefik_charm):
         },
         trust=True,
     )
+    juju.wait(all_settled, error=any_error_after(failures=5), timeout=1000, delay=5, successes=5)
     juju.integrate(f"{IPA_TESTER_APP}:require-ingress", f"{TRAEFIK_APP_NAME}:ingress")
     juju.integrate(
         f"{IPU_TESTER_APP}:require-ingress-per-unit",
