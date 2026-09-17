@@ -38,20 +38,19 @@ class AnyCharm(AnyCharmBase):
             port=HTTPBIN_PORT,
             strip_prefix=True,
         )
-        self.auth_proxy = AuthProxyRequirer(
-            self, self._auth_proxy_config, "require-auth-proxy"
-        )
+        self.auth_proxy = AuthProxyRequirer(self, relation_name="require-auth-proxy")
         self.framework.observe(self.on["any"].pebble_ready, self._on_pebble_ready)
-        self.framework.observe(self.ingress.on.ready, self._on_ingress_ready)
+        self.framework.observe(self.ingress.on.ready, self._configure_auth_proxy)
+        self.framework.observe(
+            self.on["require-auth-proxy"].relation_joined, self._configure_auth_proxy
+        )
 
     @property
     def _auth_proxy_config(self):
+        if self.ingress.url is None:
+            return None
         return AuthProxyConfig(
-            protected_urls=[
-                self.ingress.url
-                if self.ingress.url is not None
-                else "https://some-test-url.com"
-            ],
+            protected_urls=[self.ingress.url],
             headers=AUTH_PROXY_HEADERS,
             allowed_endpoints=AUTH_PROXY_ALLOWED_ENDPOINTS,
         )
@@ -79,9 +78,9 @@ class AnyCharm(AnyCharmBase):
         self.unit.open_port(protocol="tcp", port=HTTPBIN_PORT)
         self.unit.status = ops.ActiveStatus()
 
-    def _on_ingress_ready(self, event):
-        if self.unit.is_leader():
-            logger.info(f"This app's ingress URL: {event.url}")
-        self.auth_proxy.update_auth_proxy_config(
-            auth_proxy_config=self._auth_proxy_config
-        )
+    def _configure_auth_proxy(self, _event):
+        config = self._auth_proxy_config
+        if config is None:
+            return
+        logger.info("This app's ingress URL: %s", config.protected_urls[0])
+        self.auth_proxy.update_auth_proxy_config(auth_proxy_config=config)
