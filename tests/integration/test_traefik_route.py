@@ -8,6 +8,7 @@ import socket
 
 import jubilant
 import yaml
+from tenacity import retry, stop_after_delay, wait_fixed
 
 from tests.integration.any_charm_helpers import (
     ANY_CHARM_CHANNEL,
@@ -37,6 +38,12 @@ def test_deployment(juju: jubilant.Juju, traefik_charm):
         channel=ANY_CHARM_CHANNEL,
         config={"src-overwrite": route_src_overwrite()},
         trust=True,
+    )
+    juju.wait(
+        all_settled,
+        error=any_error_after(failures=5),
+        delay=5,
+        successes=5,
     )
     juju.integrate(
         f"{ROUTE_TESTER_APP}:require-traefik-route",
@@ -74,16 +81,18 @@ def test_added_entrypoint_reachable(juju: jubilant.Juju):
     traefik_ip = get_loadbalancer_ip(juju, TRAEFIK_APP_NAME)
 
     payload = b"traefik-route-udp-echo"
-    udp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    udp_sock.settimeout(60)
-    try:
-        udp_sock.sendto(payload, (traefik_ip, 4646))
-        response, _ = udp_sock.recvfrom(512)
-    finally:
-        udp_sock.close()
-    assert response == payload
+    _assert_udp_echo(traefik_ip, 4646, payload)
 
     fetch_with_retry(f"http://{traefik_ip}:4545", expected_status=404)
+
+
+@retry(stop=stop_after_delay(60), wait=wait_fixed(5), reraise=True)
+def _assert_udp_echo(host: str, port: int, payload: bytes) -> None:
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_sock:
+        udp_sock.settimeout(5)
+        udp_sock.sendto(payload, (host, port))
+        response, _ = udp_sock.recvfrom(512)
+    assert response == payload
 
 
 def test_scale_and_get_external_host(juju: jubilant.Juju):

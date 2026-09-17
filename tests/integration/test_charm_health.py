@@ -8,6 +8,7 @@ from typing import Any
 
 import httpx2
 import jubilant
+from tenacity import retry, stop_after_delay, wait_fixed
 
 from tests.integration.any_charm_helpers import (
     ANY_CHARM_CHANNEL,
@@ -40,6 +41,12 @@ def test_deployment(juju: jubilant.Juju, traefik_charm):
         num_units=3,
         trust=True,
     )
+    juju.wait(
+        all_settled,
+        error=any_error_after(failures=5),
+        delay=5,
+        successes=5,
+    )
     juju.integrate(f"{HEALTH_TESTER_APP}:require-ingress", f"{TRAEFIK_APP_NAME}:ingress")
     juju.wait(all_settled, error=any_error_after(failures=5), delay=5, successes=5)
 
@@ -49,20 +56,28 @@ def test_health(juju: jubilant.Juju):
 
     rpc(juju, f"{HEALTH_TESTER_APP}/2", "set_health", is_healthy=False)
     juju.wait(all_settled, error=any_error_after(failures=5), delay=5, successes=5)
-    for _ in range(10):
-        status, content = _fetch_health(health_address)
-        assert status == 200
-        assert content in [
+    _assert_healthy_backends(
+        health_address,
+        [
             {"host": "health-tester-0", "status": "up"},
             {"host": "health-tester-1", "status": "up"},
-        ]
+        ],
+    )
 
     rpc(juju, f"{HEALTH_TESTER_APP}/1", "set_health", is_healthy=False)
     juju.wait(all_settled, error=any_error_after(failures=5), delay=5, successes=5)
+    _assert_healthy_backends(
+        health_address,
+        [{"host": "health-tester-0", "status": "up"}],
+    )
+
+
+@retry(stop=stop_after_delay(60), wait=wait_fixed(5), reraise=True)
+def _assert_healthy_backends(url: str, expected: list[dict[str, str]]) -> None:
     for _ in range(10):
-        status, content = _fetch_health(health_address)
+        status, content = _fetch_health(url)
         assert status == 200
-        assert content == {"host": "health-tester-0", "status": "up"}
+        assert content in expected
 
 
 def test_cleanup(juju: jubilant.Juju):
