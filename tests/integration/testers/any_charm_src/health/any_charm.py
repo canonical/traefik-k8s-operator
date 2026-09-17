@@ -58,6 +58,9 @@ class AnyCharm(AnyCharmBase):
         self._configure_health_service(event.workload)
 
     def _configure_health_service(self, container):
+        if not container.exists("/usr/bin/python3"):
+            container.exec(["apt-get", "update", "-qq"]).wait()
+            container.exec(["apt-get", "install", "-y", "-qq", "python3"]).wait()
         # Push the server script
         server_script = (_src / "health_server.py").read_text()
         container.push("/bin/health_server.py", server_script, make_dirs=True)
