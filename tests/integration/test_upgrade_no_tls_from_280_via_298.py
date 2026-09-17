@@ -45,6 +45,7 @@ def test_upgrade_no_tls_from_280_via_298(juju: jubilant.Juju, traefik_charm, ing
         num_units=NUM_TRAEFIK_UNITS,
         trust=True,
     )
+    juju.wait(all_settled, error=any_error_after(failures=5), delay=5, timeout=900, successes=5)
     bring_up_traefik_without_certificate_provider(juju)
     juju.wait(all_settled, error=any_error_after(failures=5), delay=5, timeout=900, successes=5)
     url = verify_http_through_all_traefik_units(juju)

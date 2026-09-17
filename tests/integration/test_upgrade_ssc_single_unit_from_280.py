@@ -36,6 +36,7 @@ def test_upgrade_ssc_single_unit_from_280(
         revision=SOURCE_REVISION,
         trust=True,
     )
+    juju.wait(all_settled, error=any_error_after(failures=5), delay=5, timeout=900, successes=5)
     bring_up_self_signed_traefik(juju, tmp_path)
     juju.wait(all_settled, error=any_error_after(failures=5), delay=5, timeout=900, successes=5)
     url = verify_https_through_all_traefik_units(juju)

@@ -52,6 +52,7 @@ def test_upgrade_mtls_single_unit_from_280_via_298(
         revision=SOURCE_REVISION,
         trust=True,
     )
+    juju.wait(all_settled, error=any_error_after(failures=5), delay=5, timeout=900, successes=5)
     bring_up_certified_traefik(juju, tmp_path)
     juju.wait(jubilant.all_agents_idle, error=any_error_after(failures=5), timeout=900, delay=5, successes=5)
     url = verify_https_through_all_traefik_units(juju)
