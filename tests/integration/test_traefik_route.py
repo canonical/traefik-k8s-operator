@@ -11,8 +11,8 @@ import yaml
 from tenacity import retry, stop_after_delay, wait_fixed
 
 from tests.integration.any_charm_helpers import (
+    ANY_CHARM,
     ANY_CHARM_CHANNEL,
-    ANY_CHARM_K8S,
     route_src_overwrite,
 )
 from tests.integration.conftest import TRAEFIK_APP_NAME, TRAEFIK_RESOURCES
@@ -33,7 +33,7 @@ STATIC_CONFIG_PATH = "/etc/traefik/traefik.yaml"
 def test_deployment(juju: jubilant.Juju, traefik_charm):
     juju.deploy(traefik_charm, TRAEFIK_APP_NAME, resources=TRAEFIK_RESOURCES, trust=True)
     juju.deploy(
-        f"ch:{ANY_CHARM_K8S}",
+        f"ch:{ANY_CHARM}",
         ROUTE_TESTER_APP,
         channel=ANY_CHARM_CHANNEL,
         config={"src-overwrite": route_src_overwrite()},
