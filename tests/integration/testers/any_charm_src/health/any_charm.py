@@ -45,12 +45,19 @@ class AnyCharm(AnyCharmBase):
             },
         )
         self.framework.observe(self.on["any"].pebble_ready, self._on_pebble_ready)
+        self.framework.observe(self.on.start, self._on_start)
+
+    def _on_start(self, event):
+        container = self.unit.get_container("any")
+        if not container.can_connect():
+            event.defer()
+            return
+        self._configure_health_service(container)
 
     def _on_pebble_ready(self, event):
-        container = event.workload
-        # Install python3 in the minimal workload container
-        container.exec(["apt-get", "update", "-qq"]).wait()
-        container.exec(["apt-get", "install", "-y", "-qq", "python3"]).wait()
+        self._configure_health_service(event.workload)
+
+    def _configure_health_service(self, container):
         # Push the server script
         server_script = (_src / "health_server.py").read_text()
         container.push("/bin/health_server.py", server_script, make_dirs=True)
