@@ -51,6 +51,13 @@ TCP_TESTER_APP = "tcp-tester"
 def test_deployment(juju: jubilant.Juju, traefik_charm):
     """Deploy traefik and all three testers, and integrate every relation up front."""
     juju.deploy(traefik_charm, TRAEFIK_APP_NAME, resources=TRAEFIK_RESOURCES, trust=True)
+    juju.wait(
+        all_settled,
+        error=any_error_after(failures=5),
+        timeout=1000,
+        delay=5,
+        successes=5,
+    )
     juju.deploy(
         f"ch:{ANY_CHARM}",
         IPA_TESTER_APP,
@@ -59,6 +66,12 @@ def test_deployment(juju: jubilant.Juju, traefik_charm):
             "src-overwrite": ipa_src_overwrite(),
             "python-packages": PYTHON_PACKAGES,
         },
+    )
+    juju.wait(
+        all_settled,
+        error=any_error_after(failures=5),
+        delay=5,
+        successes=5,
     )
     juju.deploy(
         f"ch:{ANY_CHARM}",
@@ -69,6 +82,12 @@ def test_deployment(juju: jubilant.Juju, traefik_charm):
             "python-packages": PYTHON_PACKAGES,
         },
     )
+    juju.wait(
+        all_settled,
+        error=any_error_after(failures=5),
+        delay=5,
+        successes=5,
+    )
     juju.deploy(
         f"ch:{ANY_CHARM_K8S}",
         TCP_TESTER_APP,
@@ -78,6 +97,12 @@ def test_deployment(juju: jubilant.Juju, traefik_charm):
             "python-packages": PYTHON_PACKAGES,
         },
         trust=True,
+    )
+    juju.wait(
+        all_settled,
+        error=any_error_after(failures=5),
+        delay=5,
+        successes=5,
     )
     juju.wait(all_settled, error=any_error_after(failures=5), timeout=1000, delay=5, successes=5)
     juju.integrate(f"{IPA_TESTER_APP}:require-ingress", f"{TRAEFIK_APP_NAME}:ingress")
