@@ -1,0 +1,20 @@
+# Version of the artifact schema
+version_schema: 2
+changes:
+  - title: Forwarded workload logs to Loki via Pebble log-targets
+    author: Michael Thamm
+    type: minor
+    description: |
+      The charm now uses `LogForwarder` from the `loki_push_api` library, which
+      configures Pebble log-targets to ship the Traefik workload's stdout logs
+      to related Loki endpoints. Previously the charm only consumed the Loki
+      push API endpoint without setting up any log forwarding. An integration
+      test relating the charm to `loki-k8s` and asserting the forwarded logs
+      are queryable from Loki was added alongside. The `observability-clients`
+      dependency (dev extra) was added to support the test, and the `tenacity`
+      runtime pin was relaxed to `>=8.5.0` to satisfy it.
+    urls:
+      pr:
+        - TBD
+    visibility: public
+    highlight: false

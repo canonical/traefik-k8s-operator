@@ -8,6 +8,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 Each revision is versioned by the date of the revision.
 
+## 2026-09-23
+
+- Forward the workload's stdout logs to related Loki endpoints via Pebble log-targets (`LogForwarder`), replacing the previously unused `LokiPushApiConsumer`.
+- Added an integration test relating the charm to `loki-k8s` and asserting the forwarded logs are queryable from Loki (`observability-clients`).
+
 ## 2026-09-08
 
 - Replaced some external charms in integration tests with an any-charm as ingress requirer.

@@ -21,7 +21,10 @@ dependencies = [
     "opentelemetry-api>=1.33",
     "pydantic>=2.10",
     "cosl",
-    "tenacity==8.5.0",
+    # Relaxed from the historical ==8.5.0 pin: observability-clients (integration test dep in
+    # the dev extra) requires tenacity>=9.0.0. The APIs used by the charm and cosl are stable
+    # across this range, so bumping is safe.
+    "tenacity>=8.5.0",
 ]
 
 [project.optional-dependencies]
@@ -45,6 +48,9 @@ dev = [
     "ops-scenario~=6.0",
     "opcli ; python_version >= '3.12'",
     "pytest-interface-tester>0.3",
+    # Markered: observability-clients requires Python >= 3.11, while the dev extra is
+    # resolved by uv for ubuntu@20.04 (py3.8) too. Only the integration env uses it.
+    "observability-clients ; python_version >= '3.11'",
     "types-pyyaml>=6.0.12.20241230",
     "mypy>=1.14.1",
     "pylint>=3.2.7",
