@@ -87,4 +87,5 @@ integration-suites:
       CONCIERGE: concierge-juju4.yaml
       MODULE/jubilant_test_dynamic_configs_juju4: tests/integration/test_dynamic_configs.py
       MODULE/jubilant_test_https_multi_unit_juju4: tests/integration/test_https_multi_unit.py
+      MODULE/jubilant_test_logging_juju4: tests/integration/test_logging.py
       MODULE/jubilant_test_receive_ca_cert_status_juju4: tests/integration/test_receive_ca_cert_status.py
