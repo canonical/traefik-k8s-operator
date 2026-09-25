@@ -1388,28 +1388,28 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
                 self.unit.status = BlockedStatus("Please set tls-cert, tls-key, and tls-ca")
                 return
 
-        routing_mode = self.config["routing_mode"]
+        routing_mode_str = self.config["routing_mode"]
         try:
-            RoutingMode(routing_mode)
+            routing_mode = RoutingMode(routing_mode_str)
         except ValueError:
             self._wipe_ingress_for_all_relations()
-            self.unit.status = BlockedStatus(f"invalid routing mode: {routing_mode}; see logs.")
+            self.unit.status = BlockedStatus(f"invalid routing mode: {routing_mode_str}; see logs.")
 
             logger.error(
                 "'%s' is not a valid routing_mode value; valid values are: %s",
-                routing_mode,
+                routing_mode_str,
                 [e.value for e in RoutingMode],
             )
             return
 
-        if routing_mode == "subdomain" and self.config.get("external_hostname", None) is None:
+        if routing_mode is RoutingMode.SUBDOMAIN and self.config.get("external_hostname", None) is None:
             self._wipe_ingress_for_all_relations()
             self.unit.status = BlockedStatus(
                 '"external_hostname" must be set while using routing mode "subdomain"'
             )
             return
 
-        if self.upstream_ingress.is_ready() and routing_mode != "path":
+        if self.upstream_ingress.is_ready() and routing_mode is not RoutingMode.PATH:
             # upstream ingress is only compatible with path routing mode
             # TODO: If this charm is rewritten in a holistic way, make sure this validation
             # truly blocks the charm
