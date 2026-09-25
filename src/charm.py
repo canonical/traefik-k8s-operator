@@ -259,9 +259,23 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             self._charm_tracing, SERVER_CERT_PATH
         )
 
+        try:
+            routing_mode = self._routing_mode
+        except ValueError:
+            routing_mode_str = self.config["routing_mode"]
+            self.unit.status = BlockedStatus(
+                f"invalid routing mode: {routing_mode_str}; see logs."
+            )
+            logger.error(
+                "'%s' is not a valid routing_mode value; valid values are: %s",
+                routing_mode_str,
+                [mode.value for mode in RoutingMode],
+            )
+            return
+
         self.traefik = Traefik(
             container=self.container,
-            routing_mode=self._routing_mode,
+            routing_mode=routing_mode,
             tcp_entrypoints=self._tcp_entrypoints(),
             udp_entrypoints=self._udp_entrypoints(),
             tls_enabled=self._is_tls_enabled(),
@@ -1388,10 +1402,10 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
                 self.unit.status = BlockedStatus("Please set tls-cert, tls-key, and tls-ca")
                 return
 
-        routing_mode_str = self.config["routing_mode"]
         try:
-            routing_mode = RoutingMode(routing_mode_str)
+            routing_mode = self._routing_mode
         except ValueError:
+            routing_mode_str = self.config["routing_mode"]
             self._wipe_ingress_for_all_relations()
             self.unit.status = BlockedStatus(f"invalid routing mode: {routing_mode_str}; see logs.")
 
