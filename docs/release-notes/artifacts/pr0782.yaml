@@ -11,7 +11,7 @@ changes:
       `juju trust <app> --scope=cluster`, and removing the application no longer fails.
     urls:
       pr:
-        - ""
+        - "https://github.com/canonical/traefik-k8s-operator/pull/782"
       related_issue:
         - "https://github.com/canonical/traefik-k8s-operator/issues/589"
     visibility: public
