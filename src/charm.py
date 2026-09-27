@@ -703,14 +703,26 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             ),
         )
 
-    def _reconcile_lb(self) -> None:
-        """Reconcile the LoadBalancer's state."""
+    def _reconcile_lb(self) -> bool:
+        """Reconcile the LoadBalancer's state.
+
+        Returns:
+            False if the charm is not allowed to manage the LoadBalancer, which happens when it
+            was deployed without `--trust`; True otherwise.
+        """
         klm = self._get_lb_resource_manager()
 
         resources_list = []
         if self._annotations_valid:
             resources_list.append(self._construct_lb())
-        klm.reconcile(resources_list)
+        try:
+            klm.reconcile(resources_list)
+        except ApiError as e:
+            if e.status.code != 403:
+                raise
+            logger.error("Not allowed to reconcile the LoadBalancer service: %s", e)
+            return False
+        return True
 
     @functools.cached_property
     def _get_loadbalancer_status(self) -> Optional[str]:
@@ -1312,7 +1324,14 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
     def _on_remove(self, _: EventBase) -> None:
         if self.app.planned_units() == 0:
             klm = self._get_lb_resource_manager()
-            klm.delete(ignore_missing=True)
+            try:
+                klm.delete(ignore_missing=True)
+            except ApiError as e:
+                if e.status.code != 403:
+                    raise
+                # Without `--trust` the charm could not have created the LoadBalancer service,
+                # so there is nothing to clean up; don't block the removal.
+                logger.warning("Not allowed to delete the LoadBalancer service: %s", e)
 
     def _on_update_status(self, _: UpdateStatusEvent) -> None:
         self._process_status_and_configurations()
@@ -1374,7 +1393,11 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
 
     # pylint: disable=too-many-return-statements
     def _process_status_and_configurations(self) -> None:
-        self._reconcile_lb()
+        if not self._reconcile_lb():
+            self.unit.status = BlockedStatus(
+                f"Insufficient permissions, try: `juju trust {self.app.name} --scope=cluster`"
+            )
+            return
         if (
             self.config.get("tls-ca", None)
             or self.config.get("tls-cert", None)

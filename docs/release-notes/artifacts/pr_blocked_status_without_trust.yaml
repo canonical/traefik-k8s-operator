@@ -1,0 +1,18 @@
+# Version of the artifact schema
+version_schema: 2
+changes:
+  - title: Set a blocked status when the charm is deployed without `--trust`
+    author: cristiangirlea
+    type: bugfix
+    description: |
+      When the charm was deployed without `--trust`, Kubernetes rejected the charm's requests to
+      manage its LoadBalancer service and the unit went into error state. The unit is now
+      blocked with a message explaining how to grant the missing permissions with
+      `juju trust <app> --scope=cluster`, and removing the application no longer fails.
+    urls:
+      pr:
+        - ""
+      related_issue:
+        - "https://github.com/canonical/traefik-k8s-operator/issues/589"
+    visibility: public
+    highlight: false
