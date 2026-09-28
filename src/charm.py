@@ -300,7 +300,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         )
         # Enable logging relation for Loki and other charms that implement loki_push_api.
         # LogForwarder ships the workload's stdout to Loki via Pebble log targets.
-        self._logging = LogForwarder(self)
+        self._logging = LogForwarder(self, relation_name="logging")
         self.metrics_endpoint = MetricsEndpointProvider(
             charm=self,
             jobs=self.traefik.scrape_jobs,

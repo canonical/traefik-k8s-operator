@@ -12,15 +12,14 @@ advertised over the relation. This test:
 2. integrates ``traefik:logging`` with ``loki:logging``,
 3. asserts the Pebble log-target got added,
 4. restarts Traefik to generate fresh output,
-5. asserts the logs are queryable from Loki via ``observability_clients.Loki``.
+5. asserts the logs are queryable from Loki's HTTP API.
 """
 
 import logging
 import time
 
+import httpx2
 import jubilant
-import pytest
-from observability_clients import Loki
 from tenacity import Retrying, retry_if_result, stop_after_delay, wait_fixed
 
 from tests.integration.constants import TRAEFIK_APP_NAME
@@ -30,15 +29,11 @@ logger = logging.getLogger(__name__)
 
 LOKI_APP_NAME = "loki"
 LOKI_PORT = 3100
-# A different valid DNS name, used purely to trigger a Traefik restart (which emits logs).
-ALTERNATE_EXTERNAL_HOSTNAME = "traefik-log-forwarding.local"
-# How far back to look for log lines; Traefik is quiet while idle, so its visible
-# output dates from the restart we trigger.
 LOG_LOOKBACK_SECONDS = 300
 
 
 def test_pebble_log_target_configured(juju: jubilant.Juju, traefik_app: str):
-    """Pebble must have added a Loki log-target to the workload plan."""
+    """Pebble adds a Loki log-target to the workload plan."""
     # GIVEN Traefik and Loki are deployed
     juju.deploy("loki-k8s", LOKI_APP_NAME, channel="dev/edge", trust=True)
     # WHEN traefik is related to loki over the logging relation
@@ -52,23 +47,27 @@ def test_pebble_log_target_configured(juju: jubilant.Juju, traefik_app: str):
     )
     # THEN the logs are findable in Loki under the juju_application label
     loki_host = juju.status().apps[LOKI_APP_NAME].address
-    loki = Loki(url=f"http://{loki_host}:{LOKI_PORT}")
-    _assert_logs_from_application(loki, TRAEFIK_APP_NAME)
+    _assert_logs_from_application(f"http://{loki_host}:{LOKI_PORT}", TRAEFIK_APP_NAME)
 
 
-def _assert_logs_from_application(loki: Loki, application: str) -> None:
-    """Assert Loki has logs with a given ``juju_application`` label (cf. observability-stack)."""
+def _assert_logs_from_application(loki_url: str, application: str) -> None:
+    """Assert Loki has logs with a given ``juju_application`` label."""
 
     def _has_logs() -> bool:
         end = time.time_ns()
         start = end - LOG_LOOKBACK_SECONDS * 1_000_000_000
-        result = loki.query_range(
-            f'{{juju_application="{application}"}}',
-            start=str(start),
-            end=str(end),
-            limit=1,
+        response = httpx2.get(
+            f"{loki_url}/loki/api/v1/query_range",
+            params={
+                "query": f'{{juju_application="{application}"}}',
+                "start": str(start),
+                "end": str(end),
+                "limit": 1,
+            },
+            timeout=30,
         )
-        return bool(result.get("data", {}).get("result"))
+        response.raise_for_status()
+        return bool(response.json().get("data", {}).get("result"))
 
     retrying = Retrying(
         retry=retry_if_result(lambda result: result is False),
