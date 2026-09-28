@@ -192,6 +192,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
 
         self._stored.set_default(
             config_hash=None,
+            routing_mode=RoutingMode.PATH.value,
         )
 
         self.container = self.unit.get_container(_TRAEFIK_CONTAINER_NAME)
@@ -261,17 +262,9 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
 
         try:
             routing_mode = self._routing_mode
+            self._stored.routing_mode = routing_mode.value
         except ValueError:
-            routing_mode_str = self.config["routing_mode"]
-            self.unit.status = BlockedStatus(
-                f"invalid routing mode: {routing_mode_str}; see logs."
-            )
-            logger.error(
-                "'%s' is not a valid routing_mode value; valid values are: %s",
-                routing_mode_str,
-                [mode.value for mode in RoutingMode],
-            )
-            return
+            routing_mode = RoutingMode(self._stored.routing_mode)
 
         self.traefik = Traefik(
             container=self.container,
