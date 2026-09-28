@@ -6,6 +6,7 @@
 from dataclasses import replace
 from unittest.mock import PropertyMock, patch
 
+import yaml
 from ops.model import ActiveStatus
 from scenario import Relation, State
 
@@ -98,3 +99,38 @@ class TestDeleteDynamicConfig:
         # THEN the charm does not crash even though no config file exists for this relation
         state_out = traefik_ctx.run(ingress_rel.broken_event, state)
         assert state_out.unit_status.name == "active"
+
+
+@patch("charm.TraefikIngressCharm.version", PropertyMock(return_value="0.0.0"))
+class TestLogLevelConfig:
+    """Tests for the ``log_level`` config option."""
+
+    def _static_config(self, traefik_ctx, state_out):
+        traefik_fs = state_out.get_container("traefik").get_filesystem(traefik_ctx)
+        return yaml.safe_load((traefik_fs / "etc" / "traefik" / "traefik.yaml").read_text())
+
+    def test_configured_log_level(self, traefik_ctx, traefik_container):
+        """A configured log_level must be written to Traefik's static config."""
+        # GIVEN the log_level config option is set
+        state = State(
+            leader=True,
+            config={"log_level": "ERROR"},
+            containers=[traefik_container],
+        )
+
+        # WHEN pebble-ready fires
+        state_out = traefik_ctx.run(traefik_container.pebble_ready_event, state)
+
+        # THEN the static config uses the configured log level
+        assert self._static_config(traefik_ctx, state_out)["log"] == {"level": "ERROR"}
+
+    def test_log_level_defaults_to_debug(self, traefik_ctx, traefik_container):
+        """Without config, the log level must default to DEBUG for backwards compatibility."""
+        # GIVEN no log_level config option is set
+        state = State(leader=True, containers=[traefik_container])
+
+        # WHEN pebble-ready fires
+        state_out = traefik_ctx.run(traefik_container.pebble_ready_event, state)
+
+        # THEN the static config keeps the historical DEBUG log level
+        assert self._static_config(traefik_ctx, state_out)["log"] == {"level": "DEBUG"}

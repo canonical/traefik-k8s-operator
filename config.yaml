@@ -22,6 +22,12 @@ options:
       Ensure the annotations are correctly formatted and adhere to Kubernetes' syntax and character set : https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/#syntax-and-character-set
       Invalid values will result in LoadBalancer being removed and all previously set annotations will be lost.
     type: string
+  log_level:
+    description: |
+      The log level for the Traefik workload. Valid values are "TRACE", "DEBUG", "INFO",
+      "WARN", "ERROR", "FATAL" and "PANIC" (case-insensitive).
+    type: string
+    default: DEBUG
   basic_auth_user:
     description: |
       Enables the `basicAuth` middleware for **all** routes on this proxy. 

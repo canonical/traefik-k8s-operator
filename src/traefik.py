@@ -127,6 +127,7 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         topology: JujuTopology,
         basic_auth_user: Optional[str] = None,
         tracing_endpoint: Optional[str] = None,
+        log_level: str = "DEBUG",
     ):
         """Initialize traefik service class.
 
@@ -141,6 +142,7 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             topology: Juju topology.
             basic_auth_user: User for basic auth.
             tracing_endpoint: Tracing endpoint.
+            log_level: Traefik workload log level.
         """
         self._container = container
         self._tcp_entrypoints = tcp_entrypoints
@@ -152,6 +154,7 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         self._topology = topology
         self._basic_auth_user = basic_auth_user
         self._tracing_endpoint = tracing_endpoint
+        self._log_level = log_level
         self._dynamic_configs: Dict[str, Dict[str, Any]] = {}
 
     @property
@@ -333,7 +336,7 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
                 "checknewversion": False,
             },
             "log": {
-                "level": "DEBUG",
+                "level": self._log_level,
             },
             "entryPoints": {
                 "diagnostics": {"address": f":{_DIAGNOSTICS_PORT}"},

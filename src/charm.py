@@ -268,6 +268,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             experimental_forward_auth_enabled=self._is_forward_auth_enabled,
             traefik_route_static_configs=self._traefik_route_static_configs(),
             basic_auth_user=self._basic_auth_user,
+            log_level=self._log_level,
             topology=self._topology,
             tracing_endpoint=(
                 self._workload_tracing.get_endpoint("jaeger_thrift_http")
@@ -648,6 +649,11 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         As we can't reject it, we assume it's correctly formatted.
         """
         return cast(Optional[str], self.config.get("basic_auth_user", None))
+
+    @property
+    def _log_level(self) -> str:
+        """The log level for the Traefik workload."""
+        return cast(str, self.config.get("log_level", "DEBUG")) or "DEBUG"
 
     @functools.cached_property
     def _loadbalancer_annotations(self) -> Optional[Dict[str, str]]:
@@ -1334,6 +1340,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
                 self.config["routing_mode"],
                 self._is_forward_auth_enabled,
                 self._basic_auth_user,
+                self._log_level,
                 self._is_tls_enabled(),
                 # The dict returned by _get_certs is not hashable so use a json str instead.
                 json.dumps(self._get_certs()),

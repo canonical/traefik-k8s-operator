@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 Each revision is versioned by the date of the revision.
 
+## 2026-09-28
+
+- Added the `log_level` config option to control the Traefik workload log level. It defaults to `DEBUG`, preserving the previous hard-coded behavior.
+
 ## 2026-09-23
 
 - Forward the workload's stdout logs to related Loki endpoints via Pebble log-targets (`LogForwarder`), replacing the previously unused `LokiPushApiConsumer`.

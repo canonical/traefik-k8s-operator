@@ -1,0 +1,15 @@
+# Version of the artifact schema
+version_schema: 2
+changes:
+  - title: Added `log_level` config option for the Traefik workload
+    author: MichaelThamm
+    type: minor
+    description: |
+      Added a `log_level` config option to control the log level of the Traefik
+      workload. It defaults to `DEBUG`, matching the previously hard-coded value,
+      so existing deployments are unaffected.
+    urls:
+      pr:
+        - TBD
+    visibility: public
+    highlight: false
