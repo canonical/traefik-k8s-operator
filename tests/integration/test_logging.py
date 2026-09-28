@@ -75,11 +75,7 @@ def _assert_logs_from_application(loki_url: str, application: str) -> None:
         # Log forwarding + Loki ingestion can lag the moment the model goes idle.
         stop=stop_after_delay(60 * 2),
     )
-    try:
-        found = retrying(_has_logs)
-    except Exception as exc:  # noqa: BLE001 - report the last query error if any
-        logger.exception("Loki query kept failing")
-        raise AssertionError(f"Loki queries kept failing: {exc}") from exc
+    found = retrying(_has_logs)
     assert found, (
         f"Loki has no log lines labelled juju_application={application} "
         f"in the last {LOG_LOOKBACK_SECONDS}s"
