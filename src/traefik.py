@@ -524,7 +524,9 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         try:
             routing_mode = RoutingMode(self._routing_mode)
         except ValueError as e:
-            raise InvalidTraefikConfigError(f"invalid routing mode: {self._routing_mode}; see logs.") from e
+            raise InvalidTraefikConfigError(
+                f"invalid routing mode: {self._routing_mode}; see logs."
+            ) from e
         if routing_mode is RoutingMode.PATH:
             route_rule = f"PathPrefix(`/{prefix}`)"
         else:  # RoutingMode.SUBDOMAIN
