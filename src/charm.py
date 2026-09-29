@@ -1457,7 +1457,10 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         )
 
         self.unit.status = MaintenanceStatus("updating ingress configurations")
-        self._update_ingress_configurations()
+        try:
+            self._update_ingress_configurations()
+        except InvalidTraefikConfigError as e:
+            self.unit.status = BlockedStatus(str(e))
 
         # After processing all ingress relations, check if cert hostnames changed
         self._refresh_certs_if_needed()
