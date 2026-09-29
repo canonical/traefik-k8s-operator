@@ -97,6 +97,7 @@ from traefik import (
     CA,
     INGRESS_CONFIG_PREFIX,
     SERVER_CERT_PATH,
+    InvalidTraefikConfigError,
     RoutingMode,
     StaticConfigMergeConflictError,
     Traefik,
@@ -259,14 +260,9 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             self._charm_tracing, SERVER_CERT_PATH
         )
 
-        try:
-            routing_mode = self._routing_mode
-        except ValueError:
-            routing_mode = RoutingMode.SUBDOMAIN
-
         self.traefik = Traefik(
             container=self.container,
-            routing_mode=routing_mode,
+            routing_mode=cast(str, self.config.get("routing_mode", "")),
             tcp_entrypoints=self._tcp_entrypoints(),
             udp_entrypoints=self._udp_entrypoints(),
             tls_enabled=self._is_tls_enabled(),
@@ -1548,7 +1544,10 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         if not self.ready:
             event.defer()
             return
-        self._process_ingress_relation(event.relation)
+        try:
+            self._process_ingress_relation(event.relation)
+        except InvalidTraefikConfigError as e:
+            self.unit.status = BlockedStatus(str(e))
 
         # Without the following line, traefik.STATIC_CONFIG_PATH is updated with TCP endpoints only
         # on update-status.
