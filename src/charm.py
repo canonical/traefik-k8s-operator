@@ -29,7 +29,7 @@ from charms.certificate_transfer_interface.v1.certificate_transfer import (
     CertificateTransferRequires,
 )
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
-from charms.loki_k8s.v1.loki_push_api import LokiPushApiConsumer
+from charms.loki_k8s.v1.loki_push_api import LogForwarder
 from charms.oathkeeper.v0.forward_auth import (
     AuthConfigChangedEvent,
     AuthConfigRemovedEvent,
@@ -268,6 +268,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             experimental_forward_auth_enabled=self._is_forward_auth_enabled,
             traefik_route_static_configs=self._traefik_route_static_configs(),
             basic_auth_user=self._basic_auth_user,
+            log_level=self._log_level,
             topology=self._topology,
             tracing_endpoint=(
                 self._workload_tracing.get_endpoint("jaeger_thrift_http")
@@ -298,8 +299,9 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         self._grafana_dashboards = GrafanaDashboardProvider(
             self, relation_name="grafana-dashboard"
         )
-        # Enable logging relation for Loki and other charms that implement loki_push_api
-        self._logging = LokiPushApiConsumer(self)
+        # Enable logging relation for Loki and other charms that implement loki_push_api.
+        # LogForwarder ships the workload's stdout to Loki via Pebble log targets.
+        self._logging = LogForwarder(self, relation_name="logging")
         self.metrics_endpoint = MetricsEndpointProvider(
             charm=self,
             jobs=self.traefik.scrape_jobs,
@@ -647,6 +649,11 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         As we can't reject it, we assume it's correctly formatted.
         """
         return cast(Optional[str], self.config.get("basic_auth_user", None))
+
+    @property
+    def _log_level(self) -> str:
+        """The log level for the Traefik workload."""
+        return cast(str, self.config.get("log_level", "DEBUG")) or "DEBUG"
 
     @functools.cached_property
     def _loadbalancer_annotations(self) -> Optional[Dict[str, str]]:
@@ -1333,6 +1340,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
                 self.config["routing_mode"],
                 self._is_forward_auth_enabled,
                 self._basic_auth_user,
+                self._log_level,
                 self._is_tls_enabled(),
                 # The dict returned by _get_certs is not hashable so use a json str instead.
                 json.dumps(self._get_certs()),
