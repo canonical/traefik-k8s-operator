@@ -8,10 +8,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 Each revision is versioned by the date of the revision.
 
-## 2026-09-27
+## 2026-10-01
 
 - Set a blocked status that explains how to run `juju trust` when the charm is deployed without
   `--trust`, instead of going into error state.
+
+## 2026-09-28
+
+- Fixed invalid `routing_mode` values putting the unit into error instead of blocked status.
 
 ## 2026-09-08
 
