@@ -150,7 +150,7 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         self._tcp_entrypoints = tcp_entrypoints
         self._udp_entrypoints = udp_entrypoints
         self._traefik_route_static_configs = traefik_route_static_configs
-        self._routing_mode = routing_mode
+        self._routing_mode_str = routing_mode
         self._tls_enabled = tls_enabled
         self._experimental_forward_auth_enabled = experimental_forward_auth_enabled
         self._topology = topology
@@ -166,6 +166,22 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
                 "static_configs": [{"targets": [f"{socket.getfqdn()}:{_DIAGNOSTICS_PORT}"]}],
             }
         ]
+
+    def get_routing_mode(self) -> RoutingMode:
+        """Return the configured routing mode.
+
+        Returns:
+            The configured routing mode.
+
+        Raises:
+            InvalidTraefikConfigError: If the configured routing mode is invalid.
+        """
+        try:
+            return RoutingMode(self._routing_mode_str)
+        except ValueError as e:
+            raise InvalidTraefikConfigError(
+                f"invalid routing mode: {self._routing_mode_str}; see logs."
+            ) from e
 
     def _update_tls_configuration(self) -> None:
         """Generate and push tls config yaml for traefik."""
@@ -521,12 +537,7 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         strip_prefix_: bool = strip_prefix if strip_prefix is not None else False
 
         host = external_host
-        try:
-            routing_mode = RoutingMode(self._routing_mode)
-        except ValueError as e:
-            raise InvalidTraefikConfigError(
-                f"invalid routing mode: {self._routing_mode}; see logs."
-            ) from e
+        routing_mode = self.get_routing_mode()
         if routing_mode is RoutingMode.PATH:
             route_rule = f"PathPrefix(`/{prefix}`)"
         else:  # RoutingMode.SUBDOMAIN
@@ -612,7 +623,6 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             prefix=prefix,
             forward_auth_app=forward_auth_app,
             forward_auth_config=forward_auth_config,
-            routing_mode=routing_mode
         )
 
         if middlewares:
@@ -629,7 +639,6 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         strip_prefix: bool,
         prefix: str,
         forward_auth_app: bool,
-        routing_mode: RoutingMode,
         forward_auth_config: Optional[ForwardAuthConfig],
     ) -> dict:
         """Generate a middleware config.
@@ -657,6 +666,7 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
                 }
 
         no_prefix_middleware = {}  # type: Dict[str, Dict[str, Any]]
+        routing_mode = self.get_routing_mode()
         if routing_mode is RoutingMode.PATH and strip_prefix:
             no_prefix_middleware[f"juju-sidecar-noprefix-{prefix}"] = {
                 "stripPrefix": {"prefixes": [f"/{prefix}"], "forceSlash": False}
