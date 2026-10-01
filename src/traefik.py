@@ -537,8 +537,7 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         strip_prefix_: bool = strip_prefix if strip_prefix is not None else False
 
         host = external_host
-        routing_mode = self.get_routing_mode()
-        if routing_mode is RoutingMode.PATH:
+        if self.get_routing_mode() is RoutingMode.PATH:
             route_rule = f"PathPrefix(`/{prefix}`)"
         else:  # RoutingMode.SUBDOMAIN
             route_rule = f"Host(`{prefix}.{host}`)"
@@ -666,8 +665,7 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
                 }
 
         no_prefix_middleware = {}  # type: Dict[str, Dict[str, Any]]
-        routing_mode = self.get_routing_mode()
-        if routing_mode is RoutingMode.PATH and strip_prefix:
+        if self.get_routing_mode() is RoutingMode.PATH and strip_prefix:
             no_prefix_middleware[f"juju-sidecar-noprefix-{prefix}"] = {
                 "stripPrefix": {"prefixes": [f"/{prefix}"], "forceSlash": False}
             }
