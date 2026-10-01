@@ -14,6 +14,10 @@ Each revision is versioned by the date of the revision.
   Ingress relations are now processed once through the existing reconciliation path, which cleans
   up invalid configuration and reports status without trapping the event in a replay loop.
 
+## 2026-09-28
+
+- Fixed invalid `routing_mode` values putting the unit into error instead of blocked status.
+
 ## 2026-09-08
 
 - Replaced some external charms in integration tests with an any-charm as ingress requirer.
