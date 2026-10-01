@@ -2,13 +2,17 @@
 version_schema: 2
 # The key holding the change(s)
 changes:
-  - title: Prevented deferred ingress events from failing hooks
+  - title: Fixed deferred ingress events repeatedly failing hooks
     author: javierdelapuente
     type: bugfix
     description: |
-      Prevented deferred ingress events from failing hooks when relation data
-      changed before replay. Current relation state is now handled by the
-      existing ingress reconciliation path.
+      Fixed a case where an ingress relation was processed twice after a
+      deferred event was replayed. If relation data changed while the event
+      was deferred, the first processing attempt could fail the hook before
+      the existing reconciliation path handled the condition. Ingress
+      relations are now processed once through reconciliation, allowing
+      invalid configuration to be cleaned up and reported in unit status
+      without trapping the event in a replay loop.
     urls:
       pr:
         - https://github.com/canonical/traefik-k8s-operator/pull/787
