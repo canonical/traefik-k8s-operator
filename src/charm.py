@@ -1394,7 +1394,6 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         except InvalidTraefikConfigError as e:
             self._wipe_ingress_for_all_relations()
             self.unit.status = BlockedStatus(str(e))
-
             logger.error(
                 "'%s' is not a valid routing_mode value; valid values are: %s",
                 self.config["routing_mode"],
@@ -1460,6 +1459,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             self._update_ingress_configurations()
         except InvalidTraefikConfigError as e:
             self.unit.status = BlockedStatus(str(e))
+            return
 
         # After processing all ingress relations, check if cert hostnames changed
         self._refresh_certs_if_needed()
@@ -1550,6 +1550,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             self._process_ingress_relation(event.relation)
         except InvalidTraefikConfigError as e:
             self.unit.status = BlockedStatus(str(e))
+            return
 
         # Without the following line, traefik.STATIC_CONFIG_PATH is updated with TCP endpoints only
         # on update-status.
