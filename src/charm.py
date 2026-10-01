@@ -97,6 +97,7 @@ from traefik import (
     CA,
     INGRESS_CONFIG_PREFIX,
     SERVER_CERT_PATH,
+    InvalidTraefikConfigError,
     RoutingMode,
     StaticConfigMergeConflictError,
     Traefik,
@@ -261,7 +262,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
 
         self.traefik = Traefik(
             container=self.container,
-            routing_mode=self._routing_mode,
+            routing_mode=cast(str, self.config.get("routing_mode", "")),
             tcp_entrypoints=self._tcp_entrypoints(),
             udp_entrypoints=self._udp_entrypoints(),
             tls_enabled=self._is_tls_enabled(),
@@ -1388,28 +1389,26 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
                 self.unit.status = BlockedStatus("Please set tls-cert, tls-key, and tls-ca")
                 return
 
-        routing_mode = self.config["routing_mode"]
         try:
-            RoutingMode(routing_mode)
-        except ValueError:
+            routing_mode = self.traefik.get_routing_mode()
+        except InvalidTraefikConfigError as e:
             self._wipe_ingress_for_all_relations()
-            self.unit.status = BlockedStatus(f"invalid routing mode: {routing_mode}; see logs.")
-
+            self.unit.status = BlockedStatus(str(e))
             logger.error(
                 "'%s' is not a valid routing_mode value; valid values are: %s",
-                routing_mode,
+                self.config["routing_mode"],
                 [e.value for e in RoutingMode],
             )
             return
 
-        if routing_mode == "subdomain" and self.config.get("external_hostname", None) is None:
+        if routing_mode is RoutingMode.SUBDOMAIN and self.config.get("external_hostname", None) is None:
             self._wipe_ingress_for_all_relations()
             self.unit.status = BlockedStatus(
                 '"external_hostname" must be set while using routing mode "subdomain"'
             )
             return
 
-        if self.upstream_ingress.is_ready() and routing_mode != "path":
+        if self.upstream_ingress.is_ready() and routing_mode is not RoutingMode.PATH:
             # upstream ingress is only compatible with path routing mode
             # TODO: If this charm is rewritten in a holistic way, make sure this validation
             # truly blocks the charm
@@ -1456,7 +1455,11 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         )
 
         self.unit.status = MaintenanceStatus("updating ingress configurations")
-        self._update_ingress_configurations()
+        try:
+            self._update_ingress_configurations()
+        except InvalidTraefikConfigError as e:
+            self.unit.status = BlockedStatus(str(e))
+            return
 
         # After processing all ingress relations, check if cert hostnames changed
         self._refresh_certs_if_needed()
@@ -1543,7 +1546,11 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         if not self.ready:
             event.defer()
             return
-        self._process_ingress_relation(event.relation)
+        try:
+            self._process_ingress_relation(event.relation)
+        except InvalidTraefikConfigError as e:
+            self.unit.status = BlockedStatus(str(e))
+            return
 
         # Without the following line, traefik.STATIC_CONFIG_PATH is updated with TCP endpoints only
         # on update-status.
@@ -1854,7 +1861,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         return f"{data['model']}-{name}"
 
     def _get_ingressed_app_url(self, prefix: str) -> str:
-        if self._routing_mode is RoutingMode.PATH:
+        if self.traefik.get_routing_mode() is RoutingMode.PATH:
             url = f"{self._ingressed_scheme}://{self.ingressed_address}/{prefix}"
         else:  # traefik.RoutingMode.SUBDOMAIN
             url = f"{self._ingressed_scheme}://{prefix}.{self.ingressed_address}/"
@@ -2022,14 +2029,6 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         return self._gateway_scheme
 
     @property
-    def _routing_mode(self) -> RoutingMode:
-        """Return the current routing mode for the ingress.
-
-        The two modes are 'subdomain' and 'path', where 'path' is the default.
-        """
-        return RoutingMode(self.config["routing_mode"])
-
-    @property
     def version(self) -> Optional[str]:
         """Return the workload version."""
         if not self.container.can_connect():
@@ -2111,6 +2110,7 @@ def validate_annotation_key(key: str) -> bool:
         return False
 
     return True
+
 
 def parse_annotations(annotations: Optional[str]) -> Optional[Dict[str, str]]:
     """Parse and validate annotations from a string.
