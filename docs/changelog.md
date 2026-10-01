@@ -8,6 +8,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 Each revision is versioned by the date of the revision.
 
+## 2026-10-01
+
+- Fixed deferred ingress events repeatedly failing hooks when relation data changed before replay.
+  Ingress relations are now processed once through the existing reconciliation path, which cleans
+  up invalid configuration and reports status without trapping the event in a replay loop.
+
 ## 2026-09-28
 
 - Fixed invalid `routing_mode` values putting the unit into error instead of blocked status.
