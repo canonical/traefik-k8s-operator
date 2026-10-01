@@ -1569,11 +1569,6 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         if not self.ready:
             event.defer()
             return
-        try:
-            self._process_ingress_relation(event.relation)
-        except InvalidTraefikConfigError as e:
-            self.unit.status = BlockedStatus(str(e))
-            return
 
         # Without the following line, traefik.STATIC_CONFIG_PATH is updated with TCP endpoints only
         # on update-status.
