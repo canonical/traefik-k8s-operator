@@ -1,0 +1,18 @@
+# Version of the artifact schema
+version_schema: 2
+# The key holding the change(s)
+changes:
+  - title: Prevented deferred ingress events from failing hooks
+    author: javierdelapuente
+    type: bugfix
+    description: |
+      Prevented deferred ingress events from failing hooks when relation data
+      changed before replay. Current relation state is now handled by the
+      existing ingress reconciliation path.
+    urls:
+      pr:
+        - https://github.com/canonical/traefik-k8s-operator/pull/787
+      related_doc:
+      related_issue:
+    visibility: public
+    highlight: false

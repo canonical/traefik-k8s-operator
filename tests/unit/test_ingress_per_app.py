@@ -20,7 +20,6 @@ from charms.traefik_k8s.v2.ingress import (
 from conftest import MOCK_LB_ADDRESS
 from ops import CharmBase, Framework
 from scenario import Context, Model, Mount, Relation, State
-from scenario.runtime import UncaughtCharmError
 
 from tests.unit._utils import create_ingress_relation
 
@@ -179,8 +178,11 @@ def test_deferred_ingress_event_revalidates_incomplete_unit_data(
         relations=[incomplete_relation],
     )
 
-    with pytest.raises(UncaughtCharmError, match="provider is not ready"):
-        traefik_ctx.run(incomplete_relation.changed_event, replay_state)
+    replayed_state = traefik_ctx.run(incomplete_relation.changed_event, replay_state)
+
+    assert replayed_state.deferred == []
+    assert replayed_state.unit_status.name == "blocked"
+    assert replayed_state.unit_status.message == "setup of some ingress relation failed"
 
 
 @pytest.mark.parametrize(
