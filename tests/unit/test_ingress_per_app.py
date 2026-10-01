@@ -20,6 +20,7 @@ from charms.traefik_k8s.v2.ingress import (
 from conftest import MOCK_LB_ADDRESS
 from ops import CharmBase, Framework
 from scenario import Context, Model, Mount, Relation, State
+from scenario.runtime import UncaughtCharmError
 
 from tests.unit._utils import create_ingress_relation
 
@@ -145,6 +146,41 @@ def test_ingress_per_app_scale(
         # IPL:
         # len(d["service"][svc_name]["loadBalancer"]["servers"]) == 1
         # d["service"][svc_name]["loadBalancer"]["servers"][0]["url"] == leader_url
+
+
+def test_deferred_ingress_event_revalidates_incomplete_unit_data(
+    traefik_ctx, traefik_container, model
+):
+    """Verify replay behavior when relation data changes after deferral."""
+    relation = Relation(
+        "ingress",
+        remote_app_name="remote",
+        remote_app_data=IngressRequirerAppData(
+            model=model.name, name="remote", port=5000
+        ).dump(),
+        remote_units_data={
+            0: IngressRequirerUnitData(host="10.0.0.10", ip="10.0.0.10").dump()
+        },
+    )
+    unavailable_state = State(
+        model=model,
+        containers=[traefik_container.replace(can_connect=False)],
+        relations=[relation],
+    )
+
+    deferred_state = traefik_ctx.run(relation.changed_event, unavailable_state)
+
+    assert len(deferred_state.deferred) == 1
+    assert deferred_state.deferred[0].name == "data_provided"
+
+    incomplete_relation = relation.replace(remote_units_data={0: {}})
+    replay_state = deferred_state.replace(
+        containers=[traefik_container],
+        relations=[incomplete_relation],
+    )
+
+    with pytest.raises(UncaughtCharmError, match="provider is not ready"):
+        traefik_ctx.run(incomplete_relation.changed_event, replay_state)
 
 
 @pytest.mark.parametrize(
