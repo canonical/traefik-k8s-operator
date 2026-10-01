@@ -1390,15 +1390,14 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
                 return
 
         try:
-            routing_mode = self._routing_mode
-        except ValueError:
-            routing_mode_str = self.config["routing_mode"]
+            routing_mode = self.traefik.get_routing_mode()
+        except InvalidTraefikConfigError as e:
             self._wipe_ingress_for_all_relations()
-            self.unit.status = BlockedStatus(f"invalid routing mode: {routing_mode_str}; see logs.")
+            self.unit.status = BlockedStatus(str(e))
 
             logger.error(
                 "'%s' is not a valid routing_mode value; valid values are: %s",
-                routing_mode_str,
+                self.config["routing_mode"],
                 [e.value for e in RoutingMode],
             )
             return
@@ -1861,7 +1860,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         return f"{data['model']}-{name}"
 
     def _get_ingressed_app_url(self, prefix: str) -> str:
-        if self._routing_mode is RoutingMode.PATH:
+        if self.traefik.get_routing_mode() is RoutingMode.PATH:
             url = f"{self._ingressed_scheme}://{self.ingressed_address}/{prefix}"
         else:  # traefik.RoutingMode.SUBDOMAIN
             url = f"{self._ingressed_scheme}://{prefix}.{self.ingressed_address}/"
@@ -2029,14 +2028,6 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         return self._gateway_scheme
 
     @property
-    def _routing_mode(self) -> RoutingMode:
-        """Return the current routing mode for the ingress.
-
-        The two modes are 'subdomain' and 'path', where 'path' is the default.
-        """
-        return RoutingMode(self.config["routing_mode"])
-
-    @property
     def version(self) -> Optional[str]:
         """Return the workload version."""
         if not self.container.can_connect():
@@ -2118,6 +2109,7 @@ def validate_annotation_key(key: str) -> bool:
         return False
 
     return True
+
 
 def parse_annotations(annotations: Optional[str]) -> Optional[Dict[str, str]]:
     """Parse and validate annotations from a string.
