@@ -34,7 +34,7 @@ The purpose of these issues is to provide newcomers with opportunities to
 contribute to our projects and gain documentation skills. Using AI to
 complete these tasks undermines their purpose.
 
-If you use AI to help with your PRs, be mindful. Avoid submitting contributions
+If you use AI to help with your pull requests, be mindful. Avoid submitting contributions
 with entirely AI-generated documentation. The human aspect of documentation is
 important to us, and that includes tone, syntax, perspectives, and the
 occasional typo. 

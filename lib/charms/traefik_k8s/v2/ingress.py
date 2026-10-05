@@ -86,7 +86,7 @@ LIBAPI = 2
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 23
+LIBPATCH = 24
 
 PYDEPS = ["pydantic"]
 
@@ -244,7 +244,7 @@ class IngressUrl(BaseModel):
     url: AnyHttpUrl
 
 
-class IngressProviderAppData(DatabagModel):
+class IngressProviderAppData(DatabagModel):  # pyright: ignore[reportGeneralTypeIssues]
     """Ingress application databag schema."""
 
     ingress: Optional[IngressUrl] = None
@@ -273,7 +273,7 @@ class IngressHealthCheck(BaseModel):
     timeout: str = Field(default="5s", description="Maximum duration for a health check request.")
 
 
-class IngressRequirerAppData(DatabagModel):
+class IngressRequirerAppData(DatabagModel):  # pyright: ignore[reportGeneralTypeIssues]
     """Ingress requirer application databag model."""
 
     model: str = Field(description="The model the application is in.")
@@ -317,7 +317,7 @@ class IngressRequirerAppData(DatabagModel):
         return port
 
 
-class IngressRequirerUnitData(DatabagModel):
+class IngressRequirerUnitData(DatabagModel):  # pyright: ignore[reportGeneralTypeIssues]
     """Ingress requirer unit databag model."""
 
     host: str = Field(description="Hostname at which the unit is reachable.")
