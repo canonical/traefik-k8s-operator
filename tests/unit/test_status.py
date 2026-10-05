@@ -85,3 +85,25 @@ def test_start_traefik_active(traefik_ctx, *_):
 
     # THEN unit status is `active`
     assert out.unit_status == ActiveStatus("Serving at http://foo.bar")
+
+
+@patch("charm.TraefikIngressCharm._ingressed_address", PropertyMock(return_value="foo.bar"))
+@patch("traefik.Traefik.is_ready", PropertyMock(return_value=True))
+@patch("charm.TraefikIngressCharm._static_config_changed", PropertyMock(return_value=False))
+def test_invalid_routing_mode_blocks_and_recovers(traefik_ctx, traefik_container, *_):
+    invalid_state = State(
+        config={"routing_mode": "FOOBAR"},
+        containers=[traefik_container],
+    )
+
+    blocked_state = traefik_ctx.run("start", invalid_state)
+
+    assert blocked_state.unit_status == BlockedStatus(
+        "invalid routing mode: FOOBAR; see logs."
+    )
+
+    valid_state = blocked_state.replace(config={"routing_mode": "path"})
+
+    recovered_state = traefik_ctx.run("start", valid_state)
+
+    assert recovered_state.unit_status == ActiveStatus("Serving at http://foo.bar")

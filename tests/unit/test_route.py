@@ -212,7 +212,7 @@ def test_static_config(harness: Harness[TraefikIngressCharm], topology: JujuTopo
     charm = harness.charm
     charm.traefik = Traefik(
         container=charm.container,
-        routing_mode=charm._routing_mode,
+        routing_mode=charm.config["routing_mode"],
         tcp_entrypoints=charm._tcp_entrypoints(),
         udp_entrypoints=charm._udp_entrypoints(),
         tls_enabled=charm._is_tls_enabled(),
@@ -262,7 +262,7 @@ def test_static_config_broken(harness: Harness[TraefikIngressCharm], topology: J
     charm = harness.charm
     charm.traefik = Traefik(
         container=charm.container,
-        routing_mode=charm._routing_mode,
+        routing_mode=charm.config["routing_mode"],
         tcp_entrypoints=charm._tcp_entrypoints(),
         udp_entrypoints=charm._udp_entrypoints(),
         tls_enabled=charm._is_tls_enabled(),
@@ -301,7 +301,7 @@ def test_static_config_partially_broken(
     charm = harness.charm
     charm.traefik = Traefik(
         container=charm.container,
-        routing_mode=charm._routing_mode,
+        routing_mode=charm.config["routing_mode"],
         tcp_entrypoints=charm._tcp_entrypoints(),
         udp_entrypoints=charm._udp_entrypoints(),
         tls_enabled=charm._is_tls_enabled(),
@@ -359,7 +359,7 @@ def test_static_config_updates_tcp_entrypoints(
     charm = harness.charm
     charm.traefik = Traefik(
         container=charm.container,
-        routing_mode=charm._routing_mode,
+        routing_mode=charm.config["routing_mode"],
         tcp_entrypoints=charm._tcp_entrypoints(),
         udp_entrypoints=charm._udp_entrypoints(),
         tls_enabled=charm._is_tls_enabled(),
@@ -399,7 +399,7 @@ def test_static_config_updates_udp_entrypoints(
     charm = harness.charm
     charm.traefik = Traefik(
         container=charm.container,
-        routing_mode=charm._routing_mode,
+        routing_mode=charm.config["routing_mode"],
         tcp_entrypoints=charm._tcp_entrypoints(),
         udp_entrypoints=charm._udp_entrypoints(),
         tls_enabled=charm._is_tls_enabled(),

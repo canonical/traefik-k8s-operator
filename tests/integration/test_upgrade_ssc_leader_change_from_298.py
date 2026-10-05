@@ -7,7 +7,7 @@
 Scenario:
 
 1. Deploy traefik-k8s (3 units) at revision 298 and integrate it with
-   ``self-signed-certificates`` and ``alertmanager``; verify HTTPS works.
+    ``self-signed-certificates`` and an ingress requirer; verify HTTPS works.
 2. Force a leadership change; the old leader is restored afterwards.
 3. Trigger hook execution on the new leader and wait for all units to settle
    so the self-signed provider can issue replacement material.
@@ -24,10 +24,11 @@ from conftest import TRAEFIK_APP_NAME, TRAEFIK_RESOURCES
 from constants import MOCK_HOSTNAME, NUM_TRAEFIK_UNITS, SOURCE_CHANNEL, TRAEFIK_CHARM
 from helpers import (
     all_settled,
+    any_error_after,
     assert_traefik_revision,
     bring_up_self_signed_traefik,
     force_leader_change,
-    verify_https_on_all_units,
+    verify_https_through_all_traefik_units,
 )
 
 logger = logging.getLogger(__name__)
@@ -37,7 +38,7 @@ SOURCE_REVISION = 298
 
 @pytest.mark.setup
 def test_upgrade_ssc_leader_change_from_298(
-    juju: jubilant.Juju, traefik_charm, ssc_app, alertmanager_app, tmp_path
+    juju: jubilant.Juju, traefik_charm, ssc_app, ingress_app, tmp_path
 ):
     """Self-signed certs remain trusted on surviving units across leader change and upgrade."""
     juju.deploy(
@@ -49,15 +50,17 @@ def test_upgrade_ssc_leader_change_from_298(
         num_units=NUM_TRAEFIK_UNITS,
         trust=True,
     )
-    juju.wait(jubilant.all_agents_idle, timeout=900, delay=5, successes=5)
-    alertmanager_url = bring_up_self_signed_traefik(juju, tmp_path)
+    juju.wait(all_settled, error=any_error_after(failures=5), delay=5, timeout=900, successes=5)
+    bring_up_self_signed_traefik(juju, tmp_path)
+    juju.wait(all_settled, error=any_error_after(failures=5), delay=5, timeout=900, successes=5)
+    url = verify_https_through_all_traefik_units(juju)
 
     force_leader_change(juju, TRAEFIK_APP_NAME)
 
-    juju.wait(all_settled, timeout=900, delay=5, successes=5)
-    verify_https_on_all_units(juju, alertmanager_url)
+    juju.wait(all_settled, error=any_error_after(failures=5), timeout=900, delay=5, successes=5)
+    verify_https_through_all_traefik_units(juju, url)
 
     juju.refresh(TRAEFIK_APP_NAME, path=traefik_charm, resources=TRAEFIK_RESOURCES)
-    juju.wait(all_settled, timeout=900, delay=5)
+    juju.wait(all_settled, error=any_error_after(failures=5), timeout=900, delay=5, successes=5)
     assert_traefik_revision(juju, 0)
-    verify_https_on_all_units(juju, alertmanager_url)
+    verify_https_through_all_traefik_units(juju, url)

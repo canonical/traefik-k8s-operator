@@ -1,0 +1,11 @@
+version_schema: 2
+changes:
+  - title: Replaced Alertmanager in integration tests
+    author: f-atwi
+    type: minor
+    description: Replaced some external charm test dependencies with an any-charm as ingress requirer.
+    visibility: internal
+    highlight: false
+    urls:
+      pr:
+        - https://github.com/canonical/traefik-k8s-operator/pull/775

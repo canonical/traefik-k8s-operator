@@ -8,6 +8,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 Each revision is versioned by the date of the revision.
 
+## 2026-10-01
+
+- Fixed deferred ingress events repeatedly failing hooks when relation data changed before replay.
+  Ingress relations are now processed once through the existing reconciliation path, which cleans
+  up invalid configuration and reports status without trapping the event in a replay loop.
+
+## 2026-09-28
+
+- Fixed invalid `routing_mode` values putting the unit into error instead of blocked status.
+
+## 2026-09-08
+
+- Replaced some external charms in integration tests with an any-charm as ingress requirer.
+
+## 2026-09-02
+
+- Added `csr-subject-atttributes` config to include configurable CSR subject fields such as `C`, `ST`, `L`, `O`, `OU`, `CN`, and `emailAddress` in certificate requests.
+
 ## 2026-08-26
 
 - Added `get-loadbalancer-ip` Juju action to expose the external LoadBalancer address.

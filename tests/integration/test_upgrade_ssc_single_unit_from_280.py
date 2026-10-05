@@ -8,13 +8,14 @@ import logging
 
 import jubilant
 import pytest
-from conftest import TRAEFIK_APP_NAME, TRAEFIK_RESOURCES
-from constants import MOCK_HOSTNAME, SOURCE_CHANNEL, TRAEFIK_CHARM
+from conftest import TRAEFIK_RESOURCES
+from constants import MOCK_HOSTNAME, SOURCE_CHANNEL, TRAEFIK_APP_NAME, TRAEFIK_CHARM
 from helpers import (
     all_settled,
+    any_error_after,
     assert_traefik_revision,
     bring_up_self_signed_traefik,
-    verify_https_on_unit,
+    verify_https_through_all_traefik_units,
 )
 
 logger = logging.getLogger(__name__)
@@ -24,7 +25,7 @@ SOURCE_REVISION = 280
 
 @pytest.mark.setup
 def test_upgrade_ssc_single_unit_from_280(
-    juju: jubilant.Juju, traefik_charm, ssc_app, alertmanager_app, tmp_path
+    juju: jubilant.Juju, traefik_charm, ssc_app, ingress_app, tmp_path
 ):
     """A single traefik unit keeps serving HTTPS after upgrading from rev 280."""
     juju.deploy(
@@ -35,12 +36,13 @@ def test_upgrade_ssc_single_unit_from_280(
         revision=SOURCE_REVISION,
         trust=True,
     )
-    juju.wait(jubilant.all_agents_idle, timeout=900, delay=5, successes=5)
-    url = bring_up_self_signed_traefik(juju, tmp_path)
-    unit_name = next(iter(juju.status().apps[TRAEFIK_APP_NAME].units))
+    juju.wait(all_settled, error=any_error_after(failures=5), delay=5, timeout=900, successes=5)
+    bring_up_self_signed_traefik(juju, tmp_path)
+    juju.wait(all_settled, error=any_error_after(failures=5), delay=5, timeout=900, successes=5)
+    url = verify_https_through_all_traefik_units(juju)
 
     juju.refresh(TRAEFIK_APP_NAME, path=traefik_charm, resources=TRAEFIK_RESOURCES)
-    juju.wait(all_settled, delay=5, timeout=900)
+    juju.wait(all_settled, error=any_error_after(failures=5), delay=5, timeout=900, successes=5)
     assert_traefik_revision(juju, 0)
 
-    verify_https_on_unit(juju, unit_name, url)
+    verify_https_through_all_traefik_units(juju, expected_url=url)
