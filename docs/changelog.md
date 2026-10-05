@@ -8,6 +8,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 Each revision is versioned by the date of the revision.
 
+## 2026-10-05
+
+- Fixed CI breakage from dev/docs tooling version bumps: resolved new `pyright` 1.1.414
+  findings in the `ingress`, `ingress_per_unit`, and `ingress` v2 charm libraries, silenced
+  `sphinx_llm` warnings for unsupported `meta`/`mermaid` nodes, and reworded two docs pages
+  to clear `vale` spell-check false positives.
+
 ## 2026-10-01
 
 - Set a blocked status that explains how to run `juju trust` when the charm is deployed without

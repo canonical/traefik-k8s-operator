@@ -380,3 +380,9 @@ llms_txt_description = textwrap.dedent(
     for deploying and managing Traefik as an ingress controller.
     """
 )
+
+# The llms.txt markdown builder doesn't know how to render the docutils nodes
+# emitted by sphinxext.opengraph ("meta") or sphinxcontrib.mermaid ("mermaid"),
+# so without this it warns (and fails the build with --fail-on-warning) while
+# still correctly dropping the unsupported subtree from the generated markdown.
+llms_txt_suppress_unknown_node_warnings = ["meta", "mermaid"]

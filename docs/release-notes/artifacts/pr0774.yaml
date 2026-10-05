@@ -1,0 +1,19 @@
+# Version of the artifact schema
+version_schema: 2
+changes:
+  - title: Fixed CI breakage caused by dev/docs tooling updates
+    author: swetha1654
+    type: bugfix
+    description: |
+      Updated the `ingress`, `ingress_per_unit`, and `ingress` v2 charm libraries to
+      resolve new `pyright` 1.1.414 findings (possibly-unbound `jsonschema` references,
+      an `on` event-source property override, and invalid base-class arguments on the
+      pydantic `DatabagModel` subclasses), configured `sphinx_llm` to stop warning on
+      `meta`/`mermaid` nodes it cannot render to markdown, and reworded two documentation
+      pages to avoid `vale` spell-check false positives, unblocking CI on dependency-bump
+      pull requests.
+    urls:
+      pr:
+        - https://github.com/canonical/traefik-k8s-operator/pull/774
+    visibility: internal
+    highlight: false
