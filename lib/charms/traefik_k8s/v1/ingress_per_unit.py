@@ -83,7 +83,7 @@ LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 25
+LIBPATCH = 26
 
 log = logging.getLogger(__name__)
 
@@ -187,8 +187,8 @@ def _validate_data(data: Any, schema: Any) -> None:
     if not DO_VALIDATION:
         return
     try:
-        jsonschema.validate(instance=data, schema=schema)  # pyright: ignore[reportUnboundVariable]
-    except jsonschema.ValidationError as e:  # pyright: ignore[reportUnboundVariable]
+        jsonschema.validate(instance=data, schema=schema)  # pyright: ignore[reportPossiblyUnboundVariable]
+    except jsonschema.ValidationError as e:  # pyright: ignore[reportPossiblyUnboundVariable]
         raise DataValidationError(data, schema) from e
 
 
@@ -685,7 +685,7 @@ class IngressPerUnitRequirerEvents(ObjectEvents):
 class IngressPerUnitRequirer(_IngressPerUnitBase):
     """Implementation of the requirer of ingress_per_unit."""
 
-    on: IngressPerUnitRequirerEvents = IngressPerUnitRequirerEvents()
+    on = IngressPerUnitRequirerEvents()  # type: ignore
     # used to prevent spurious urls to be sent out if the event we're currently
     # handling is a relation-broken one.
     _stored = StoredState()
