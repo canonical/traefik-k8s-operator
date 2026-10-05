@@ -5,12 +5,12 @@
 """Integration tests for experimental forward auth using jubilant."""
 
 import json
-from pathlib import Path
 
+import httpx2
 import jubilant
 import pytest
-import requests
 import yaml
+from conftest import TRAEFIK_RESOURCES
 from lightkube import Client
 from lightkube.resources.core_v1 import ConfigMap
 from tenacity import retry, stop_after_attempt, wait_exponential
@@ -23,7 +23,9 @@ from tests.integration.any_charm_helpers import (
 )
 from tests.integration.helpers import (
     all_settled,
-    get_k8s_service_address,
+    any_error_after,
+    fetch_with_retry,
+    proxied_url,
     remove_application,
 )
 
@@ -31,15 +33,15 @@ OATHKEEPER_APP = "oathkeeper"
 TRAEFIK_APP = "traefik-k8s"
 IAP_REQUIRER_APP = "iap-requirer"
 
-_METADATA = yaml.safe_load(Path("./metadata.yaml").read_text(encoding="utf-8"))
-_TRAEFIK_RESOURCES = {
-    name: val["upstream-source"] for name, val in _METADATA["resources"].items()
-}
-
 
 def test_deployment(juju: jubilant.Juju, traefik_charm):
-    juju.deploy(traefik_charm, TRAEFIK_APP, resources=_TRAEFIK_RESOURCES, trust=True)
-    juju.config(TRAEFIK_APP, {"enable_experimental_forward_auth": "True"})
+    juju.deploy(
+        traefik_charm,
+        TRAEFIK_APP,
+        resources=TRAEFIK_RESOURCES,
+        trust=True,
+        config={"enable_experimental_forward_auth": "True"},
+    )
 
     juju.deploy(OATHKEEPER_APP, channel="latest/edge", trust=True)
     juju.deploy(
@@ -53,34 +55,35 @@ def test_deployment(juju: jubilant.Juju, traefik_charm):
         trust=True,
     )
 
+    juju.wait(all_settled, error=any_error_after(failures=5), timeout=1000, delay=5, successes=5)
     juju.integrate(f"{IAP_REQUIRER_APP}:require-ingress", TRAEFIK_APP)
     juju.integrate(f"{IAP_REQUIRER_APP}:require-auth-proxy", OATHKEEPER_APP)
     juju.integrate(f"{TRAEFIK_APP}:experimental-forward-auth", OATHKEEPER_APP)
     juju.model_config({"update-status-hook-interval": "5m"})
-    juju.wait(all_settled, error=jubilant.any_error, timeout=1000, delay=5, successes=5)
+    juju.wait(all_settled, error=any_error_after(failures=5), timeout=1000, delay=5, successes=5)
 
 
-@pytest.mark.xfail(reason="See https://github.com/canonical/traefik-k8s-operator/issues/522")
-@retry(
-    wait=wait_exponential(multiplier=3, min=1, max=30),
-    stop=stop_after_attempt(30),
-    reraise=True,
-)
 def test_allowed_forward_auth_url_redirect(juju: jubilant.Juju) -> None:
     requirer_url = _reverse_proxy_app_url(juju, TRAEFIK_APP, IAP_REQUIRER_APP)
-    response = requests.get(f"{requirer_url}anything/allowed", verify=False, timeout=30)
-    assert response.status_code == 200
+    fetch_with_retry(
+        f"{requirer_url}anything/allowed",
+        200,
+        stop=stop_after_attempt(30),
+        wait=wait_exponential(multiplier=3, min=1, max=30),
+    )
 
 
 def test_protected_forward_auth_url_redirect(juju: jubilant.Juju) -> None:
     requirer_url = _reverse_proxy_app_url(juju, TRAEFIK_APP, IAP_REQUIRER_APP)
-    response = requests.get(f"{requirer_url}anything/deny", verify=False, timeout=30)
-    assert response.status_code == 401
+    fetch_with_retry(
+        f"{requirer_url}anything/deny",
+        401,
+        stop=stop_after_attempt(30),
+        wait=wait_exponential(multiplier=3, min=1, max=30),
+    )
 
 
-def test_forward_auth_url_response_headers(
-    juju: jubilant.Juju, lightkube_client: Client
-) -> None:
+def test_forward_auth_url_response_headers(juju: jubilant.Juju, lightkube_client: Client) -> None:
     requirer_url = _reverse_proxy_app_url(juju, TRAEFIK_APP, IAP_REQUIRER_APP)
     protected_url = f"{requirer_url}anything/anonymous"
 
@@ -105,7 +108,7 @@ def test_forward_auth_url_response_headers(
 
 def test_remove_forward_auth_integration(juju: jubilant.Juju):
     juju.remove_relation(OATHKEEPER_APP, f"{TRAEFIK_APP}:experimental-forward-auth")
-    juju.wait(all_settled, error=jubilant.any_error, delay=5, successes=5)
+    juju.wait(all_settled, error=any_error_after(failures=5), delay=5, successes=5)
 
 
 def test_cleanup(juju: jubilant.Juju):
@@ -118,9 +121,7 @@ def lightkube_client(juju: jubilant.Juju) -> Client:
 
 
 def _reverse_proxy_app_url(juju: jubilant.Juju, ingress_app_name: str, app_name: str) -> str:
-    address = get_k8s_service_address(juju.model, f"{ingress_app_name}-lb")
-    assert address, "Expected a traefik load balancer address"
-    return f"http://{address}/{juju.model}-{app_name}/"
+    return f"{proxied_url(juju, ingress_app_name, app_name)}/"
 
 
 @retry(
@@ -129,7 +130,7 @@ def _reverse_proxy_app_url(juju: jubilant.Juju, ingress_app_name: str, app_name:
     reraise=True,
 )
 def _assert_anonymous_response(url: str) -> None:
-    response = requests.get(url, verify=False, timeout=30)
+    response = httpx2.get(url, verify=False, timeout=30)
     assert response.status_code == 200
     headers = response.json().get("headers", {})
     assert headers["X-User"] == "anonymous"

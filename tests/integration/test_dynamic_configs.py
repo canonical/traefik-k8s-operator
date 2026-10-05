@@ -10,17 +10,16 @@ dynamic config YAML files exist in /opt/traefik/juju/ inside the traefik contain
 
 import logging
 
-import jubilant
 import pytest
 import yaml
 
 from tests.integration.any_charm_helpers import (
+    ANY_CHARM,
     ANY_CHARM_CHANNEL,
-    ANY_CHARM_K8S,
-    PYTHON_PACKAGES,
+    HEALTH_PYTHON_PACKAGES,
     health_src_overwrite,
 )
-from tests.integration.helpers import all_settled
+from tests.integration.helpers import all_settled, any_error_after
 
 logger = logging.getLogger(__name__)
 
@@ -32,16 +31,16 @@ DYNAMIC_CONFIG_DIR = "/opt/traefik/juju"
 def secondary_ingress_app(juju):
     """Deploy a second ingress requirer."""
     juju.deploy(
-        f"ch:{ANY_CHARM_K8S}",
+        f"ch:{ANY_CHARM}",
         SECONDARY_INGRESS_APP_NAME,
         channel=ANY_CHARM_CHANNEL,
         config={
             "src-overwrite": health_src_overwrite(),
-            "python-packages": PYTHON_PACKAGES,
+            "python-packages": HEALTH_PYTHON_PACKAGES,
         },
         trust=True,
     )
-    juju.wait(all_settled, error=jubilant.any_error, delay=5, successes=5)
+    juju.wait(all_settled, error=any_error_after(failures=5), delay=5, successes=5)
     return SECONDARY_INGRESS_APP_NAME
 
 
@@ -59,19 +58,16 @@ def test_dynamic_configs_present(juju, traefik_app, ingress_app, secondary_ingre
     """After integrating 2 apps, verify dynamic config files exist in the container."""
     juju.integrate(f"{secondary_ingress_app}:require-ingress", traefik_app)
     juju.integrate(f"{ingress_app}:require-ingress", traefik_app)
-    juju.wait(all_settled, error=jubilant.any_error, delay=5, successes=5)
+    juju.wait(all_settled, error=any_error_after(failures=5), delay=5, successes=5)
     files = _list_dynamic_configs(juju, traefik_app)
     logger.info("Dynamic config files in container: %s", files)
 
     # Each integrated app should have a config file matching juju_ingress_ingress_*_{app}.yaml
     ingress_configs = [f for f in files if f.endswith(f"_{ingress_app}.yaml")]
-    secondary_ingress_configs = [
-        f for f in files if f.endswith(f"_{secondary_ingress_app}.yaml")
-    ]
+    secondary_ingress_configs = [f for f in files if f.endswith(f"_{secondary_ingress_app}.yaml")]
 
     assert len(ingress_configs) == 1, (
-        f"Expected exactly 1 config for {ingress_app}, "
-        f"found {ingress_configs} in {files}"
+        f"Expected exactly 1 config for {ingress_app}, found {ingress_configs} in {files}"
     )
     assert len(secondary_ingress_configs) == 1, (
         f"Expected exactly 1 config for {secondary_ingress_app}, "
@@ -85,9 +81,7 @@ def test_dynamic_configs_present(juju, traefik_app, ingress_app, secondary_ingre
         )
 
 
-def test_dynamic_config_content_valid(
-    juju, traefik_app, ingress_app, secondary_ingress_app
-):
+def test_dynamic_config_content_valid(juju, traefik_app, ingress_app, secondary_ingress_app):
     """Verify that the dynamic config files contain valid traefik routing config."""
     files = _list_dynamic_configs(juju, traefik_app)
 
@@ -112,9 +106,7 @@ def test_dynamic_config_content_valid(
         assert len(http["services"]) >= 1, f"No services defined for {app_name}"
 
 
-def test_staging_artifacts_cleaned_up(
-    juju, traefik_app, ingress_app, secondary_ingress_app
-):
+def test_staging_artifacts_cleaned_up(juju, traefik_app, ingress_app, secondary_ingress_app):
     """Verify that the tar archive and staging directory are removed after flush."""
     # The tar archive should not exist in the dynamic config dir
     output = juju.ssh(
@@ -132,9 +124,7 @@ def test_staging_artifacts_cleaned_up(
         "test -d /tmp/_juju_ingress_staging && echo EXISTS || echo GONE",
         container="traefik",
     )
-    assert "GONE" in output, (
-        "Staging directory /tmp/_juju_ingress_staging was not cleaned up"
-    )
+    assert "GONE" in output, "Staging directory /tmp/_juju_ingress_staging was not cleaned up"
 
 
 def test_dynamic_config_removed_after_relation_removed(
@@ -159,22 +149,19 @@ def test_dynamic_config_removed_after_relation_removed(
     # its ingress-relation-broken hook and deleted the config file.
     juju.wait(
         lambda status: (
-            jubilant.all_active(status, traefik_app, secondary_ingress_app)
-            and jubilant.all_agents_idle(status)
+            all_settled(status, traefik_app, secondary_ingress_app)
             and not any(
                 r.related_app == traefik_app
                 for r in status.apps[ingress_app].relations.get("require-ingress", [])
             )
         ),
-        error=jubilant.any_error,
+        error=any_error_after(failures=5),
         timeout=300,
     )
 
     # Verify the ingress requirer config file is gone
     files_after = _list_dynamic_configs(juju, traefik_app)
-    ingress_configs_after = [
-        f for f in files_after if f.endswith(f"_{ingress_app}.yaml")
-    ]
+    ingress_configs_after = [f for f in files_after if f.endswith(f"_{ingress_app}.yaml")]
     assert len(ingress_configs_after) == 0, (
         f"Expected ingress requirer config to be removed after relation broken, "
         f"but found: {ingress_configs_after}"

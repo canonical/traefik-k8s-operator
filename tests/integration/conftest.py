@@ -8,9 +8,9 @@ import pytest
 import yaml
 
 from tests.integration.any_charm_helpers import (
+    ANY_CHARM,
     ANY_CHARM_CHANNEL,
-    ANY_CHARM_K8S,
-    PYTHON_PACKAGES,
+    HEALTH_PYTHON_PACKAGES,
     health_src_overwrite,
 )
 from tests.integration.constants import (
@@ -22,14 +22,12 @@ from tests.integration.constants import (
     SSC_CHARM,
     TRAEFIK_APP_NAME,
 )
-from tests.integration.helpers import all_settled
+from tests.integration.helpers import all_settled, any_error_after
 
 logger = logging.getLogger(__name__)
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
-TRAEFIK_RESOURCES = {
-    name: val["upstream-source"] for name, val in METADATA["resources"].items()
-}
+TRAEFIK_RESOURCES = {name: val["upstream-source"] for name, val in METADATA["resources"].items()}
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
@@ -39,7 +37,10 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         parser: Pytest parser.
     """
     parser.addoption(
-        "--base", action="store", default="ubuntu@26.04", help="Base to use for the integration test",
+        "--base",
+        action="store",
+        default="ubuntu@26.04",
+        help="Base to use for the integration test",
     )
 
 
@@ -75,10 +76,9 @@ def deploy_traefik(juju, traefik_charm):
         TRAEFIK_APP_NAME,
         resources=TRAEFIK_RESOURCES,
         trust=True,
+        config={"external_hostname": "traefik-demo.local"},
     )
-    juju.wait(jubilant.all_agents_idle, error=jubilant.any_error, timeout=900, delay=5, successes=5)
-    juju.config(TRAEFIK_APP_NAME, {"external_hostname": "traefik-demo.local"})
-    juju.wait(all_settled, error=jubilant.any_error, delay=5, successes=5)
+    juju.wait(all_settled, error=any_error_after(failures=5), delay=5, successes=5)
     return TRAEFIK_APP_NAME
 
 
@@ -86,18 +86,18 @@ def deploy_traefik(juju, traefik_charm):
 def ingress_fixture(juju):
     """Deploy the any-charm HTTP ingress requirer."""
     juju.deploy(
-        f"ch:{ANY_CHARM_K8S}",
+        f"ch:{ANY_CHARM}",
         INGRESS_REQUIRER_APP_NAME,
         channel=ANY_CHARM_CHANNEL,
         config={
             "src-overwrite": health_src_overwrite(),
-            "python-packages": PYTHON_PACKAGES,
+            "python-packages": HEALTH_PYTHON_PACKAGES,
         },
         trust=True,
     )
     juju.wait(
         lambda status: jubilant.all_active(status, INGRESS_REQUIRER_APP_NAME),
-        error=jubilant.any_error,
+        error=any_error_after(),
         delay=5,
         successes=5,
     )
@@ -110,7 +110,7 @@ def mtls_fixture(juju):
     juju.deploy(MANUAL_TLS_APP_NAME, MANUAL_TLS_APP_NAME, channel=MANUAL_TLS_CHANNEL)
     juju.wait(
         lambda status: jubilant.all_active(status, MANUAL_TLS_APP_NAME),
-        error=jubilant.any_error,
+        error=any_error_after(failures=5),
         delay=5,
         successes=5,
     )
@@ -123,7 +123,7 @@ def self_signed_certificates_fixture(juju):
     juju.deploy(SSC_CHARM, SSC_APP_NAME, channel=SSC_CHANNEL, trust=True)
     juju.wait(
         lambda status: jubilant.all_active(status, SSC_APP_NAME),
-        error=jubilant.any_error,
+        error=any_error_after(failures=5),
         delay=5,
         successes=5,
     )

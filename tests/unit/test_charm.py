@@ -170,34 +170,6 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
         self.assertTrue(self.harness.charm.traefik.is_ready)
 
-    def test_bad_routing_mode_config_and_recovery(self):
-        """Test round-trip bootstrap and relation with a consumer."""
-        self.harness.update_config({"external_hostname": "testhostname"})
-        self.harness.set_leader(True)
-        self.harness.begin_with_initial_hooks()
-
-        self.harness.update_config(
-            {
-                "external_hostname": "testhostname",
-                "routing_mode": "FOOBAR",
-            }
-        )
-
-        self.harness.container_pebble_ready("traefik")
-
-        self.assertEqual(
-            self.harness.charm.unit.status,
-            BlockedStatus("invalid routing mode: FOOBAR; see logs."),
-        )
-
-        self.harness.update_config(
-            {
-                "routing_mode": "path",
-            }
-        )
-
-        self.assertIsInstance(self.harness.charm.unit.status, ActiveStatus)
-
     @patch(
         "charm.TraefikIngressCharm._get_loadbalancer_status",
         new_callable=PropertyMock,

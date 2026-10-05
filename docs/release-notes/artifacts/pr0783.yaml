@@ -1,0 +1,13 @@
+version_schema: 2
+changes:
+  - title: Fixed charm going into Error state when invalid routing-mode on startup
+    author: f-atwi
+    type: bugfix
+    description: |
+      Fixed the charm going into error state when the configured routing-mode is invalid on startup.
+      Charm becomes "Blocked" instead.
+    visibility: public
+    highlight: false
+    urls:
+      pr:
+        - https://github.com/canonical/traefik-k8s-operator/pull/783

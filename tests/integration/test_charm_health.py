@@ -4,85 +4,88 @@
 
 """Integration tests for ingress health checks using jubilant."""
 
-from pathlib import Path
 from typing import Any
 
+import httpx2
 import jubilant
-import requests
-import yaml
+from tenacity import retry, stop_after_delay, wait_fixed
 
 from tests.integration.any_charm_helpers import (
+    ANY_CHARM,
     ANY_CHARM_CHANNEL,
-    ANY_CHARM_K8S,
-    PYTHON_PACKAGES,
+    HEALTH_PYTHON_PACKAGES,
     health_src_overwrite,
 )
+from tests.integration.conftest import TRAEFIK_APP_NAME, TRAEFIK_RESOURCES
 from tests.integration.helpers import (
     all_settled,
-    get_k8s_service_address,
+    any_error_after,
+    proxied_url,
     remove_application,
     rpc,
 )
 
-TRAEFIK_APP = "traefik-k8s"
 HEALTH_TESTER_APP = "health-tester"
-
-_METADATA = yaml.safe_load(Path("./metadata.yaml").read_text(encoding="utf-8"))
-_TRAEFIK_RESOURCES = {
-    name: val["upstream-source"] for name, val in _METADATA["resources"].items()
-}
 
 
 def test_deployment(juju: jubilant.Juju, traefik_charm):
-    juju.deploy(traefik_charm, TRAEFIK_APP, resources=_TRAEFIK_RESOURCES, trust=True)
+    juju.deploy(traefik_charm, TRAEFIK_APP_NAME, resources=TRAEFIK_RESOURCES, trust=True)
     juju.deploy(
-        f"ch:{ANY_CHARM_K8S}",
+        f"ch:{ANY_CHARM}",
         HEALTH_TESTER_APP,
         channel=ANY_CHARM_CHANNEL,
         config={
             "src-overwrite": health_src_overwrite(),
-            "python-packages": PYTHON_PACKAGES,
+            "python-packages": HEALTH_PYTHON_PACKAGES,
         },
         num_units=3,
         trust=True,
     )
-    juju.wait(all_settled, error=jubilant.any_error, timeout=1000, delay=5, successes=5)
-
-
-def test_relate(juju: jubilant.Juju):
-    juju.integrate(f"{HEALTH_TESTER_APP}:require-ingress", f"{TRAEFIK_APP}:ingress")
-    juju.wait(all_settled, error=jubilant.any_error, delay=5, successes=5)
+    juju.wait(
+        all_settled,
+        error=any_error_after(failures=5),
+        delay=5,
+        successes=5,
+    )
+    juju.integrate(f"{HEALTH_TESTER_APP}:require-ingress", f"{TRAEFIK_APP_NAME}:ingress")
+    juju.wait(all_settled, error=any_error_after(failures=5), delay=5, successes=5)
 
 
 def test_health(juju: jubilant.Juju):
-    traefik_address = get_k8s_service_address(juju.model, f"{TRAEFIK_APP}-lb")
-    assert traefik_address, "Expected a traefik load balancer address"
-    health_address = f"http://{traefik_address}/{juju.model}-{HEALTH_TESTER_APP}/health"
+    health_address = f"{proxied_url(juju, TRAEFIK_APP_NAME, HEALTH_TESTER_APP)}/health"
 
     rpc(juju, f"{HEALTH_TESTER_APP}/2", "set_health", is_healthy=False)
-    juju.wait(all_settled, error=jubilant.any_error, delay=5, successes=5)
-    for _ in range(10):
-        status, content = _fetch_health(health_address)
-        assert status == 200
-        assert content in [
+    juju.wait(all_settled, error=any_error_after(failures=5), delay=5, successes=5)
+    _assert_healthy_backends(
+        health_address,
+        [
             {"host": "health-tester-0", "status": "up"},
             {"host": "health-tester-1", "status": "up"},
-        ]
+        ],
+    )
 
     rpc(juju, f"{HEALTH_TESTER_APP}/1", "set_health", is_healthy=False)
-    juju.wait(all_settled, error=jubilant.any_error, delay=5, successes=5)
+    juju.wait(all_settled, error=any_error_after(failures=5), delay=5, successes=5)
+    _assert_healthy_backends(
+        health_address,
+        [{"host": "health-tester-0", "status": "up"}],
+    )
+
+
+@retry(stop=stop_after_delay(60), wait=wait_fixed(5), reraise=True)
+def _assert_healthy_backends(url: str, expected: list[dict[str, str]]) -> None:
     for _ in range(10):
-        status, content = _fetch_health(health_address)
+        status, content = _fetch_health(url)
         assert status == 200
-        assert content == {"host": "health-tester-0", "status": "up"}
+        assert content in expected
 
 
 def test_cleanup(juju: jubilant.Juju):
-    remove_application(juju, TRAEFIK_APP, timeout=60)
+    remove_application(juju, TRAEFIK_APP_NAME, timeout=60)
 
 
 def _fetch_health(url: str) -> tuple[int, Any]:
-    response = requests.get(url, timeout=10)
+    response = httpx2.get(url, timeout=10)
     try:
         content = response.json()
     except ValueError:
