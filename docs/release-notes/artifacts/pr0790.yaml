@@ -8,7 +8,7 @@ changes:
       traefik Pebble service reported ready - such as right after a charm upgrade -
       would cause the charm to compute an empty certificate request list, which in
       turn caused the TLS certificates library to wipe the existing, valid CSR from
-      manual-tls-certificates relation data. Endpoint/certificate-request computation
+      the certificates relation data. Endpoint/certificate-request computation
       no longer depends on Pebble readiness, only on the external address being known.
     urls:
       pr:
