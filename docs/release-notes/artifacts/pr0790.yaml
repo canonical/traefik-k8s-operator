@@ -15,5 +15,6 @@ changes:
         - https://github.com/canonical/traefik-k8s-operator/pull/790
       related_doc:
       related_issue:
+        - https://github.com/canonical/traefik-k8s-operator/issues/770
     visibility: public
     highlight: false
