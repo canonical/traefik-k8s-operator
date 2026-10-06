@@ -2,7 +2,7 @@
 # See LICENSE file for licensing details.
 
 juju:
-  channel: 4.0/edge
+  channel: 4.0/stable
   model-defaults:
     test-mode: "true"
     automatically-retry-hooks: "true"

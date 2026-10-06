@@ -13,6 +13,23 @@ Each revision is versioned by the date of the revision.
 - Fixed certificate signing requests being wiped from `certificates` interface relation data when a hook (e.g. `config-changed`) runs before the traefik Pebble service reports ready, such as right after a charm upgrade.
 - Widened the integration test retry predicate to also retry on 5xx HTTP errors, not just connection errors.
 
+## 2026-10-05
+
+- Fixed CI breakage from dev/docs tooling version bumps: resolved new `pyright` 1.1.414
+  findings in the `ingress`, `ingress_per_unit`, and `ingress` v2 charm libraries, silenced
+  `sphinx_llm` warnings for unsupported `meta`/`mermaid` nodes, and reworded two docs pages
+  to clear `vale` spell-check false positives.
+
+## 2026-10-01
+
+- Fixed deferred ingress events repeatedly failing hooks when relation data changed before replay.
+  Ingress relations are now processed once through the existing reconciliation path, which cleans
+  up invalid configuration and reports status without trapping the event in a replay loop.
+
+## 2026-09-28
+
+- Fixed invalid `routing_mode` values putting the unit into error instead of blocked status.
+
 ## 2026-09-08
 
 - Replaced some external charms in integration tests with an any-charm as ingress requirer.
@@ -57,6 +74,7 @@ Each revision is versioned by the date of the revision.
 
 ## 2026-07-22
 
+- Updated the Grafana dashboard to the official Traefik Kubernetes dashboard using Traefik v2 metric names (e.g. `traefik_service_requests_total`).
 - Added a basic deployment tutorial.
 
 ## 2026-07-10
