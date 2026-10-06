@@ -1,0 +1,20 @@
+version_schema: 2
+changes:
+  - title: Fixed certificate signing requests being wiped after upgrade
+    author: swetha1654
+    type: bugfix
+    description: |
+      Fixed a race condition where a hook (e.g. config-changed) running before the
+      traefik Pebble service reported ready - such as right after a charm upgrade -
+      would cause the charm to compute an empty certificate request list, which in
+      turn caused the TLS certificates library to wipe the existing, valid CSR from
+      the certificates relation data. Endpoint/certificate-request computation
+      no longer depends on Pebble readiness, only on the external address being known.
+    urls:
+      pr:
+        - https://github.com/canonical/traefik-k8s-operator/pull/790
+      related_doc:
+      related_issue:
+        - https://github.com/canonical/traefik-k8s-operator/issues/770
+    visibility: public
+    highlight: false

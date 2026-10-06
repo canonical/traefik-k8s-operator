@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 Each revision is versioned by the date of the revision.
 
+## 2026-10-06
+
+- Fixed certificate signing requests being wiped from `certificates` interface relation data when a hook (e.g. `config-changed`) runs before the traefik Pebble service reports ready, such as right after a charm upgrade.
+
 ## 2026-10-05
 
 - Fixed CI breakage from dev/docs tooling version bumps: resolved new `pyright` 1.1.414
