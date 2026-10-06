@@ -8,6 +8,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 Each revision is versioned by the date of the revision.
 
+## 2026-10-06
+
+- Fixed certificate signing requests being wiped from `manual-tls-certificates` relation data when a hook (e.g. `config-changed`) runs before the traefik Pebble service reports ready, such as right after a charm upgrade.
+- Widened the integration test retry predicate to also retry on 5xx HTTP errors, not just connection errors.
+
 ## 2026-09-08
 
 - Replaced some external charms in integration tests with an any-charm as ingress requirer.
