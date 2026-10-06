@@ -31,7 +31,6 @@ from constants import (
 from tenacity import (
     before_sleep_log,
     retry,
-    retry_if_exception,
     retry_if_exception_type,
     retry_if_result,
     stop_after_delay,
@@ -355,43 +354,6 @@ def get_loadbalancer_ip(
     ip = result.results["loadbalancer-ip"]
     assert isinstance(ip, str) and ip, "Expected a non-empty loadbalancer IP"
     return ip
-
-
-def _is_retriable_request_error(exc: BaseException) -> bool:
-    """Return True for transient request failures worth retrying.
-
-    Covers two distinct failure layers: the connection never being established
-    (``ConnectionError``, e.g. the port isn't listening yet) and the connection
-    succeeding but the server responding with a 5xx status (``HTTPError``, e.g.
-    traefik is up but its backend/upstream isn't ready yet, so it replies with
-    502/503/504 instead of refusing the connection outright).
-    """
-    if isinstance(exc, requests.exceptions.ConnectionError):
-        return True
-    if isinstance(exc, requests.exceptions.HTTPError):
-        response = exc.response
-        return response is not None and response.status_code >= 500
-    return False
-
-
-@retry(
-    retry=retry_if_exception(_is_retriable_request_error),
-    stop=stop_after_delay(120),
-    wait=wait_fixed(5),
-    before_sleep=before_sleep_log(logger, logging.INFO),
-    reraise=True,
-)
-def _get_with_retry(session: requests.Session, url: str) -> None:
-    """GET *url*, retrying on connection errors and 5xx responses for up to two minutes.
-
-    Juju can report a unit ``active/idle`` a beat before the traefik workload has
-    reloaded and started listening on :443 with the freshly-signed certificate, so
-    the first request to a just-upgraded unit may be refused outright (connection
-    error) or answered with a 5xx while a backend/upstream is still starting up.
-    Retry both transient windows instead of failing the whole test.
-    """
-    response = session.get(url, timeout=30)
-    response.raise_for_status()
 
 
 def proxied_url(juju: jubilant.Juju, traefik_app_name: str, endpoint_key: str) -> str:
