@@ -38,7 +38,6 @@ CERTS_DIR = Path(DYNAMIC_CONFIG_DIR)
 CA_CERTS_DIR = Path("/usr/local/share/ca-certificates")
 RECV_CA_TEMPLATE = Template(f"{str(CA_CERTS_DIR)}/receive-ca-cert-$rel_id-ca.crt")
 BIN_PATH = "/usr/bin/traefik"
-LOG_PATH = "/var/log/traefik.log"
 
 # Based on Mozilla's intermediate profile guideline
 TLS_MIN_VERSION = "VersionTLS12"
@@ -749,8 +748,7 @@ class Traefik:  # pylint: disable=too-many-instance-attributes,too-many-public-m
                 self.service_name: {
                     "override": "replace",
                     "summary": "Traefik",
-                    # trick to drop the logs to a file but also keep them available in the pod logs
-                    "command": f'/bin/sh -c "{BIN_PATH} | tee {LOG_PATH}"',
+                    "command": BIN_PATH,
                     "startup": "enabled",
                     "environment": environment,
                 },

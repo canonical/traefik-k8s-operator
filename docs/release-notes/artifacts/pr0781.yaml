@@ -17,3 +17,19 @@ changes:
       related_issue:
     visibility: public
     highlight: false
+  - title: Removed the duplicate local log file
+    author: michaelthamm
+    type: breaking
+    description: |
+      Traefik no longer writes its logs to `/var/log/traefik.log`. The file was
+      never rotated, so it grew until the disk filled, and it wrote every log
+      line twice. Logs are still available from the workload's stdout through
+      `pebble logs traefik` and `kubectl logs`, and over the `logging`
+      interface.
+    urls:
+      pr:
+        - https://github.com/canonical/traefik-k8s-operator/pull/781
+      related_doc:
+      related_issue:
+    visibility: public
+    highlight: false

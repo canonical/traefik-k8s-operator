@@ -61,6 +61,27 @@ class TestLogForwarding:
         assert labels["job"].startswith("juju_")
         assert labels["job"].endswith("_traefik-k8s")
 
+    def test_service_command_runs_binary_directly(self, traefik_ctx, traefik_container):
+        """The service command must not shell out to a pipe or write a log file.
+
+        Log lines used to be teed to /var/log/traefik.log, which duplicated every
+        line and grew unbounded. Pebble forwards the service's stdout either way,
+        so the command is now the bare binary.
+        """
+        # GIVEN a started Traefik with no logging relation
+        state = State(
+            leader=True,
+            containers=[traefik_container],
+        )
+
+        # WHEN pebble-ready fires
+        state_out = traefik_ctx.run(traefik_container.pebble_ready_event, state)
+
+        # THEN the plan runs the binary directly, with no shell or pipe
+        container_out = state_out.get_container("traefik")
+        command = container_out.layers["traefik"].to_dict()["services"]["traefik"]["command"]
+        assert command == "/usr/bin/traefik"
+
     def test_relation_changed_after_pebble_ready_configures_log_target(
         self, traefik_ctx, traefik_container
     ):

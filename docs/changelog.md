@@ -13,6 +13,9 @@ Each revision is versioned by the date of the revision.
 - Forwarded the workload's logs to related Loki endpoints over the `logging` interface using
   Pebble log targets, so the `loki_push_api` relation now actually ships logs instead of only
   reading the interface.
+- Removed the duplicate write of the workload's logs to `/var/log/traefik.log`. The file was
+  never rotated, grew until the disk filled, and wrote every line twice. Logs remain available
+  through `juju exec --unit traefik/0 -- pebble logs traefik` and `kubectl logs`.
 - Fixed CI breakage from dev/docs tooling version bumps: resolved new `pyright` 1.1.414
   findings in the `ingress`, `ingress_per_unit`, and `ingress` v2 charm libraries, silenced
   `sphinx_llm` warnings for unsupported `meta`/`mermaid` nodes, and reworded two docs pages
