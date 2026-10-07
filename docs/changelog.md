@@ -11,7 +11,7 @@ Each revision is versioned by the date of the revision.
 ## 2026-10-07
 
 - Added a scheduled `close_stale.yaml` GitHub Actions workflow to automatically mark inactive
-  issues and PRs as stale and close them after a grace period.
+  issues and pull requests as stale and close them after a grace period.
 
 ## 2026-10-06
 
