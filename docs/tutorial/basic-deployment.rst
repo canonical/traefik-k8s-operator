@@ -63,7 +63,7 @@ of the load balancer to the IP of our working station or Multipass VM:
     VM_IP=$(hostname -I | awk '{print $1}')
     cat << EOF > concierge.yaml
     providers:
-    k8s:
+      k8s:
         enable: true
         bootstrap: true
         bootstrap-constraints:
