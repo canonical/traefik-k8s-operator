@@ -11,5 +11,6 @@ changes:
     urls:
       pr:
         - "https://github.com/canonical/traefik-k8s-operator/pull/0"
+        - https://github.com/canonical/traefik-k8s-operator/pull/791
     visibility: public
     highlight: false
