@@ -1,0 +1,15 @@
+# Version of the artifact schema
+version_schema: 2
+changes:
+  - title: Added workflow to automatically close stale issues and PRs
+    author: swetha1654
+    type: minor
+    description: |
+      Added a scheduled `close_stale.yaml` GitHub Actions workflow, matching the one used in
+      `canonical/platform-engineering-charm-template`, which marks issues and PRs inactive for
+      90 days as stale and closes them after a further 14 days without activity.
+    urls:
+      pr:
+        - "https://github.com/canonical/traefik-k8s-operator/pull/0"
+    visibility: public
+    highlight: false
