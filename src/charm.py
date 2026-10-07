@@ -1167,7 +1167,8 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             A dict of the form {"url": "<endpoint_url>", ...}
         """
         result: Dict[str, Dict[str, str]] = {}
-        if not self.ready:
+        if not self._external_address_ready:
+            logger.warning("External address not ready yet")
             return result
 
         traefik_endpoint = {
@@ -1528,13 +1529,20 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         return current != traefik_static_config
 
     @property
-    def ready(self) -> bool:
-        """Check whether we have an external host set, and traefik is running."""
+    def _external_address_ready(self) -> bool:
+        """Check whether we have an external host set."""
         if not self._traefik_external_address:
             self._wipe_ingress_for_all_relations()  # fixme: no side-effects in prop
             self.unit.status = BlockedStatus(
                 "Traefik load balancer is unable to obtain an IP or hostname from the cluster."
             )
+            return False
+        return True
+
+    @property
+    def ready(self) -> bool:
+        """Check whether we have an external host set, and traefik is running."""
+        if not self._external_address_ready:
             return False
         if not self.traefik.is_ready:
             self.unit.status = WaitingStatus(f"waiting for service: '{self.traefik.service_name}'")

@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 Each revision is versioned by the date of the revision.
 
+## 2026-10-06
+
+- Fixed certificate signing requests being wiped from `certificates` interface relation data when a hook (e.g. `config-changed`) runs before the traefik Pebble service reports ready, such as right after a charm upgrade.
+
 ## 2026-10-05
 
 - Forwarded the workload's logs to related Loki endpoints over the `logging` interface using
@@ -75,6 +79,7 @@ Each revision is versioned by the date of the revision.
 
 ## 2026-07-22
 
+- Updated the Grafana dashboard to the official Traefik Kubernetes dashboard using Traefik v2 metric names (e.g. `traefik_service_requests_total`).
 - Added a basic deployment tutorial.
 
 ## 2026-07-10
