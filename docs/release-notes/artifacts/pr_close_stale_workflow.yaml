@@ -10,7 +10,6 @@ changes:
       90 days as stale and closes them after a further 14 days without activity.
     urls:
       pr:
-        - "https://github.com/canonical/traefik-k8s-operator/pull/0"
-        - https://github.com/canonical/traefik-k8s-operator/pull/791
+        - "https://github.com/canonical/traefik-k8s-operator/pull/791"
     visibility: public
     highlight: false
