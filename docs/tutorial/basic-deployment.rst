@@ -69,12 +69,12 @@ of the load balancer to the IP of our working station or Multipass VM:
         bootstrap-constraints:
         root-disk: "5G"
         features:
-        load-balancer:
+          load-balancer:
             l2-mode: "true"
             cidrs: "$VM_IP/28"
-        local-storage: {}
-        network: {}
-        ingress:
+          local-storage: {}
+          network: {}
+          ingress:
 
     host:
     snaps:
