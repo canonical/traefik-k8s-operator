@@ -88,6 +88,46 @@ def test_ca_cert_written_from_app_databag_on_pebble_ready(traefik_ctx, traefik_c
     assert written_content == ca_cert
 
 
+def test_received_ca_certs_updated_before_configure_on_pebble_ready(
+    traefik_ctx, traefik_container, traefik_charm, monkeypatch
+):
+    """Received CAs must enter system trust before Pebble starts Traefik."""
+    calls = []
+    original_update_received_ca_certs = traefik_charm._update_received_ca_certs
+    original_configure = traefik_charm._configure
+
+    def track_update_received_ca_certs(charm, event=None):
+        calls.append("update_received_ca_certs")
+        original_update_received_ca_certs(charm, event)
+
+    def track_configure(charm):
+        calls.append("configure")
+        original_configure(charm)
+
+    monkeypatch.setattr(
+        traefik_charm, "_update_received_ca_certs", track_update_received_ca_certs
+    )
+    monkeypatch.setattr(traefik_charm, "_configure", track_configure)
+
+    ca_cert = "-----BEGIN CERTIFICATE-----\nMIIBfake\n-----END CERTIFICATE-----"
+    receive_ca_cert_relation = Relation(
+        "receive-ca-cert",
+        remote_app_data={
+            "certificates": json.dumps([ca_cert]),
+            "version": "1",
+        },
+    )
+    state = State(
+        leader=True,
+        containers=[traefik_container],
+        relations=[receive_ca_cert_relation],
+    )
+
+    traefik_ctx.run(traefik_container.pebble_ready_event, state)
+
+    assert calls == ["update_received_ca_certs", "configure"]
+
+
 def test_relation_add_does_not_leave_status_in_restart(traefik_ctx, traefik_container):
     """After receive-ca-cert relation changes, unit status must not be stuck in maintenance."""
     # GIVEN a receive-ca-cert relation (no cert data needed — the charm only restarts on the event)
