@@ -77,8 +77,6 @@ of the load balancer to the IP of our working station or Multipass VM:
           ingress:
 
     host:
-    snaps:
-        aws-cli:
     EOF
 
     sudo concierge prepare -c concierge.yaml
