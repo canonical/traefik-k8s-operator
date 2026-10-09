@@ -8,6 +8,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 Each revision is versioned by the date of the revision.
 
+## 2026-10-08
+
+- Fixed Traefik retaining a stale CA trust pool when certificates from an existing
+  `receive-ca-cert` relation were restored during Pebble readiness.
+
 ## 2026-10-07
 
 - Added a scheduled `close_stale.yaml` GitHub Actions workflow to automatically mark inactive

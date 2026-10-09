@@ -1284,9 +1284,9 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             return
         # Wipe stale dynamic configs that may have survived on the storage volume.
         self.traefik.delete_dynamic_configs()
-        # push the (fresh new) configs.
-        self._configure()
         self._update_received_ca_certs()
+        # push the (fresh new) configs and restart Traefik with the updated system trust store.
+        self._configure()
         self._set_workload_version()
 
     def _clear_all_configs_and_restart_traefik(self) -> None:
