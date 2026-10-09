@@ -48,7 +48,7 @@ def traefik_container(tmp_path):
                 "traefik": {
                     "override": "replace",
                     "summary": "Traefik",
-                    "command": '/bin/sh -c "/usr/bin/traefik | tee /var/log/traefik.log"',
+                    "command": "/usr/bin/traefik",
                     "startup": "enabled",
                 },
             },
