@@ -10,6 +10,7 @@ changes:
       HTTPS backends signed by those CAs to pass certificate verification.
     urls:
       pr:
+        - https://github.com/canonical/traefik-k8s-operator/pull/794
       related_doc:
       related_issue:
         - https://github.com/canonical/traefik-k8s-operator/issues/788
