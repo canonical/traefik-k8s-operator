@@ -67,7 +67,7 @@ of the load balancer to the IP of our working station or Multipass VM:
         enable: true
         bootstrap: true
         bootstrap-constraints:
-        root-disk: "5G"
+          root-disk: "5G"
         features:
           load-balancer:
             l2-mode: "true"
@@ -75,8 +75,6 @@ of the load balancer to the IP of our working station or Multipass VM:
           local-storage: {}
           network: {}
           ingress:
-
-    host:
     EOF
 
     sudo concierge prepare -c concierge.yaml
