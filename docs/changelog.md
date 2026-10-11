@@ -8,6 +8,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 Each revision is versioned by the date of the revision.
 
+## 2026-10-07
+
+- Added a scheduled `close_stale.yaml` GitHub Actions workflow to automatically mark inactive
+  issues and pull requests as stale and close them after a grace period.
+
+## 2026-10-06
+
+- Fixed certificate signing requests being wiped from `certificates` interface relation data when a hook (e.g. `config-changed`) runs before the traefik Pebble service reports ready, such as right after a charm upgrade.
+
 ## 2026-10-05
 
 - Fixed CI breakage from dev/docs tooling version bumps: resolved new `pyright` 1.1.414
@@ -71,6 +80,7 @@ Each revision is versioned by the date of the revision.
 
 ## 2026-07-22
 
+- Updated the Grafana dashboard to the official Traefik Kubernetes dashboard using Traefik v2 metric names (e.g. `traefik_service_requests_total`).
 - Added a basic deployment tutorial.
 
 ## 2026-07-10

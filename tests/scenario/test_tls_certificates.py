@@ -547,3 +547,37 @@ class TestNonLeaderReadsCerts:
 
             assert "testhostname" not in certs
             assert isinstance(charm.unit.status, BlockedStatus)
+
+
+@patch("charm.TraefikIngressCharm._ingressed_address", PropertyMock(return_value="10.0.0.1"))
+@patch("charm.TraefikIngressCharm._static_config_changed", PropertyMock(return_value=False))
+@patch("charm.TraefikIngressCharm.version", PropertyMock(return_value="0.0.0"))
+@patch("traefik.Traefik.update_cert_configuration", MagicMock())
+def test_csr_survives_config_changed_before_pebble_ready(traefik_ctx, traefik_container):
+    """CSR in relation data must survive a config-changed that runs before pebble is ready."""
+    certs_rel = Relation(endpoint="certificates", remote_app_name="manual-tls-certificates")
+    peer_rel = PeerRelation(endpoint="peers")
+
+    state = State(
+        leader=True,
+        config={"external_hostname": "testhostname"},
+        relations=[certs_rel, peer_rel],
+        containers=[traefik_container],
+    )
+
+    # pebble ready: CSR gets published
+    with patch("traefik.Traefik.is_ready", PropertyMock(return_value=True)):
+        state_after_csr = traefik_ctx.run(certs_rel.created_event, state)
+
+    csrs = state_after_csr.get_relations("certificates")[0].local_app_data
+    csr_before = csrs.get("certificate_signing_requests")
+    assert csr_before not in (None, "[]")
+
+    # pebble not ready: CSR must still be there, unchanged
+    with patch("traefik.Traefik.is_ready", PropertyMock(return_value=False)):
+        state_after_race = traefik_ctx.run("config_changed", state_after_csr)
+
+    csrs_after_race = state_after_race.get_relations("certificates")[0].local_app_data
+    csr_after = csrs_after_race.get("certificate_signing_requests")
+    assert csr_after not in (None, "[]")
+    assert csr_after == csr_before
