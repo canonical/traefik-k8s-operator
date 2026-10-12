@@ -66,7 +66,7 @@ from cosl import JujuTopology
 from deepmerge import always_merger
 from lightkube.core.client import Client
 from lightkube.core.exceptions import ApiError
-from lightkube.models.core_v1 import ServicePort, ServiceSpec
+from lightkube.models.core_v1 import LoadBalancerIngress, ServicePort, ServiceSpec
 from lightkube.models.meta_v1 import ObjectMeta
 from lightkube.resources.core_v1 import Service
 from lightkube_extensions.batch import (
@@ -713,8 +713,11 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             resources_list.append(self._construct_lb())
         klm.reconcile(resources_list)
 
-    @functools.cached_property
-    def _get_loadbalancer_status(self) -> Optional[str]:
+    def _fetch_loadbalancer_address(self) -> Optional[LoadBalancerIngress]:
+        """Fetch the first external address of the LoadBalancer service (non-cached).
+
+        Returns None if the service cannot be read or has no external address yet.
+        """
         try:
             traefik_service = self.lightkube_client.get(
                 Service, name=self._lb_name, namespace=self.model.name
@@ -732,32 +735,26 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         if not (ingress_address := ingress_addresses[0]):  # pylint: disable=unsubscriptable-object
             return None
 
-        return ingress_address.hostname or ingress_address.ip
+        return ingress_address
 
     @functools.cached_property
-    def _traefik_loadbalancer_ip(self) -> Optional[str]:
-        return self._fetch_loadbalancer_ip()
+    def _loadbalancer_address(self) -> Optional[LoadBalancerIngress]:
+        """The first external address of the LoadBalancer service, fetched once per event."""
+        return self._fetch_loadbalancer_address()
 
-    def _fetch_loadbalancer_ip(self) -> Optional[str]:
-        """Fetch the LoadBalancer IP from the Kubernetes API (non-cached)."""
-        try:
-            traefik_service = self.lightkube_client.get(
-                Service, name=self._lb_name, namespace=self.model.name
-            )
-        except ApiError as e:
-            logger.error(f"Failed to fetch LoadBalancer {self._lb_name}: {e}")
+    @property
+    def _loadbalancer_host(self) -> Optional[str]:
+        """The LoadBalancer's hostname, falling back to its IP; None if it has neither yet."""
+        if (address := self._loadbalancer_address) is None:
             return None
+        return address.hostname or address.ip
 
-        if not (status := getattr(traefik_service, "status", None)):
+    @property
+    def _loadbalancer_ip(self) -> Optional[str]:
+        """The LoadBalancer's IP address; None if it has none yet."""
+        if (address := self._loadbalancer_address) is None:
             return None
-        if not (load_balancer_status := getattr(status, "loadBalancer", None)):
-            return None
-        if not (ingress_addresses := getattr(load_balancer_status, "ingress", None)):
-            return None
-        if not (ingress_address := ingress_addresses[0]):  # pylint: disable=unsubscriptable-object
-            return None
-
-        return ingress_address.ip
+        return address.ip
 
     @property
     def _annotations_valid(self) -> bool:
@@ -1143,7 +1140,8 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             ),
         )
         def _get_ip() -> Optional[str]:
-            return self._fetch_loadbalancer_ip()
+            address = self._fetch_loadbalancer_address()
+            return address.ip if address else None
 
         try:
             ip = _get_ip()
@@ -1468,7 +1466,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         if self._certificates_pending() and isinstance(self.unit.status, ActiveStatus):
             self.unit.status = ActiveStatus("Certificate not available yet")
 
-        if not self._get_loadbalancer_status:
+        if not self._loadbalancer_host:
             self.unit.status = WaitingStatus(
                 "Load balancer service has not yet obtained an external address."
             )
@@ -1941,7 +1939,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             "scheme": scheme,
             "host": host,
             "port": port,
-            "ip": self._traefik_loadbalancer_ip,
+            "ip": self._loadbalancer_ip,
         }
 
     @functools.cached_property
@@ -1959,7 +1957,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         if external_hostname := self.model.config.get("external_hostname"):
             return cast(str, external_hostname)
 
-        return self._get_loadbalancer_status
+        return self._loadbalancer_host
 
     @functools.cached_property
     def gateway_address(self) -> str:

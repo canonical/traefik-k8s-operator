@@ -1,0 +1,16 @@
+version_schema: 2
+changes:
+  - title: Fetched the LoadBalancer address once per event
+    author: cristiangirlea
+    type: minor
+    description: |
+      The charm read the LoadBalancer service from Kubernetes twice per event, once
+      for the hostname-or-IP used as the gateway address and once for the IP passed to
+      an upstream ingress. It now reads it once and derives both from the same address.
+    urls:
+      pr:
+        - ""
+      related_issue:
+        - https://github.com/canonical/traefik-k8s-operator/issues/596
+    visibility: internal
+    highlight: false

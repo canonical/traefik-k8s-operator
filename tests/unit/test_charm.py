@@ -29,8 +29,7 @@ def _clear_cached_properties(charm):
     """
     for attr in (
         "_loadbalancer_annotations",
-        "_get_loadbalancer_status",
-        "_traefik_loadbalancer_ip",
+        "_loadbalancer_address",
         "_traefik_external_address",
         "gateway_address",
     ):
@@ -171,11 +170,11 @@ class TestTraefikIngressCharm(unittest.TestCase):
         self.assertTrue(self.harness.charm.traefik.is_ready)
 
     @patch(
-        "charm.TraefikIngressCharm._get_loadbalancer_status",
+        "charm.TraefikIngressCharm._loadbalancer_host",
         new_callable=PropertyMock,
         return_value=None,
     )
-    def test_pebble_ready_without_gateway_address(self, mock_get_loadbalancer_status):
+    def test_pebble_ready_without_gateway_address(self, mock_loadbalancer_host):
         """Test that requirers do not get addresses until the gateway address is available."""
         self.harness.set_leader(True)
         self.harness.begin_with_initial_hooks()
@@ -204,11 +203,11 @@ class TestTraefikIngressCharm(unittest.TestCase):
         )
 
     @patch(
-        "charm.TraefikIngressCharm._get_loadbalancer_status",
+        "charm.TraefikIngressCharm._loadbalancer_host",
         new_callable=PropertyMock,
         return_value="10.0.0.1",
     )
-    def test_pebble_ready_with_joined_relations(self, mock_get_loadbalancer_status):
+    def test_pebble_ready_with_joined_relations(self, mock_loadbalancer_host):
         self.harness.set_leader(True)
         self.harness.begin_with_initial_hooks()
 
@@ -228,11 +227,11 @@ class TestTraefikIngressCharm(unittest.TestCase):
         self.assertIsInstance(self.harness.charm.unit.status, ActiveStatus)
 
     @patch(
-        "charm.TraefikIngressCharm._get_loadbalancer_status",
+        "charm.TraefikIngressCharm._loadbalancer_host",
         new_callable=PropertyMock,
         return_value="10.0.0.1",
     )
-    def test_gateway_address_change_with_joined_relations(self, mock_get_loadbalancer_status):
+    def test_gateway_address_change_with_joined_relations(self, mock_loadbalancer_host):
         self.harness.set_leader(True)
         self.harness.begin_with_initial_hooks()
 
@@ -261,12 +260,12 @@ class TestTraefikIngressCharm(unittest.TestCase):
         self.assertIsInstance(self.harness.charm.unit.status, ActiveStatus)
 
     @patch(
-        "charm.TraefikIngressCharm._get_loadbalancer_status",
+        "charm.TraefikIngressCharm._loadbalancer_host",
         new_callable=PropertyMock,
         return_value="10.0.0.1",
     )
     def test_gateway_address_becomes_unavailable_after_relation_join(
-        self, mock_get_loadbalancer_status
+        self, mock_loadbalancer_host
     ):
         self.harness.update_config({"external_hostname": "testhostname"})
         self.harness.set_leader(True)
@@ -286,7 +285,7 @@ class TestTraefikIngressCharm(unittest.TestCase):
         self.assertIsInstance(self.harness.charm.unit.status, ActiveStatus)
 
         _clear_cached_properties(self.harness.charm)
-        mock_get_loadbalancer_status.return_value = None
+        mock_loadbalancer_host.return_value = None
         self.harness.update_config(unset=["external_hostname"])
 
         self.assertEqual(
@@ -327,11 +326,11 @@ class TestTraefikIngressCharm(unittest.TestCase):
             pass
 
     @patch(
-        "charm.TraefikIngressCharm._get_loadbalancer_status",
+        "charm.TraefikIngressCharm._loadbalancer_host",
         new_callable=PropertyMock,
         return_value="10.0.0.1",
     )
-    def test_show_proxied_endpoints_action_no_relations(self, mock_get_loadbalancer_status):
+    def test_show_proxied_endpoints_action_no_relations(self, mock_loadbalancer_host):
         self.harness.begin_with_initial_hooks()
         action_event = Mock(spec=ActionEvent)
         _clear_cached_properties(self.harness.charm)
@@ -348,12 +347,12 @@ class TestTraefikIngressCharm(unittest.TestCase):
         )
 
     @patch(
-        "charm.TraefikIngressCharm._get_loadbalancer_status",
+        "charm.TraefikIngressCharm._loadbalancer_host",
         new_callable=PropertyMock,
         return_value="10.0.0.1",
     )
     def test_show_proxied_endpoints_action_only_ingress_per_app_relations(
-        self, mock_get_loadbalancer_status
+        self, mock_loadbalancer_host
     ):
         self.harness.set_leader(True)
         self.harness.update_config({"external_hostname": "testhostname"})
@@ -385,12 +384,12 @@ class TestTraefikIngressCharm(unittest.TestCase):
         )
 
     @patch(
-        "charm.TraefikIngressCharm._get_loadbalancer_status",
+        "charm.TraefikIngressCharm._loadbalancer_host",
         new_callable=PropertyMock,
         return_value="10.0.0.1",
     )
     def test_show_proxied_endpoints_action_only_ingress_per_unit_relations(
-        self, mock_get_loadbalancer_status
+        self, mock_loadbalancer_host
     ):
         self.harness.set_leader(True)
         self.harness.update_config({"external_hostname": "testhostname"})
@@ -417,11 +416,11 @@ class TestTraefikIngressCharm(unittest.TestCase):
         )
 
     @patch(
-        "charm.TraefikIngressCharm._get_loadbalancer_status",
+        "charm.TraefikIngressCharm._loadbalancer_host",
         new_callable=PropertyMock,
         return_value=None,
     )
-    def test_base_static_config(self, mock_get_loadbalancer_status):
+    def test_base_static_config(self, mock_loadbalancer_host):
         """Verify that the static config that should always be there, is in fact there."""
         self.harness.set_leader(True)
         self.harness.update_config({"external_hostname": "testhostname"})
@@ -451,11 +450,11 @@ class TestTraefikIngressCharm(unittest.TestCase):
         assert cfg["providers"]["file"]["watch"] is True
 
     @patch(
-        "charm.TraefikIngressCharm._get_loadbalancer_status",
+        "charm.TraefikIngressCharm._loadbalancer_host",
         new_callable=PropertyMock,
         return_value=None,
     )
-    def test_tcp_config(self, mock_get_loadbalancer_status):
+    def test_tcp_config(self, mock_loadbalancer_host):
         self.harness.set_leader(True)
         self.harness.update_config({"external_hostname": "testhostname"})
         self.harness.begin_with_initial_hooks()
@@ -560,11 +559,11 @@ class TestTraefikCertTransferInterface(unittest.TestCase):
 
     @patch("ops.model.Container.exec")
     @patch(
-        "charm.TraefikIngressCharm._get_loadbalancer_status",
+        "charm.TraefikIngressCharm._loadbalancer_host",
         new_callable=PropertyMock,
         return_value="10.0.0.1",
     )
-    def test_transferred_ca_certs_are_updated(self, mock_get_loadbalancer_status, patch_exec):
+    def test_transferred_ca_certs_are_updated(self, mock_loadbalancer_host, patch_exec):
         # Given container is ready, when receive-ca-cert relation joins,
         # then ca certs are updated.
         provider_app = "self-signed-certificates"
@@ -582,11 +581,11 @@ class TestTraefikCertTransferInterface(unittest.TestCase):
 
     @patch("ops.model.Container.exec")
     @patch(
-        "charm.TraefikIngressCharm._get_loadbalancer_status",
+        "charm.TraefikIngressCharm._loadbalancer_host",
         new_callable=PropertyMock,
         return_value="10.0.0.1",
     )
-    def test_transferred_ca_certs_are_not_updated(self, mock_get_loadbalancer_status, patch_exec):
+    def test_transferred_ca_certs_are_not_updated(self, mock_loadbalancer_host, patch_exec):
         # Given container is not ready, when receive-ca-cert relation joins,
         # then not attempting to update ca certs.
         provider_app = "self-signed-certificates"
@@ -603,11 +602,11 @@ class TestTraefikCertTransferInterface(unittest.TestCase):
 
 class TestConfigOptionsValidation(unittest.TestCase):
     @patch(
-        "charm.TraefikIngressCharm._get_loadbalancer_status",
+        "charm.TraefikIngressCharm._loadbalancer_host",
         new_callable=PropertyMock,
         return_value="10.0.0.1",
     )
-    def setUp(self, mock_get_loadbalancer_status):
+    def setUp(self, mock_loadbalancer_host):
         self.harness: Harness[TraefikIngressCharm] = Harness(TraefikIngressCharm)
         self.harness.set_model_name("test-model")
         self.addCleanup(self.harness.cleanup)
