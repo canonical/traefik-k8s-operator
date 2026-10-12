@@ -10,6 +10,8 @@ Each revision is versioned by the date of the revision.
 
 ## 2026-10-12
 
+- Fixed Traefik retaining a stale CA trust pool when certificates from an existing
+  `receive-ca-cert` relation were restored during Pebble readiness.
 - Renamed the misspelled `csr-subject-atttributes` config option to `csr-subject-attributes`.
 
 ## 2026-10-07
