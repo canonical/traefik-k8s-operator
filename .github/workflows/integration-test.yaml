@@ -9,7 +9,7 @@ jobs:
       actions: read
       contents: read
       packages: write
-    uses: canonical/charm-ci/.github/workflows/integration-test.yml@58ae6614a3b143d4e57eff0fd1770e97d8c30fab # v1.0.1
+    uses: canonical/charm-ci/.github/workflows/integration-test.yml@14b1cf49d48b9d5b96192d9bca2890c98b7295cf # v1.0.2
     secrets: inherit
     with:
       working-directory: .
