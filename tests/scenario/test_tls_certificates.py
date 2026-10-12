@@ -183,7 +183,7 @@ def test_custom_csr_subject_attributes_are_added_to_certificate_requests(
         leader=True,
         config={
             "external_hostname": "testhostname",
-            "csr-subject-atttributes": (
+            "csr-subject-attributes": (
                 "C=DE, ST=Hesse, L=Frankfurt, O=Canonical, OU=Engineering, "
                 "CN=csr.example.com, emailAddress=ops@example.com"
             ),
@@ -219,7 +219,7 @@ def test_external_hostname_is_used_when_custom_subject_has_no_common_name(
         leader=True,
         config={
             "external_hostname": "testhostname",
-            "csr-subject-atttributes": (
+            "csr-subject-attributes": (
                 "C=DE, ST=Hesse, L=Frankfurt, O=Canonical, OU=Engineering, "
                 "emailAddress=ops@example.com"
             ),
@@ -248,7 +248,7 @@ def test_invalid_custom_csr_subject_attributes_put_charm_in_blocked_status(
         leader=True,
         config={
             "external_hostname": "testhostname",
-            "csr-subject-atttributes": "foo=bar",
+            "csr-subject-attributes": "foo=bar",
         },
         containers=[traefik_container],
     )
@@ -256,7 +256,7 @@ def test_invalid_custom_csr_subject_attributes_put_charm_in_blocked_status(
     out = traefik_ctx.run("config_changed", state)
 
     assert out.unit_status == BlockedStatus(
-        'invalid "csr-subject-atttributes" value; see logs.'
+        'invalid "csr-subject-attributes" value; see logs.'
     )
 
 
