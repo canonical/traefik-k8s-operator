@@ -721,7 +721,11 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         except ApiError as e:
             if e.status.code != 403:
                 raise
-            logger.error("Not allowed to reconcile the LoadBalancer service: %s", e)
+            logger.error(
+                "Insufficient permissions to reconcile the LoadBalancer service, "
+                "is the charm deployed with --trust?: %s",
+                e,
+            )
             return False
         return True
 
@@ -1333,7 +1337,9 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
                     raise
                 # Without `--trust` the charm could not have created the LoadBalancer service,
                 # so there is nothing to clean up; don't block the removal.
-                logger.warning("Not allowed to delete the LoadBalancer service: %s", e)
+                logger.warning(
+                    "Insufficient permissions to delete the LoadBalancer service: %s", e
+                )
 
     def _on_update_status(self, _: UpdateStatusEvent) -> None:
         self._process_status_and_configurations()
