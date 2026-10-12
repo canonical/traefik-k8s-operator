@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 Each revision is versioned by the date of the revision.
 
+## 2026-10-12
+
+- Renamed the misspelled `csr-subject-atttributes` config option to `csr-subject-attributes`.
+
 ## 2026-10-07
 
 - Added a scheduled `close_stale.yaml` GitHub Actions workflow to automatically mark inactive

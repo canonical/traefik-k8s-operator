@@ -1,0 +1,12 @@
+version_schema: 2
+changes:
+  - title: Fixed misspelled CSR subject attributes config option
+    author: swetha1654
+    type: breaking
+    description: |
+      Renamed `csr-subject-atttributes` to `csr-subject-attributes`.
+    urls:
+      pr:
+        - https://github.com/canonical/traefik-k8s-operator/pull/794
+    visibility: public
+    highlight: false
