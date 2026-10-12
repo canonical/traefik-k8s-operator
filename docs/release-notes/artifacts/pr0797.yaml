@@ -7,6 +7,6 @@ changes:
       Renamed `csr-subject-atttributes` to `csr-subject-attributes`.
     urls:
       pr:
-        - https://github.com/canonical/traefik-k8s-operator/pull/794
+        - https://github.com/canonical/traefik-k8s-operator/pull/797
     visibility: public
     highlight: false
