@@ -145,6 +145,22 @@ def test_remove_without_trust(m_lb_manager, traefik_ctx, *_):
     m_lb_manager.return_value.delete.assert_called_once_with(ignore_missing=True)
 
 
+@patch("charm.TraefikIngressCharm._get_lb_resource_manager")
+def test_remove_other_api_errors_are_raised(m_lb_manager, traefik_ctx, *_):
+    # GIVEN deleting the LoadBalancer fails for a reason other than permissions
+    m_lb_manager.return_value.delete.side_effect = _api_error(500)
+    state = State(
+        planned_units=0,
+        containers=[Container(name="traefik", can_connect=True)],
+    )
+
+    # WHEN the last unit is removed
+    # THEN the error is not swallowed
+    with pytest.raises(Exception) as exc_info:
+        traefik_ctx.run("remove", state)
+    assert isinstance(exc_info.value.__cause__, ApiError)
+
+
 @patch("charm.TraefikIngressCharm._ingressed_address", PropertyMock(return_value="foo.bar"))
 @patch("traefik.Traefik.is_ready", PropertyMock(return_value=True))
 @patch("charm.TraefikIngressCharm._static_config_changed", PropertyMock(return_value=False))
