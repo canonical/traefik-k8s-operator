@@ -668,7 +668,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
     def _custom_csr_subject_attributes(self) -> Optional[Dict[str, str]]:
         """Parse configured CSR subject attributes."""
         configured_attributes = cast(
-            Optional[str], self.config.get("csr-subject-atttributes", None)
+            Optional[str], self.config.get("csr-subject-attributes", None)
         )
         return parse_custom_csr_subject_attributes(configured_attributes)
 
@@ -704,14 +704,30 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             ),
         )
 
-    def _reconcile_lb(self) -> None:
-        """Reconcile the LoadBalancer's state."""
+    def _reconcile_lb(self) -> bool:
+        """Reconcile the LoadBalancer's state.
+
+        Returns:
+            False if the charm is not allowed to manage the LoadBalancer, which happens when it
+            was deployed without `--trust`; True otherwise.
+        """
         klm = self._get_lb_resource_manager()
 
         resources_list = []
         if self._annotations_valid:
             resources_list.append(self._construct_lb())
-        klm.reconcile(resources_list)
+        try:
+            klm.reconcile(resources_list)
+        except ApiError as e:
+            if e.status.code != 403:
+                raise
+            logger.error(
+                "Insufficient permissions to reconcile the LoadBalancer service, "
+                "is the charm deployed with --trust?: %s",
+                e,
+            )
+            return False
+        return True
 
     @functools.cached_property
     def _get_loadbalancer_status(self) -> Optional[str]:
@@ -1284,9 +1300,9 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             return
         # Wipe stale dynamic configs that may have survived on the storage volume.
         self.traefik.delete_dynamic_configs()
-        # push the (fresh new) configs.
-        self._configure()
         self._update_received_ca_certs()
+        # push the (fresh new) configs and restart Traefik with the updated system trust store.
+        self._configure()
         self._set_workload_version()
 
     def _clear_all_configs_and_restart_traefik(self) -> None:
@@ -1314,7 +1330,16 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
     def _on_remove(self, _: EventBase) -> None:
         if self.app.planned_units() == 0:
             klm = self._get_lb_resource_manager()
-            klm.delete(ignore_missing=True)
+            try:
+                klm.delete(ignore_missing=True)
+            except ApiError as e:
+                if e.status.code != 403:
+                    raise
+                # Without `--trust` the charm could not have created the LoadBalancer service,
+                # so there is nothing to clean up; don't block the removal.
+                logger.warning(
+                    "Insufficient permissions to delete the LoadBalancer service: %s", e
+                )
 
     def _on_update_status(self, _: UpdateStatusEvent) -> None:
         self._process_status_and_configurations()
@@ -1374,9 +1399,13 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
 
             self._process_status_and_configurations()
 
-    # pylint: disable=too-many-return-statements
+    # pylint: disable=too-many-return-statements,too-many-branches
     def _process_status_and_configurations(self) -> None:
-        self._reconcile_lb()
+        if not self._reconcile_lb():
+            self.unit.status = BlockedStatus(
+                f"Insufficient permissions, try: `juju trust {self.app.name} --scope=cluster`"
+            )
+            return
         if (
             self.config.get("tls-ca", None)
             or self.config.get("tls-cert", None)
@@ -1421,7 +1450,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
 
         if self._custom_csr_subject_attributes is None:
             self.unit.status = BlockedStatus(
-                'invalid "csr-subject-atttributes" value; see logs.'
+                'invalid "csr-subject-attributes" value; see logs.'
             )
             return
 
@@ -2166,7 +2195,7 @@ def parse_custom_csr_subject_attributes(attributes: Optional[str]) -> Optional[D
     for pair in normalized_attributes.split(","):
         if not pair.strip():
             logger.error(
-                "Invalid format for 'csr-subject-atttributes'. Empty attribute found."
+                "Invalid format for 'csr-subject-attributes'. Empty attribute found."
             )
             error = True
             continue
@@ -2174,7 +2203,7 @@ def parse_custom_csr_subject_attributes(attributes: Optional[str]) -> Optional[D
         key_value = pair.split("=")
         if len(key_value) != 2:
             logger.error(
-                "Invalid format for 'csr-subject-atttributes'. "
+                "Invalid format for 'csr-subject-attributes'. "
                 "Expected format: key1=value1,key2=value2."
             )
             error = True
@@ -2184,7 +2213,7 @@ def parse_custom_csr_subject_attributes(attributes: Optional[str]) -> Optional[D
         value = key_value[1].strip()
         if not key or not value:
             logger.error(
-                "Invalid format for 'csr-subject-atttributes'. "
+                "Invalid format for 'csr-subject-attributes'. "
                 "Each attribute must have a non-empty key and value."
             )
             error = True
@@ -2203,7 +2232,7 @@ def parse_custom_csr_subject_attributes(attributes: Optional[str]) -> Optional[D
         if mapped_key in parsed_attributes:
             logger.error(
                 "Duplicate CSR subject attribute '%s' is not allowed in "
-                "'csr-subject-atttributes'.",
+                "'csr-subject-attributes'.",
                 key,
             )
             error = True

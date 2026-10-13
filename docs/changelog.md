@@ -8,6 +8,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 Each revision is versioned by the date of the revision.
 
+## 2026-10-12
+
+- Fixed Traefik retaining a stale CA trust pool when certificates from an existing
+  `receive-ca-cert` relation were restored during Pebble readiness.
+- Renamed the misspelled `csr-subject-atttributes` config option to `csr-subject-attributes`.
+
+## 2026-10-07
+
+- Added a scheduled `close_stale.yaml` GitHub Actions workflow to automatically mark inactive
+  issues and pull requests as stale and close them after a grace period.
+
 ## 2026-10-06
 
 - Fixed certificate signing requests being wiped from `certificates` interface relation data when a hook (e.g. `config-changed`) runs before the traefik Pebble service reports ready, such as right after a charm upgrade.
@@ -28,6 +39,8 @@ Each revision is versioned by the date of the revision.
 
 ## 2026-10-01
 
+- Set a blocked status that explains how to run `juju trust` when the charm is deployed without
+  `--trust`, instead of going into error state.
 - Fixed deferred ingress events repeatedly failing hooks when relation data changed before replay.
   Ingress relations are now processed once through the existing reconciliation path, which cleans
   up invalid configuration and reports status without trapping the event in a replay loop.

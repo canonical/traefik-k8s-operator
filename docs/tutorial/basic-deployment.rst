@@ -63,22 +63,18 @@ of the load balancer to the IP of our working station or Multipass VM:
     VM_IP=$(hostname -I | awk '{print $1}')
     cat << EOF > concierge.yaml
     providers:
-    k8s:
+      k8s:
         enable: true
         bootstrap: true
         bootstrap-constraints:
-        root-disk: "5G"
+          root-disk: "5G"
         features:
-        load-balancer:
+          load-balancer:
             l2-mode: "true"
             cidrs: "$VM_IP/28"
-        local-storage: {}
-        network: {}
-        ingress:
-
-    host:
-    snaps:
-        aws-cli:
+          local-storage: {}
+          network: {}
+          ingress:
     EOF
 
     sudo concierge prepare -c concierge.yaml

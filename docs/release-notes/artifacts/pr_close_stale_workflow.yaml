@@ -1,0 +1,15 @@
+# Version of the artifact schema
+version_schema: 2
+changes:
+  - title: Added workflow to automatically close stale issues and pull requests
+    author: swetha1654
+    type: minor
+    description: |
+      Added a scheduled `close_stale.yaml` GitHub Actions workflow, which marks issues and
+      pull requests inactive for 90 days as stale and closes them after a further 30 days
+      without activity.
+    urls:
+      pr:
+        - "https://github.com/canonical/traefik-k8s-operator/pull/791"
+    visibility: public
+    highlight: false

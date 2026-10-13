@@ -1,0 +1,18 @@
+version_schema: 2
+changes:
+  - title: Loaded received CA certificates before starting Traefik
+    author: f-atwi
+    type: bugfix
+    description: |
+      Fixed a startup race where Traefik could load the system CA pool before
+      certificates from an existing receive-ca-cert relation were installed.
+      Received CAs are now added to system trust before Traefik starts, allowing
+      HTTPS backends signed by those CAs to pass certificate verification.
+    urls:
+      pr:
+        - https://github.com/canonical/traefik-k8s-operator/pull/794
+      related_doc:
+      related_issue:
+        - https://github.com/canonical/traefik-k8s-operator/issues/788
+    visibility: public
+    highlight: false
