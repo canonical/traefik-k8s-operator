@@ -83,3 +83,62 @@ class TestLogForwarding:
         # THEN a loki log target is added to the Pebble config
         container_out = state_2.get_container("traefik")
         assert _log_targets(container_out)["loki/0"]["location"] == LOKI_URL
+
+    def test_relation_broken_disables_log_target(self, traefik_ctx, traefik_container):
+        """Removing the last Loki relation must disable the Pebble log target."""
+        # GIVEN the current Pebble plan already forwards the workload to Loki.
+        # The computed plan is seeded directly because scenario does not fold a
+        # layer's ``log-targets`` into ``Container.plan``; a layer-only fixture would
+        # leave ``disable_inactive_endpoints`` with nothing to reconcile.
+        container = traefik_container.replace(
+            _base_plan={
+                "services": {
+                    "traefik": {
+                        "override": "replace",
+                        "summary": "Traefik",
+                        "command": "/usr/bin/traefik",
+                        "startup": "enabled",
+                    }
+                },
+                "log-targets": {
+                    "loki/0": {
+                        "override": "replace",
+                        "type": "loki",
+                        "location": LOKI_URL,
+                        "services": ["all"],
+                    }
+                },
+            }
+        )
+
+        # WHEN the last logging relation is broken and its endpoints are gone
+        broken_rel = Relation(endpoint="logging", remote_app_name="loki")
+        state = State(
+            leader=True,
+            relations=[broken_rel],
+            containers=[container],
+        )
+        state_out = traefik_ctx.run(broken_rel.broken_event, state)
+
+        # THEN the target is disabled instead of left retrying the removed endpoint
+        assert _log_targets(state_out.get_container("traefik"))["loki/0"]["services"] == ["-all"]
+
+    def test_service_command_runs_binary_directly(self, traefik_ctx, traefik_container):
+        """The service command must run the binary directly, with no shell or log file.
+
+        Log lines used to be teed to ``/var/log/traefik.log``; Pebble forwards the
+        service's stdout either way, so the command is now the bare binary.
+        """
+        # GIVEN a started Traefik with no logging relation
+        state = State(
+            leader=True,
+            containers=[traefik_container],
+        )
+
+        # WHEN pebble-ready fires
+        state_out = traefik_ctx.run(traefik_container.pebble_ready_event, state)
+
+        # THEN the plan runs the binary directly, with no shell or pipe
+        container_out = state_out.get_container("traefik")
+        command = container_out.layers["traefik"].to_dict()["services"]["traefik"]["command"]
+        assert command == "/usr/bin/traefik"
