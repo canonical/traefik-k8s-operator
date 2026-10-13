@@ -14,11 +14,12 @@ Each revision is versioned by the date of the revision.
 
 ## 2026-10-05
 
-- Forwarded the workload's logs to related Loki endpoints over the `logging` interface using
-  Pebble log targets, so the `loki_push_api` relation now actually ships logs instead of only
-  reading the interface.
-- Removed the duplicate write of the workload's logs to `/var/log/traefik.log`. The file was
-  never rotated, grew until the disk filled, and wrote every line twice. Logs remain available
+- Switched the `logging` integration from `LokiPushApiConsumer` to `LogForwarder`, so the
+  `loki_push_api` relation now forwards the workload's logs to related Loki endpoints using
+  Pebble log targets instead of only reading the interface.
+- Removed the write of the workload's logs to `/var/log/traefik.log`. The service command used
+  to `tee` the output to that file as well as stdout, but `tee` was called without `-a`, so the
+  file was truncated on every restart instead of growing without bound. Logs remain available
   through `juju exec --unit traefik/0 -- pebble logs traefik` and `kubectl logs`.
 - Fixed CI breakage from dev/docs tooling version bumps: resolved new `pyright` 1.1.414
   findings in the `ingress`, `ingress_per_unit`, and `ingress` v2 charm libraries, silenced

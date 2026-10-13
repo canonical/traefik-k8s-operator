@@ -2,27 +2,14 @@
 # Copyright 2026 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-"""Integration test: Traefik workload logs reach Loki via the ``logging`` relation.
-
-Traefik uses ``LogForwarder`` (from the ``loki_push_api`` library), which configures a
-Pebble log-target that ships the workload's stdout to the Loki push API endpoint
-advertised over the relation.
-
-The shape of the log target that gets written to the Pebble plan is asserted in
-``tests/scenario/test_logging.py``; this test covers only what a real model can show,
-that Pebble accepted the plan and the logs arrive in Loki.
-
-Pebble log targets only forward output written *after* the target is added to the plan
-(the gatherer tails the service ring buffer), so this test restarts the workload to
-produce fresh lines rather than relying on an idle Traefik happening to log.
-"""
+"""Integration test: Traefik workload logs reach Loki via the ``logging`` relation."""
 
 import logging
 import time
 
 import httpx2
 import jubilant
-from tenacity import Retrying, retry_if_result, stop_after_delay, wait_fixed
+from tenacity import retry, stop_after_delay, wait_fixed
 
 from tests.integration.helpers import all_settled, any_error_after
 
@@ -65,33 +52,28 @@ def test_workload_logs_reach_loki(juju: jubilant.Juju, traefik_app: str):
     _assert_logs_from_application(f"http://{loki_host}:{LOKI_PORT}", traefik_app)
 
 
+@retry(
+    wait=wait_fixed(10),
+    # Log forwarding + Loki ingestion can lag the moment the model goes idle.
+    stop=stop_after_delay(60 * 3),
+    reraise=True,
+)
 def _assert_logs_from_application(loki_url: str, application: str) -> None:
     """Assert Loki has logs with a given ``juju_application`` label."""
-
-    def _has_logs() -> bool:
-        end = time.time_ns()
-        start = end - LOG_LOOKBACK_SECONDS * 1_000_000_000
-        response = httpx2.get(
-            f"{loki_url}/loki/api/v1/query_range",
-            params={
-                "query": f'{{juju_application="{application}"}}',
-                "start": str(start),
-                "end": str(end),
-                "limit": 1,
-            },
-            timeout=30,
-        )
-        response.raise_for_status()
-        return bool(response.json().get("data", {}).get("result"))
-
-    retrying = Retrying(
-        retry=retry_if_result(lambda result: result is False),
-        wait=wait_fixed(10),
-        # Log forwarding + Loki ingestion can lag the moment the model goes idle.
-        stop=stop_after_delay(60 * 3),
+    end = time.time_ns()
+    start = end - LOG_LOOKBACK_SECONDS * 1_000_000_000
+    response = httpx2.get(
+        f"{loki_url}/loki/api/v1/query_range",
+        params={
+            "query": f'{{juju_application="{application}"}}',
+            "start": str(start),
+            "end": str(end),
+            "limit": 1,
+        },
+        timeout=30,
     )
-    found = retrying(_has_logs)
-    assert found, (
+    response.raise_for_status()
+    assert response.json().get("data", {}).get("result"), (
         f"Loki has no log lines labelled juju_application={application} "
         f"in the last {LOG_LOOKBACK_SECONDS}s"
     )

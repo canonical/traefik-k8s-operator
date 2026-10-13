@@ -2,14 +2,15 @@
 version_schema: 2
 # The key holding the change(s)
 changes:
-  - title: Forwarded workload logs to Loki via Pebble log targets
+  - title: Forwarded workload logs to Loki using `LogForwarder`
     author: michaelthamm
     type: minor
     description: |
-      When related to a charm that provides the `logging` interface, Traefik now
-      configures a Pebble log target that forwards the workload's logs to the
-      related Loki push endpoints. Previously the charm read the `logging`
-      interface but did not forward any logs.
+      The charm now uses `LogForwarder` from the `loki_push_api` library
+      instead of `LokiPushApiConsumer`. When related to a charm that provides
+      the `logging` interface, it configures a Pebble log target that forwards
+      the workload's logs to the related Loki push endpoints. Previously the
+      charm read the `logging` interface but did not forward any logs.
     urls:
       pr:
         - https://github.com/canonical/traefik-k8s-operator/pull/781
@@ -17,13 +18,15 @@ changes:
       related_issue:
     visibility: public
     highlight: false
-  - title: Removed the duplicate local log file
+  - title: Removed the local log file written via `tee`
     author: michaelthamm
     type: breaking
     description: |
-      Traefik no longer writes its logs to `/var/log/traefik.log`. The file was
-      never rotated, so it grew until the disk filled, and it wrote every log
-      line twice. Logs are still available from the workload's stdout through
+      Traefik no longer writes its logs to `/var/log/traefik.log`. The service
+      command used to `tee` the workload's output to that file in addition to
+      stdout, but `tee` was called without `-a`, so it opened the file in write
+      mode and truncated it on every service restart rather than appending to
+      it. Logs remain available from the workload's stdout through
       `pebble logs traefik` and `kubectl logs`, and over the `logging`
       interface.
     urls:
