@@ -16,7 +16,7 @@ This module requires a `juju` model to be available. Refer to the [usage section
 
 | Name | Version |
 |------|---------|
-| <a name="provider_juju"></a> [juju](#provider\_juju) | >= 1.0, < 3.0 |
+| <a name="provider_juju"></a> [juju](#provider\_juju) | 2.4.1 |
 
 ## Modules
 
@@ -36,8 +36,8 @@ No modules.
 | <a name="input_base"></a> [base](#input\_base) | The operating system on which to deploy. E.g. ubuntu@26.04. Check Charmhub for per-charm base support. | `string` | `null` | no |
 | <a name="input_channel"></a> [channel](#input\_channel) | Channel that the charm is deployed from | `string` | n/a | yes |
 | <a name="input_config"></a> [config](#input\_config) | Map of the charm configuration options | `map(string)` | `{}` | no |
-| <a name="input_constraints"></a> [constraints](#input\_constraints) | String listing constraints for this application | `string` | `"arch=amd64"` | no |
-| <a name="input_expose"></a> [expose](#input\_expose) | Make the application publicly available over the network. Requires `external_hostname` to be set in `config`. | `bool` | `false` | no |
+| <a name="input_constraints"></a> [constraints](#input\_constraints) | String listing constraints for this application | `string` | `null` | no |
+| <a name="input_expose"></a> [expose](#input\_expose) | The `expose` block, as defined by the `juju_application` resource. Set `enabled = true` to make the application publicly available over the network. Requires `external_hostname` to be set in `config`. | <pre>object({<br/>    enabled   = optional(bool, false)<br/>    cidrs     = optional(string)<br/>    endpoints = optional(string)<br/>    spaces    = optional(string)<br/>  })</pre> | `{}` | no |
 | <a name="input_model_uuid"></a> [model\_uuid](#input\_model\_uuid) | ID of the model to deploy to | `string` | n/a | yes |
 | <a name="input_resources"></a> [resources](#input\_resources) | The charm's resources i.e., a resource revision number from CharmHub or a custom OCI image resource | `map(string)` | `{}` | no |
 | <a name="input_revision"></a> [revision](#input\_revision) | Revision number of the charm | `number` | `null` | no |
@@ -50,23 +50,25 @@ No modules.
 |------|-------------|
 | <a name="output_app_name"></a> [app\_name](#output\_app\_name) | Legacy output: name of the deployed application |
 | <a name="output_application"></a> [application](#output\_application) | The deployed traefik-k8s application. |
-| <a name="output_endpoints"></a> [endpoints](#output\_endpoints) | Legacy output: endpoints exposed by the application |
 | <a name="output_provides"></a> [provides](#output\_provides) | Map of the provides endpoints exposed by the charm. |
 | <a name="output_requires"></a> [requires](#output\_requires) | Map of the requires endpoints consumed by the charm. |
 <!-- END_TF_DOCS -->
 
 ### Exposing the application
 
-Set `expose = true` together with the charm's `external_hostname` to mark the application as publicly available over the network:
+Set `expose.enabled = true` together with the charm's `external_hostname` to mark the application as publicly available over the network:
 
 ```hcl
 module "traefik" {
   # ...
-  expose = true
+  expose = { enabled = true }
   config = { external_hostname = "<hostname>" }
 }
 ```
 
-Juju refuses to expose a Kubernetes (container) application unless `juju-external-hostname` is set, so the module derives `juju-external-hostname` from `external_hostname` automatically. Because of this, setting `expose = true` without `external_hostname` in `config` is rejected at plan time by a variable validation rule, instead of failing later when Juju rejects the apply. This mirrors the pattern used by the [IS COS Terraform module](https://github.com/canonical/is-terraform-modules/blob/main/juju/applications/cos/traefik.tf).
+Juju refuses to expose a Kubernetes (container) application unless `juju-external-hostname` is set, so the module derives `juju-external-hostname` from `external_hostname` automatically. Because of this, setting `expose.enabled = true` without `external_hostname` in `config` is rejected at plan time by a variable validation rule, instead of failing later when Juju rejects the apply. This mirrors the pattern used by the [IS COS Terraform module](https://github.com/canonical/is-terraform-modules/blob/main/juju/applications/cos/traefik.tf).
 
-Per-CIDR / per-endpoint / per-space restrictions are intentionally not supported: the traefik-k8s charm manages its own Kubernetes `LoadBalancer` Service and does not honour Juju's expose restrictions, so they would have no effect. To restrict who can reach Traefik, use the charm's `loadbalancer_annotations` config instead.
+The `expose.cidrs`, `expose.endpoints` and `expose.spaces` fields exist to mirror the `expose` block of the [`juju_application` resource](https://registry.terraform.io/providers/juju/juju/latest/docs/resources/application#expose-1), but have no effect for this charm: the traefik-k8s charm manages its own Kubernetes `LoadBalancer` Service and does not honour Juju's per-CIDR / per-endpoint / per-space expose restrictions. To restrict who can reach Traefik, use the charm's `loadbalancer_annotations` config instead.
+
+> [!NOTE]
+> Prior to this module's CC008 migration, `expose` was a plain `bool`. Replace `expose = true` with `expose = { enabled = true }` when upgrading.

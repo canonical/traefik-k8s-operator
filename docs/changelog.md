@@ -8,6 +8,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 Each revision is versioned by the date of the revision.
 
+## 2026-10-13
+
+- Migrated the `terraform/` module to the CC008 Charm Terraform Standard: renamed
+  `versions.tf` to `terraform.tf`, added `terraform/MAJOR_VERSION`, made `app_name`,
+  `channel` and `model_uuid` non-nullable, and reshaped the `provides`/`requires` outputs
+  into CC008's `map(object({ kind, name, endpoint, controller }))` form. Added the
+  `terraform_modules_compliance.yaml`, `terraform_modules_release.yaml` and
+  `generate_terraform_docs.yaml` reusable workflows from `canonical/operator-workflows`.
+  **Breaking:** `constraints` now defaults to `null` instead of `"arch=amd64"`, and
+  `expose` is now an object (`{ enabled, cidrs, endpoints, spaces }`, defaulting to `{}`)
+  instead of a `bool`; replace `expose = true` with `expose = { enabled = true }`.
+
 ## 2026-10-12
 
 - Fixed Traefik retaining a stale CA trust pool when certificates from an existing

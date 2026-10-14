@@ -7,7 +7,7 @@ resource "juju_application" "traefik" {
   # can be exposed. Derive it from the charm's own `external_hostname` config so callers
   # only need to set one hostname (mirrors canonical/is-terraform-modules' COS module).
   # The `expose` variable validation guarantees `external_hostname` is set when exposing.
-  config = var.expose ? merge(var.config, {
+  config = var.expose.enabled ? merge(var.config, {
     "juju-external-hostname" = var.config["external_hostname"]
   }) : var.config
   constraints        = var.constraints
@@ -25,7 +25,11 @@ resource "juju_application" "traefik" {
   }
 
   dynamic "expose" {
-    for_each = var.expose ? [1] : []
-    content {}
+    for_each = var.expose.enabled ? [1] : []
+    content {
+      cidrs     = var.expose.cidrs
+      endpoints = var.expose.endpoints
+      spaces    = var.expose.spaces
+    }
   }
 }

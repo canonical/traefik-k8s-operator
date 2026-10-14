@@ -1,32 +1,10 @@
 # Copyright 2026 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-# Legacy outputs
-
 output "app_name" {
-  value = juju_application.traefik.name
+  description = "Legacy output: name of the deployed application"
+  value       = juju_application.traefik.name
 }
-
-output "endpoints" {
-  value = {
-    # Requires
-    certificates              = "certificates",
-    charm_tracing             = "charm-tracing",
-    experimental_forward_auth = "experimental-forward-auth",
-    logging                   = "logging",
-    receive_ca_cert           = "receive-ca-cert",
-    workload_tracing          = "workload-tracing",
-    upstream-ingress          = "upstream-ingress"
-    # Provides
-    grafana_dashboard = "grafana-dashboard",
-    ingress           = "ingress",
-    ingress_per_unit  = "ingress-per-unit",
-    metrics_endpoint  = "metrics-endpoint",
-    traefik_route     = "traefik-route",
-  }
-}
-
-# CC008 compliant outputs
 
 output "application" {
   description = "The deployed traefik-k8s application."
@@ -36,23 +14,83 @@ output "application" {
 output "provides" {
   description = "Map of the provides endpoints exposed by the charm."
   value = {
-    ingress           = "ingress",
-    ingress_per_unit  = "ingress-per-unit",
-    metrics_endpoint  = "metrics-endpoint",
-    traefik_route     = "traefik-route",
-    grafana_dashboard = "grafana-dashboard",
+    grafana_dashboard = {
+      kind       = "endpoint"
+      name       = juju_application.traefik.name
+      endpoint   = "grafana-dashboard"
+      controller = null
+    }
+    ingress = {
+      kind       = "endpoint"
+      name       = juju_application.traefik.name
+      endpoint   = "ingress"
+      controller = null
+    }
+    ingress_per_unit = {
+      kind       = "endpoint"
+      name       = juju_application.traefik.name
+      endpoint   = "ingress-per-unit"
+      controller = null
+    }
+    metrics_endpoint = {
+      kind       = "endpoint"
+      name       = juju_application.traefik.name
+      endpoint   = "metrics-endpoint"
+      controller = null
+    }
+    traefik_route = {
+      kind       = "endpoint"
+      name       = juju_application.traefik.name
+      endpoint   = "traefik-route"
+      controller = null
+    }
   }
 }
 
 output "requires" {
   description = "Map of the requires endpoints consumed by the charm."
   value = {
-    certificates              = "certificates",
-    experimental_forward_auth = "experimental-forward-auth",
-    logging                   = "logging",
-    charm_tracing             = "charm-tracing",
-    workload_tracing          = "workload-tracing",
-    receive_ca_cert           = "receive-ca-cert",
-    upstream_ingress          = "upstream-ingress",
+    certificates = {
+      kind       = "endpoint"
+      name       = juju_application.traefik.name
+      endpoint   = "certificates"
+      controller = null
+    }
+    charm_tracing = {
+      kind       = "endpoint"
+      name       = juju_application.traefik.name
+      endpoint   = "charm-tracing"
+      controller = null
+    }
+    experimental_forward_auth = {
+      kind       = "endpoint"
+      name       = juju_application.traefik.name
+      endpoint   = "experimental-forward-auth"
+      controller = null
+    }
+    logging = {
+      kind       = "endpoint"
+      name       = juju_application.traefik.name
+      endpoint   = "logging"
+      controller = null
+    }
+    receive_ca_cert = {
+      kind       = "endpoint"
+      name       = juju_application.traefik.name
+      endpoint   = "receive-ca-cert"
+      controller = null
+    }
+    upstream_ingress = {
+      kind       = "endpoint"
+      name       = juju_application.traefik.name
+      endpoint   = "upstream-ingress"
+      controller = null
+    }
+    workload_tracing = {
+      kind       = "endpoint"
+      name       = juju_application.traefik.name
+      endpoint   = "workload-tracing"
+      controller = null
+    }
   }
 }

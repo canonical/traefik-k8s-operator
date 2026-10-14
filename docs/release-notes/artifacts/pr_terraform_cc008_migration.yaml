@@ -1,0 +1,24 @@
+# Version of the artifact schema
+version_schema: 2
+changes:
+  - title: Migrated the Terraform charm module to the CC008 standard
+    author: copilot
+    type: breaking
+    description: |
+      Migrated `terraform/` to the CC008 Charm Terraform Standard: renamed `versions.tf`
+      to `terraform.tf`; made `app_name`, `channel` and `model_uuid` non-nullable; added
+      the `terraform/MAJOR_VERSION` file; split the `provides`/`requires` outputs into
+      CC008's `map(object({ kind, name, endpoint, controller }))` shape; and wired up the
+      `terraform_modules_compliance.yaml`, `terraform_modules_release.yaml` and
+      `generate_terraform_docs.yaml` reusable workflows from `canonical/operator-workflows`.
+      Two input defaults changed as part of this migration: `constraints` now defaults to
+      `null` instead of `"arch=amd64"`, and `expose` is now an object
+      (`{ enabled, cidrs, endpoints, spaces }`, defaulting to `{}` i.e. not exposed) instead
+      of a plain `bool`. Callers must update `expose = true` to `expose = { enabled = true }`.
+    urls:
+      pr:
+        - https://github.com/canonical/traefik-k8s-operator/pull/798
+      related_doc:
+      related_issue:
+    visibility: public
+    highlight: true
