@@ -17,7 +17,7 @@ changes:
       of a plain `bool`. Callers must update `expose = true` to `expose = { enabled = true }`.
     urls:
       pr:
-        - ""
+        - https://github.com/canonical/traefik-k8s-operator/pull/798
       related_doc:
       related_issue:
     visibility: public
