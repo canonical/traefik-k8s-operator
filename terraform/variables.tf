@@ -5,6 +5,7 @@ variable "app_name" {
   description = "Name to give the deployed application"
   type        = string
   default     = "traefik"
+  nullable    = false
 }
 
 variable "base" {
@@ -17,6 +18,7 @@ variable "base" {
 variable "channel" {
   description = "Channel that the charm is deployed from"
   type        = string
+  nullable    = false
 }
 
 variable "config" {
@@ -31,14 +33,21 @@ variable "constraints" {
   description = "String listing constraints for this application"
   type        = string
   # FIXME: Passing an empty constraints value to the Juju Terraform provider currently
-  # causes the operation to fail due to https://github.com/juju/terraform-provider-juju/issues/344
-  default = "arch=amd64"
+  # causes the operation to fail due to https://github.com/juju/terraform-provider-juju/issues/344.
+  # CC008 requires this variable to default to null; pass `constraints = "arch=amd64"`
+  # explicitly if you hit that provider bug.
+  default = null
 }
 
 variable "expose" {
-  description = "Make the application publicly available over the network. Requires `external_hostname` to be set in `config`."
-  type        = bool
-  default     = false
+  description = "The `expose` block, as defined by the `juju_application` resource. Set `enabled = true` to make the application publicly available over the network. Requires `external_hostname` to be set in `config`."
+  type = object({
+    enabled   = optional(bool, false)
+    cidrs     = optional(string)
+    endpoints = optional(string)
+    spaces    = optional(string)
+  })
+  default = {}
 
   validation {
     # Juju refuses to expose a Kubernetes (container) application unless
@@ -46,14 +55,15 @@ variable "expose" {
     # `external_hostname` config. Fail fast at plan time instead of letting Juju
     # reject the apply with `cannot expose a container application without a
     # "juju-external-hostname" value set`.
-    condition     = !var.expose || lookup(var.config, "external_hostname", "") != ""
-    error_message = "When `expose` is true, `external_hostname` must be set in `config`."
+    condition     = !var.expose.enabled || lookup(var.config, "external_hostname", "") != ""
+    error_message = "When `expose.enabled` is true, `external_hostname` must be set in `config`."
   }
 }
 
 variable "model_uuid" {
   description = "ID of the model to deploy to"
   type        = string
+  nullable    = false
 }
 
 variable "resources" {

@@ -35,4 +35,5 @@ header:
   - 'src/prometheus_alert_rules/*.rule'
   - 'src/loki_alert_rules/*.rules'
   - 'src/prometheus_alert_rules/*.rules'
+  - '**/MAJOR_VERSION'
   comment: on-failure

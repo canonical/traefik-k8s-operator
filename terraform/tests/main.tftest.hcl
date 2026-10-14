@@ -46,7 +46,9 @@ run "expose_true_without_hostname_errors" {
     # renovate: depName="traefik-k8s"
     revision = 273
 
-    expose = true
+    expose = {
+      enabled = true
+    }
   }
 
   expect_failures = [
@@ -63,7 +65,9 @@ run "expose_true_with_hostname" {
     # renovate: depName="traefik-k8s"
     revision = 273
 
-    expose = true
+    expose = {
+      enabled = true
+    }
     config = {
       external_hostname = "traefik.test"
     }
@@ -89,7 +93,9 @@ run "expose_false_with_hostname" {
     # renovate: depName="traefik-k8s"
     revision = 273
 
-    expose = false
+    expose = {
+      enabled = false
+    }
     config = {
       external_hostname = "traefik.test"
     }
