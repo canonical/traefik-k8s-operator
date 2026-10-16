@@ -38,7 +38,7 @@ Pebble is a lightweight, API-driven process supervisor that is responsible for c
 
 Pebble `services` are configured through [layers](https://github.com/canonical/pebble#layer-specification), and the following layer forms the effective Pebble configuration, or `plan`:
 
-1. **traefik** layer: runs the Traefik binary (`/usr/bin/traefik`) and pipes output to both stdout and a log file at `/var/log/traefik.log`.
+1. **traefik** layer: runs the Traefik binary (`/usr/bin/traefik`), whose logs go to stdout. A `traefik-log-forwarding` layer adds a Pebble log target when the charm is related to a `logging` provider, which forwards those logs to the advertised endpoints.
 
 As a result, if you run `kubectl get pods` on a namespace named for the Juju model you've deployed the traefik-k8s charm into, you'll see something like the following:
 
@@ -60,7 +60,6 @@ Key paths inside the container:
 - `/etc/traefik/traefik.yaml` — the static configuration file (entrypoints, providers, API settings)
 - `/opt/traefik/juju/` — dynamic configuration directory with per-route YAML files
 - `/usr/bin/traefik` — the Traefik binary
-- `/var/log/traefik.log` — log file
 - `/usr/local/share/ca-certificates/` — trusted CA certificates
 
 ## OCI images
