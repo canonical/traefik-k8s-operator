@@ -21,7 +21,7 @@ def traefik_charm():
     with charm_tracing_disabled():
         with patch("lightkube.core.client.GenericSyncClient"):
             with patch(
-                "charm.TraefikIngressCharm._get_loadbalancer_status",
+                "charm.TraefikIngressCharm._loadbalancer_host",
                 new_callable=PropertyMock,
                 return_value=MOCK_LB_ADDRESS,
             ):

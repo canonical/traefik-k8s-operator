@@ -60,7 +60,7 @@ def mock_provider_certificate_fixture() -> MagicMock:
 class TestTlsWithExternalHostname:
 
     @patch(
-        "charm.TraefikIngressCharm._get_loadbalancer_status",
+        "charm.TraefikIngressCharm._loadbalancer_host",
         new_callable=PropertyMock,
         return_value="10.0.0.1",
     )

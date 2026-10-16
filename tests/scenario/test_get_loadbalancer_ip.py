@@ -3,6 +3,7 @@
 
 from unittest.mock import patch
 
+from lightkube.models.core_v1 import LoadBalancerIngress
 from scenario import Action, State
 
 
@@ -11,8 +12,8 @@ def test_get_loadbalancer_ip_available(traefik_ctx, traefik_container):
     state = State(leader=True, containers=[traefik_container])
 
     with patch(
-        "charm.TraefikIngressCharm._fetch_loadbalancer_ip",
-        return_value="10.0.0.1",
+        "charm.TraefikIngressCharm._fetch_loadbalancer_address",
+        return_value=LoadBalancerIngress(ip="10.0.0.1"),
     ):
         out = traefik_ctx.run_action(
             Action("get-loadbalancer-ip", params={"timeout": 300}),
@@ -28,7 +29,7 @@ def test_get_loadbalancer_ip_unavailable(traefik_ctx, traefik_container):
     state = State(leader=True, containers=[traefik_container])
 
     with patch(
-        "charm.TraefikIngressCharm._fetch_loadbalancer_ip",
+        "charm.TraefikIngressCharm._fetch_loadbalancer_address",
         return_value=None,
     ):
         out = traefik_ctx.run_action(
