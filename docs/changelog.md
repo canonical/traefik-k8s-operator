@@ -8,10 +8,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 Each revision is versioned by the date of the revision.
 
-## 2026-10-12
+## 2026-10-16
 
 - Fetched the LoadBalancer's external address from Kubernetes once per event; the
   gateway address and the IP passed to an upstream ingress now come from the same read.
+
+## 2026-10-12
+
 - Fixed Traefik retaining a stale CA trust pool when certificates from an existing
   `receive-ca-cert` relation were restored during Pebble readiness.
 - Renamed the misspelled `csr-subject-atttributes` config option to `csr-subject-attributes`.
