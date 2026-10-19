@@ -1,10 +1,6 @@
-# Copyright 2026 Canonical Ltd.
-# See LICENSE file for licensing details.
-
 import datetime
 import os
 import textwrap
-import yaml
 
 # Configuration for the Sphinx documentation builder.
 # All configuration specific to your project should be done in this file.
@@ -12,140 +8,94 @@ import yaml
 # If you're new to Sphinx and don't want any advanced or custom features,
 # just go through the items marked 'TODO'.
 #
-# Our starter pack uses the custom Canonical Sphinx extension
-# to keep all documentation based on it consistent and on brand:
+# A complete list of built-in Sphinx configuration values:
+# https://www.sphinx-doc.org/en/master/usage/configuration.html
+#
+# The Sphinx Stack uses the Canonical Sphinx theme to keep all documentation consistent
+# and on brand:
 # https://github.com/canonical/canonical-sphinx
-
 
 #######################
 # Project information #
 #######################
 
 # Project name
-
 project = "Traefik K8s charm"
+
+# Author name; used in the default copyright statement in the page footer
 author = "Canonical Ltd."
 
-# Version
+# The year in the copyright statement
+copyright = f"{datetime.date.today().year}"
 
+# Version
 version = f"{os.environ.get('READTHEDOCS_VERSION', 'local')}"
 
-# Sidebar documentation title; best kept reasonably short
-
+# Sidebar documentation title
+# To disable the title, set it to an empty string.
 html_title = project + " documentation"
 
-
-# Copyright string; shown at the bottom of the page
-#
-# Now, the starter pack uses CC-BY-SA as the license
-# and the current year as the copyright year.
-#
-# TODO: If your docs need another license, specify it instead of 'CC-BY-SA'.
-#
-# TODO: If your documentation is a part of the code repository of your project,
-#       it inherits the code license instead; specify it instead of 'CC-BY-SA'.
-#
-# NOTE: For static works, it is common to provide the first publication year.
-#       Another option is to provide both the first year of publication
-#       and the current year, especially for docs that frequently change,
-#       e.g. 2022–2023 (note the en-dash).
-#
-#       A way to check a repo's creation date is to get a classic GitHub token
-#       with 'repo' permissions; see https://github.com/settings/tokens
-#       Next, use 'curl' and 'jq' to extract the date from the API's output:
-#
-#       curl -H 'Authorization: token <TOKEN>' \
-#         -H 'Accept: application/vnd.github.v3.raw' \
-#         https://api.github.com/repos/canonical/<REPO> | jq '.created_at'
-
-copyright = "%s CC-BY-SA, %s" % (datetime.date.today().year, author)
-
-
 # Documentation website URL
-#
-# NOTE: The Open Graph Protocol (OGP) enhances page display in a social graph
-#       and is used by social media platforms; see https://ogp.me/
 
 ogp_site_url = f"https://canonical.com/juju/docs/traefik-k8s-charm/{version}/"
 
 
 # Preview name of the documentation website
-
 ogp_site_name = project
 
 # Preview image URL
-
 ogp_image = "https://assets.ubuntu.com/v1/cc828679-docs_illustration.svg"
-
 
 # Product favicon; shown in bookmarks, browser tabs, etc.
 
-# TODO: To customise the favicon, uncomment and update as needed.
 
-# html_favicon = '.sphinx/_static/favicon.png'
-
-# Dictionary of values to pass into the Sphinx context for all pages
-
+# Dictionary of values to pass into the Sphinx context for all pages:
+# https://www.sphinx-doc.org/en/master/usage/configuration.html#confval-html_context
 html_context = {
     # Product page URL; can be different from product docs URL
     "product_page": "charmhub.io/traefik-k8s",
-    # Product tag image; the orange part of your logo, shown in the page header
-    #
-    # TODO: To add a tag image, uncomment and update as needed.
-    # 'product_tag': '_static/tag.png',
+
     # Your Discourse instance URL
-    #
-    # NOTE: If set, adding ':discourse: 123' to an .rst file
-    #       will add a link to Discourse topic 123 at the bottom of the page.
     "discourse": "https://discourse.charmhub.io",
     # Your Mattermost channel URL
-    #
     "mattermost": "",
     # Your Matrix channel URL
-    #
     "matrix": "https://matrix.to/#/#charmhub-charmdev:ubuntu.com",
-    # Your documentation GitHub repository URL
-    #
-    # NOTE: If set, links for viewing the documentation source files
-    #       and creating GitHub issues are added at the bottom of each page.
+    # Your documentation GitHub repository URL If set, links for viewing the
+    # documentation source files and creating GitHub issues are added at the bottom of
+    # each page.
     "github_url": "https://github.com/canonical/traefik-k8s-operator",
     # Docs branch in the repo; used in links for viewing the source files
-    #
-    'repo_default_branch': 'main',
+    "repo_default_branch": "main",
     # Docs location in the repo; used in links for viewing the source files
-    #
     "repo_folder": "/docs/",
     # TODO: To enable or disable the Previous / Next buttons at the bottom of pages
     # Valid options: none, prev, next, both
-    # "sequential_nav": "both",
+    # "sequential_nav": "",
     # TODO: To enable listing contributors on individual pages, set to True
     "display_contributors": False,
-
-    # Required for feedback button    
-    'github_issues': 'enabled',
+    # Required for feedback button
+    "github_issues": "enabled",
+    # Passes the top-level 'author' value to the theme
+    "author": author,
+    # Documentation license information
+    "license": {
+        "name": "Apache-2.0",
+        "url": "https://github.com/canonical/traefik-k8s-operator/blob/main/LICENSE",
+    },
 }
 
-html_extra_path = []
 
-# Allow opt-in build of the OpenAPI "Hello" example so docs stay clean by default.
-if os.getenv("OPENAPI", ""):
-    tags.add("openapi")
-    html_extra_path.append("how-to/assets/openapi.yaml")
-
-# TODO: To enable the edit button on pages, uncomment and change the link to a
-# public repository on GitHub or Launchpad. Any of the following link domains
-# are accepted:
-# - https://github.com/example-org/example"
-# - https://launchpad.net/example
-# - https://git.launchpad.net/example
-#
+# Enable the edit button on pages
 html_theme_options = {
-"source_edit_link": "https://github.com/canonical/traefik-k8s-operator",
+    "source_edit_link": "https://github.com/canonical/traefik-k8s-operator",
 }
 
-# Project slug; see https://meta.discourse.org/t/what-is-category-slug/87897
 
-slug = 'juju/docs/traefik-k8s-charm'
+
+# Project slug for Read the Docs
+slug = "juju/docs/traefik-k8s-charm"
+
 
 #######################
 # Sitemap configuration: https://sphinx-sitemap.readthedocs.io/
@@ -155,113 +105,115 @@ slug = 'juju/docs/traefik-k8s-charm'
 
 html_baseurl = f"https://canonical.com/juju/docs/traefik-k8s-charm/{version}/"
 
-# sphinx-sitemap uses html_baseurl to generate the full URL for each page:
 
-sitemap_url_scheme = '{link}'
+# sphinx-sitemap uses html_baseurl to generate the full URL for each page:
+sitemap_url_scheme = "{link}"
 
 sitemap_filename = "doc-sitemap.xml"
 
 # Include `lastmod` dates in the sitemap:
-
 sitemap_show_lastmod = True
 
-# Exclude generated pages from the sitemap:
-
+# TODO: Exclude pages that aren't user-facing from the sitemap (e.g., module pages
+# generated by autodoc).
+# Pages excluded from the sitemap:
 sitemap_excludes = [
-    '404/',
-    'genindex/',
-    'search/',
+    "404/",
+    "genindex/",
+    "search/",
 ]
 
-# TODO: Add more pages to sitemap_excludes if needed. Wildcards are supported.
-#       For example, to exclude module pages generated by autodoc, add '_modules/*'.
-
-#######################
-# Template and asset locations
-#######################
+################################
+# Template and asset locations #
+################################
 
 html_static_path = ["_static"]
 templates_path = ["_templates"]
-
 
 #############
 # Redirects #
 #############
 
-# To set up redirects: https://documatt.gitlab.io/sphinx-reredirects/usage.html
-# For example: 'explanation/old-name.html': '../how-to/prettify.html',
+# Add redirects to the 'redirects.txt' file
+# https://sphinxext-rediraffe.readthedocs.io/en/latest/
 
 # To set up redirects in the Read the Docs project dashboard:
 # https://docs.readthedocs.io/en/stable/guides/redirects.html
 
-# NOTE: If undefined, set to None, or empty,
-#       the sphinx_reredirects extension will be disabled.
+rediraffe_redirects = "redirects.txt"
 
-redirects = {
-    "how-to/force-https-redirect": "/",
-    "tutorial/tls-termination-using-a-local-ca": "../how-to/tls-termination-using-a-local-ca/",
-}
+# Strips '/index.html' from destination URLs when building with 'dirhtml'
+rediraffe_dir_only = True
 
+
+############################
+# sphinx-llm configuration #
+############################
+
+# This description is included in llms.txt to provide some initial context for your
+# product docs.
+llms_txt_description = textwrap.dedent(
+    """\
+    This is the documentation for the Traefik K8s charm, a Juju Kubernetes charm for deploying and managing Traefik as an ingress controller.
+    """
+)
+
+# sphinx-markdown-builder (run by sphinx_llm.txt) has no visitor for these nodes.
+# "meta" may be removable once liran-funaro/sphinx-markdown-builder#70 / NVIDIA/sphinx-llm#172 land;
+# "mermaid" is unaddressed upstream and will still need suppressing.
+llms_txt_suppress_unknown_node_warnings = ["meta", "mermaid"]
+
+# The base URL for references built by sphinx-markdown-builder.
+if os.environ.get("READTHEDOCS"):
+    markdown_http_base = html_baseurl
 
 ###########################
 # Link checker exceptions #
 ###########################
 
 # A regex list of URLs that are ignored by 'make linkcheck'
-#
-# TODO: Remove or adjust the ACME entry after you update the contributing guide
-
 linkcheck_ignore = [
-    "https://matrix.to/#/#charmhub-charmdev:ubuntu.com",
     "http://127.0.0.1:8000",
     "https://github.com",
-    "https://matrix\\.to/.*",
+    r"https://matrix\.to/.*",
     "https://example.com",
-    "https://.*\\.sourceforge\\.(net|io)/.*",
+    # SourceForge domains often block linkcheck
+    r"https://.*\.sourceforge\.(net|io)/.*",
 ]
-
 
 # A regex list of URLs where anchors are ignored by 'make linkcheck'
-
 linkcheck_anchors_ignore_for_url = [
     r"https://github\.com/.*",
-    "https://charmhub.io/traefik-k8s/integrations"
+    "https://charmhub.io/traefik-k8s/integrations",
 ]
 
-# give linkcheck multiple tries on failure
-# linkcheck_timeout = 30
+# How long the link checker will wait for a response for each request
+linkcheck_timeout = 30
+
+# Give linkcheck multiple tries on failure
 linkcheck_retries = 3
+
 
 ########################
 # Configuration extras #
 ########################
 
-# Custom MyST syntax extensions; see
-# https://myst-parser.readthedocs.io/en/latest/syntax/optional.html
-#
-# NOTE: By default, the following MyST extensions are enabled:
-#       substitution, deflist, linkify
-
-# myst_enable_extensions = set()
-
-
-# Custom Sphinx extensions
-
-# NOTE: The canonical_sphinx extension is required for the starter pack.
-
+# Custom Sphinx extensions beyond what the template provides.
+# Re-add any project-specific extensions here during onboarding (Phase 6).
 extensions = [
-    "sphinxcontrib.mermaid",
     "canonical_sphinx",
     "notfound.extension",
     "sphinx_design",
-    "sphinx_reredirects",
     "sphinx_rerediraffe",
+    "sphinx_reredirects",
     "sphinx_tabs.tabs",
     "sphinxcontrib.jquery",
+    "sphinxcontrib.mermaid",
     "sphinxext.opengraph",
     "sphinx_config_options",
     "sphinx_contributor_listing",
     "sphinx_filtered_toctree",
+    "sphinx_llm.txt",
     "sphinx_related_links",
     "sphinx_roles",
     "sphinx_terminal",
@@ -271,118 +223,33 @@ extensions = [
     "sphinx_last_updated_by_git",
     "sphinx.ext.intersphinx",
     "sphinx_sitemap",
-    "sphinx_llm.txt",
 ]
 
-# Excludes files or directories from processing
+# Lets a plain ```mermaid fence (which GitHub also renders natively) be
+# treated as the {mermaid} directive, instead of requiring that directive
+# syntax explicitly.
+myst_fence_as_directive = {"mermaid"}
 
+# Excludes files or directories from processing
 exclude_patterns = [
-    "doc-cheat-sheet*",
     ".venv*",
 ]
 
-# Adds custom CSS files, located under 'html_static_path'
-
-html_css_files = ["https://assets.ubuntu.com/v1/d86746ef-cookie_banner.css"]
-
-# Adds custom JavaScript files, located under 'html_static_path'
+html_css_files = [
+    "https://assets.ubuntu.com/v1/d86746ef-cookie_banner.css",
+]
 
 html_js_files = [
     "https://assets.ubuntu.com/v1/287a5e8f-bundle.js",
     "js/overwrite_links.js",
 ]
 
+# A string of reStructuredText included at the beginning of every source file.
+# rst_prolog = """
+# .. |charm| replace:: MyCharm
+# """
 
-# Specifies a reST snippet to be appended to each .rst file
-
-#rst_epilog = """
-#.. include:: /reuse/links.txt
-#.. include:: /reuse/substitutions.txt
-#"""
-
-# Feedback button at the top; enabled by default
-#
-# TODO: To disable the button, uncomment this.
-
-# disable_feedback_button = True
-
-
-# Your manpage URL
-#
-# TODO: To enable manpage links, uncomment and replace {codename} with required
-#       release, preferably an LTS release (e.g. noble). Do *not* substitute
-#       {section} or {page}; these will be replaced by sphinx at build time
-#
-# NOTE: If set, adding ':manpage:' to an .rst file
-#       adds a link to the corresponding man section at the bottom of the page.
-
-# manpages_url = 'https://manpages.ubuntu.com/manpages/{codename}/en/' + \
-#     'man{section}/{page}.{section}.html'
-
-
-# Specifies a reST snippet to be prepended to each .rst file
-# This defines a :center: role that centers table cell content.
-# This defines a :h2: role that styles content for use with PDF generation.
-
-rst_prolog = """
-.. role:: center
-   :class: align-center
-.. role:: h2
-    :class: hclass2
-.. role:: woke-ignore
-    :class: woke-ignore
-.. role:: vale-ignore
-    :class: vale-ignore
-"""
-
-# Workaround for https://github.com/canonical/canonical-sphinx/issues/34
-
-if "discourse_prefix" not in html_context and "discourse" in html_context:
-    html_context["discourse_prefix"] = html_context["discourse"] + "/t/"
-
-# Workaround for substitutions.yaml
-
-if os.path.exists('./reuse/substitutions.yaml'):
-    with open('./reuse/substitutions.yaml', 'r') as fd:
-        myst_substitutions = yaml.safe_load(fd.read())
-
-# Add configuration for intersphinx mapping
-
+# Intersphinx mappings for cross-referencing external documentation.
 intersphinx_mapping = {
-    "juju": ("https://documentation.ubuntu.com/juju/3.6/", None),
-    'starter-pack': ('https://canonical-starter-pack.readthedocs-hosted.com/stable/', None),
-    'sphinxcontrib-mermaid': ('https://sphinxcontrib-mermaid-demo.readthedocs.io/en/latest', None)
+    "juju": ("https://canonical.com/juju/docs/juju-cli/3.6/", None),
 }
-
-#############
-# Redirects #
-#############
-
-# To use sphinx-rerediraffe for redirects (recommended), create a file
-# called `redirects.txt` and use `rediraffe_redirects`.
-# See https://github.com/canonical/sphinx-stack/blob/main/docs/reference/redirects.md
-# for more information about setting up redirects.
-
-# Strips '/index.html' from destination URLs when building with 'dirhtml'
-rediraffe_dir_only = True
-
-rediraffe_redirects = "redirects.txt"
-
-#############
-# LLMs.txt  #
-#############
-
-# This description is included in llms.txt to provide some initial context for your
-# product docs.
-llms_txt_description = textwrap.dedent(
-    """\
-    This is the documentation for the Traefik K8s charm, a Juju Kubernetes charm
-    for deploying and managing Traefik as an ingress controller.
-    """
-)
-
-# The llms.txt markdown builder doesn't know how to render the docutils nodes
-# emitted by sphinxext.opengraph ("meta") or sphinxcontrib.mermaid ("mermaid"),
-# so without this it warns (and fails the build with --fail-on-warning) while
-# still correctly dropping the unsupported subtree from the generated markdown.
-llms_txt_suppress_unknown_node_warnings = ["meta", "mermaid"]
