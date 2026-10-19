@@ -1,5 +1,7 @@
 # Redirects file for sphinx-rerediraffe
 # Format: "old-source.md" "new-target.md"
 "how-to/force-https-redirect.md" "index.md"
+"how-to/force-https-redirect.html" "index.html"
 "reference/ingress-integration.md" "how-to/integrate.md"
+"reference/ingress-integration.html" "how-to/integrate/index.html"
 "tutorial/tls-termination-using-a-local-ca.md" "how-to/tls-termination-using-a-local-ca.md"
