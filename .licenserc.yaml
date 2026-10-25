@@ -28,6 +28,7 @@ header:
   - '**/*.md.j2'
   - '**/*.rst.j2'
   - 'docs/**'
+  - '.copier-answers.yml'
   - 'uv.lock'
   - 'lib/**'
   - 'src/grafana_dashboards/*.tmpl'

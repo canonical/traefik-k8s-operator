@@ -1,0 +1,12 @@
+version_schema: 2
+changes:
+  - title: Moved the documentation tooling to centrally managed Copier template
+    author: swetha1654
+    type: minor
+    description: |
+      Moved the documentation tooling to the centrally managed `platform-engineering-documentation-files` Copier template.
+    urls:
+      pr:
+        - https://github.com/canonical/traefik-k8s-operator/pull/802
+    visibility: internal
+    highlight: false

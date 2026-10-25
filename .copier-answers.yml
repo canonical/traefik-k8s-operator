@@ -1,0 +1,26 @@
+# Changes here will be overwritten by Copier; NEVER EDIT MANUALLY
+_commit: d2d1381
+_src_path: gh:canonical/platform-engineering-documentation-files.git
+author: Canonical Ltd.
+discourse: https://discourse.charmhub.io
+display_contributors: false
+docs_host: canonical.com
+github_url: https://github.com/canonical/traefik-k8s-operator
+html_favicon: ''
+license_name: Apache-2.0
+license_url: https://github.com/canonical/traefik-k8s-operator/blob/main/LICENSE
+linkcheck_timeout: 30
+llms_txt_description: This is the documentation for the Traefik K8s charm, a Juju
+    Kubernetes charm for deploying and managing Traefik as an ingress controller.
+matrix: https://matrix.to/#/#charmhub-charmdev:ubuntu.com
+mattermost: ''
+new_domain: canonical.com/juju/docs/traefik-k8s-charm
+ogp_image: https://assets.ubuntu.com/v1/cc828679-docs_illustration.svg
+old_domain: canonical-traefik-k8s-charm.readthedocs-hosted.com
+product_page: charmhub.io/traefik-k8s
+product_tag: ''
+project: Traefik K8s charm
+repo_default_branch: main
+repo_folder: /docs/
+rtd_slug: juju/docs/traefik-k8s-charm
+source_edit_link: https://github.com/canonical/traefik-k8s-operator
