@@ -8,6 +8,7 @@
 import contextlib
 import enum
 import functools
+import hashlib
 import itertools
 import json
 import logging
@@ -544,12 +545,7 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             custom_subject_attributes = {}
 
         csrs: List[CertificateRequestAttributes] = []
-        for addr in addrs:
-            # Additional validation - addr should not be None or empty
-            if not addr:
-                logger.warning("Skipping empty or None address when creating certificate requests")
-                continue
-
+        for addr in sorted(a for a in addrs if a):
             sans_dns: List[str] = []  # Needed for pyright
             sans_ip: List[str] = []  # Needed for pyright
             if is_hostname(addr):
@@ -1346,25 +1342,26 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
         self._set_workload_version()
 
     @property
-    def _config_hash(self) -> int:
-        """A hash of the config of this application.
+    def _config_hash(self) -> str:
+        """A deterministic digest of the config of this application.
 
         Only include here the config options that, should they change, should trigger a
         recalculation of the traefik config files.
         The main goal of this logic is to avoid recalculating status and configs on each event,
         since it can be quite expensive.
         """
-        return hash(
-            (
+        payload = json.dumps(
+            [
                 self._traefik_external_address,
                 self.config["routing_mode"],
                 self._is_forward_auth_enabled,
                 self._basic_auth_user,
                 self._is_tls_enabled(),
-                # The dict returned by _get_certs is not hashable so use a json str instead.
-                json.dumps(self._get_certs()),
-            )
+                self._get_certs(),
+            ],
+            sort_keys=True,
         )
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
     def _on_change(self, _: EventBase) -> None:
         """General event handler for any change to config."""
