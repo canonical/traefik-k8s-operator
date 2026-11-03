@@ -1,0 +1,16 @@
+name: Sync with platform-engineering-documentation-files
+
+on:
+  schedule:
+    - cron: "0 6 * * 1" # Every Monday at 6 AM UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    uses: canonical/platform-engineering-documentation-files/.github/workflows/copier-update.yml@main
+    secrets:
+      token: ${{ secrets.GITHUB_TOKEN }}
