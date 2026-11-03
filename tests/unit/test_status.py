@@ -40,7 +40,7 @@ def test_start_traefik_no_hostname(traefik_ctx, *_):
     )
 
 
-@patch("charm.TraefikIngressCharm._get_loadbalancer_status", PropertyMock(return_value=None))
+@patch("charm.TraefikIngressCharm._loadbalancer_host", PropertyMock(return_value=None))
 @patch("traefik.Traefik.is_ready", PropertyMock(return_value=True))
 @patch("charm.TraefikIngressCharm._static_config_changed", PropertyMock(return_value=False))
 def test_start_loadbalancer_pending(traefik_ctx, *_):

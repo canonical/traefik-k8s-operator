@@ -11,7 +11,7 @@ from charm import TraefikIngressCharm
 
 
 @patch(
-    "charm.TraefikIngressCharm._get_loadbalancer_status", PropertyMock(return_value="loadbalancer")
+    "charm.TraefikIngressCharm._loadbalancer_host", PropertyMock(return_value="loadbalancer")
 )
 @patch("lightkube.core.client.GenericSyncClient")
 @patch("charm.TraefikIngressCharm._static_config_changed", PropertyMock(return_value=False))

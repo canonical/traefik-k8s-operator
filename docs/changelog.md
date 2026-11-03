@@ -8,6 +8,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 Each revision is versioned by the date of the revision.
 
+## 2026-10-25
+
+- Fetched the LoadBalancer's external address from Kubernetes once per event; the
+  gateway address and the IP passed to an upstream ingress now come from the same read.
+
 ## 2026-10-19
 
 - Moved the documentation tooling to the centrally managed `platform-engineering-documentation-files` Copier template and added a scheduled workflow that keeps it in sync. There is no change to the charm.
