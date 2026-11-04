@@ -1,0 +1,16 @@
+# Version of the artifact schema
+version_schema: 2
+
+# The key holding the change(s)
+changes:
+- title: Prevented unnecessary databag updates and config recalculations
+  author: alanveloper-epam
+  type: bugfix
+  description: Sorted CSR addresses deterministically and replaced the non-deterministic builtin hash() in _config_hash with a SHA-256 digest to prevent spurious databag, secret, and configuration updates across hook invocations.
+  urls:
+    pr:
+      - ""
+    related_doc:
+    related_issue: https://github.com/canonical/traefik-k8s-operator/issues/738
+  visibility: public
+  highlight: false
