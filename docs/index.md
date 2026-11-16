@@ -44,7 +44,7 @@ Ingress is a purely in-model concern. Traefik will happily cross-model relate wi
 * - **Design**
   - {ref}`Charm architecture <reference_charm_architecture>` | {ref}`How TLS works in the Traefik charm <explanation_tls>`
 * - **Security**
-  - {ref}`Overview <explanation_security>` | {ref}`Enable BasicAuth <how_to_enable_basicauth>` | {ref}`Cryptographic overview <reference_cryptography>`
+  - {ref}`Overview <explanation_security>` | {ref}`Enable BasicAuth <how_to_enable_basicauth>`
 ```
 
 ## How this documentation is organized
@@ -53,7 +53,7 @@ This documentation uses the [Diátaxis documentation structure](https://diataxis
 
 - The {ref}`Tutorial <tutorial_index>` takes you step-by-step through a basic Traefik deployment and shows how to expose a workload through ingress.
 - {ref}`How-to guides <how_to_index>` cover practical tasks for integrating applications, securing ingress, troubleshooting issues, upgrading, and contributing to the project.
-- {ref}`Reference <reference_index>` provides technical details on charm architecture, ingress-related relations, and cryptographic considerations.
+- {ref}`Reference <reference_index>` provides technical details on charm architecture, and ingress-related relations.
 - {ref}`Explanation <explanation_index>` gives background and context for security-related topics.
 - {ref}`Release notes <release_notes_index>` track stable charm revisions, including new features, bug fixes, and compatibility notes.
 

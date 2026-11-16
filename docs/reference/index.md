@@ -13,7 +13,6 @@ The pages in this section contain technical information for topics related to th
 ```{toctree}
 :maxdepth: 1
 charm-architecture
-cryptography
 ingress-libraries
 ../changelog.md
 ```

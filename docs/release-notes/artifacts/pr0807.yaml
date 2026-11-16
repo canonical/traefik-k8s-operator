@@ -1,16 +1,18 @@
 version_schema: 2
 changes:
-  - title: Replaced the COS-Lite cryptographic documentation with a Traefik-specific page
+  - title: Removed the COS-Lite cryptographic documentation page
     author: swetha1654
     type: minor
     description: |
-      Replaced the "Cryptographic documentation for COS-Lite charms" reference page with a
-      Traefik-specific cryptographic overview. The new page documents the TLS versions, cipher
-      suites, and curves enforced by the charm, how private keys are generated and stored,
-      how downstream certificates are verified, and the hashing algorithms supported for BasicAuth.
+      Removed the "Cryptographic documentation for COS-Lite charms" reference page, which was
+      not specific to the Traefik charm. The Traefik-specific cryptographic details are now part
+      of the existing documentation: the TLS explanation page covers the enforced TLS versions,
+      cipher suites, and curves, how private keys are generated and stored, and how downstream
+      certificates are verified; the security overview and BasicAuth how-to guide cover the
+      recommended BasicAuth hashing algorithm. The old URL redirects to the TLS explanation page.
     urls:
       pr:
         - https://github.com/canonical/traefik-k8s-operator/pull/807
-      related_doc: https://documentation.ubuntu.com/traefik-k8s-charm/latest/reference/cryptography/
+      related_doc: https://documentation.ubuntu.com/traefik-k8s-charm/latest/explanation/tls/
     visibility: public
     highlight: false

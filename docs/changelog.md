@@ -10,9 +10,10 @@ Each revision is versioned by the date of the revision.
 
 ## 2026-11-16
 
-- Replaced the COS-Lite cryptographic documentation page with a Traefik-specific cryptographic
-  overview covering TLS settings, private key generation and storage, downstream certificate
-  verification, and BasicAuth password hashing.
+- Removed the COS-Lite cryptographic documentation page. The Traefik-specific details (TLS
+  settings, private key generation and storage, downstream certificate verification, and
+  BasicAuth hashing recommendations) are now documented in the TLS and security explanation
+  pages and the BasicAuth how-to guide.
 
 ## 2026-10-19
 

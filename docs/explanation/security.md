@@ -38,3 +38,5 @@ The Traefik charm supports [BasicAuth](https://doc.traefik.io/traefik/reference/
 #### Best practices
 
 - Consider {ref}`enabling BasicAuth <how_to_enable_basicauth>` if you want access to the backend workloads to be authenticated. Alternatively, [ForwardAuth](https://doc.traefik.io/traefik/reference/routing-configuration/http/middlewares/forwardauth/) can also be enabled as an experimental feature.
+- Hash BasicAuth passwords with bcrypt. Traefik also accepts MD5 and SHA1 hashes, but these are considered weak.
+- Only enable BasicAuth together with upstream TLS. BasicAuth credentials are sent with every request and are readable by anyone who can intercept unencrypted traffic.

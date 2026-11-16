@@ -5,5 +5,5 @@
 "reference/ingress-integration.md" "how-to/integrate.md"
 "reference/ingress-integration.html" "how-to/integrate/index.html"
 "tutorial/tls-termination-using-a-local-ca.md" "how-to/tls-termination-using-a-local-ca.md"
-"reference/cryptographic-documentation-for-cos-lite-charms.md" "reference/cryptography.md"
-"reference/cryptographic-documentation-for-cos-lite-charms.html" "reference/cryptography/index.html"
+"reference/cryptographic-documentation-for-cos-lite-charms.md" "explanation/tls.md"
+"reference/cryptographic-documentation-for-cos-lite-charms.html" "explanation/tls/index.html"
