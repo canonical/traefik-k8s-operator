@@ -1,0 +1,16 @@
+version_schema: 2
+changes:
+  - title: Replaced the COS-Lite cryptographic documentation with a Traefik-specific page
+    author: swetha1654
+    type: minor
+    description: |
+      Replaced the "Cryptographic documentation for COS-Lite charms" reference page with a
+      Traefik-specific cryptographic overview. The new page documents the TLS versions, cipher
+      suites, and curves enforced by the charm, how private keys are generated and stored,
+      how downstream certificates are verified, and the hashing algorithms supported for BasicAuth.
+    urls:
+      pr:
+        - ""
+      related_doc: https://documentation.ubuntu.com/traefik-k8s-charm/latest/reference/cryptography/
+    visibility: public
+    highlight: false

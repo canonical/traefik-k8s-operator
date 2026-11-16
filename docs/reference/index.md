@@ -13,7 +13,7 @@ The pages in this section contain technical information for topics related to th
 ```{toctree}
 :maxdepth: 1
 charm-architecture
-cryptographic-documentation-for-cos-lite-charms
+cryptography
 ingress-libraries
 ../changelog.md
 ```

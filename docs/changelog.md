@@ -8,6 +8,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 Each revision is versioned by the date of the revision.
 
+## 2026-11-16
+
+- Replaced the COS-Lite cryptographic documentation page with a Traefik-specific cryptographic
+  overview covering TLS settings, private key generation and storage, downstream certificate
+  verification, and BasicAuth password hashing.
+
 ## 2026-10-19
 
 - Moved the documentation tooling to the centrally managed `platform-engineering-documentation-files` Copier template and added a scheduled workflow that keeps it in sync. There is no change to the charm.
