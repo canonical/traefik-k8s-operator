@@ -10,7 +10,7 @@ changes:
       how downstream certificates are verified, and the hashing algorithms supported for BasicAuth.
     urls:
       pr:
-        - ""
+        - https://github.com/canonical/traefik-k8s-operator/pull/807
       related_doc: https://documentation.ubuntu.com/traefik-k8s-charm/latest/reference/cryptography/
     visibility: public
     highlight: false
