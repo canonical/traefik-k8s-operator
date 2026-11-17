@@ -68,7 +68,7 @@ key as-is and doesn't check its algorithm or size.
 
 ```{warning}
 Juju configuration values aren't stored as secrets. Any user with access to the model's
-configuration can read the private key passed through `tls-key`. Prefer the `certificates`
+configuration can read the private key passed through `tls-key`. Use the `certificates`
 relation where possible.
 ```
 
