@@ -11,9 +11,9 @@ charms:
       type: oci-image
   platforms:
   - arch: amd64
-    # ubuntu-22.04 runners still use kernel 6.8. Kernel 7.0 (ubuntu-24.04/26.04 runners)
-    # rejects the AppArmor profile snapd loads in the ubuntu@20.04 build container.
-    runner: [ubuntu-22.04]
+    # Kernel 7.0 (GitHub ubuntu-24.04/26.04 runners) rejects the AppArmor profile snapd loads
+    # in the ubuntu@20.04 build container. This self-hosted noble runner uses kernel 6.8.
+    runner: [self-hosted-linux-amd64-noble-large]
   - arch: arm64
     runner: [ubuntu-24.04-arm]
   - arch: s390x
