@@ -39,9 +39,9 @@ certificate available to them in order to validate the certificate Traefik prese
 
 ### TLS settings
 
-The charm configures Traefik with the following TLS settings. They are based on
-[Mozilla's intermediate compatibility profile](https://wiki.mozilla.org/Security/Server_Side_TLS#Intermediate_compatibility_.28recommended.29)
-and aren't user-configurable:
+The charm configures Traefik with the following TLS settings. They are based on the
+[intermediate compatibility profile](https://docs.tlsref.org/server-side-tls.html#intermediate-compatibility)
+of the Server Side TLS guidelines, originally published by Mozilla, and aren't user-configurable:
 
 - Minimum TLS version: TLS 1.2. TLS 1.3 is also supported.
 - Elliptic curve preferences: `X25519`, `CurveP256`, `CurveP384`.
