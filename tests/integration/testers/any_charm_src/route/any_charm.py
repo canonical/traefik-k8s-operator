@@ -13,6 +13,8 @@ import subprocess
 import sys
 import time
 
+import logging
+
 import ops
 from any_charm_base import AnyCharmBase
 from charmlibs import apt
@@ -24,6 +26,9 @@ from charms.traefik_k8s.v0.traefik_route import TraefikRouteRequirer  # noqa: E4
 
 _UDP_PORT = 9999
 _SERVICE_NAME = "traefik-route-udp"
+_DEBUG_LOG = "/tmp/traefik-route-udp.log"  # TEMPORARY: debug for socat startup failures
+
+logger = logging.getLogger(__name__)
 
 
 class AnyCharm(AnyCharmBase):
@@ -62,6 +67,8 @@ class AnyCharm(AnyCharmBase):
                     "--name",
                     _SERVICE_NAME,
                     "--respawn",
+                    f"--output={_DEBUG_LOG}",
+                    f"--dbglog={_DEBUG_LOG}",
                     "--",
                     "/usr/bin/socat",
                     "-T",
@@ -95,7 +102,27 @@ class AnyCharm(AnyCharmBase):
                     return
             except OSError:
                 time.sleep(0.5)
+        AnyCharm._log_udp_echo_debug()
         raise RuntimeError("UDP echo service did not become ready")
+
+    @staticmethod
+    def _log_udp_echo_debug():
+        """TEMPORARY: log why the UDP echo service didn't answer."""
+        for cmd in (
+            ["id"],
+            ["ls", "-l", "/usr/bin/daemon", "/usr/bin/socat"],
+            ["daemon", "--name", _SERVICE_NAME, "--running", "--verbose"],
+            ["ps", "-eo", "pid,user,args"],
+            ["cat", "/proc/net/udp"],
+            ["cat", _DEBUG_LOG],
+            ["timeout", "3", "/usr/bin/socat", "-d", "-d", "-T", "1",
+             f"UDP4-RECVFROM:{_UDP_PORT},reuseaddr", "PIPE"],
+        ):
+            proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
+            logger.error(
+                "udp-echo debug: %s -> rc=%s\nstdout:\n%s\nstderr:\n%s",
+                " ".join(cmd), proc.returncode, proc.stdout, proc.stderr,
+            )
 
     def _sync_config(self, _event=None):
         if not self.unit.is_leader() or not self.traefik_route.is_ready():
