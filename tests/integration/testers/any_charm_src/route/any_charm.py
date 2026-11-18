@@ -8,6 +8,7 @@ on port 9999 so that the static entrypoint test can reach it.
 """
 
 import pathlib
+import resource
 import socket
 import subprocess
 import sys
@@ -56,8 +57,17 @@ class AnyCharm(AnyCharmBase):
     def _on_install(self, _event):
         self._ensure_udp_echo_tools_installed()
 
+    @staticmethod
+    def _lower_nofile_limit():
+        # `daemon` closes every possible fd before starting the service. Under a huge
+        # RLIMIT_NOFILE (~1e9 in some k8s pods) that takes minutes, so cap it first.
+        resource.setrlimit(resource.RLIMIT_NOFILE, (65536, 65536))
+
     def _on_start(self, _event):
         self._ensure_udp_echo_tools_installed()
+        logger.info(  # TEMPORARY: debug
+            "udp-echo debug: RLIMIT_NOFILE=%s", resource.getrlimit(resource.RLIMIT_NOFILE)
+        )
         if subprocess.run(
             ["daemon", "--name", _SERVICE_NAME, "--running"], check=False
         ).returncode:
@@ -77,6 +87,7 @@ class AnyCharm(AnyCharmBase):
                     "PIPE",
                 ],
                 check=True,
+                preexec_fn=self._lower_nofile_limit,
             )
         self._wait_for_udp_echo()
         self._sync_config()
