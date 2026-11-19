@@ -24,8 +24,8 @@ class TestUpstreamIngressStrip(unittest.TestCase):
         self.addCleanup(patcher.stop)
 
     @patch("charm.TraefikIngressCharm._loadbalancer_host", new_callable=PropertyMock)
-    def test_ingressed_address_strips_slash(self, mock_get_lb_status):
-        mock_get_lb_status.return_value = "1.2.3.4"
+    def test_ingressed_address_strips_slash(self, mock_loadbalancer_host):
+        mock_loadbalancer_host.return_value = "1.2.3.4"
 
         self.harness.set_leader(True)
         self.harness.begin()
@@ -46,8 +46,8 @@ class TestUpstreamIngressStrip(unittest.TestCase):
                 self.assertEqual(charm._ingressed_address, "upstream.example.com/some/path")
 
     @patch("charm.TraefikIngressCharm._loadbalancer_host", new_callable=PropertyMock)
-    def test_ingressed_address_base_url_strips_slash(self, mock_get_lb_status):
-        mock_get_lb_status.return_value = "1.2.3.4"
+    def test_ingressed_address_base_url_strips_slash(self, mock_loadbalancer_host):
+        mock_loadbalancer_host.return_value = "1.2.3.4"
 
         self.harness.set_leader(True)
         self.harness.begin()

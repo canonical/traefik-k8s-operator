@@ -729,10 +729,11 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             return False
         return True
 
-    def _fetch_loadbalancer_address(self) -> Optional[LoadBalancerIngress]:
-        """Fetch the first external address of the LoadBalancer service (non-cached).
+    @functools.cached_property
+    def _loadbalancer_address(self) -> Optional[LoadBalancerIngress]:
+        """The first external address of the LoadBalancer service, fetched once per event.
 
-        Returns None if the service cannot be read or has no external address yet.
+        None if the service cannot be read or has no external address yet.
         """
         try:
             traefik_service = self.lightkube_client.get(
@@ -752,11 +753,6 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             return None
 
         return ingress_address
-
-    @functools.cached_property
-    def _loadbalancer_address(self) -> Optional[LoadBalancerIngress]:
-        """The first external address of the LoadBalancer service, fetched once per event."""
-        return self._fetch_loadbalancer_address()
 
     @property
     def _loadbalancer_host(self) -> Optional[str]:
@@ -1156,8 +1152,9 @@ class TraefikIngressCharm(CharmBase):  # pylint: disable=too-many-instance-attri
             ),
         )
         def _get_ip() -> Optional[str]:
-            address = self._fetch_loadbalancer_address()
-            return address.ip if address else None
+            # Each attempt reads the Service again rather than the value cached for this event.
+            self.__dict__.pop("_loadbalancer_address", None)
+            return self._loadbalancer_ip
 
         try:
             ip = _get_ip()

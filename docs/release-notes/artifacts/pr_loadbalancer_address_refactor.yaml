@@ -9,7 +9,7 @@ changes:
       an upstream ingress. It now reads it once and derives both from the same address.
     urls:
       pr:
-        - ""
+        - https://github.com/canonical/traefik-k8s-operator/pull/800
       related_issue:
         - https://github.com/canonical/traefik-k8s-operator/issues/596
     visibility: internal
