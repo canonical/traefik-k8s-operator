@@ -12,7 +12,8 @@ In order to enable BasicAuth in `traefik-k8s` you will need to:
 
 First you will need to  generate a user string with the format
 `<username>:<hashed-password>`,
-where the password must be hashed with either MD5, SHA1, or bcrypt. 
+where the password must be hashed with either MD5, SHA1, or bcrypt. We recommend bcrypt, as MD5
+and SHA1 are considered weak.
 
 We recommend using `htpasswd` to generate the user string:
 
@@ -30,6 +31,11 @@ admin:$2y$05$ChsVYFWoLO7YbNnRZSS2IeLcKzL1jgfdOdCfyhtz4tcPOvmTkQYPy
 
 ```{tip}
 Use a strong password (at least 15 characters).
+```
+
+```{warning}
+BasicAuth credentials are sent with every request. Enable upstream TLS (see
+{ref}`explanation_tls`) so that they aren't sent in plain text.
 ```
 
 ## Pass the user string to `traefik-k8s`

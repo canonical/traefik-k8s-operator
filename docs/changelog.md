@@ -8,10 +8,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 Each revision is versioned by the date of the revision.
 
-## 2026-10-25
+## 2026-11-19
 
 - Fetched the LoadBalancer's external address from Kubernetes once per event; the
   gateway address and the IP passed to an upstream ingress now come from the same read.
+
+## 2026-11-16
+
+- Removed the COS-Lite cryptographic documentation page. The Traefik-specific details (TLS
+  settings, private key generation and storage, downstream certificate verification, and
+  BasicAuth hashing recommendations) are now documented in the TLS and security explanation
+  pages and the BasicAuth how-to guide.
 
 ## 2026-10-19
 
