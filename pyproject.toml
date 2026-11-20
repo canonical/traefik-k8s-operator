@@ -34,7 +34,7 @@ dev = [
     # Markered because requires-python spans the ubuntu@20.04 (py3.8) charm platform, which
     # never installs the dev extra but is still covered by uv's universal resolution.
     "pytest==8.4.2 ; python_version >= '3.9'",
-    "pytest-asyncio==0.26.0 ; python_version >= '3.9'",
+    "pytest-asyncio==1.5.0; python_version >= '3.9'",
     "jubilant",
     "pytest-jubilant",
     "sh",
