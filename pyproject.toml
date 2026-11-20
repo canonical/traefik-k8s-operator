@@ -21,7 +21,7 @@ dependencies = [
     "opentelemetry-api>=1.33",
     "pydantic>=2.10",
     "cosl",
-    "tenacity==8.5.0",
+    "tenacity==9.2.1",
 ]
 
 [project.optional-dependencies]
