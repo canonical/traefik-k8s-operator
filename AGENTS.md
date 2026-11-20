@@ -62,7 +62,7 @@ charmcraft pack                                              # build the .charm 
       assert state_out.unit_status.name == "active"
   ```
 - Shared fixtures (`tests/scenario/conftest.py`, `tests/unit/conftest.py`): `traefik_charm` (patches
-  lightkube + `_get_loadbalancer_status`), `traefik_ctx`, `traefik_container` (mounts at `/opt/` and
+  lightkube + `_loadbalancer_host`), `traefik_ctx`, `traefik_container` (mounts at `/opt/` and
   `/etc/traefik/`), `mock_lightkube_client` (autouse), `_mock_flush_dynamic_configs` (autouse).
 - Harness gotcha: `cached_property` on the charm is per-event in production but persists across
   events in `Harness`. Call `_clear_cached_properties(harness.charm)` after config changes.
