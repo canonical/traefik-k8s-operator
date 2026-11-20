@@ -547,6 +547,39 @@ class TestTraefikIngressCharm(unittest.TestCase):
 
         assert mocked_handle.called
 
+    def test_cert_requests_are_sorted_deterministically(self):
+        self.harness.update_config({"external_hostname": "testhostname"})
+        self.harness.set_leader(True)
+        self.harness.begin_with_initial_hooks()
+
+        with patch.object(
+            self.harness.charm,
+            "_get_proxied_endpoints",
+            return_value={
+                "z-app": {"url": "https://zeta.example.com/path"},
+                "a-app": {"url": "https://alpha.example.com/path"},
+                "m-app": {"url": "https://mu.example.com/path"},
+            },
+        ):
+            csrs = self.harness.charm._get_cert_requests()
+
+        self.assertEqual(
+            [csr.common_name for csr in csrs],
+            ["alpha.example.com", "mu.example.com", "zeta.example.com"],
+        )
+
+    def test_config_hash_is_deterministic_sha256(self):
+        self.harness.update_config({"external_hostname": "testhostname"})
+        self.harness.set_leader(True)
+        self.harness.begin_with_initial_hooks()
+
+        digest_1 = self.harness.charm._config_hash
+        digest_2 = self.harness.charm._config_hash
+
+        self.assertIsInstance(digest_1, str)
+        self.assertEqual(len(digest_1), 64)
+        self.assertEqual(digest_1, digest_2)
+
 
 class TestTraefikCertTransferInterface(unittest.TestCase):
     def setUp(self):
