@@ -12,6 +12,9 @@ Each revision is versioned by the date of the revision.
 
 - Added a maintainer guide for upgrading the Traefik rock, testing its dev image,
   and promoting it through OCI Factory.
+- Refactored the "Gateway Address Unavailable" and reachability troubleshooting guides: added an
+  Overview, remediation steps and support links, and moved developer guidance to the integration
+  guide.
 
 ## 2026-11-19
 

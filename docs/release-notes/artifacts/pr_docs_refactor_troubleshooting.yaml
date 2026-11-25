@@ -1,0 +1,19 @@
+# Version of the artifact schema
+version_schema: 2
+changes:
+  - title: Refactored the troubleshooting guides
+    author: seb4stien
+    type: minor
+    description: |
+      Reworked the "Gateway Address Unavailable" and "reachability" troubleshooting guides.
+      Replaced the Requirements and Checklist sections with an Overview, added fixes and
+      support links, and removed developer-specific content. Charm-developer guidance on making
+      a workload reachable now lives in "How to integrate your charm to Traefik".
+    urls:
+      pr:
+        - ""
+      related_doc:
+        - https://documentation.ubuntu.com/traefik-k8s-charm/latest/how-to/troubleshoot-gateway-address-unavailable/
+        - https://documentation.ubuntu.com/traefik-k8s-charm/latest/how-to/troubleshoot-reachability/
+    visibility: public
+    highlight: false

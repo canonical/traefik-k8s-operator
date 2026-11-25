@@ -70,6 +70,26 @@ object to strip the model path prefix from the request Traefik forwards on to yo
 For details on the `strip_prefix` parameter and when to use it, see
 {ref}`reference_ingress_libraries`.
 
+### Make your workload reachable behind Traefik
+
+Traefik forwards requests to your workload through its Kubernetes service. For this to work:
+
+- The workload must listen on `0.0.0.0` (not `127.0.0.1`), and its port must be exposed, either
+  with `open-port` or by patching the Kubernetes service (for example with the
+  [`kubernetes_service_patch`](https://github.com/canonical/observability-libs/blob/main/lib/charms/observability_libs/v1/kubernetes_service_patch.py)
+  library).
+- The workload must serve under the path prefix Traefik uses (`/<model_name>-<app_name>`) or the
+  charm must set `strip_prefix=True`:
+
+  ```python
+  self.ingress = IngressPerAppRequirer(self, port=80, strip_prefix=True)
+  ```
+
+- If the workload serves HTTPS, its certificate must have a SAN matching the URL that Traefik
+  uses, and Traefik must trust the CA that signed it. See {ref}`explanation_tls`.
+
+If requests don't reach the workload, see {ref}`how_to_troubleshoot_reachability`.
+
 ### Update the ingress request later on
 
 The `host` and `port` passed to the `IngressPerAppRequirer` constructor are only the *initial*
