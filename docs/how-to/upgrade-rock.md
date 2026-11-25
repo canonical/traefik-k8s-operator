@@ -27,8 +27,8 @@ Traefik charm.
 
 ## Create the version directory
 
-Replace all angle-bracketed placeholders with your release values. Set the
-versions without the `v` prefix:
+Replace angle-bracketed placeholders with your values. Commands use shell
+variables; enter YAML values directly. Set the versions without the `v` prefix:
 
 ```bash
 OLD_VERSION='<previous-version>'
@@ -116,7 +116,7 @@ from this branch.
 
 In the GitHub UI, open **Actions** > `Publish rock to GHCR:dev` >
 **Run workflow**. Leave **Use workflow from** set to `main`, and set the separate
-**Branch to build from** input to the pull request branch, `rock/<new-version>`.
+**Branch to build from** input to the rock pull request branch created above.
 **Use workflow from** selects the workflow definition; **Branch to build from**
 selects the rock sources. Then run the workflow.
 
@@ -126,7 +126,7 @@ The equivalent command is:
 gh workflow run rock-release-dev.yaml --repo canonical/traefik-rock --ref main -f "branch=rock/$NEW_VERSION"
 ```
 
-Run this before merging or closing the rock pull request: the workflow detects
+Run the workflow before merging or closing the rock pull request: it detects
 version directories changed relative to `main` and publishes them to
 `ghcr.io/canonical/traefik:dev`.
 
@@ -156,8 +156,8 @@ git push -u origin "test-traefik-$NEW_VERSION-dev"
 gh pr create --title "[DO NOT MERGE] test traefik-rock $NEW_VERSION" --fill
 ```
 
-Mark the pull request as test-only and **do not merge it**. It leaves the charm
-pointing at the dev image, which is not suitable for a release.
+**Do not merge the test pull request.** The test change points the charm at the
+dev image, which is not suitable for a release.
 
 Wait for the full integration test matrix to pass. See
 [traefik-k8s-operator PR #809](https://github.com/canonical/traefik-k8s-operator/pull/809)
@@ -176,7 +176,8 @@ pull request, rather than a later unrelated commit on `main`:
 ```bash
 git switch main
 git pull
-gh pr view '<rock-pr-number>' --json mergeCommit --jq '.mergeCommit.oid'
+ROCK_PR_NUMBER='<rock-pr-number>'
+gh pr view "$ROCK_PR_NUMBER" --json mergeCommit --jq '.mergeCommit.oid'
 ```
 
 ## Promote through OCI Factory
@@ -236,15 +237,15 @@ git push -u origin "chore/add-traefik-$NEW_VERSION"
 gh pr create --title "chore: Add traefik $NEW_VERSION" --fill
 ```
 
-Check the OCI Factory integration tests and vulnerability scan results. Resolve
+Check the OCI Factory build and vulnerability scan results. Resolve
 failures, or obtain team agreement for temporary exceptions as described
 above, before merging.
 
 ## Finish the charm update
 
 After the OCI Factory pull request merges and the image is published, close the
-temporary charm test pull request without merging it. The next pull request in
-`traefik-k8s-operator` will consume the new image.
+temporary charm test pull request without merging it. Future charm builds use
+the updated image through the existing tag.
 
 ## Related information
 
