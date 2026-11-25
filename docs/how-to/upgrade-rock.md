@@ -52,21 +52,8 @@ cp -r "$OLD_VERSION" "$NEW_VERSION"
 
 ## Update the rock definition
 
-Update the new directory's `rockcraft.yaml` to use your target upstream release:
-
-- Set `version` to the release version without the `v` prefix.
-- Set both `parts.traefik.source-tag` and
-  `parts.traefik-frontend.source-tag` to the upstream Git tag, including its
-  `v` prefix.
-- Set `TRAEFIK_VERSION` in the `traefik` part's `build-environment` to the same
-  upstream Git tag.
-- Check the upstream `go.mod` and web UI build requirements. Update the Go and
-  Node build snap channels if the target release requires different versions.
-
-### Example rock definition
-
-Replace the placeholders in this excerpt with your target release and its
-required build snap versions. Preserve the rest of the copied `rockcraft.yaml`:
+Replace the placeholders below with your target release and the Go/Node
+versions required upstream. Preserve the rest of the copied `rockcraft.yaml`:
 
 ```yaml
 name: traefik
