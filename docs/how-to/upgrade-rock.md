@@ -44,7 +44,7 @@ git switch -c "rock/$NEW_VERSION"
 ```
 
 Copy the previous version directory from the same supported release series into
-`$NEW_VERSION`, which must not already exist. Keep `$OLD_VERSION` unchanged:
+`$NEW_VERSION`. Keep `$OLD_VERSION` unchanged:
 
 ```bash
 cp -r "$OLD_VERSION" "$NEW_VERSION"
@@ -133,10 +133,6 @@ version directories changed relative to `main` and publishes them to
 Wait for the workflow to finish, then confirm that the assemble-and-publish job
 succeeded rather than being skipped. See the
 [example dev publish run](https://github.com/canonical/traefik-rock/actions/runs/44269729342).
-
-The `dev` tag is shared and can be overwritten by another publish run.
-Coordinate with the team so it is not overwritten while the charm integration
-tests are running.
 
 ## Test the dev image with the charm
 
