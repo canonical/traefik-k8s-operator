@@ -74,10 +74,8 @@ For details on the `strip_prefix` parameter and when to use it, see
 
 Traefik forwards requests to your workload through its Kubernetes service. For this to work:
 
-- The workload must listen on `0.0.0.0` (not `127.0.0.1`), and its port must be exposed, either
-  with `open-port` or by patching the Kubernetes service (for example with the
-  [`kubernetes_service_patch`](https://github.com/canonical/observability-libs/blob/main/lib/charms/observability_libs/v1/kubernetes_service_patch.py)
-  library).
+- The workload must listen on `0.0.0.0` (not `127.0.0.1`), and its port must be exposed, for
+  example with `open-port`.
 - The workload must serve under the path prefix Traefik uses (`/<model_name>-<app_name>`) or the
   charm must set `strip_prefix=True`:
 
