@@ -15,11 +15,6 @@ dev image with
 [`canonical/traefik-k8s-operator`](https://github.com/canonical/traefik-k8s-operator),
 and promote it through OCI Factory.
 
-```{note}
-This process will be deprecated once SuperDistro is live and Traefik is
-onboarded there. After onboarding, use the SuperDistro process instead.
-```
-
 ## Repositories and images
 
 - [`canonical/traefik-rock`](https://github.com/canonical/traefik-rock) contains
