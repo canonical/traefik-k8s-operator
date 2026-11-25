@@ -224,11 +224,9 @@ Review these fields:
 If OCI Factory reports vulnerabilities that you cannot fix in this upgrade,
 discuss the severity and impact with the
 [official Traefik rock maintainers](https://github.com/canonical/traefik-rock/blob/main/CODEOWNERS)
-or the Platform Engineering team before adding them to `ignored-vulnerabilities`.
+before adding them to `ignored-vulnerabilities`.
 Request a maintainer review on your pull request or reach out in the
 [public charm-development Matrix room](https://matrix.to/#/#charmhub-charmdev:ubuntu.com).
-Canonical staff can also use the
-[Platform Engineering Mattermost channel](https://chat.canonical.com/canonical/channels/platform-engineering).
 
 Add entries temporarily and include the CVE, package,
 CVSS score, Ubuntu priority, status, and link. See
@@ -245,8 +243,7 @@ gh pr create --title "chore: Add traefik $NEW_VERSION" --fill
 ```
 
 Check the OCI Factory build and vulnerability scan results. Resolve failures,
-or obtain maintainer or Platform Engineering approval for temporary exceptions,
-before merging.
+or obtain maintainer approval for temporary exceptions, before merging.
 
 ## Finish the charm update
 
