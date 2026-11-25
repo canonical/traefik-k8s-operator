@@ -11,7 +11,7 @@ changes:
       a workload reachable now lives in "How to integrate your charm to Traefik".
     urls:
       pr:
-        - ""
+        - https://github.com/canonical/traefik-k8s-operator/pull/816
       related_doc:
         - https://documentation.ubuntu.com/traefik-k8s-charm/latest/how-to/troubleshoot-gateway-address-unavailable/
         - https://documentation.ubuntu.com/traefik-k8s-charm/latest/how-to/troubleshoot-reachability/
