@@ -9,11 +9,7 @@ myst:
 # How to upgrade the Traefik rock
 
 This guide is for maintainers updating the workload image used by the
-Traefik charm. Add the upstream release to
-[`canonical/traefik-rock`](https://github.com/canonical/traefik-rock), test its
-dev image with
-[`canonical/traefik-k8s-operator`](https://github.com/canonical/traefik-k8s-operator),
-and promote it through OCI Factory.
+Traefik charm.
 
 ## Repositories and images
 
