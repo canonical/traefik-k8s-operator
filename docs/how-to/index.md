@@ -32,6 +32,7 @@ This section contains how-to guides for troubleshooting actions during normal op
 Upgrades and community contributions ensure the Traefik charm stays current and benefits from ongoing improvements.
 
 * {ref}`Upgrade <how_to_upgrade>`
+* {ref}`Upgrade the Traefik rock <how_to_upgrade_rock>`
 * {ref}`Contribute <how_to_contribute>`
 
 
@@ -44,5 +45,6 @@ Configure TLS termination using a local CA <tls-termination-using-a-local-ca>
 Troubleshoot "Gateway Address Unavailable" <troubleshoot-gateway-address-unavailable>
 Troubleshoot reachability <troubleshoot-reachability>
 Upgrade <upgrade>
+Upgrade the Traefik rock <upgrade-rock>
 Contribute <contribute>
 ```

@@ -8,6 +8,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 Each revision is versioned by the date of the revision.
 
+## 2026-11-25
+
+- Added a maintainer guide for upgrading the Traefik rock, testing its dev image,
+  and promoting it through OCI Factory.
+
 ## 2026-11-19
 
 - Fetched the LoadBalancer's external address from Kubernetes once per event; the
