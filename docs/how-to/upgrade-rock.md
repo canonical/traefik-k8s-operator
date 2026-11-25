@@ -18,10 +18,12 @@ Traefik charm.
 - `ghcr.io/canonical/traefik:dev` is published from the rock pull request
   branch. Use it only for testing.
 - [`canonical/oci-factory`](https://github.com/canonical/oci-factory) builds and
-  publishes the official image from a commit and directory in `traefik-rock`.
+  publishes the official image to
+  [`ubuntu/traefik` on Docker Hub](https://hub.docker.com/r/ubuntu/traefik)
+  from a commit and directory in `traefik-rock`.
 - [`canonical/traefik-k8s-operator`](https://github.com/canonical/traefik-k8s-operator)
-  uses the official image. A temporary pull request points its `traefik-image`
-  resource at the dev image for integration testing.
+  contains the charm, which uses the official image. A temporary pull request
+  points its `traefik-image` resource at the dev image for integration testing.
 
 ## Create the version directory
 
@@ -41,16 +43,12 @@ cd traefik-rock
 git switch -c "rock/$NEW_VERSION"
 ```
 
-Copy the previous version directory from the same supported release series.
-Choose a new directory name that does not already exist. Do not edit the old
-directory:
+Copy the previous version directory from the same supported release series into
+`$NEW_VERSION`, which must not already exist. Keep `$OLD_VERSION` unchanged:
 
 ```bash
 cp -r "$OLD_VERSION" "$NEW_VERSION"
 ```
-
-The directory name must match the upstream release version without the `v`
-prefix.
 
 ## Update the rock definition
 
@@ -88,10 +86,6 @@ parts:
       - TRAEFIK_VERSION: "v<new-version>"
 ```
 
-If the new upstream release changes configuration files or build steps, copy
-those changes into the new directory as well. Review the upstream release notes
-for the version you are adding.
-
 Compare the new directory with the previous one to confirm the intended
 changes:
 
@@ -123,19 +117,17 @@ from this branch.
 In the GitHub UI, open **Actions** > `Publish rock to GHCR:dev` >
 **Run workflow**. Leave **Use workflow from** set to `main`, and set the separate
 **Branch to build from** input to the pull request branch, `rock/<new-version>`.
-Then run the workflow. Selecting a workflow branch alone does not set the build
-input: leaving **Branch to build from** at its default, `main`, results in no
-changed version directories and skips publishing.
+**Use workflow from** selects the workflow definition; **Branch to build from**
+selects the rock sources. Then run the workflow.
 
-Alternatively, run the workflow from the command line:
+The equivalent command is:
 
 ```bash
 gh workflow run rock-release-dev.yaml --repo canonical/traefik-rock --ref main -f "branch=rock/$NEW_VERSION"
 ```
 
-The workflow compares the selected branch with `main` to find the changed
-version directories. Run it before merging or closing the pull request, while
-the branch still contains the new directory. The workflow publishes
+Run this before merging or closing the rock pull request: the workflow detects
+version directories changed relative to `main` and publishes them to
 `ghcr.io/canonical/traefik:dev`.
 
 Wait for the workflow to finish, then confirm that the assemble-and-publish job
@@ -156,7 +148,12 @@ directory, outside the rock repository:
 gh repo clone canonical/traefik-k8s-operator
 cd traefik-k8s-operator
 git switch -c "test-traefik-$NEW_VERSION-dev"
-yq -i '.resources.traefik-image.upstream-source = "ghcr.io/canonical/traefik:dev"' metadata.yaml
+```
+
+In `metadata.yaml`, change only `resources.traefik-image.upstream-source` to
+`ghcr.io/canonical/traefik:dev`. Commit the edit and open the test pull request:
+
+```bash
 git add metadata.yaml
 git commit -m "test: use traefik dev rock for $NEW_VERSION"
 git push -u origin "test-traefik-$NEW_VERSION-dev"
@@ -198,7 +195,9 @@ git switch -c "chore/add-traefik-$NEW_VERSION"
 ```
 
 Update the existing entry in `oci/traefik/image.yaml` to use the merge commit
-and new version directory. Keep the release track and risk used by the charm:
+and new version directory. Keep the release track and risk used by the charm.
+See [OCI Factory PR #1335](https://github.com/canonical/oci-factory/pull/1335/changes)
+for an example:
 
 ```yaml
 version: 2
@@ -248,8 +247,8 @@ above, before merging.
 ## Finish the charm update
 
 After the OCI Factory pull request merges and the image is published, close the
-temporary charm test pull request without merging it. Follow the normal charm
-release process.
+temporary charm test pull request without merging it. The next pull request in
+`traefik-k8s-operator` will consume the new image.
 
 ## Related information
 
