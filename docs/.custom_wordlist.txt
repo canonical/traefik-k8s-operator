@@ -3,6 +3,7 @@ Alertmanager
 BasicAuth
 bcrypt
 databag
+dev
 docstring
 hardcoded
 middleware
