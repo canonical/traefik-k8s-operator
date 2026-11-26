@@ -106,9 +106,7 @@ root@trfk-0:/# curl --capath /opt/traefik/juju \
 OK
 ```
 
-If the request fails, Traefik doesn't trust the CA. Integrate Traefik with the same certificate
-provider as the workload, or provide the CA to Traefik with the `receive-ca-cert` relation. See
-{ref}`explanation_tls` if you need background on how Traefik handles TLS.
+If the request fails with a certificate verification error, Traefik doesn't trust the CA. DNS, connectivity, or HTTP errors indicate a different problem; inspect the `curl` error and Traefik log before changing the certificate integration. Integrate Traefik with the same certificate provider as the workload, or provide the CA to Traefik with the `receive-ca-cert` relation. See {ref}`explanation_tls` if you need background on how Traefik handles TLS.
 
 (reachability_logs)=
 
