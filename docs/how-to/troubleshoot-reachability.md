@@ -138,9 +138,8 @@ kubectl -n welcome-k8s logs pods/trfk-0 -c traefik -f
 
 ## Getting help
 
-If the problem persists, ask for help on the
-[Discourse forum](https://discourse.charmhub.io/tag/traefik) or the
-[Matrix chat](https://matrix.to/#/#charmhub-charmdev:ubuntu.com), or
-[file an issue](https://github.com/canonical/traefik-k8s-operator/issues). Include the output of
+If the problem persists,
+[file an issue](https://github.com/canonical/traefik-k8s-operator/issues) or ask for help on the
+[Matrix chat](https://matrix.to/#/#charmhub-charmdev:ubuntu.com). Include the output of
 `juju status`, the relevant Traefik logs and the contents of the Traefik configuration file for
 your workload (`/opt/traefik/juju/juju_ingress_*.yaml`).

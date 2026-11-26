@@ -38,9 +38,8 @@ help, see {ref}`gateway_getting_help`.
 
 Traefik manages its own `LoadBalancer` Kubernetes service, which requires elevated
 (cluster-scoped) Kubernetes permissions. If Traefik is deployed without the `--trust` flag (or
-`juju trust` is not run afterwards), the charm cannot create or update this service. Juju's
-`ApiError`/`Forbidden` exception is currently uncaught, so the charm crashes and the unit goes
-into `error` status rather than a clean blocked/waiting status.
+`juju trust` is not run afterwards), the charm cannot create or update this service. The
+Kubernetes API answers with a `403 Forbidden` error, and the unit goes into `blocked` status.
 
 Check with:
 
@@ -48,15 +47,15 @@ Check with:
 juju status
 ```
 
-Confirm that Traefik was deployed without `trust` by checking for an `error` message in
-the Traefik unit and checking if `juju debug-log` shows a `lightkube.core.exceptions.ApiError`
-mentioning `services is forbidden` or `cannot [...] resource "services"`.
+Confirm that Traefik was deployed without `trust` by checking that the Traefik unit is
+`blocked` with the message ``Insufficient permissions, try: `juju trust <traefik> --scope=cluster` ``,
+and that `juju debug-log` shows the error
+`Insufficient permissions to reconcile the LoadBalancer service, is the charm deployed with --trust?`.
 
-Fix it by granting trust and resolving the error:
+Fix it by granting trust. The charm then reconciles the service on the next event:
 
 ```bash
 juju trust <traefik> --scope=cluster
-juju resolve <traefik>/0
 ```
 
 (gateway_metallb_disabled)=
@@ -102,6 +101,9 @@ Depending on what you see:
 (gateway_no_ip_in_pool)=
 
 ## No available IP in the address pool
+
+The number of services requiring a `LoadBalancer` IP address is higher than the number of IP
+addresses allocated to the MetalLB pool.
 
 This frequently happens when:
 
@@ -189,10 +191,9 @@ This command should return a long HTML code block if everything works as expecte
 
 ## Getting help
 
-If the problem persists, ask for help on the
-[Discourse forum](https://discourse.charmhub.io/tag/traefik) or the
-[Matrix chat](https://matrix.to/#/#charmhub-charmdev:ubuntu.com), or
-[file an issue](https://github.com/canonical/traefik-k8s-operator/issues). Include the output of:
+If the problem persists,
+[file an issue](https://github.com/canonical/traefik-k8s-operator/issues) or ask for help on the
+[Matrix chat](https://matrix.to/#/#charmhub-charmdev:ubuntu.com). Include the output of:
 
 ```bash
 juju status
